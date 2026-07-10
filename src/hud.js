@@ -9,6 +9,7 @@ export class HUD {
     this.els = {
       location: document.getElementById('hud-location'),
       road: document.getElementById('hud-road'),
+      sky: document.getElementById('hud-sky'),
       speed: document.getElementById('hud-speed'),
       mode: document.getElementById('hud-mode'),
       cities: document.getElementById('score-cities'),
@@ -115,8 +116,9 @@ export class HUD {
     this.els.interact.style.display = 'block';
   }
 
-  update(player, counts, road, water, clock, weatherIcon, stats) {
+  update(player, counts, road, water, clock, weatherIcon, stats, skyLine) {
     this.lastDist = stats?.dist ?? this.lastDist;
+    this.els.sky.textContent = skyLine || '';
     // location line: nearest city + real distance
     const { city, dist } = nearestCity(player.pos.x, player.pos.z);
     const km = (dist * 0.1).toFixed(dist < 100 ? 1 : 0);

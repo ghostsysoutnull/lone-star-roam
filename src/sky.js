@@ -225,7 +225,7 @@ export class SkySystem {
       const sp = disc(`#${color.toString(16).padStart(6, '0')}`, size, 0.35);
       const label = mkTextSprite(name, 90);
       scene.add(label);
-      this.planets.push({ sp, label, elong });
+      this.planets.push({ name, sp, label, elong });
     }
   }
 
@@ -307,11 +307,14 @@ export class SkySystem {
     const mDir = new THREE.Vector3(-Math.cos(moonAng), Math.sin(moonAng) * 0.85 + 0.12, 0.35).normalize();
     this.moon.position.set(px + mDir.x * 8200, mDir.y * 8200, pz + mDir.z * 8200);
     this.moon.visible = mDir.y > 0.02;
+    this.moonDir = mDir;
+    this.skyVis = skyVis;
 
     // planets: fixed elongation from the sun along its path (real positions for today)
     for (const p of this.planets) {
       const a2 = ang + p.elong;
       const dir = new THREE.Vector3(-Math.cos(a2), Math.sin(a2) * 0.85 + 0.08, 0.35).normalize();
+      p.dir = dir;
       p.sp.position.set(px + dir.x * 8300, dir.y * 8300, pz + dir.z * 8300);
       p.label.position.set(px + dir.x * 8300, dir.y * 8300 - 300, pz + dir.z * 8300);
       const vis = dir.y > 0.03 ? skyVis : 0;
@@ -384,5 +387,43 @@ export class SkySystem {
   weatherIcon() {
     if (ATMOS.night > 0.6 && this.target === 'clear') return '🌙';
     return WEATHER[this.target].icon;
+  }
+
+  // What's up there right now: moon + phase, visible planets, the constellation you're facing
+  skyReport(heading) {
+    if (!this.celestial) return '';
+    const compass = (v) => {
+      const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      const az = Math.atan2(v.x, -v.z);
+      return dirs[Math.round(((az + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8];
+    };
+    const parts = [];
+
+    if (this.moon.visible && ATMOS.night > 0.15) {
+      const f = (this.days % 8) / 8; // 0 = full (opposite sun)
+      const names = ['Full Moon', 'Waning Gibbous', 'Last Quarter', 'Waning Crescent', 'New Moon', 'Waxing Crescent', 'First Quarter', 'Waxing Gibbous'];
+      const name = names[Math.round(f * 8) % 8];
+      if (name !== 'New Moon') parts.push(`🌙 ${name} ${compass(this.moonDir)}`);
+    }
+
+    const SYMBOLS = { Mercury: '☿', Venus: '♀', Mars: '♂', Jupiter: '♃', Saturn: '♄' };
+    for (const p of this.planets) {
+      if (p.sp.material.opacity > 0.25 && p.dir) parts.push(`${SYMBOLS[p.name] ?? '·'} ${p.name} ${compass(p.dir)}`);
+    }
+
+    // constellation nearest to straight ahead (within ~30° of heading, above ~15° elevation)
+    if (this.skyVis > 0.3 && GEO.sky) {
+      const fx = -Math.sin(heading), fz = -Math.cos(heading);
+      let best = null, bestElev = 0.25;
+      for (const { n, v } of GEO.sky.labels) {
+        const w = new THREE.Vector3(v[0], v[1], v[2]).applyQuaternion(this.celestial.quaternion);
+        if (w.y < bestElev) continue;
+        const L = Math.hypot(w.x, w.z) || 1;
+        if ((w.x / L) * fx + (w.z / L) * fz > 0.87) { bestElev = w.y; best = n; }
+      }
+      if (best) parts.push(`✨ ${best}`);
+    }
+
+    return parts.slice(0, 4).join('  ·  ');
   }
 }
