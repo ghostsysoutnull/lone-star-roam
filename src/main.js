@@ -50,6 +50,7 @@ async function boot() {
   const audio = new AudioSystem();
   sky.onBolt = () => audio.thunder();
   gameplay.onCollect = (kind) => audio.chime(kind);
+  player.onStep = () => audio.step();
 
   // Spawn on I-35 just south of Austin
   const austin = GEO.cities.find((c) => c.name === 'Austin');

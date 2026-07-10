@@ -23,7 +23,17 @@ export class AudioSystem {
     this.engineFilter = ctx.createBiquadFilter();
     this.engineFilter.type = 'lowpass';
     this.engineFilter.frequency.value = 320;
-    this.engineFilter.connect(this.engineGain);
+    // prop AM stage: an LFO chops the engine tone at blade frequency in FLY mode
+    this.propMod = ctx.createGain();
+    this.propMod.gain.value = 1;
+    this.engineFilter.connect(this.propMod).connect(this.engineGain);
+    this.propLfo = ctx.createOscillator();
+    this.propLfo.type = 'sine';
+    this.propLfo.frequency.value = 18;
+    this.propDepth = ctx.createGain();
+    this.propDepth.gain.value = 0; // 0 in drive; ~0.45 in fly
+    this.propLfo.connect(this.propDepth).connect(this.propMod.gain);
+    this.propLfo.start();
     this.engOsc = ctx.createOscillator();
     this.engOsc.type = 'sawtooth';
     this.engOsc.frequency.value = 50;
@@ -89,15 +99,21 @@ export class AudioSystem {
     const set = (param, v, tc = 0.08) => param.setTargetAtTime(v, t, tc);
 
     if (player.mode === 'DRIVE') {
+      if (this.engOsc.type !== 'sawtooth') this.engOsc.type = 'sawtooth';
+      set(this.propDepth.gain, 0, 0.15); // no prop chop in the truck
       set(this.engOsc.frequency, 42 + spd * 2.3);
       set(this.engSub.frequency, 21 + spd * 1.15);
       set(this.engineFilter.frequency, 260 + spd * 10);
       set(this.engineGain.gain, spd > 0.5 ? 0.05 + (spd / 46) * 0.075 : 0.03);
     } else if (player.mode === 'FLY') {
-      set(this.engOsc.frequency, 78 + spd * 0.9); // prop drone
-      set(this.engSub.frequency, 39 + spd * 0.45);
-      set(this.engineFilter.frequency, 420 + spd * 4);
-      set(this.engineGain.gain, 0.055 + (spd / 150) * 0.05);
+      // prop plane: rounder tone chopped by blade-frequency AM ("putt-putt")
+      if (this.engOsc.type !== 'triangle') this.engOsc.type = 'triangle';
+      set(this.propDepth.gain, 0.45, 0.15);
+      set(this.propLfo.frequency, 13 + spd * 0.14); // blades speed up with throttle
+      set(this.engOsc.frequency, 95 + spd * 0.5);
+      set(this.engSub.frequency, 47 + spd * 0.25);
+      set(this.engineFilter.frequency, 500 + spd * 3);
+      set(this.engineGain.gain, 0.07 + (spd / 150) * 0.05);
     } else {
       set(this.engineGain.gain, 0);
     }
@@ -133,6 +149,17 @@ export class AudioSystem {
       dialog: [[660, 0, 0.1, 0.06]],
     };
     for (const [f, w, d, g] of SONGS[kind] || []) this.note(f, w, d, g ?? 0.1, 'triangle');
+  }
+
+  // footstep: soft thump + spur jingle every other stride
+  step() {
+    if (!this.ctx || this.muted) return;
+    this.note(75, 0, 0.07, 0.09, 'sine');
+    this.stepAlt = !this.stepAlt;
+    if (this.stepAlt) {
+      this.note(5400, 0.015, 0.05, 0.018, 'square');
+      this.note(6700, 0.03, 0.04, 0.012, 'square');
+    }
   }
 
   thunder() {
