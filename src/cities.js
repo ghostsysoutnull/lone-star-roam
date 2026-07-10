@@ -14,9 +14,10 @@ export class CitySystem {
   constructor(scene) {
     this.scene = scene;
     this.live = new Map(); // name -> group
+    const { dayTex, nightTex } = mkFacadeTextures();
     this.buildingMat = new THREE.MeshLambertMaterial({
-      color: 0xffffff, flatShading: true,
-      emissive: 0xffffff, emissiveMap: mkWindowTexture(), emissiveIntensity: 0,
+      color: 0xffffff, flatShading: true, map: dayTex,
+      emissive: 0xffffff, emissiveMap: nightTex, emissiveIntensity: 0,
     });
     this.boxGeo = new THREE.BoxGeometry(1, 1, 1);
     this.boxGeo.translate(0, 0.5, 0); // scale from ground up
@@ -118,26 +119,39 @@ export class CitySystem {
   }
 }
 
-// Window grid texture used as emissiveMap: warm lit windows of varying brightness,
-// ~35% dark. Row 0 (v < 1/16) is kept black — roofs remap their UVs there.
-function mkWindowTexture() {
-  const c = document.createElement('canvas');
-  c.width = 64; c.height = 128;
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, 64, 128);
+// One window pattern painted into two textures: a diffuse facade (light walls,
+// cool glass — visible by day, tinted by instance color) and an emissive map
+// (black walls, warm lit subset — visible by night). Canvas row 0 is reserved
+// for roofs: plain wall in the day map, black in the night map.
+function mkFacadeTextures() {
+  const mk = () => {
+    const c = document.createElement('canvas');
+    c.width = 64; c.height = 128;
+    return [c, c.getContext('2d')];
+  };
+  const [dayC, day] = mk(), [nightC, night] = mk();
+  day.fillStyle = '#e8e6e0'; day.fillRect(0, 0, 64, 128);   // wall (takes instance tint)
+  night.fillStyle = '#000'; night.fillRect(0, 0, 64, 128);
   const cols = 8, rows = 16;
-  for (let y = 1; y < rows; y++) { // row 0 stays black for roofs
+  for (let y = 1; y < rows; y++) { // row 0 stays plain for roofs
     for (let x = 0; x < cols; x++) {
-      if (Math.random() < 0.35) continue; // dark window
+      const lit = Math.random() > 0.35;
+      // day: every window is dark glass
+      day.fillStyle = `rgb(${100 + Math.random() * 25},${115 + Math.random() * 25},${135 + Math.random() * 25})`;
+      day.fillRect(x * 8 + 2, y * 8 + 2, 4, 4);
+      if (!lit) continue;
+      // night: the lit subset glows warm
       const warm = 0.55 + Math.random() * 0.45;
-      ctx.fillStyle = `rgb(${Math.round(255 * warm)},${Math.round(205 * warm)},${Math.round(120 * warm)})`;
-      ctx.fillRect(x * 8 + 2, y * 8 + 2, 4, 4);
+      night.fillStyle = `rgb(${Math.round(255 * warm)},${Math.round(205 * warm)},${Math.round(120 * warm)})`;
+      night.fillRect(x * 8 + 2, y * 8 + 2, 4, 4);
     }
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.magFilter = THREE.NearestFilter;
-  return tex;
+  const tex = (c) => {
+    const t = new THREE.CanvasTexture(c);
+    t.magFilter = THREE.NearestFilter;
+    return t;
+  };
+  return { dayTex: tex(dayC), nightTex: tex(nightC) };
 }
 
 // BoxGeometry face order: +x -x +y -y +z -z, 4 verts each. Point the top/bottom

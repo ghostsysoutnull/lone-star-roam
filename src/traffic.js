@@ -157,11 +157,13 @@ export class TrafficSystem {
     this.candTimer = 0;
   }
 
-  // lamps on after dark; a whisper of body glow so shapes don't vanish entirely
+  // lamps on after dark. Body paint: boost the material color multiplier above 1
+  // at night so the dim moonlight still reveals each instance's color (uniform
+  // emissive can't do this — it ignores instance colors and goes flat beige).
   setNight(f) {
     const on = f > 0.45;
     for (const lm of Object.values(this.lampMeshes)) lm.visible = on;
-    this.mat.emissive.setScalar(0.05 * f);
+    this.mat.color.setScalar(1 + f * 2.4);
   }
 
   // refresh candidate polylines around the player (cheap, but not every frame)
