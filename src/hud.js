@@ -161,6 +161,16 @@ export class HUD {
       ctx.arc(x, 12, 6, 0, Math.PI * 2);
       ctx.fill();
     }
+    // mission target diamond (same bearing math as the city pip; clamps at the ends)
+    if (this.mission?.target) {
+      const [mx, mz] = this.mission.target;
+      const tDeg = ((Math.atan2(mx - player.pos.x, -(mz - player.pos.z)) * 180) / Math.PI % 360 + 360) % 360;
+      let rel = tDeg - deg;
+      if (rel > 180) rel -= 360;
+      if (rel < -180) rel += 360;
+      const x = Math.max(14, Math.min(W - 14, W / 2 + rel * PX_PER_DEG));
+      this.diamond(ctx, x, 13, 8);
+    }
     // center caret + degree readout
     ctx.fillStyle = '#ffd35c';
     ctx.beginPath();

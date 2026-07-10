@@ -97,7 +97,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   the payout; fast travel is locked while cargo is aboard. Bankroll is pure
   score for now (HUD + help stats), saved under new keys (`bank`, `jobsDone`,
   `job`) — rose RNG untouched. Rain now slows the player 22% like it slows
-  traffic. Deadline/pay knobs live at the top of `genOffers()` in
+  traffic. Guidance: target diamond on the compass tape + a floating 3D guide
+  arrow over the player (G toggles, preference persisted); both turn red when
+  late. Deadline/pay knobs live at the top of `genOffers()` in
   `src/missions.js`. Next: truck upgrades to spend the bankroll on, real
   highway routing for route lines + road-distance pay.
 - [x] ~~County system~~ — done 2026-07-10: all 254 real county boundaries (Census

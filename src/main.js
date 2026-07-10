@@ -52,7 +52,7 @@ async function boot() {
   gameplay.onToast = (m) => hud.toast(m);
   const audio = new AudioSystem();
   const npcs = new NPCSystem(scene, () => ({ night: ATMOS.night, weather: ATMOS.weather, counts: gameplay.counts() }));
-  const missions = new MissionSystem(gameplay, player, (m) => hud.toast(m), (k) => audio.chime(k));
+  const missions = new MissionSystem(scene, gameplay, player, (m) => hud.toast(m), (k) => audio.chime(k));
   const travel = new TravelMenu(player, gameplay, sky, npcs, missions, (m) => hud.toast(m));
   const trains = new TrainSystem(scene);
   const maritime = new MaritimeSystem(scene);
@@ -79,6 +79,7 @@ async function boot() {
     if (e.code === 'KeyH') hud.toggleHelp(gameplay.save.stats, gameplay.save.ufo, gameplay.save.bank, gameplay.save.jobsDone);
     if (e.code === 'KeyZ') hud.cycleZoom();
     if (e.code === 'KeyC') hud.toggleCompass();
+    if (e.code === 'KeyG') hud.toast(missions.toggleArrow() ? '🧭 Guide arrow on' : '🧭 Guide arrow off');
     if (e.code === 'KeyP') travel.toggle();
     if (e.code === 'Escape') travel.close();
     if (e.code === 'KeyN') hud.toast(audio.toggleMute() ? '🔇 Muted' : '🔊 Sound on');

@@ -25,7 +25,8 @@ Everything through 2026-07-10 is shipped, including **missions**: a 💼 Jobs ta
 in the travel menu (P) offers delivery hauls between real cities — load at the
 origin (crates ride in the truck bed), beat a distance-scaled deadline, earn a
 bankroll. ×1.5 road bonus for never flying, half pay when late, fast travel
-locked mid-haul, 🔥 rush jobs, rain slows the player 22%.
+locked mid-haul, 🔥 rush jobs, rain slows the player 22%. Guidance: compass-tape
+diamond + G-toggled 3D guide arrow (both red when late).
 
 Today's candidates (my pick order):
 
@@ -35,8 +36,10 @@ Today's candidates (my pick order):
 2. **Truck upgrades** — something to spend the mission bankroll on: top speed /
    acceleration / better headlights tiers, bought from the Jobs tab. Save under
    new keys; apply as multipliers in the DRIVE branch of `vehicle.js`.
-3. **Big-map click-to-set-waypoint** — click on M-map → gold marker + compass pip
-   (the missions diamond in `hud.js` already does the marker pattern; generalize it).
+3. **Big-map click-to-set-waypoint** — click on M-map → target marker. The whole
+   rendering stack already exists for missions (map diamond + compass-tape diamond
+   in `hud.js` via `hud.mission`, 3D guide arrow in `missions.js`); generalize
+   "current target" so a map click feeds the same pipeline.
 
 If those finish early: real highway A* routing (route lines on the map,
 road-distance mission pay), or mission variety (multi-stop hauls, fragile-cargo

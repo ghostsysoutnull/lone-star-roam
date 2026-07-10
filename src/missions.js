@@ -3,6 +3,8 @@
 // Cargo rides visibly in the truck bed; staying out of the air the whole haul
 // pays a x1.5 road bonus, blowing the deadline halves the payout. Bankroll and
 // the active job live in the save (new keys only — rose RNG untouched).
+// Guidance: a diamond on the compass tape (hud.js) + a floating 3D arrow (G toggles).
+import * as THREE from 'three';
 import { GEO } from './geo.js';
 import { cityRadius } from './cities.js';
 
@@ -29,16 +31,35 @@ const CARGO = [
 const fmt = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 
 export class MissionSystem {
-  constructor(gameplay, player, onToast, onChime) {
+  constructor(scene, gameplay, player, onToast, onChime) {
     this.gp = gameplay;
     this.save = gameplay.save;
     this.player = player;
     this.onToast = onToast;
     this.onChime = onChime;
     this.checkT = 0;
+    this.t = 0;
     this.offers = this.genOffers();
     // restore a mid-haul crate after reload
     this.crate(this.job?.phase === 'haul');
+
+    // floating guide arrow over the player, pointing at the current target
+    this.arrowOn = localStorage.getItem('lonestar-arrow') !== 'off';
+    this.arrowMat = new THREE.MeshLambertMaterial({ color: 0xffd35c, emissive: 0xbb8a1a, emissiveIntensity: 0.7, flatShading: true });
+    this.arrow = new THREE.Group();
+    this.arrow.add(
+      new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.6, 8).rotateX(-Math.PI / 2), this.arrowMat),
+      new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 1.0, 6).rotateX(Math.PI / 2).translate(0, 0, 1.2), this.arrowMat)
+    );
+    this.arrow.visible = false;
+    scene.add(this.arrow);
+  }
+
+  toggleArrow() {
+    this.arrowOn = !this.arrowOn;
+    localStorage.setItem('lonestar-arrow', this.arrowOn ? 'on' : 'off');
+    if (!this.arrowOn) this.arrow.visible = false;
+    return this.arrowOn;
   }
 
   get job() { return this.save.job; }
@@ -93,6 +114,7 @@ export class MissionSystem {
     const j = this.job;
     this.save.job = null;
     this.crate(false);
+    this.arrow.visible = false;
     this.gp.persist();
     this.offers = this.genOffers();
     this.onToast?.(`📦 ${j.cargo} job abandoned`);
@@ -100,7 +122,9 @@ export class MissionSystem {
 
   update(dt, pos, mode, agl) {
     const j = this.job;
-    if (!j) return;
+    if (!j) { this.arrow.visible = false; return; }
+    const tgt = this.city(j.phase === 'pickup' ? j.from : j.to);
+    if (!tgt) { this.save.job = null; this.arrow.visible = false; return; } // stale save from a renamed city
     if (j.phase === 'haul') {
       if (mode === 'FLY' && !j.flew) {
         j.flew = true;
@@ -110,13 +134,19 @@ export class MissionSystem {
       j.left -= dt;
       if (!wasLate && j.left <= 0) this.onToast?.('⏱ Deadline blown — delivery pays half now');
     }
+    // guide arrow: hover over the player, yaw toward the target, bob gently
+    this.t += dt;
+    this.arrow.visible = this.arrowOn;
+    if (this.arrowOn) {
+      this.arrow.position.set(pos.x, pos.y + (mode === 'WALK' ? 3.2 : 4.6) + Math.sin(this.t * 2.2) * 0.25, pos.z);
+      this.arrow.rotation.y = Math.atan2(-(tgt.x - pos.x), -(tgt.z - pos.z)); // heading convention: -z fwd
+      this.arrowMat.color.setHex(j.phase === 'haul' && j.left <= 0 ? 0xff7a66 : 0xffd35c);
+    }
     // arrival checks a few times a second are plenty
     this.checkT += dt;
     if (this.checkT < 0.25) return;
     this.checkT = 0;
     if (agl > 12) return; // must be on (or near) the ground, same as city visits
-    const tgt = this.city(j.phase === 'pickup' ? j.from : j.to);
-    if (!tgt) { this.save.job = null; return; } // stale save from a renamed city
     const d = Math.hypot(tgt.x - pos.x, tgt.z - pos.z);
     if (d < Math.max(6, cityRadius(tgt.pop) * 0.5)) {
       if (j.phase === 'pickup') this.load(j);
@@ -142,6 +172,7 @@ export class MissionSystem {
     this.save.jobsDone += 1;
     this.save.job = null;
     this.crate(false);
+    this.arrow.visible = false;
     this.gp.persist();
     this.offers = this.genOffers();
     const notes = [bonus && '×1.5 road bonus', late && 'late — half pay'].filter(Boolean).join(', ');
