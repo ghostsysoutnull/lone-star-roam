@@ -79,6 +79,19 @@ export class AudioSystem {
     cricket.connect(pulse).connect(this.cricketGain);
     cricket.start(); lfo.start();
 
+    // --- theremin: eerie wavering tone, fades in near a UFO ---
+    this.ufoGain = chan();
+    const ufoOsc = ctx.createOscillator();
+    ufoOsc.type = 'sine';
+    ufoOsc.frequency.value = 620;
+    const vib = ctx.createOscillator();
+    vib.frequency.value = 5.5;
+    const vibAmt = ctx.createGain();
+    vibAmt.gain.value = 40;
+    vib.connect(vibAmt).connect(ufoOsc.frequency);
+    ufoOsc.connect(this.ufoGain);
+    ufoOsc.start(); vib.start();
+
     this.sfx = ctx.createGain();
     this.sfx.gain.value = 1;
     this.sfx.connect(this.master);
@@ -98,13 +111,18 @@ export class AudioSystem {
     const spd = Math.abs(player.speed);
     const set = (param, v, tc = 0.08) => param.setTargetAtTime(v, t, tc);
 
+    // near a UFO: engine sputters (the Levelland effect) and the theremin swells
+    const ufo = atmos.ufo || 0;
+    set(this.ufoGain.gain, ufo * 0.045, 0.3);
+    const sputter = ufo > 0 && Math.random() < ufo * 0.4 ? 0.12 : 1;
+
     if (player.mode === 'DRIVE') {
       if (this.engOsc.type !== 'sawtooth') this.engOsc.type = 'sawtooth';
       set(this.propDepth.gain, 0, 0.15); // no prop chop in the truck
       set(this.engOsc.frequency, 42 + spd * 2.3);
       set(this.engSub.frequency, 21 + spd * 1.15);
       set(this.engineFilter.frequency, 260 + spd * 10);
-      set(this.engineGain.gain, spd > 0.5 ? 0.05 + (spd / 46) * 0.075 : 0.03);
+      set(this.engineGain.gain, (spd > 0.5 ? 0.05 + (spd / 46) * 0.075 : 0.03) * sputter, 0.03);
     } else if (player.mode === 'FLY') {
       // prop plane: rounder tone chopped by blade-frequency AM ("putt-putt")
       if (this.engOsc.type !== 'triangle') this.engOsc.type = 'triangle';

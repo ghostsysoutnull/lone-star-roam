@@ -9,7 +9,7 @@ export const DAY_SECONDS = 720; // 12 min per full day
 const FF_SPEED = 80;            // hold T
 
 // mutable atmosphere state read by world.js (windmills), traffic, cities, gameplay
-export const ATMOS = { wind: 1, night: 0, weather: 'clear', rain: 0 };
+export const ATMOS = { wind: 1, night: 0, weather: 'clear', rain: 0, ufo: 0 };
 
 // time-of-day keyframes (t: 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset)
 const KEYS = [

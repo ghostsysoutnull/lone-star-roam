@@ -13,6 +13,7 @@ import { AudioSystem } from './audio.js';
 import { NPCSystem } from './npcs.js';
 import { TrainSystem } from './trains.js';
 import { MaritimeSystem } from './maritime.js';
+import { UFOSystem } from './ufo.js';
 import { HUD } from './hud.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
@@ -54,6 +55,7 @@ async function boot() {
   const trains = new TrainSystem(scene);
   const maritime = new MaritimeSystem(scene);
   trains.onHorn = () => audio.trainHorn();
+  const ufo = new UFOSystem(scene, () => gameplay.ufoSighting());
   npcs.onDialog = (d) => hud.dialog(d);
   npcs.onTalk = () => audio.chime('dialog');
   sky.onBolt = () => audio.thunder();
@@ -70,7 +72,7 @@ async function boot() {
   addEventListener('keydown', (e) => {
     if (e.code === 'KeyV') player.cycleMode();
     if (e.code === 'KeyM') hud.toggleBigMap();
-    if (e.code === 'KeyH') hud.toggleHelp(gameplay.save.stats);
+    if (e.code === 'KeyH') hud.toggleHelp(gameplay.save.stats, gameplay.save.ufo);
     if (e.code === 'KeyZ') hud.cycleZoom();
     if (e.code === 'KeyP') travel.toggle();
     if (e.code === 'Escape') travel.close();
@@ -87,7 +89,7 @@ async function boot() {
 
   document.getElementById('loading').style.display = 'none';
   hud.toast('🤠 Welcome to Texas! Press H for controls.');
-  window.__game = { player, gameplay, GEO, animals, sky, npcs, trains }; // debug/testing hook
+  window.__game = { player, gameplay, GEO, animals, sky, npcs, trains, ufo }; // debug/testing hook
 
   const clock = new THREE.Clock();
   let hudTick = 0;
@@ -102,6 +104,8 @@ async function boot() {
     traffic.setNight(ATMOS.night);
     trains.update(dt, player.pos.x, player.pos.z);
     maritime.update(dt, clock.elapsedTime);
+    ufo.update(dt, player.pos.x, player.pos.z, player.pos.y);
+    ATMOS.ufo = ufo.near;
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed);

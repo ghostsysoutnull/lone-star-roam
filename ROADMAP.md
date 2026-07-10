@@ -51,6 +51,13 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   cranes/stacks at 5 real port sites; cargo ships and tankers on a coastal
   lane, shrimp boats off Padre, 7 offshore oil platforms with flares.
 
+- [x] ~~UFO events~~ — done 2026-07-10: rare deep-night sightings, 3× more likely
+  near the real Texas cases (Levelland '57, Lubbock Lights '51, Stephenville '08,
+  Marfa, Aurora 1897). Light formations + a hovering saucer with rim lights and
+  ground beam that darts away when approached; engine sputter + headlight flicker
+  nearby (the Levelland effect); theremin proximity tone; secret 👽 counter on
+  the help screen; townsfolk rumor lines.
+
 ### Larger bets
 - [x] ~~Terrain elevation~~ — done 2026-07-10: real AWS Terrarium DEM baked to a
   420×400 grid (328 KB, city-pad flattening + outside-Texas mask baked in),

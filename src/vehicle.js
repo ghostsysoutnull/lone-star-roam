@@ -215,7 +215,7 @@ export class Player {
     const u = this.truck.userData;
 
     // headlights & brake lights
-    u.headlights.visible = night && this.mode !== 'WALK';
+    u.headlights.visible = night && this.mode !== 'WALK' && !(ATMOS.ufo > 0 && Math.random() < ATMOS.ufo * 0.35);
     for (const b of u.brakes) b.material.color.setHex(this.braking ? 0xff3322 : 0x441111);
 
     if (this.mode === 'DRIVE') {

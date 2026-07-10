@@ -66,6 +66,8 @@ const TOWNSFOLK_LINES = [
   'Howdy!', 'Fine day, ain’t it?', 'Y’all come back now.', 'New in town?', 'Good roads out there today.',
   'Best pie in the county, right up the street.', 'Seen any deer on the way in?', 'Don’t miss the high school game Friday.',
   'That your truck? Nice one.', 'Sure could use some rain.', 'Hot enough for ya?', 'Tell ’em Marge sent you.',
+  'You ever seen them lights out by Levelland? Me neither. Officially.',
+  'My cousin swears the sky stalled his truck once, out west. He don’t drive at night no more.',
 ];
 const TOWNSFOLK_NAMES = ['Earl', 'Ruby', 'Cole', 'June', 'Wade', 'Dolly', 'Buck', 'Lupe', 'Roy', 'Faye', 'Cash', 'Ida', 'Slim', 'Pearl'];
 

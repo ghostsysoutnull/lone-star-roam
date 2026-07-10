@@ -95,12 +95,13 @@ export class HUD {
 
   toggleBigMap() { this.big.style.display = this.big.style.display === 'block' ? 'none' : 'block'; }
 
-  toggleHelp(stats) {
+  toggleHelp(stats, ufoCount = 0) {
     const open = this.els.help.style.display !== 'block';
     if (open && stats) {
       const h = Math.floor(stats.time / 3600), m = Math.floor((stats.time % 3600) / 60);
       document.getElementById('help-stats').textContent =
-        `🚗 ${Math.round(stats.dist).toLocaleString()} km traveled · ⏱ ${h ? h + ' h ' : ''}${m} min · 🏁 top ${stats.top} mph`;
+        `🚗 ${Math.round(stats.dist).toLocaleString()} km traveled · ⏱ ${h ? h + ' h ' : ''}${m} min · 🏁 top ${stats.top} mph` +
+        (ufoCount > 0 ? ` · 👽 ${ufoCount}` : '');
     }
     this.els.help.style.display = open ? 'block' : 'none';
   }

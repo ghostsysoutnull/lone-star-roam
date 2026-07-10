@@ -39,6 +39,7 @@ export class Gameplay {
     this.save.species ??= []; // added later — default for older saves
     this.save.stats ??= { dist: 0, time: 0, top: 0 }; // km real, seconds, mph
     this.save.counties ??= [];
+    this.save.ufo ??= 0;
     this.saveTimer = 0;
     this.countyNow = null;
     this.countyToastT = 0;
@@ -70,6 +71,13 @@ export class Gameplay {
     this.countyToastT = 6;
     this.onToast?.(`🗺 ${name} County (${this.save.counties.length}/254)`);
     this.onCollect?.('county');
+  }
+
+  ufoSighting() {
+    this.save.ufo++;
+    this.persist();
+    this.onToast?.(this.save.ufo === 1 ? '\u{1F47D} You saw something out there\u2026' : `\u{1F47D} Another sighting\u2026 (${this.save.ufo})`);
+    this.onCollect?.('species');
   }
 
   spotSpecies(key, label, total) {
