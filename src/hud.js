@@ -128,10 +128,11 @@ export class HUD {
     const PX_PER_DEG = W / 120; // 120° field of view on the tape
     const label = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
     ctx.textAlign = 'center';
-    for (let t = -60; t <= 60; t += 5) {
-      const d = ((deg + t) % 360 + 360) % 360;
-      if (d % 15 !== 0) continue;
-      const x = W / 2 + t * PX_PER_DEG;
+    // walk absolute 15° tick marks inside the visible window (not offsets from the
+    // heading — those only align with the grid when the heading itself is a multiple)
+    for (let td = Math.ceil((deg - 60) / 15) * 15; td <= deg + 60; td += 15) {
+      const d = ((td % 360) + 360) % 360;
+      const x = W / 2 + (td - deg) * PX_PER_DEG;
       const cardinal = label[d];
       ctx.strokeStyle = 'rgba(255,255,255,0.5)';
       ctx.lineWidth = cardinal ? 3 : 1.5;
