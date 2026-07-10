@@ -1,5 +1,7 @@
 # 🤠 Lone Star Roam
 
+**▶ Play it: https://ghostsysoutnull.github.io/lone-star-roam/**
+
 A single-page free-roam game set in a scaled-down but **geographically real Texas** —
 built from actual OpenStreetMap highway geometry and the real state border.
 
