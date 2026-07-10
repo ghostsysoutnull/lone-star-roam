@@ -5,9 +5,10 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 
 ## Known limitations (v1)
 
-- **Procedural downtowns outside the big four metros** — Houston/DFW/SA/Austin have
-  real OSM arterials (fake grids removed there); all other cities keep seeded-procedural
-  grids. Buildings everywhere are procedural. Full street-level precision statewide
+- **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin
+  plus El Paso, Corpus, Lubbock, Amarillo, and McAllen/RGV have real OSM arterials
+  (fake grids removed there); all other cities keep seeded-procedural grids.
+  Buildings everywhere are procedural. Full street-level precision statewide
   would be gigabytes of data.
 - **Terrain resolution ~3 km/cell** — hills roll and ranges rise, but canyon
   walls (Palo Duro) read as steep slopes, not cliffs; a finer local grid or LOD
@@ -74,8 +75,12 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   (El Paso 1130 m, Palo Duro floor 919 m vs rim).
 - [x] ~~Real arterial roads in major metros~~ — done 2026-07-10: `primary` statewide
   + `secondary` in the four big metro bboxes; four road tiers with per-tier speed caps.
-- [ ] **Real arterials in mid-size cities** — extend the metro `secondary` fetch to
-  El Paso, Corpus, Lubbock, Amarillo, McAllen bboxes (same pipeline).
+- [x] ~~Real arterials in mid-size cities~~ — done 2026-07-10: `secondary` fetched
+  for El Paso, Corpus, Lubbock, Amarillo, McAllen/RGV bboxes (+ Edinburg/Pharr for
+  free) via `tools/add-metro-streets.mjs`, which appends to `data/highways.json`
+  without rebuilding the statewide tiers (rose indices untouched). +1,157 polylines,
+  +75 KB. Mission stays procedural — its nearest OSM secondary is outside its whole
+  building disc, so the fake grid is the better render there.
 - [ ] **Missions/delivery gameplay** — "haul BBQ from Lockhart to Amarillo"-style
   jobs using the real highway routing.
 - [x] ~~County system~~ — done 2026-07-10: all 254 real county boundaries (Census

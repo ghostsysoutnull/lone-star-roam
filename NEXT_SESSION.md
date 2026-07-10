@@ -32,7 +32,8 @@ Today I want to work on: **[PICK ONE]**
 3. **Tuning pass from my play notes** — [list your gripes: steering feel, camera
    distances, audio mix levels, collectible density, etc.]
 4. **Polish backlog** — big-map click-to-teleport/waypoint, mobile touch controls,
-   real arterials for mid-size cities (El Paso, Corpus, Lubbock…).
+   more real-arterial cities (Waco, Laredo, Midland/Odessa — reuse
+   `tools/add-metro-streets.mjs`).
 
 ---
 
