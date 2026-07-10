@@ -41,6 +41,24 @@ function buildGround(scene) {
   ground.position.y = 0;
   scene.add(ground);
 
+  // County lines — faint ground lines you cross on the highway
+  if (GEO.counties?.length) {
+    const pos = [];
+    for (const c of GEO.counties) {
+      for (const ring of c.rings) {
+        for (let i = 0; i < ring.length; i++) {
+          const a = ring[i], b = ring[(i + 1) % ring.length];
+          pos.push(a[0], 0.14, a[1], b[0], 0.14, b[1]);
+        }
+      }
+    }
+    const seg = new THREE.LineSegments(
+      new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)),
+      new THREE.LineBasicMaterial({ color: 0x77775e, transparent: true, opacity: 0.35 })
+    );
+    scene.add(seg);
+  }
+
   // Border outline — subtle dark ridge so the state edge reads from the air
   const borderPts = GEO.border.map(([x, z]) => new THREE.Vector3(x, 0.4, z));
   borderPts.push(borderPts[0].clone());

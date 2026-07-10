@@ -38,7 +38,10 @@ export class Gameplay {
     this.save = JSON.parse(localStorage.getItem(SAVE_KEY) || '{"cities":[],"landmarks":[],"roses":[]}');
     this.save.species ??= []; // added later — default for older saves
     this.save.stats ??= { dist: 0, time: 0, top: 0 }; // km real, seconds, mph
+    this.save.counties ??= [];
     this.saveTimer = 0;
+    this.countyNow = null;
+    this.countyToastT = 0;
     this.onToast = null;
 
     this.cityStars = this.mkCityStars();
@@ -51,7 +54,22 @@ export class Gameplay {
     return {
       cities: this.save.cities.length, landmarks: this.save.landmarks.length,
       roses: this.save.roses.length, species: this.save.species.length,
+      counties: this.save.counties.length,
     };
+  }
+
+  // called at HUD rate with the current county name (or null outside Texas)
+  enterCounty(name, dt) {
+    this.countyToastT -= dt;
+    if (!name || name === this.countyNow) return;
+    this.countyNow = name;
+    if (this.save.counties.includes(name)) return;
+    this.save.counties.push(name); // always counts —
+    this.persist();
+    if (this.countyToastT > 0) return; // — but boundary zigzags only toast once
+    this.countyToastT = 6;
+    this.onToast?.(`🗺 ${name} County (${this.save.counties.length}/254)`);
+    this.onCollect?.('county');
   }
 
   spotSpecies(key, label, total) {

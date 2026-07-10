@@ -147,6 +147,7 @@ export class AudioSystem {
       rose: [[1319, 0, 0.18, 0.07], [1760, 0.07, 0.25, 0.07]],
       species: [[587, 0, 0.25], [740, 0.1, 0.25], [880, 0.2, 0.45]],
       dialog: [[660, 0, 0.1, 0.06]],
+      county: [[784, 0, 0.15, 0.06], [988, 0.08, 0.22, 0.06]],
     };
     for (const [f, w, d, g] of SONGS[kind] || []) this.note(f, w, d, g ?? 0.1, 'triangle');
   }

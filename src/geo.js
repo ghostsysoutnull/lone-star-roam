@@ -23,6 +23,17 @@ export async function loadGeo(onStatus) {
   GEO.lakes = await get('lakes.json').catch(() => []);
   onStatus?.('Loading the night sky…');
   GEO.sky = await get('sky.json').catch(() => null); // real star catalog + constellations
+  onStatus?.('Drawing county lines…');
+  GEO.counties = await get('counties.json').catch(() => []);
+  for (const c of GEO.counties) {
+    // bbox per county for cheap point-in-county prefiltering
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+    for (const ring of c.rings) for (const [x, z] of ring) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    c.bbox = [minX, maxX, minZ, maxZ];
+  }
 
   const xs = GEO.border.map((p) => p[0]);
   const zs = GEO.border.map((p) => p[1]);
@@ -120,6 +131,29 @@ export function waterAt(x, z) {
     }
   }
   return best;
+}
+
+// Which county is (x,z) in? Cached: the answer rarely changes between calls.
+let lastCounty = null;
+const inRings = (x, z, rings) => {
+  for (const poly of rings) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, zi] = poly[i], [xj, zj] = poly[j];
+      if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    }
+    if (inside) return true;
+  }
+  return false;
+};
+export function countyAt(x, z) {
+  if (lastCounty && inRings(x, z, lastCounty.rings)) return lastCounty.name;
+  for (const c of GEO.counties) {
+    const [minX, maxX, minZ, maxZ] = c.bbox;
+    if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+    if (inRings(x, z, c.rings)) { lastCounty = c; return c.name; }
+  }
+  return null;
 }
 
 export function nearestCity(x, z) {

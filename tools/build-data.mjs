@@ -312,6 +312,24 @@ if (flags.lakes) {
   console.log(`Lakes: ${lakes.map((l) => l.name).join(', ')}`);
 }
 
+// --- 6. Counties: Census 500k boundaries, Texas only (STATE 48) ---
+let counties = [];
+if (flags.counties) {
+  const cin = JSON.parse(readFileSync(flags.counties, 'utf8'));
+  for (const f of cin.features) {
+    if (f.properties.STATE !== '48') continue;
+    const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    const rings = [];
+    for (const poly of polys) {
+      const s = simplify(poly[0], 0.004);
+      if (s.length > 3) rings.push(s.map(proj));
+    }
+    counties.push({ name: f.properties.NAME, rings });
+  }
+  const pts = counties.reduce((s, c) => s + c.rings.reduce((a, r) => a + r.length, 0), 0);
+  console.log(`Counties: ${counties.length}, ${pts} pts`);
+}
+
 // --- Write outputs ---
 mkdirSync(join(ROOT, 'data'), { recursive: true });
 const border = borderSimple.map(proj);
@@ -320,7 +338,8 @@ writeFileSync(join(ROOT, 'data', 'highways.json'), JSON.stringify(kept));
 writeFileSync(join(ROOT, 'data', 'cities.json'), JSON.stringify(cities));
 if (flags.rivers) writeFileSync(join(ROOT, 'data', 'rivers.json'), JSON.stringify(rivers));
 if (flags.lakes) writeFileSync(join(ROOT, 'data', 'lakes.json'), JSON.stringify(lakes));
-for (const f of ['border.json', 'highways.json', 'cities.json', 'rivers.json', 'lakes.json']) {
+if (flags.counties) writeFileSync(join(ROOT, 'data', 'counties.json'), JSON.stringify(counties));
+for (const f of ['border.json', 'highways.json', 'cities.json', 'rivers.json', 'lakes.json', 'counties.json']) {
   const { statSync } = await import('fs');
   console.log(`data/${f}: ${(statSync(join(ROOT, 'data', f)).size / 1024).toFixed(0)} KB`);
 }

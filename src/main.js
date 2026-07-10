@@ -1,6 +1,6 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
-import { loadGeo, GEO, nearestRoad, waterAt } from './geo.js';
+import { loadGeo, GEO, nearestRoad, waterAt, countyAt } from './geo.js';
 import { buildWorld } from './world.js';
 import { CitySystem } from './cities.js';
 import { Player } from './vehicle.js';
@@ -102,9 +102,11 @@ async function boot() {
     // HUD text/minimap at ~12 Hz — nearestCity/nearestRoad every frame is wasteful
     hudTick += dt;
     if (hudTick > 0.08) {
-      hudTick = 0;
+      const county = countyAt(player.pos.x, player.pos.z);
+      gameplay.enterCounty(county, hudTick);
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
-      hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading));
+      hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading), county);
+      hudTick = 0;
     }
     renderer.render(scene, camera);
   });

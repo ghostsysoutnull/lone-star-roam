@@ -53,8 +53,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   El Paso, Corpus, Lubbock, Amarillo, McAllen bboxes (same pipeline).
 - [ ] **Missions/delivery gameplay** — "haul BBQ from Lockhart to Amarillo"-style
   jobs using the real highway routing.
-- [ ] **County system** — all 254 county lines + name toast on crossing
-  (TIGER data; adds a collect-all-counties meta-goal).
+- [x] ~~County system~~ — done 2026-07-10: all 254 real county boundaries (Census
+  500k, 143 KB), county in the HUD location line, crossing toasts + chime with
+  zigzag debounce, collect-all-254 counter, faint ground lines + map lines.
 - [x] ~~Weather~~ — done 2026-07-10: region-weighted states (Gulf rain, Panhandle
   thunderstorms with lightning, West Texas dust storms) with ~9 s crossfades,
   drifting instanced cloud layer, rain streaks, windmills spin up with the wind.

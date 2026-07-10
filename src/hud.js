@@ -16,6 +16,7 @@ export class HUD {
       landmarks: document.getElementById('score-landmarks'),
       roses: document.getElementById('score-roses'),
       critters: document.getElementById('score-critters'),
+      counties: document.getElementById('score-counties'),
       toast: document.getElementById('toast'),
       dialog: document.getElementById('dialog'),
       interact: document.getElementById('interact-hint'),
@@ -43,6 +44,16 @@ export class HUD {
     GEO.border.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = '#c8b878'; ctx.lineWidth = 2; ctx.stroke();
+    // county lines beneath everything
+    ctx.strokeStyle = '#3d4438';
+    ctx.lineWidth = 0.7;
+    for (const c of GEO.counties ?? []) {
+      for (const ring of c.rings) {
+        ctx.beginPath();
+        ring.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+        ctx.closePath(); ctx.stroke();
+      }
+    }
     // water below roads
     ctx.strokeStyle = '#3e7aa8';
     ctx.fillStyle = '#3e7aa8';
@@ -116,7 +127,7 @@ export class HUD {
     this.els.interact.style.display = 'block';
   }
 
-  update(player, counts, road, water, clock, weatherIcon, stats, skyLine) {
+  update(player, counts, road, water, clock, weatherIcon, stats, skyLine, county) {
     this.lastDist = stats?.dist ?? this.lastDist;
     this.els.sky.textContent = skyLine || '';
     // location line: nearest city + real distance
@@ -125,7 +136,8 @@ export class HUD {
     const dx = player.pos.x - city.x, dz = player.pos.z - city.z;
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     const dir = dirs[Math.round(((Math.atan2(dx, -dz) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8];
-    this.els.location.textContent = dist < 3 ? `📍 ${city.name}` : `📍 ${km} km ${dir} of ${city.name}`;
+    const co = county ? ` · ${county} Co.` : '';
+    this.els.location.textContent = (dist < 3 ? `📍 ${city.name}` : `📍 ${km} km ${dir} of ${city.name}`) + co;
     // road when on one; water body when over one (both can show — bridges exist)
     this.els.road.textContent = [road && `🛣 ${road.ref}`, water && `🌊 ${water}`].filter(Boolean).join('   ');
     this.els.speed.innerHTML = player.mode === 'WALK' ? '🚶'
@@ -136,6 +148,7 @@ export class HUD {
     this.els.landmarks.textContent = counts.landmarks;
     this.els.roses.textContent = counts.roses;
     this.els.critters.textContent = counts.species;
+    this.els.counties.textContent = counts.counties;
 
     this.drawMini(player);
     if (this.big.style.display === 'block') this.drawBig(player);
