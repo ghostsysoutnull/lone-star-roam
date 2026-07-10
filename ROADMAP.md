@@ -52,8 +52,14 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   (TIGER data; adds a collect-all-counties meta-goal).
 - [ ] **Weather** — regional: Gulf storms, Panhandle wind, West Texas heat shimmer.
 
+- [x] ~~Wildlife & nature pass~~ — done 2026-07-10: 8 regional species (deer,
+  longhorn, armadillo, jackrabbit, roadrunner, coyote, hog, vulture) with
+  graze/wander/flee/circle behaviors + critter log (8th collectible category);
+  flora variance (multi-blob live oaks, tiered pines, mesquite, yucca), rocks,
+  hay bales, animated Permian Basin pumpjacks and plains windmills.
+
 ### Polish backlog (small)
-- [ ] Bluebonnet patches along Hill Country roads (springtime flavor)
+- [x] ~~Bluebonnet patches along Hill Country roads~~ — done with the nature pass
 - [ ] More landmarks (Buc-ee's beaver, Stonehenge II, Beaumont fire hydrant…)
 - [ ] Minimap zoom control; big map click-to-set-waypoint
 - [ ] Odometer + total play stats on the help screen

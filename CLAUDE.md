@@ -39,7 +39,9 @@ Re-downloading OSM inputs: Overpass **POST fails (406) from this environment —
 ### Module graph
 `main.js` boots everything and owns the render loop. `geo.js` is the foundation: `GEO` data, spatial grid over highway segments (`nearestRoad`), `nearestCity`, `inTexas` point-in-polygon, and `seededRand(str)` — the deterministic RNG used by *all* procedural generation (cities, scenery, NPC placement, rose scatter). Same seed string ⇒ same world every session; changing seed strings invalidates players' spatial memory of the world.
 
-- `world.js` — static world (Texas-shaped ground from border polygon, gulf, highway ribbon meshes, mountains) + `ScenerySystem` (chunked trees/cacti by region, 260-unit chunks around player).
+- `world.js` — static world (Texas-shaped ground from border polygon, gulf, highway/river ribbon meshes, lakes, mountains) + `ScenerySystem` (chunked regional flora/props, 260-unit chunks; animated pumpjacks/windmills registered per-chunk in `group.userData.animated`).
+- `animals.js` — `AnimalSystem`, chunked like scenery but simulated: regional species tables, graze/wander/flee/circle behaviors, critter-log callback into `gameplay.spotSpecies`. Region boxes (Permian, plains, Hill Country) are duplicated between world.js and animals.js region tables — keep them consistent.
+- `traffic.js` — `TrafficSystem`, 4 vehicle types as InstancedMesh with vertex-color-baked details; per-instance tint only affects white bodywork.
 - `cities.js` — `CitySystem` spawns/despawns procedural downtowns within 600 units; buildings are `InstancedMesh`, height scaled by population. Exports `cityRadius(pop)` used by gameplay for visit-detection radii.
 - `vehicle.js` — `Player`: one class, three modes (DRIVE/FLY/WALK) switched by rebuilding nothing — same pos/heading, different physics branch and avatar visibility. Also exports `mkStarMesh` (reused by gameplay).
 - `gameplay.js` — collectibles + NPCs + progress. Landmarks live here with real lat/lon via `LL()`. Save = `localStorage['lonestar-roam-save-v1']` `{cities:[names], landmarks:[names], roses:[indices]}` — rose indices are positions in the seeded scatter, so changing the rose RNG breaks saves.

@@ -44,6 +44,7 @@ export class Gameplay {
   constructor(scene) {
     this.scene = scene;
     this.save = JSON.parse(localStorage.getItem(SAVE_KEY) || '{"cities":[],"landmarks":[],"roses":[]}');
+    this.save.species ??= []; // added later — default for older saves
     this.onToast = null;
     this.onDialog = null;
     this.activeNPC = null;
@@ -57,7 +58,17 @@ export class Gameplay {
   }
 
   counts() {
-    return { cities: this.save.cities.length, landmarks: this.save.landmarks.length, roses: this.save.roses.length };
+    return {
+      cities: this.save.cities.length, landmarks: this.save.landmarks.length,
+      roses: this.save.roses.length, species: this.save.species.length,
+    };
+  }
+
+  spotSpecies(key, label, total) {
+    if (this.save.species.includes(key)) return;
+    this.save.species.push(key);
+    this.persist();
+    this.onToast?.(`🦌 ${label} spotted! (${this.save.species.length}/${total})`);
   }
 
   persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); }

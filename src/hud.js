@@ -14,6 +14,7 @@ export class HUD {
       cities: document.getElementById('score-cities'),
       landmarks: document.getElementById('score-landmarks'),
       roses: document.getElementById('score-roses'),
+      critters: document.getElementById('score-critters'),
       toast: document.getElementById('toast'),
       dialog: document.getElementById('dialog'),
       interact: document.getElementById('interact-hint'),
@@ -117,6 +118,7 @@ export class HUD {
     this.els.cities.textContent = counts.cities;
     this.els.landmarks.textContent = counts.landmarks;
     this.els.roses.textContent = counts.roses;
+    this.els.critters.textContent = counts.species;
 
     this.drawMini(player);
     if (this.big.style.display === 'block') this.drawBig(player);
