@@ -5,6 +5,7 @@ import { buildWorld } from './world.js';
 import { CitySystem } from './cities.js';
 import { Player } from './vehicle.js';
 import { Gameplay } from './gameplay.js';
+import { TrafficSystem } from './traffic.js';
 import { HUD } from './hud.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
@@ -34,6 +35,7 @@ async function boot() {
   const cities = new CitySystem(scene);
   const player = new Player(scene, camera);
   const gameplay = new Gameplay(scene);
+  const traffic = new TrafficSystem(scene);
   const hud = new HUD();
 
   gameplay.onToast = (m) => hud.toast(m);
@@ -68,6 +70,7 @@ async function boot() {
     player.update(dt);
     scenery.update(player.pos.x, player.pos.z);
     cities.update(player.pos.x, player.pos.z);
+    traffic.update(dt, player.pos.x, player.pos.z);
     const npcName = gameplay.update(dt, player.pos);
     hud.interactHint(npcName);
     // HUD text/minimap at ~12 Hz — nearestCity/nearestRoad every frame is wasteful

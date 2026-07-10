@@ -66,14 +66,14 @@ function inPoly(pt, poly) {
 
 // --- 1. Texas border ---
 const states = JSON.parse(readFileSync(statesPath, 'utf8'));
-const tx = states.features.find((f) => f.properties.name === 'Texas');
+const tx = states.features.find((f) => (f.properties.name || f.properties.NAME) === 'Texas');
 if (!tx) throw new Error('Texas not found in states file');
 // Take largest ring (mainland; ignore tiny islands)
 let rings = tx.geometry.type === 'Polygon' ? [tx.geometry.coordinates[0]] : tx.geometry.coordinates.map((p) => p[0]);
 rings.sort((a, b) => b.length - a.length);
 const borderDeg = rings[0]; // [lon,lat]
 console.log(`Border: ${borderDeg.length} pts raw`);
-const borderSimple = simplify(borderDeg, 0.008);
+const borderSimple = simplify(borderDeg, 0.0035); // keep the Red River wiggles at Texoma
 console.log(`Border: ${borderSimple.length} pts simplified`);
 
 // --- 2. Highways: chain OSM ways by ref + shared endpoints, simplify, clip ---
