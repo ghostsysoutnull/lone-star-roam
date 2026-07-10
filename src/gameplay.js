@@ -8,7 +8,7 @@ const SAVE_KEY = 'lonestar-roam-save-v1';
 
 // Real landmarks at real coordinates (projected same as pipeline: 1u=100m, center 31N 99.5W)
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
-const LANDMARKS = [
+export const LANDMARKS = [
   { name: 'The Alamo', at: LL(29.4260, -98.4861), kind: 'alamo', fact: 'Built 1718; site of the 1836 battle for Texas independence.' },
   { name: 'Texas State Capitol', at: LL(30.2747, -97.7404), kind: 'capitol', fact: 'Taller than the US Capitol — of course it is.' },
   { name: 'Reunion Tower', at: LL(32.7756, -96.8089), kind: 'tower', fact: 'Dallas’ glowing ball, 561 ft up.' },

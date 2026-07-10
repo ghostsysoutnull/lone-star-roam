@@ -61,6 +61,10 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   flora variance (multi-blob live oaks, tiered pines, mesquite, yucca), rocks,
   hay bales, animated Permian Basin pumpjacks and plains windmills.
 
+- [x] ~~Travel menu~~ — done 2026-07-10: P-key overlay; landmarks/nature/Texas-icon
+  sights always available with smart arrivals (drive on road vs. fly at altitude,
+  Marfa auto-arrives at night); cities unlock as fast-travel after first visit.
+
 ### Polish backlog (small)
 - [x] ~~Bluebonnet patches along Hill Country roads~~ — done with the nature pass
 - [ ] More landmarks (Buc-ee's beaver, Stonehenge II, Beaumont fire hydrant…)
