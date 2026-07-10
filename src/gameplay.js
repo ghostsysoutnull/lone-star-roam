@@ -1,4 +1,5 @@
-// Gameplay: city visits, landmarks, yellow roses, NPCs with dialog. Progress in localStorage.
+// Gameplay: city visits, landmarks, yellow roses, critter log. Progress in localStorage.
+// (NPCs live in npcs.js.)
 import * as THREE from 'three';
 import { GEO, seededRand, nearestCity } from './geo.js';
 import { mkStarMesh } from './vehicle.js';
@@ -31,21 +32,6 @@ export const LANDMARKS = [
 ];
 export const LANDMARK_COUNT = LANDMARKS.length;
 
-const NPC_DATA = [
-  ['Austin', 'Willie', 'Welcome to Austin! Keep it weird, partner. Try the breakfast tacos before you fly off.', 'Austin is the live music capital of the world — 250+ venues.'],
-  ['Houston', 'Rosa', 'This here’s the biggest city in Texas. NASA’s just down the road — you can’t miss the rocket.', 'Houston is home to the largest medical center on Earth.'],
-  ['Dallas', 'Big Tex', 'Howdy folks! You look like you could use some state fair corny dogs.', 'The frozen margarita machine was invented in Dallas in 1971.'],
-  ['San Antonio', 'Elena', 'Remember the Alamo? It’s right in the middle of downtown. The river walk’s prettier at truck-height.', 'San Antonio’s missions are a UNESCO World Heritage site.'],
-  ['Fort Worth', 'Hank', 'Cowtown, they call it. Real cowboys drive the herd through twice a day at the Stockyards.', 'Fort Worth is where the West begins, so they say.'],
-  ['El Paso', 'Marisol', 'You made it all the way out west! We’re closer to Los Angeles than to Houston out here.', 'El Paso sits in Mountain Time — the rest of Texas is Central.'],
-  ['Amarillo', 'Dusty', 'Panhandle wind’ll knock your hat off. Spray-paint a Cadillac while you’re here — everyone does.', 'Amarillo means "yellow" in Spanish, for the local soil.'],
-  ['Corpus Christi', 'Gully', 'Sparkling city by the sea! Watch for the shrimp boats off Padre Island.', 'Selena, the Queen of Tejano, called Corpus home.'],
-  ['Lubbock', 'Peggy Sue', 'Buddy Holly grew up right here. Flat? Sure. But you can see tomorrow from here.', 'Lubbock is the world’s largest cottonseed processing region.'],
-  ['Laredo', 'Chuy', 'Bienvenido to the border! I-35 starts right here and runs clear to Minnesota.', 'Laredo has flown seven flags, one more than the rest of Texas.'],
-  ['Marfa', 'Quill', 'Artists, antelope, and lights nobody can explain. Stick around till dark.', 'Marfa’s mystery lights have been reported since 1883.'],
-  ['Galveston', 'Cap’n Sal', 'This island was once the biggest city in Texas, before the 1900 storm.', 'The 1900 Galveston hurricane is still the deadliest US natural disaster.'],
-];
-
 export class Gameplay {
   constructor(scene) {
     this.scene = scene;
@@ -54,14 +40,10 @@ export class Gameplay {
     this.save.stats ??= { dist: 0, time: 0, top: 0 }; // km real, seconds, mph
     this.saveTimer = 0;
     this.onToast = null;
-    this.onDialog = null;
-    this.activeNPC = null;
-    this.dialogStep = 0;
 
     this.cityStars = this.mkCityStars();
     this.roseSystem = this.mkRoses();
     this.landmarkGroup = this.mkLandmarks();
-    this.npcs = this.mkNPCs();
     this.t = 0;
   }
 
@@ -166,51 +148,6 @@ export class Gameplay {
     return group;
   }
 
-  // --- NPCs — placed at their home city downtown edge ---
-  mkNPCs() {
-    const npcs = [];
-    for (const [cityName, name, line1, fact] of NPC_DATA) {
-      const c = GEO.cities.find((c) => c.name === cityName);
-      if (!c) continue;
-      const rand = seededRand('npc:' + name);
-      const g = mkNPCMesh(rand);
-      const R = cityRadius(c.pop);
-      const a = rand() * Math.PI * 2;
-      g.position.set(c.x + Math.cos(a) * R * 0.45, 0, c.z + Math.sin(a) * R * 0.45);
-      g.userData = { npc: { name, lines: [line1, '📌 ' + fact] } };
-      this.scene.add(g);
-      npcs.push(g);
-    }
-    return npcs;
-  }
-
-  // Nearest interactable NPC within range
-  npcNear(pos, range = 6) {
-    let best = null, bd = range * range;
-    for (const n of this.npcs) {
-      const d = (n.position.x - pos.x) ** 2 + (n.position.z - pos.z) ** 2;
-      if (d < bd) { bd = d; best = n; }
-    }
-    return best;
-  }
-
-  interact(pos) {
-    if (this.activeNPC) { // advance / close dialog
-      this.dialogStep++;
-      const lines = this.activeNPC.userData.npc.lines;
-      if (this.dialogStep >= lines.length) { this.activeNPC = null; this.onDialog?.(null); }
-      else this.onDialog?.({ name: this.activeNPC.userData.npc.name, text: lines[this.dialogStep] });
-      return;
-    }
-    const n = this.npcNear(pos);
-    if (n) {
-      this.activeNPC = n;
-      this.dialogStep = 0;
-      this.onDialog?.({ name: n.userData.npc.name, text: n.userData.npc.lines[0] });
-      this.onCollect?.('dialog');
-    }
-  }
-
   // quick expanding golden ring at a collect point
   burst(x, y, z) {
     const ring = new THREE.Mesh(
@@ -245,9 +182,8 @@ export class Gameplay {
       this.bursts = this.bursts.filter((b) => b.age <= 0.7);
     }
 
-    // landmark beacons pulse; NPC markers bob
+    // landmark beacons pulse
     if (this.beams) this.beams.forEach((b, i) => (b.material.opacity = 0.18 + 0.1 * Math.sin(this.t * 2 + i)));
-    this.npcs.forEach((n, i) => (n.children[3].position.y = 2.9 + Math.sin(this.t * 3 + i) * 0.2));
 
     // roses near the player bob and spin (matrices touched only within range)
     const m4 = this.tmpM4 ??= new THREE.Matrix4();
@@ -336,9 +272,6 @@ export class Gameplay {
       }
     }
 
-    // NPC proximity hint
-    const near = this.npcNear(pos);
-    return near && !this.activeNPC ? near.userData.npc.name : null;
   }
 }
 
@@ -539,19 +472,3 @@ function mkPalm() {
   return g;
 }
 
-function mkNPCMesh(rand) {
-  const g = new THREE.Group();
-  const colors = [0x8a2f2f, 0x2f5a8a, 0x3f7a3f, 0x7a5a2f, 0x6a3f7a];
-  const shirt = new THREE.MeshLambertMaterial({ color: colors[Math.floor(rand() * colors.length)] });
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.8, 3, 8), shirt);
-  body.position.y = 0.9;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 8, 6), new THREE.MeshLambertMaterial({ color: 0xd9a066 }));
-  head.position.y = 1.75;
-  const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.05, 10), new THREE.MeshLambertMaterial({ color: 0x8a6f4d }));
-  brim.position.y = 1.95;
-  const marker = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.5, 4), new THREE.MeshBasicMaterial({ color: 0xffd35c }));
-  marker.position.y = 2.9;
-  marker.rotation.x = Math.PI;
-  g.add(body, head, brim, marker);
-  return g;
-}

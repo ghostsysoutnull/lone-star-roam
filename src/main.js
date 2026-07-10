@@ -10,6 +10,7 @@ import { AnimalSystem, SPECIES, SPECIES_COUNT } from './animals.js';
 import { SkySystem, ATMOS } from './sky.js';
 import { TravelMenu } from './travel.js';
 import { AudioSystem } from './audio.js';
+import { NPCSystem } from './npcs.js';
 import { HUD } from './hud.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
@@ -45,9 +46,11 @@ async function boot() {
   const hud = new HUD();
 
   gameplay.onToast = (m) => hud.toast(m);
-  gameplay.onDialog = (d) => hud.dialog(d);
   const travel = new TravelMenu(player, gameplay, sky, (m) => hud.toast(m));
   const audio = new AudioSystem();
+  const npcs = new NPCSystem(scene, () => ({ night: ATMOS.night, weather: ATMOS.weather, counts: gameplay.counts() }));
+  npcs.onDialog = (d) => hud.dialog(d);
+  npcs.onTalk = () => audio.chime('dialog');
   sky.onBolt = () => audio.thunder();
   gameplay.onCollect = (kind) => audio.chime(kind);
   player.onStep = () => audio.step();
@@ -65,7 +68,7 @@ async function boot() {
     if (e.code === 'Escape') travel.close();
     if (e.code === 'KeyN') hud.toast(audio.toggleMute() ? '🔇 Muted' : '🔊 Sound on');
     if (e.code === 'KeyR') player.resetToRoad();
-    if (e.code === 'KeyE') gameplay.interact(player.pos);
+    if (e.code === 'KeyE') npcs.interact(player.pos);
     if (e.code === 'Space') e.preventDefault();
   });
   addEventListener('resize', () => {
@@ -76,7 +79,7 @@ async function boot() {
 
   document.getElementById('loading').style.display = 'none';
   hud.toast('🤠 Welcome to Texas! Press H for controls.');
-  window.__game = { player, gameplay, GEO, animals, sky }; // debug/testing hook
+  window.__game = { player, gameplay, GEO, animals, sky, npcs }; // debug/testing hook
 
   const clock = new THREE.Clock();
   let hudTick = 0;
@@ -91,8 +94,8 @@ async function boot() {
     traffic.setNight(ATMOS.night);
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y);
     audio.update(player, ATMOS);
-    const npcName = gameplay.update(dt, player.pos, ATMOS.night, player.speed);
-    hud.interactHint(npcName);
+    gameplay.update(dt, player.pos, ATMOS.night, player.speed);
+    hud.interactHint(npcs.update(dt, player.pos));
     // HUD text/minimap at ~12 Hz — nearestCity/nearestRoad every frame is wasteful
     hudTick += dt;
     if (hudTick > 0.08) {
