@@ -14,14 +14,18 @@ export class CitySystem {
   constructor(scene) {
     this.scene = scene;
     this.live = new Map(); // name -> group
-    this.buildingMat = new THREE.MeshLambertMaterial({ color: 0xffffff, flatShading: true });
+    this.buildingMat = new THREE.MeshLambertMaterial({
+      color: 0xffffff, flatShading: true,
+      emissive: 0xffffff, emissiveMap: mkWindowTexture(), emissiveIntensity: 0,
+    });
     this.boxGeo = new THREE.BoxGeometry(1, 1, 1);
     this.boxGeo.translate(0, 0.5, 0); // scale from ground up
+    remapRoofUVs(this.boxGeo);
   }
 
-  // downtown windows glow after dark (one shared material — cheap and uniform)
+  // after dark the window grid lights up (emissiveMap = lit windows, walls stay dark)
   setNight(f) {
-    this.buildingMat.emissive.setRGB(0.9 * f * 0.4, 0.75 * f * 0.4, 0.45 * f * 0.4);
+    this.buildingMat.emissiveIntensity = f * 0.9;
   }
 
   update(px, pz) {
@@ -112,6 +116,36 @@ export class CitySystem {
     this.scene.add(group);
     this.live.set(city.name, group);
   }
+}
+
+// Window grid texture used as emissiveMap: warm lit windows of varying brightness,
+// ~35% dark. Row 0 (v < 1/16) is kept black — roofs remap their UVs there.
+function mkWindowTexture() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 128;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, 64, 128);
+  const cols = 8, rows = 16;
+  for (let y = 1; y < rows; y++) { // row 0 stays black for roofs
+    for (let x = 0; x < cols; x++) {
+      if (Math.random() < 0.35) continue; // dark window
+      const warm = 0.55 + Math.random() * 0.45;
+      ctx.fillStyle = `rgb(${Math.round(255 * warm)},${Math.round(205 * warm)},${Math.round(120 * warm)})`;
+      ctx.fillRect(x * 8 + 2, y * 8 + 2, 4, 4);
+    }
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.NearestFilter;
+  return tex;
+}
+
+// BoxGeometry face order: +x -x +y -y +z -z, 4 verts each. Point the top/bottom
+// faces (verts 8-15) at the reserved black row so roofs don't glow.
+function remapRoofUVs(geo) {
+  const uv = geo.attributes.uv;
+  for (let i = 8; i < 16; i++) uv.setXY(i, 0.02, 0.99);
+  uv.needsUpdate = true;
 }
 
 function mkLabel(text, x, y, z, scale) {

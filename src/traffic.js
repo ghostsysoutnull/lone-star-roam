@@ -87,6 +87,29 @@ function mkSemi() {
   ]);
 }
 
+// lamp clusters per type: unlit vertex-colored boxes (white head, red tail),
+// shown only at night, sharing each car's instance matrix
+const HEAD = 0xfff2c0, TAIL = 0xff2a20;
+const lamp = (w, h, d, x, y, z, hex) => tinted(new THREE.BoxGeometry(w, h, d).translate(x, y, z), hex);
+const LAMPS = {
+  sedan: () => merge([
+    lamp(0.24, 0.12, 0.06, -0.5, 0.55, -1.52, HEAD), lamp(0.24, 0.12, 0.06, 0.5, 0.55, -1.52, HEAD),
+    lamp(0.24, 0.1, 0.06, -0.5, 0.55, 1.52, TAIL), lamp(0.24, 0.1, 0.06, 0.5, 0.55, 1.52, TAIL),
+  ]),
+  pickup: () => merge([
+    lamp(0.26, 0.14, 0.06, -0.54, 0.62, -1.72, HEAD), lamp(0.26, 0.14, 0.06, 0.54, 0.62, -1.72, HEAD),
+    lamp(0.26, 0.12, 0.06, -0.54, 0.62, 1.72, TAIL), lamp(0.26, 0.12, 0.06, 0.54, 0.62, 1.72, TAIL),
+  ]),
+  suv: () => merge([
+    lamp(0.26, 0.14, 0.06, -0.54, 0.7, -1.57, HEAD), lamp(0.26, 0.14, 0.06, 0.54, 0.7, -1.57, HEAD),
+    lamp(0.26, 0.12, 0.06, -0.54, 0.7, 1.57, TAIL), lamp(0.26, 0.12, 0.06, 0.54, 0.7, 1.57, TAIL),
+  ]),
+  semi: () => merge([
+    lamp(0.28, 0.16, 0.06, -0.56, 0.75, -3.22, HEAD), lamp(0.28, 0.16, 0.06, 0.56, 0.75, -3.22, HEAD),
+    lamp(0.3, 0.14, 0.06, -0.6, 0.6, 3.12, TAIL), lamp(0.3, 0.14, 0.06, 0.6, 0.6, 3.12, TAIL),
+  ]),
+};
+
 function pickType(mix) {
   let r = Math.random();
   for (const [type, p] of Object.entries(mix)) { r -= p; if (r <= 0) return type; }
@@ -103,9 +126,16 @@ export class TrafficSystem {
       suv: new THREE.InstancedMesh(mkSuv(), mat, POOL),
       semi: new THREE.InstancedMesh(mkSemi(), mat, POOL),
     };
-    for (const m of Object.values(this.meshes)) {
+    const lampMat = new THREE.MeshBasicMaterial({ vertexColors: true }); // unlit — lamps glow at night
+    this.lampMeshes = {};
+    for (const [type, m] of Object.entries(this.meshes)) {
       m.frustumCulled = false; // instances move every frame; skip stale-bounds culling
       scene.add(m);
+      const lm = new THREE.InstancedMesh(LAMPS[type](), lampMat, POOL);
+      lm.frustumCulled = false;
+      lm.visible = false;
+      scene.add(lm);
+      this.lampMeshes[type] = lm;
     }
 
     // per-polyline bbox for cheap "near player" candidate filtering
@@ -127,9 +157,11 @@ export class TrafficSystem {
     this.candTimer = 0;
   }
 
-  // faint glow at night so traffic stays visible (stand-in for headlights)
+  // lamps on after dark; a whisper of body glow so shapes don't vanish entirely
   setNight(f) {
-    this.mat.emissive.setRGB(0.28 * f, 0.26 * f, 0.2 * f);
+    const on = f > 0.45;
+    for (const lm of Object.values(this.lampMeshes)) lm.visible = on;
+    this.mat.emissive.setScalar(0.05 * f);
   }
 
   // refresh candidate polylines around the player (cheap, but not every frame)
@@ -217,13 +249,16 @@ export class TrafficSystem {
         new THREE.Vector3(car.scale, car.scale, car.scale)
       );
       mesh.setMatrixAt(i, this.m4);
+      this.lampMeshes[car.type].setMatrixAt(i, this.m4);
       mesh.setColorAt(i, this.tmpColor.set(car.color));
     }
     // park unused instances at zero scale
     this.m4.makeScale(0, 0, 0);
     for (const [type, mesh] of Object.entries(this.meshes)) {
-      for (let j = counts[type]; j < POOL; j++) mesh.setMatrixAt(j, this.m4);
+      const lamps = this.lampMeshes[type];
+      for (let j = counts[type]; j < POOL; j++) { mesh.setMatrixAt(j, this.m4); lamps.setMatrixAt(j, this.m4); }
       mesh.instanceMatrix.needsUpdate = true;
+      lamps.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     }
   }

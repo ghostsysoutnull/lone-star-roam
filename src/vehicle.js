@@ -165,10 +165,13 @@ function mkTruck() {
   // headlights — emissive quads, toggled on after dark
   const lights = new THREE.Group();
   const lightMat = new THREE.MeshBasicMaterial({ color: 0xfff2c0 });
+  const tailMat = new THREE.MeshBasicMaterial({ color: 0xff2a20 });
   for (const x of [-0.55, 0.55]) {
     const beam = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.06), lightMat);
     beam.position.set(x, 0.68, -1.82);
-    lights.add(beam);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.06), tailMat);
+    tail.position.set(x, 0.68, 1.82);
+    lights.add(beam, tail);
   }
   lights.visible = false;
   g.add(bed, cab, star, lights);
