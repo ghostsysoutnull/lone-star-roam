@@ -25,6 +25,8 @@ export class HUD {
     this.mapLayer = this.renderMapLayer(1400, 1320);
     this.zoomLevels = [1.4, 2.4, 4.5];
     this.zoomIdx = 1;
+    this.compass = document.getElementById('compass');
+    if (localStorage.getItem('lonestar-compass') === 'off') this.compass.style.display = 'none';
     const s = Math.min(innerWidth, innerHeight) - 60;
     this.bigCanvas.width = s; this.bigCanvas.height = s * 0.95;
     this.toastTimer = null;
@@ -108,6 +110,64 @@ export class HUD {
 
   cycleZoom() { this.zoomIdx = (this.zoomIdx + 1) % this.zoomLevels.length; }
 
+  toggleCompass() {
+    const off = this.compass.style.display !== 'none';
+    this.compass.style.display = off ? 'none' : 'block';
+    localStorage.setItem('lonestar-compass', off ? 'off' : 'on');
+    return !off;
+  }
+
+  // sliding compass tape: cardinals, 15° ticks, degree readout, gold nearest-city pip
+  drawCompass(player, city) {
+    if (this.compass.style.display === 'none') return;
+    const ctx = this.compass.getContext('2d');
+    const W = this.compass.width, H = this.compass.height;
+    ctx.clearRect(0, 0, W, H);
+    // heading: 0 = north, increases counterclockwise in game space; compass shows clockwise degrees
+    const deg = ((-player.heading * 180) / Math.PI % 360 + 360) % 360;
+    const PX_PER_DEG = W / 120; // 120° field of view on the tape
+    const label = { 0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW' };
+    ctx.textAlign = 'center';
+    for (let t = -60; t <= 60; t += 5) {
+      const d = ((deg + t) % 360 + 360) % 360;
+      if (d % 15 !== 0) continue;
+      const x = W / 2 + t * PX_PER_DEG;
+      const cardinal = label[d];
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+      ctx.lineWidth = cardinal ? 3 : 1.5;
+      ctx.beginPath();
+      ctx.moveTo(x, H);
+      ctx.lineTo(x, H - (cardinal ? 22 : d % 45 === 0 ? 16 : 10));
+      ctx.stroke();
+      if (cardinal) {
+        ctx.font = 'bold 26px system-ui';
+        ctx.fillStyle = cardinal === 'N' ? '#ff8866' : '#fff';
+        ctx.fillText(cardinal, x, H - 32);
+      }
+    }
+    // nearest-city pip
+    if (city) {
+      const cityDeg = ((Math.atan2(city.x - player.pos.x, -(city.z - player.pos.z)) * 180) / Math.PI % 360 + 360) % 360;
+      let rel = cityDeg - deg;
+      if (rel > 180) rel -= 360;
+      if (rel < -180) rel += 360;
+      const x = Math.max(10, Math.min(W - 10, W / 2 + rel * PX_PER_DEG));
+      ctx.fillStyle = '#ffd35c';
+      ctx.beginPath();
+      ctx.arc(x, 12, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // center caret + degree readout
+    ctx.fillStyle = '#ffd35c';
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 8, 0); ctx.lineTo(W / 2 + 8, 0); ctx.lineTo(W / 2, 12);
+    ctx.closePath(); ctx.fill();
+    ctx.font = '20px system-ui';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${Math.round(deg)}°`, 10, 30);
+  }
+
   toast(msg) {
     this.els.toast.textContent = msg;
     this.els.toast.style.opacity = 1;
@@ -152,6 +212,7 @@ export class HUD {
     this.els.counties.textContent = counts.counties;
 
     this.drawMini(player);
+    this.drawCompass(player, city);
     if (this.big.style.display === 'block') this.drawBig(player);
   }
 

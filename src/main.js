@@ -75,6 +75,7 @@ async function boot() {
     if (e.code === 'KeyM') hud.toggleBigMap();
     if (e.code === 'KeyH') hud.toggleHelp(gameplay.save.stats, gameplay.save.ufo);
     if (e.code === 'KeyZ') hud.cycleZoom();
+    if (e.code === 'KeyC') hud.toggleCompass();
     if (e.code === 'KeyP') travel.toggle();
     if (e.code === 'Escape') travel.close();
     if (e.code === 'KeyN') hud.toast(audio.toggleMute() ? '🔇 Muted' : '🔊 Sound on');
