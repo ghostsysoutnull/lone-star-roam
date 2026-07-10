@@ -9,6 +9,7 @@ import { TrafficSystem } from './traffic.js';
 import { AnimalSystem, SPECIES, SPECIES_COUNT } from './animals.js';
 import { SkySystem, ATMOS } from './sky.js';
 import { TravelMenu } from './travel.js';
+import { AudioSystem } from './audio.js';
 import { HUD } from './hud.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
@@ -46,6 +47,9 @@ async function boot() {
   gameplay.onToast = (m) => hud.toast(m);
   gameplay.onDialog = (d) => hud.dialog(d);
   const travel = new TravelMenu(player, gameplay, sky, (m) => hud.toast(m));
+  const audio = new AudioSystem();
+  sky.onBolt = () => audio.thunder();
+  gameplay.onCollect = (kind) => audio.chime(kind);
 
   // Spawn on I-35 just south of Austin
   const austin = GEO.cities.find((c) => c.name === 'Austin');
@@ -57,6 +61,7 @@ async function boot() {
     if (e.code === 'KeyH') hud.toggleHelp();
     if (e.code === 'KeyP') travel.toggle();
     if (e.code === 'Escape') travel.close();
+    if (e.code === 'KeyN') hud.toast(audio.toggleMute() ? '🔇 Muted' : '🔊 Sound on');
     if (e.code === 'KeyR') player.resetToRoad();
     if (e.code === 'KeyE') gameplay.interact(player.pos);
     if (e.code === 'Space') e.preventDefault();
@@ -83,6 +88,7 @@ async function boot() {
     traffic.update(dt, player.pos.x, player.pos.z);
     traffic.setNight(ATMOS.night);
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y);
+    audio.update(player, ATMOS);
     const npcName = gameplay.update(dt, player.pos, ATMOS.night);
     hud.interactHint(npcName);
     // HUD text/minimap at ~12 Hz — nearestCity/nearestRoad every frame is wasteful

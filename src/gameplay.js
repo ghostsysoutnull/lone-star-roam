@@ -69,6 +69,7 @@ export class Gameplay {
     this.save.species.push(key);
     this.persist();
     this.onToast?.(`🦌 ${label} spotted! (${this.save.species.length}/${total})`);
+    this.onCollect?.('species');
   }
 
   persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); }
@@ -176,6 +177,7 @@ export class Gameplay {
       this.activeNPC = n;
       this.dialogStep = 0;
       this.onDialog?.({ name: n.userData.npc.name, text: n.userData.npc.lines[0] });
+      this.onCollect?.('dialog');
     }
   }
 
@@ -203,6 +205,7 @@ export class Gameplay {
         const star = this.cityStars.children.find((s) => s.userData.city === city.name);
         if (star) this.cityStars.remove(star);
         this.onToast?.(`⭐ ${city.name} visited! (${this.save.cities.length}/132)`);
+        this.onCollect?.('city');
       }
     }
 
@@ -219,6 +222,7 @@ export class Gameplay {
         this.roseSystem.setMatrixAt(r.i, m);
         this.roseSystem.instanceMatrix.needsUpdate = true;
         this.onToast?.(`🌹 Yellow rose (${this.save.roses.length}/300)`);
+        this.onCollect?.('rose');
       }
     }
 
@@ -232,6 +236,7 @@ export class Gameplay {
         this.persist();
         g.children[g.children.length - 1].material.color.set(0x557755);
         this.onToast?.(`🏛 ${lm.name} — ${lm.fact}`);
+        this.onCollect?.('landmark');
       }
     }
 

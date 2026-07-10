@@ -36,7 +36,11 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 - [x] ~~Day/night cycle~~ — done 2026-07-10: 12-min days (hold T to fast-forward),
   keyframed sun/sky/fog palette, stars, city windows glow at night, headlights,
   Marfa Lights orbs only appear after dark. HUD clock + weather icon.
-- [ ] **Audio** — WebAudio engine hum tied to speed, wind in fly mode, collect chimes.
+- [x] ~~Audio~~ — done 2026-07-10: all-synthesized WebAudio (no files): engine
+  pitched to speed (car growl / prop drone), wind by speed+weather, rain patter,
+  thunder synced to lightning with distance delay, per-category collect chimes,
+  NPC blip, night crickets (silenced by rain). N mutes. Mix levels untuned by ear —
+  gather feedback.
 - [ ] **Gamepad support** — map Gamepad API axes/buttons alongside the keyboard.
 
 ### Larger bets

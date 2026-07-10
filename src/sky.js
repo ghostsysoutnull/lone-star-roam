@@ -6,7 +6,7 @@ export const DAY_SECONDS = 720; // 12 min per full day
 const FF_SPEED = 80;            // hold T
 
 // mutable atmosphere state read by world.js (windmills), traffic, cities, gameplay
-export const ATMOS = { wind: 1, night: 0, weather: 'clear' };
+export const ATMOS = { wind: 1, night: 0, weather: 'clear', rain: 0 };
 
 // time-of-day keyframes (t: 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset)
 const KEYS = [
@@ -137,6 +137,7 @@ export class SkySystem {
     const mix = (p) => wa[p] + (wb[p] - wa[p]) * this.blend;
     ATMOS.weather = this.target;
     ATMOS.wind = mix('wind');
+    ATMOS.rain = mix('rain');
 
     // --- sun + sky + fog from time keyframes, modulated by weather ---
     const { a, b, k } = this.frame(this.t);
@@ -213,6 +214,7 @@ export class SkySystem {
       if (this.boltT <= 0) {
         this.boltT = 4 + Math.random() * 9;
         this.flash = 0.8;
+        this.onBolt?.();
         this.bolt.material.opacity = 1;
         const a2 = Math.random() * Math.PI * 2, r = 120 + Math.random() * 200;
         this.bolt.position.set(px + Math.cos(a2) * r, 0, pz + Math.sin(a2) * r);

@@ -1,0 +1,161 @@
+// All-synthesized WebAudio: engine, wind, rain, thunder, collect chimes,
+// night crickets. No audio files. Context starts lazily on the first
+// keypress (browser autoplay policy). N toggles mute.
+export class AudioSystem {
+  constructor() {
+    this.ctx = null;
+    this.muted = false;
+    const boot = () => { this.init(); removeEventListener('keydown', boot); };
+    addEventListener('keydown', boot);
+  }
+
+  init() {
+    if (this.ctx) return;
+    const ctx = (this.ctx = new (window.AudioContext || window.webkitAudioContext)());
+    this.master = ctx.createGain();
+    this.master.gain.value = 0.5;
+    this.master.connect(ctx.destination);
+
+    const chan = () => { const g = ctx.createGain(); g.gain.value = 0; g.connect(this.master); return g; };
+
+    // --- engine: saw + sub through a lowpass, pitch tracks speed ---
+    this.engineGain = chan();
+    this.engineFilter = ctx.createBiquadFilter();
+    this.engineFilter.type = 'lowpass';
+    this.engineFilter.frequency.value = 320;
+    this.engineFilter.connect(this.engineGain);
+    this.engOsc = ctx.createOscillator();
+    this.engOsc.type = 'sawtooth';
+    this.engOsc.frequency.value = 50;
+    this.engSub = ctx.createOscillator();
+    this.engSub.type = 'square';
+    this.engSub.frequency.value = 25;
+    const subGain = ctx.createGain();
+    subGain.gain.value = 0.5;
+    this.engOsc.connect(this.engineFilter);
+    this.engSub.connect(subGain).connect(this.engineFilter);
+    this.engOsc.start(); this.engSub.start();
+
+    // --- shared looping noise buffer for wind & rain ---
+    const len = ctx.sampleRate * 2;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    const noiseSrc = (filterType, freq, q) => {
+      const src = ctx.createBufferSource();
+      src.buffer = buf; src.loop = true;
+      const f = ctx.createBiquadFilter();
+      f.type = filterType; f.frequency.value = freq; f.Q.value = q;
+      src.connect(f); src.start();
+      return f;
+    };
+    this.windGain = chan();
+    noiseSrc('bandpass', 500, 0.6).connect(this.windGain);
+    this.rainGain = chan();
+    noiseSrc('highpass', 1900, 0.4).connect(this.rainGain);
+
+    // --- crickets: pulsed high tone at night ---
+    this.cricketGain = chan();
+    const cricket = ctx.createOscillator();
+    cricket.type = 'square';
+    cricket.frequency.value = 4300;
+    const pulse = ctx.createGain();
+    pulse.gain.value = 0;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 13;
+    const lfoAmt = ctx.createGain();
+    lfoAmt.gain.value = 0.5;
+    lfo.connect(lfoAmt).connect(pulse.gain);
+    cricket.connect(pulse).connect(this.cricketGain);
+    cricket.start(); lfo.start();
+
+    this.sfx = ctx.createGain();
+    this.sfx.gain.value = 1;
+    this.sfx.connect(this.master);
+  }
+
+  toggleMute() {
+    if (!this.ctx) return false;
+    this.muted = !this.muted;
+    this.master.gain.setTargetAtTime(this.muted ? 0 : 0.5, this.ctx.currentTime, 0.05);
+    return this.muted;
+  }
+
+  // called every frame from the game loop
+  update(player, atmos) {
+    if (!this.ctx || this.muted) return;
+    const t = this.ctx.currentTime;
+    const spd = Math.abs(player.speed);
+    const set = (param, v, tc = 0.08) => param.setTargetAtTime(v, t, tc);
+
+    if (player.mode === 'DRIVE') {
+      set(this.engOsc.frequency, 42 + spd * 2.3);
+      set(this.engSub.frequency, 21 + spd * 1.15);
+      set(this.engineFilter.frequency, 260 + spd * 10);
+      set(this.engineGain.gain, spd > 0.5 ? 0.05 + (spd / 46) * 0.075 : 0.03);
+    } else if (player.mode === 'FLY') {
+      set(this.engOsc.frequency, 78 + spd * 0.9); // prop drone
+      set(this.engSub.frequency, 39 + spd * 0.45);
+      set(this.engineFilter.frequency, 420 + spd * 4);
+      set(this.engineGain.gain, 0.055 + (spd / 150) * 0.05);
+    } else {
+      set(this.engineGain.gain, 0);
+    }
+
+    const windSpd = player.mode === 'FLY' ? spd / 150 : spd / 60;
+    set(this.windGain.gain, Math.min(0.14, windSpd * 0.1 + (atmos.wind - 1) * 0.02), 0.3);
+    set(this.rainGain.gain, (atmos.rain || 0) * 0.05, 0.5);
+    set(this.cricketGain.gain, atmos.night * (1 - Math.min(1, atmos.rain || 0)) * 0.012, 0.5);
+  }
+
+  // one-shot helpers ---------------------------------------------------------
+  note(freq, when, dur, gain = 0.12, type = 'sine') {
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.type = type;
+    o.frequency.value = freq;
+    const g = ctx.createGain();
+    const t0 = ctx.currentTime + when;
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(gain, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(g).connect(this.sfx);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+
+  chime(kind) {
+    if (!this.ctx || this.muted) return;
+    const SONGS = {
+      city: [[523, 0, 0.35], [659, 0.09, 0.35], [784, 0.18, 0.4], [1047, 0.27, 0.6]],
+      landmark: [[392, 0, 0.5], [523, 0.14, 0.5], [659, 0.28, 0.5], [784, 0.42, 0.9]],
+      rose: [[1319, 0, 0.18, 0.07], [1760, 0.07, 0.25, 0.07]],
+      species: [[587, 0, 0.25], [740, 0.1, 0.25], [880, 0.2, 0.45]],
+      dialog: [[660, 0, 0.1, 0.06]],
+    };
+    for (const [f, w, d, g] of SONGS[kind] || []) this.note(f, w, d, g ?? 0.1, 'triangle');
+  }
+
+  thunder() {
+    if (!this.ctx || this.muted) return;
+    const ctx = this.ctx;
+    const delay = 0.15 + Math.random() * 1.4; // distance
+    // rumble: noise burst through a closing lowpass
+    const src = ctx.createBufferSource();
+    const len = ctx.sampleRate * 3;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len) ** 2;
+    src.buffer = buf;
+    const f = ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    const t0 = ctx.currentTime + delay;
+    f.frequency.setValueAtTime(160, t0);
+    f.frequency.exponentialRampToValueAtTime(45, t0 + 2.5);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.4, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 3);
+    src.connect(f).connect(g).connect(this.sfx);
+    src.start(t0); src.stop(t0 + 3.2);
+  }
+}
