@@ -124,7 +124,7 @@ function mkLabel(text, x, y, z, scale) {
   ctx.fillText(text, 256, 48);
   const tex = new THREE.CanvasTexture(c);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
-  sprite.position.set(x, y, z);
-  sprite.scale.set(22 * scale, 4.1 * scale, 1);
+  sprite.position.set(x, y + 4, z);
+  sprite.scale.set(13 * scale, 2.4 * scale, 1);
   return sprite;
 }

@@ -5,6 +5,7 @@ built from actual OpenStreetMap highway geometry and the real state border.
 
 - **Real geography**: four tiers of real OSM roads — interstates, US highways, state
   highways statewide, plus real arterial streets in Houston/DFW/San Antonio/Austin —
+  26 major rivers (the Rio Grande traces the whole border), 6 big reservoirs,
   and 132 real cities at their true locations, sized by real population.
 - **Scale**: 1 game unit = 100 m. Texas is ~125 km of drivable world, ~10 min border to border.
 - **Modes**: 🚙 drive a pickup, ✈️ fly (the truck sprouts wings), 🚶 walk as a cowboy.

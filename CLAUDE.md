@@ -34,7 +34,7 @@ Re-downloading OSM inputs: Overpass **POST fails (406) from this environment —
 - World is ~12,500 × 11,800 units. Player scale is deliberately non-realistic (truck ≈ 4 units ≈ 400 m "real") — mini-world style.
 
 ### Data flow
-`tools/build-data.mjs` (offline, one-time) → `data/border.json`, `data/highways.json`, `data/cities.json` → loaded by `src/geo.js` into the `GEO` singleton at boot. All modules read `GEO`; nothing fetches at runtime except these three files. City list (names/lat-lon/population) is hardcoded in the build script, not fetched.
+`tools/build-data.mjs` (offline, one-time) → `data/{border,highways,cities,rivers,lakes}.json` → loaded by `src/geo.js` into the `GEO` singleton at boot. Rivers/lakes come from `--rivers=`/`--lakes=` flags (OSM named-river regex fetch + Natural Earth 10m lakes); border rivers survive clipping via a ~3.5 km dilated-border test. All modules read `GEO`; nothing fetches at runtime except these three files. City list (names/lat-lon/population) is hardcoded in the build script, not fetched.
 
 ### Module graph
 `main.js` boots everything and owns the render loop. `geo.js` is the foundation: `GEO` data, spatial grid over highway segments (`nearestRoad`), `nearestCity`, `inTexas` point-in-polygon, and `seededRand(str)` — the deterministic RNG used by *all* procedural generation (cities, scenery, NPC placement, rose scatter). Same seed string ⇒ same world every session; changing seed strings invalidates players' spatial memory of the world.

@@ -11,8 +11,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   would be gigabytes of data.
 - **Flat terrain** — no elevation; the Hill Country is flat, mountains in the
   Trans-Pecos are decorative cones, no Palo Duro depth.
-- **No rivers or lakes** — Rio Grande border, Colorado, Brazos, and the big
-  reservoirs (Travis, Texoma) are missing.
+- **Only the biggest lakes** — Natural Earth 10m has just 6 reservoirs; mid-size
+  lakes (Travis, Sam Rayburn, Livingston, Whitney) are missing. Rivers have no
+  width variation along their course.
 - **Static NPCs** — 12 stationary characters; no schedules, no movement.
 - **No traffic** — highways are empty except the player.
 - **No audio** — no engine, wind, or music.
@@ -25,9 +26,13 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 ### High value, moderate effort
 - [ ] **Ambient traffic** — vehicles spawned on nearby highway polylines following
   the real geometry; despawn beyond view radius (same pattern as `ScenerySystem`).
-- [ ] **Rivers & lakes** — Overpass `waterway=river` for the majors + Natural Earth
-  lakes; extend `tools/build-data.mjs` (a `rivers.json` alongside highways; ribbons
-  rendered like roads). Rio Grande doubles as the visible SW border.
+- [x] ~~Rivers & lakes~~ — done 2026-07-10: 26 major named rivers (436 polylines) +
+  6 big reservoirs (Amistad, Falcon, Texoma, Meredith, Red Bluff, Toledo Bend).
+  Rio Grande/Red River render wide; border-river clipping uses a ~3.5 km dilation.
+- [ ] **Higher-resolution state border** — current border is only 150 points, so
+  land near wiggly borders (Red River at Texoma) falls outside the ground polygon
+  and shows the "outside" plane. Swap in Census cb_500k Texas boundary; also
+  improves river clipping.
 - [ ] **Day/night cycle** — sun angle + sky/fog color lerp; city buildings get
   emissive windows at night; Marfa Lights only visible after dark.
 - [ ] **Audio** — WebAudio engine hum tied to speed, wind in fly mode, collect chimes.

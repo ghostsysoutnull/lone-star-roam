@@ -39,6 +39,20 @@ export class HUD {
     GEO.border.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = '#c8b878'; ctx.lineWidth = 2; ctx.stroke();
+    // water below roads
+    ctx.strokeStyle = '#3e7aa8';
+    ctx.fillStyle = '#3e7aa8';
+    for (const r of GEO.rivers) {
+      ctx.lineWidth = /Rio Grande|Red River/.test(r.name) ? 1.4 : 0.7;
+      ctx.beginPath();
+      r.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+      ctx.stroke();
+    }
+    for (const l of GEO.lakes) {
+      ctx.beginPath();
+      l.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+      ctx.closePath(); ctx.fill();
+    }
     const roadStyle = {
       motorway: ['#c05040', 1.6], trunk: ['#907048', 0.8],
       primary: ['#6a6a52', 0.5], street: ['#4c5258', 0.4],

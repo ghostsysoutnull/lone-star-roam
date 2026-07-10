@@ -5,6 +5,8 @@ export const GEO = {
   border: [],    // [[x,z], ...] Texas border polygon
   highways: [],  // [{ref, type, pts:[[x,z],...]}]
   cities: [],    // [{name, x, z, pop}]
+  rivers: [],    // [{name, pts:[[x,z],...]}]
+  lakes: [],     // [{name, pts:[[x,z],...]}] closed polygons
   bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
 };
 
@@ -16,6 +18,9 @@ export async function loadGeo(onStatus) {
   GEO.highways = await get('highways.json');
   onStatus?.('Loading cities…');
   GEO.cities = await get('cities.json');
+  onStatus?.('Loading rivers…');
+  GEO.rivers = await get('rivers.json').catch(() => []);
+  GEO.lakes = await get('lakes.json').catch(() => []);
 
   const xs = GEO.border.map((p) => p[0]);
   const zs = GEO.border.map((p) => p[1]);

@@ -1,12 +1,15 @@
 #!/usr/bin/env node
 // Build pipeline: raw OSM/GeoJSON -> compact game data (data/*.json)
 // Usage: node tools/build-data.mjs <us-states.json> <motorways.json> <trunks.json> [primary.json] [metro-streets.json ...]
+//        [--rivers=osm-rivers.json] [--lakes=ne_10m_lakes.json]
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const [statesPath, motorwaysPath, trunksPath, primaryPath, ...metroPaths] = process.argv.slice(2);
+const flags = Object.fromEntries(process.argv.slice(2).filter((a) => a.startsWith('--')).map((a) => a.slice(2).split('=')));
+const positional = process.argv.slice(2).filter((a) => !a.startsWith('--'));
+const [statesPath, motorwaysPath, trunksPath, primaryPath, ...metroPaths] = positional;
 
 // --- Projection: local equirectangular centered on Texas, 1 game unit = 100 m real ---
 const LAT0 = 31.0, LON0 = -99.5; // approx center of Texas
@@ -231,13 +234,93 @@ const cities = [
 });
 console.log(`Cities: ${cities.length}`);
 
+// --- 4. Rivers: chain by name, clip to *dilated* border (Rio Grande/Red River ARE the border) ---
+// distance (deg, approx) from point to border polyline
+function distToBorder(p) {
+  let best = Infinity;
+  for (let i = 0; i < borderDeg.length; i++) {
+    const a = borderDeg[i], b = borderDeg[(i + 1) % borderDeg.length];
+    let x = a[0], y = a[1];
+    const dx = b[0] - x, dy = b[1] - y, L = dx * dx + dy * dy;
+    if (L) {
+      const t = Math.max(0, Math.min(1, ((p[0] - x) * dx + (p[1] - y) * dy) / L));
+      x += dx * t; y += dy * t;
+    }
+    best = Math.min(best, (p[0] - x) ** 2 + (p[1] - y) ** 2);
+  }
+  return Math.sqrt(best);
+}
+const inDilatedTexas = (p) => inPoly(p, borderDeg) || distToBorder(p) < 0.035; // ~3.5 km buffer
+
+let rivers = [];
+if (flags.rivers) {
+  const riverWays = loadWays(flags.rivers, 'river').map((w) => ({ ...w, ref: w.ref.replace(/^\?$/, 'River') }));
+  // chain by name (same algorithm as roads)
+  const byName = new Map();
+  for (const w of riverWays) {
+    if (!byName.has(w.ref)) byName.set(w.ref, []);
+    byName.get(w.ref).push(w);
+  }
+  for (const [name, group] of byName) {
+    const used = new Set();
+    const startMap = new Map();
+    for (let i = 0; i < group.length; i++) {
+      const k = key(group[i].pts[0]);
+      if (!startMap.has(k)) startMap.set(k, []);
+      startMap.get(k).push(i);
+    }
+    for (let i = 0; i < group.length; i++) {
+      if (used.has(i)) continue;
+      used.add(i);
+      const pts = [...group[i].pts];
+      for (;;) {
+        const nexts = (startMap.get(key(pts[pts.length - 1])) || []).filter((j) => !used.has(j));
+        if (!nexts.length) break;
+        used.add(nexts[0]);
+        pts.push(...group[nexts[0]].pts.slice(1));
+      }
+      // clip to dilated Texas, simplify, project
+      let run = [];
+      const flush = () => {
+        if (run.length > 1) {
+          const s = simplify(run, 0.002);
+          if (s.length > 1 && lenOf(s.map(proj)) > 8) rivers.push({ name, pts: s.map(proj) });
+        }
+        run = [];
+      };
+      for (const p of pts) (inDilatedTexas(p) ? run.push(p) : flush());
+      flush();
+    }
+  }
+  console.log(`Rivers: ${rivers.length} polylines, ${rivers.reduce((s, r) => s + r.pts.length, 0)} pts`);
+}
+
+// --- 5. Lakes: Natural Earth polygons with any point in dilated Texas ---
+let lakes = [];
+if (flags.lakes) {
+  const ne = JSON.parse(readFileSync(flags.lakes, 'utf8'));
+  for (const f of ne.features) {
+    const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+    for (const poly of polys) {
+      const ring = poly[0]; // outer ring only
+      if (!ring.some((p) => p[1] > 25.8 && p[1] < 36.6 && p[0] > -106.7 && p[0] < -93.5)) continue;
+      if (!ring.some(inDilatedTexas)) continue;
+      const s = simplify(ring, 0.002);
+      if (s.length > 3) lakes.push({ name: f.properties.name || 'Lake', pts: s.map(proj) });
+    }
+  }
+  console.log(`Lakes: ${lakes.map((l) => l.name).join(', ')}`);
+}
+
 // --- Write outputs ---
 mkdirSync(join(ROOT, 'data'), { recursive: true });
 const border = borderSimple.map(proj);
 writeFileSync(join(ROOT, 'data', 'border.json'), JSON.stringify(border));
 writeFileSync(join(ROOT, 'data', 'highways.json'), JSON.stringify(kept));
 writeFileSync(join(ROOT, 'data', 'cities.json'), JSON.stringify(cities));
-for (const f of ['border.json', 'highways.json', 'cities.json']) {
+if (flags.rivers) writeFileSync(join(ROOT, 'data', 'rivers.json'), JSON.stringify(rivers));
+if (flags.lakes) writeFileSync(join(ROOT, 'data', 'lakes.json'), JSON.stringify(lakes));
+for (const f of ['border.json', 'highways.json', 'cities.json', 'rivers.json', 'lakes.json']) {
   const { statSync } = await import('fs');
   console.log(`data/${f}: ${(statSync(join(ROOT, 'data', f)).size / 1024).toFixed(0)} KB`);
 }

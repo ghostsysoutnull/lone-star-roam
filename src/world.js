@@ -4,6 +4,7 @@ import { GEO, seededRand, inTexas } from './geo.js';
 
 export function buildWorld(scene) {
   buildGround(scene);
+  buildWater(scene);
   buildHighways(scene);
   buildMountains(scene);
   return new ScenerySystem(scene);
@@ -66,44 +67,61 @@ function buildGround(scene) {
   scene.add(piney);
 }
 
-// Highways as flat ribbons — real OSM geometry, merged into two meshes
-function buildHighways(scene) {
-  const build = (type, width, color, y) => {
-    const pos = [], idx = [];
-    for (const h of GEO.highways) {
-      if (h.type !== type) continue;
-      const pts = h.pts;
+// Flat ribbon mesh from an array of polylines (roads, rivers)
+function buildRibbons(scene, polylines, width, color, y) {
+  const pos = [], idx = [];
+  for (const pts of polylines) {
       const base = () => pos.length / 3;
-      for (let i = 0; i < pts.length; i++) {
-        // direction = average of adjacent segments
-        const p = pts[i];
-        const pPrev = pts[Math.max(0, i - 1)], pNext = pts[Math.min(pts.length - 1, i + 1)];
-        let dx = pNext[0] - pPrev[0], dz = pNext[1] - pPrev[1];
-        const L = Math.hypot(dx, dz) || 1;
-        dx /= L; dz /= L;
-        const nx = -dz * width / 2, nz = dx * width / 2; // left normal
-        if (i === 0) var start = base();
-        pos.push(p[0] + nx, y, p[1] + nz, p[0] - nx, y, p[1] - nz);
-      }
-      for (let i = 0; i < pts.length - 1; i++) {
-        const a = start + i * 2;
-        // wound counter-clockwise viewed from +y so normals face up (front side)
-        idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
-      }
+    const start = pos.length / 3;
+    for (let i = 0; i < pts.length; i++) {
+      // direction = average of adjacent segments
+      const p = pts[i];
+      const pPrev = pts[Math.max(0, i - 1)], pNext = pts[Math.min(pts.length - 1, i + 1)];
+      let dx = pNext[0] - pPrev[0], dz = pNext[1] - pPrev[1];
+      const L = Math.hypot(dx, dz) || 1;
+      dx /= L; dz /= L;
+      const nx = -dz * width / 2, nz = dx * width / 2; // left normal
+      pos.push(p[0] + nx, y, p[1] + nz, p[0] - nx, y, p[1] - nz);
     }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setIndex(idx);
-    g.computeVertexNormals();
-    const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color }));
-    scene.add(mesh);
-  };
-  build('motorway', 3.2, 0x33333c, 0.12); // interstates — wide dark asphalt
-  build('trunk', 2.0, 0x4a4843, 0.1);     // US highways — narrower
-  build('primary', 1.5, 0x5c584e, 0.09);  // state highways / FM connectors
-  build('street', 1.1, 0x565460, 0.14);   // real metro arterials — above city street quads
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = start + i * 2;
+      // wound counter-clockwise viewed from +y so normals face up (front side)
+      idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color })));
+}
+
+// Highways — real OSM geometry, one merged mesh per tier
+function buildHighways(scene) {
+  const ofType = (t) => GEO.highways.filter((h) => h.type === t).map((h) => h.pts);
+  buildRibbons(scene, ofType('motorway'), 3.2, 0x33333c, 0.12); // interstates — wide dark asphalt
+  buildRibbons(scene, ofType('trunk'), 2.0, 0x4a4843, 0.1);     // US highways — narrower
+  buildRibbons(scene, ofType('primary'), 1.5, 0x5c584e, 0.09);  // state highways / FM connectors
+  buildRibbons(scene, ofType('street'), 1.1, 0x565460, 0.14);   // real metro arterials — above city street quads
   // center stripes on interstates so roads read clearly at driving height
-  build('motorway', 0.25, 0xd8c860, 0.16);
+  buildRibbons(scene, ofType('motorway'), 0.25, 0xd8c860, 0.16);
+}
+
+// Rivers as blue ribbons, lakes as polygons — real geometry
+function buildWater(scene) {
+  const WATER = 0x2e6f9e;
+  const major = /Rio Grande|Red River/;
+  buildRibbons(scene, GEO.rivers.filter((r) => major.test(r.name)).map((r) => r.pts), 2.4, WATER, 0.07);
+  buildRibbons(scene, GEO.rivers.filter((r) => !major.test(r.name)).map((r) => r.pts), 1.3, WATER, 0.07);
+  for (const lake of GEO.lakes) {
+    const shape = new THREE.Shape();
+    lake.pts.forEach(([x, z], i) => (i ? shape.lineTo(x, -z) : shape.moveTo(x, -z)));
+    const g = new THREE.ShapeGeometry(shape);
+    g.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: WATER }));
+    mesh.position.y = 0.08;
+    scene.add(mesh);
+  }
 }
 
 // Far-west mountain ranges (Guadalupe, Davis, Chisos) — decorative cones
