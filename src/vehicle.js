@@ -50,6 +50,8 @@ export class Player {
     this.puffTimer = 0;
 
     this.camPos = new THREE.Vector3(0, 8, 12);
+    this.getObstacles = null; // set by main: building meshes for camera occlusion
+    this.ray = new THREE.Raycaster();
     addEventListener('keydown', (e) => (this.keys[e.code] = true));
     addEventListener('keyup', (e) => (this.keys[e.code] = false));
   }
@@ -175,7 +177,21 @@ export class Player {
       this.pos.z + Math.cos(this.heading) * back2
     );
     this.camPos.lerp(target, 1 - Math.pow(0.001, dt));
-    this.camera.position.copy(this.camPos);
+    // camera occlusion: if a building blocks the view line, pull the camera in front of it
+    let finalCam = this.camPos;
+    if (this.mode !== 'FLY' && this.getObstacles) {
+      const obstacles = this.getObstacles();
+      if (obstacles.length) {
+        const eye = new THREE.Vector3(this.pos.x, this.pos.y + 1.6, this.pos.z);
+        const toCam = this.camPos.clone().sub(eye);
+        const L = toCam.length();
+        this.ray.set(eye, toCam.normalize());
+        this.ray.far = L;
+        const hit = this.ray.intersectObjects(obstacles, false)[0];
+        if (hit && hit.distance < L) finalCam = eye.addScaledVector(toCam, Math.max(2.2, hit.distance - 0.4));
+      }
+    }
+    this.camera.position.copy(finalCam);
     this.camera.lookAt(this.pos.x, this.pos.y + 1.5, this.pos.z);
     this.prevSpeed = this.speed;
   }

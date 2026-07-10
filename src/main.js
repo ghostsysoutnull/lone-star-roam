@@ -46,9 +46,9 @@ async function boot() {
   const hud = new HUD();
 
   gameplay.onToast = (m) => hud.toast(m);
-  const travel = new TravelMenu(player, gameplay, sky, (m) => hud.toast(m));
   const audio = new AudioSystem();
   const npcs = new NPCSystem(scene, () => ({ night: ATMOS.night, weather: ATMOS.weather, counts: gameplay.counts() }));
+  const travel = new TravelMenu(player, gameplay, sky, npcs, (m) => hud.toast(m));
   npcs.onDialog = (d) => hud.dialog(d);
   npcs.onTalk = () => audio.chime('dialog');
   sky.onBolt = () => audio.thunder();
@@ -58,6 +58,9 @@ async function boot() {
   // Spawn on I-35 just south of Austin
   const austin = GEO.cities.find((c) => c.name === 'Austin');
   player.spawnAt(austin.x, austin.z + 12);
+  // building meshes near the player, for camera occlusion
+  player.getObstacles = () =>
+    [...cities.live.values()].map((g) => g.children.find((c) => c.isInstancedMesh)).filter(Boolean);
 
   addEventListener('keydown', (e) => {
     if (e.code === 'KeyV') player.cycleMode();

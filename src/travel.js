@@ -33,10 +33,11 @@ const ICONS = [
 ];
 
 export class TravelMenu {
-  constructor(player, gameplay, sky, onToast) {
+  constructor(player, gameplay, sky, npcs, onToast) {
     this.player = player;
     this.gameplay = gameplay;
     this.sky = sky;
+    this.npcs = npcs;
     this.onToast = onToast;
     this.tab = 'Cities';
     this.el = document.getElementById('travel');
@@ -70,6 +71,16 @@ export class TravelMenu {
       this.current = LANDMARKS.map((l) => ({ name: l.name, at: l.at, fly: 15, star: collected.has(l.name) }));
     } else if (this.tab === 'Nature') {
       this.current = NATURE;
+    } else if (this.tab === 'Folks') {
+      // meet a character once you've visited their town
+      const cityOf = (name) => GEO.cities.find((c) => Math.hypot(c.x - name.g.position.x, c.z - name.g.position.z) < 100)?.name ?? '';
+      this.current = this.npcs.named.map((n) => {
+        const city = cityOf(n);
+        return {
+          name: `${n.name} — ${city}`, at: [n.g.position.x, n.g.position.z],
+          walkTo: n, locked: !visited.has(city),
+        };
+      });
     } else {
       this.current = ICONS;
     }
@@ -77,7 +88,9 @@ export class TravelMenu {
       .map((p, i) => `<button data-i="${i}" ${p.locked ? 'disabled' : ''}>${p.star ? '⭐ ' : ''}${p.name}${p.locked ? ' 🔒' : ''}</button>`)
       .join('');
     this.el.querySelector('.hint').textContent =
-      this.tab === 'Cities' ? 'Locked cities unlock as fast-travel once you visit them.' : 'Click to travel.';
+      this.tab === 'Cities' ? 'Locked cities unlock as fast-travel once you visit them.'
+      : this.tab === 'Folks' ? 'Meet the locals — you can drop in on anyone whose town you’ve visited.'
+      : 'Click to travel.';
   }
 
   go(poi) {
@@ -87,7 +100,28 @@ export class TravelMenu {
       this.sky.t = 0.9; // ~21:36 — dark enough for the lights
       this.onToast?.('🌙 Arriving after dark…');
     }
-    if (poi.fly) {
+    if (poi.walkTo) {
+      // arrive on foot facing the character. Characters stand on road shoulders,
+      // so the road itself is the guaranteed-clear spot to appear on.
+      const n = poi.walkTo;
+      const r = nearestRoad(n.g.position.x, n.g.position.z, 30);
+      const stand = 2.6 + (n.g.scale.x - 1) * 1.8;
+      let sx, sz;
+      if (r) {
+        // stand between the road point and the NPC, `stand` away from the NPC
+        const dx = r.x - n.g.position.x, dz = r.z - n.g.position.z;
+        const L = Math.hypot(dx, dz) || 1;
+        sx = n.g.position.x + (dx / L) * stand;
+        sz = n.g.position.z + (dz / L) * stand;
+      } else {
+        sx = n.g.position.x + stand * 0.7;
+        sz = n.g.position.z + stand * 0.7;
+      }
+      p.setMode('WALK');
+      p.pos.set(sx, 0, sz);
+      p.heading = Math.atan2(sx - n.g.position.x, n.g.position.z - sz) + Math.PI;
+      p.speed = 0;
+    } else if (poi.fly) {
       p.setMode('FLY');
       p.pos.set(x, poi.fly, z + poi.fly * 1.2); // stand off south, looking north at the sight
       p.heading = 0;
