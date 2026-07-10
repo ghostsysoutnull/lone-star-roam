@@ -5,7 +5,7 @@ import { GEO, hAt } from './geo.js';
 import { merge, tinted } from './traffic.js';
 
 const MAX_TRAINS = 3;
-const SPAWN_R = 350, DESPAWN_R = 500;
+const SPAWN_R = 350, DESPAWN_R = 1200; // despawn only beyond fog — never in plain sight
 const CAR_LEN = 3.3, SPEED = 16;
 
 // --- rolling stock (face -z; BODY-white takes instance tint where used) ---
@@ -96,10 +96,13 @@ export class TrainSystem {
 
   spawn(px, pz) {
     const near = this.rails.filter((r) =>
-      px > r.minX - SPAWN_R && px < r.maxX + SPAWN_R && pz > r.minZ - SPAWN_R && pz < r.maxZ + SPAWN_R);
+      px > r.minX - SPAWN_R && px < r.maxX + SPAWN_R && pz > r.minZ - SPAWN_R && pz < r.maxZ + SPAWN_R &&
+      // mainlines only — no freight trains on 200-unit yard spurs
+      Math.max(r.maxX - r.minX, r.maxZ - r.minZ) > 350);
     if (!near.length) return;
     const rail = near[(Math.random() * near.length) | 0];
     this.arcInit(rail);
+    if (rail.len < 500) return;
     const nCars = 14 + ((Math.random() * 14) | 0);
     if (rail.len < nCars * CAR_LEN + 60) return;
     const dir = Math.random() < 0.5 ? 1 : -1;
@@ -128,11 +131,15 @@ export class TrainSystem {
 
     const counts = { loco: 0, boxcar: 0, hopper: 0, tanker: 0 };
     for (const tr of this.trains) {
-      tr.s += SPEED * tr.dir * dt;
       const total = (tr.cars.length + 1) * CAR_LEN;
-      // wrap at rail ends (train "loops" its line)
-      if (tr.dir > 0 && tr.s > tr.rail.len) tr.s = total;
-      if (tr.dir < 0 && tr.s < total) tr.s = tr.rail.len;
+      // end of line: hold at the buffer if the player is watching, retire otherwise
+      const atEnd = (tr.dir > 0 && tr.s >= tr.rail.len) || (tr.dir < 0 && tr.s <= total);
+      if (!atEnd) tr.s += SPEED * tr.dir * dt;
+      else {
+        tr.s = tr.dir > 0 ? tr.rail.len : total;
+        const [hx, hz] = this.at(tr.rail, tr.s);
+        if (Math.hypot(hx - px, hz - pz) > 300) { tr.dead = true; continue; }
+      }
       tr.dead = true;
       for (let c = 0; c <= tr.cars.length; c++) {
         const s = tr.s - tr.dir * c * CAR_LEN;
