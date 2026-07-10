@@ -71,9 +71,12 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 
 ### Polish backlog (small)
 - [x] ~~Bluebonnet patches along Hill Country roads~~ — done with the nature pass
-- [ ] More landmarks (Buc-ee's beaver, Stonehenge II, Beaumont fire hydrant…)
-- [ ] Minimap zoom control; big map click-to-set-waypoint
-- [ ] Odometer + total play stats on the help screen
+- [x] ~~More landmarks~~ — done 2026-07-10: Buc-ee's beaver, Stonehenge II,
+  Beaumont fire hydrant, Paisano Pete (14 → 18)
+- [x] ~~Minimap zoom control~~ — done: Z cycles 3 levels. Big map
+  click-to-set-waypoint still open.
+- [x] ~~Odometer + play stats~~ — done: live odometer under the speedo;
+  distance/time/top-speed on the help screen, persisted with the save
 - [ ] Mobile touch controls (virtual stick + buttons)
 
 ## Non-goals

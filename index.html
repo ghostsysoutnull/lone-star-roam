@@ -14,6 +14,7 @@
   #hud-score { top: 12px; right: 14px; text-align: right; font-size: 14px; line-height: 1.5; }
   #hud-speed { bottom: 18px; right: 20px; font-size: 30px; font-weight: 700; }
   #hud-speed small { font-size: 13px; font-weight: 400; opacity: .8; }
+  #hud-odo { font-size: 12px; font-weight: 400; opacity: .65; text-align: right; }
   #hud-mode { bottom: 58px; right: 22px; font-size: 13px; opacity: .9; }
   #minimap { position: fixed; left: 14px; bottom: 14px; width: 190px; height: 180px;
     border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(10,14,20,.65); }
@@ -65,7 +66,7 @@
 </div>
 <div id="hud-score" class="hud">
   <div>⭐ Cities <span id="score-cities">0</span>/132</div>
-  <div>🏛 Landmarks <span id="score-landmarks">0</span>/14</div>
+  <div>🏛 Landmarks <span id="score-landmarks">0</span>/18</div>
   <div>🌹 Roses <span id="score-roses">0</span>/300</div>
   <div>🦌 Critters <span id="score-critters">0</span>/8</div>
 </div>
@@ -97,9 +98,10 @@
   <div><kbd>E</kbd> talk to NPCs &nbsp; <kbd>M</kbd> map &nbsp; <kbd>R</kbd> reset to road</div>
   <div><kbd>T</kbd> hold to fast-forward time (12-min days)</div>
   <div><kbd>P</kbd> travel menu — landmarks, nature, Texas icons; cities unlock as you visit</div>
-  <div><kbd>N</kbd> mute / unmute sound</div>
+  <div><kbd>N</kbd> mute / unmute sound &nbsp; <kbd>Z</kbd> minimap zoom</div>
   <div><kbd>H</kbd> toggle this help</div>
-  <div style="margin-top:8px;opacity:.7">Visit all 132 real cities, find 14 landmarks, collect yellow roses.</div>
+  <div style="margin-top:8px;opacity:.7">Visit all 132 real cities, find 18 landmarks, collect roses, spot the critters.</div>
+  <div id="help-stats" style="margin-top:6px;color:#ffd35c"></div>
 </div>
 
 <div id="loading">

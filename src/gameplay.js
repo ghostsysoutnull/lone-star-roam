@@ -23,7 +23,12 @@ export const LANDMARKS = [
   { name: 'Galveston Pleasure Pier', at: LL(29.2854, -94.7905), kind: 'ferris', fact: 'A ferris wheel over the Gulf of Mexico.' },
   { name: 'Padre Island', at: LL(26.5940, -97.2780), kind: 'beach', fact: 'Longest undeveloped barrier island in the world.' },
   { name: 'El Paso Star', at: LL(31.8046, -106.4820), kind: 'star', fact: 'A 459-ft lit star on the Franklin Mountains.' },
+  { name: 'Buc-ee’s New Braunfels', at: LL(29.7377, -98.0857), kind: 'beaver', fact: 'World’s largest convenience store — and famously spotless restrooms.' },
+  { name: 'Stonehenge II', at: LL(30.0772, -99.3005), kind: 'henge', fact: 'A Hill Country Stonehenge replica, built on a whim in 1989.' },
+  { name: 'World’s Largest Fire Hydrant', at: LL(30.0860, -94.1018), kind: 'hydrant', fact: '24 feet of Dalmatian-spotted hydrant outside Beaumont’s Fire Museum.' },
+  { name: 'Paisano Pete', at: LL(30.8940, -102.8720), kind: 'pete', fact: 'An 11-ft roadrunner, greeting Fort Stockton travelers since 1979.' },
 ];
+export const LANDMARK_COUNT = LANDMARKS.length;
 
 const NPC_DATA = [
   ['Austin', 'Willie', 'Welcome to Austin! Keep it weird, partner. Try the breakfast tacos before you fly off.', 'Austin is the live music capital of the world — 250+ venues.'],
@@ -45,6 +50,8 @@ export class Gameplay {
     this.scene = scene;
     this.save = JSON.parse(localStorage.getItem(SAVE_KEY) || '{"cities":[],"landmarks":[],"roses":[]}');
     this.save.species ??= []; // added later — default for older saves
+    this.save.stats ??= { dist: 0, time: 0, top: 0 }; // km real, seconds, mph
+    this.saveTimer = 0;
     this.onToast = null;
     this.onDialog = null;
     this.activeNPC = null;
@@ -181,8 +188,16 @@ export class Gameplay {
     }
   }
 
-  update(dt, pos, night = 0) {
+  update(dt, pos, night = 0, speed = 0) {
     this.t += dt;
+
+    // play stats (1 game unit = 100 m real; speed*2.4 matches the HUD mph)
+    const st = this.save.stats;
+    st.time += dt;
+    st.dist += Math.abs(speed) * dt * 0.1;
+    st.top = Math.max(st.top, Math.abs(Math.round(speed * 2.4)));
+    this.saveTimer += dt;
+    if (this.saveTimer > 20) { this.saveTimer = 0; this.persist(); }
     // spin stars & bob roses
     for (const s of this.cityStars.children) s.rotation.y = this.t * 1.2;
 
@@ -339,6 +354,74 @@ function mkLandmarkMesh(kind) {
       star.position.y = 8; g.add(star);
       const hill = add(new THREE.Mesh(new THREE.ConeGeometry(9, 7, 7), new THREE.MeshLambertMaterial({ color: 0x9a7a58, flatShading: true })));
       hill.position.y = 3.5;
+      break;
+    }
+    case 'beaver': {
+      const fur = new THREE.MeshLambertMaterial({ color: 0x8a5a30, flatShading: true });
+      const belly = add(new THREE.Mesh(new THREE.SphereGeometry(1.6, 8, 6), fur));
+      belly.position.y = 1.8; belly.scale.set(1, 1.25, 0.8);
+      const head = add(new THREE.Mesh(new THREE.SphereGeometry(1.0, 8, 6), fur));
+      head.position.y = 4.0;
+      const teeth = add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.15), new THREE.MeshLambertMaterial({ color: 0xfff8e0 })));
+      teeth.position.set(0, 3.55, -0.85);
+      const cap = add(new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.4, 10), new THREE.MeshLambertMaterial({ color: 0xcc2222 })));
+      cap.position.y = 4.85;
+      // the roadside sign
+      const pole = add(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 8, 6), stone));
+      pole.position.set(3, 4, 0);
+      const disc = add(new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.2, 12).rotateX(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xffd35c })));
+      disc.position.set(3, 8.2, 0);
+      break;
+    }
+    case 'henge': {
+      const rock = new THREE.MeshLambertMaterial({ color: 0x9a9288, flatShading: true });
+      const R = 5.5, n = 9;
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const slab = add(new THREE.Mesh(new THREE.BoxGeometry(1.1, 3.2, 0.7), rock));
+        slab.position.set(Math.cos(a) * R, 1.6, Math.sin(a) * R);
+        slab.rotation.y = -a;
+        if (i % 2 === 0) { // lintels across alternating pairs
+          const lin = add(new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.6, 0.8), rock));
+          const a2 = a + Math.PI / n;
+          lin.position.set(Math.cos(a2) * R, 3.5, Math.sin(a2) * R);
+          lin.rotation.y = -a2;
+        }
+      }
+      break;
+    }
+    case 'hydrant': {
+      const white = new THREE.MeshLambertMaterial({ color: 0xf2f2f0, flatShading: true });
+      const black = new THREE.MeshLambertMaterial({ color: 0x222222 });
+      const body = add(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 5, 10), white));
+      body.position.y = 2.5;
+      const dome = add(new THREE.Mesh(new THREE.SphereGeometry(1.2, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), white));
+      dome.position.y = 5;
+      const cap = add(new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.5, 8), black));
+      cap.position.y = 5.9;
+      for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) { // side nozzles
+        const noz = add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.9, 8).rotateZ(Math.PI / 2), black));
+        noz.position.set(Math.cos(a) * 1.35, 3.4, Math.sin(a) * 1.35);
+        noz.rotation.y = -a;
+      }
+      break;
+    }
+    case 'pete': {
+      // giant roadrunner statue — Fort Stockton's finest
+      const feathers = new THREE.MeshLambertMaterial({ color: 0x6a6250, flatShading: true });
+      const body = add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 2, 4), feathers));
+      body.position.y = 3.2;
+      const neckHead = add(new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 1.6), feathers));
+      neckHead.position.set(0, 5.2, -2.4);
+      const beak = add(new THREE.Mesh(new THREE.ConeGeometry(0.4, 1.6, 6).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a3a30 })));
+      beak.position.set(0, 5.2, -3.9);
+      const tail = add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 3, 3.4), feathers));
+      tail.position.set(0, 4.6, 2.8);
+      tail.rotation.x = -0.65;
+      for (const x of [-0.5, 0.5]) {
+        const leg = add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 2.4, 6), new THREE.MeshLambertMaterial({ color: 0x3a3a30 })));
+        leg.position.set(x, 1.1, 0);
+      }
       break;
     }
   }

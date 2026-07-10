@@ -21,6 +21,8 @@ export class HUD {
       help: document.getElementById('help'),
     };
     this.mapLayer = this.renderMapLayer(1400, 1320);
+    this.zoomLevels = [1.4, 2.4, 4.5];
+    this.zoomIdx = 1;
     const s = Math.min(innerWidth, innerHeight) - 60;
     this.bigCanvas.width = s; this.bigCanvas.height = s * 0.95;
     this.toastTimer = null;
@@ -80,7 +82,18 @@ export class HUD {
   }
 
   toggleBigMap() { this.big.style.display = this.big.style.display === 'block' ? 'none' : 'block'; }
-  toggleHelp() { this.els.help.style.display = this.els.help.style.display === 'block' ? 'none' : 'block'; }
+
+  toggleHelp(stats) {
+    const open = this.els.help.style.display !== 'block';
+    if (open && stats) {
+      const h = Math.floor(stats.time / 3600), m = Math.floor((stats.time % 3600) / 60);
+      document.getElementById('help-stats').textContent =
+        `🚗 ${Math.round(stats.dist).toLocaleString()} km traveled · ⏱ ${h ? h + ' h ' : ''}${m} min · 🏁 top ${stats.top} mph`;
+    }
+    this.els.help.style.display = open ? 'block' : 'none';
+  }
+
+  cycleZoom() { this.zoomIdx = (this.zoomIdx + 1) % this.zoomLevels.length; }
 
   toast(msg) {
     this.els.toast.textContent = msg;
@@ -102,7 +115,8 @@ export class HUD {
     this.els.interact.style.display = 'block';
   }
 
-  update(player, counts, road, water, clock, weatherIcon) {
+  update(player, counts, road, water, clock, weatherIcon, stats) {
+    this.lastDist = stats?.dist ?? this.lastDist;
     // location line: nearest city + real distance
     const { city, dist } = nearestCity(player.pos.x, player.pos.z);
     const km = (dist * 0.1).toFixed(dist < 100 ? 1 : 0);
@@ -112,7 +126,8 @@ export class HUD {
     this.els.location.textContent = dist < 3 ? `📍 ${city.name}` : `📍 ${km} km ${dir} of ${city.name}`;
     // road when on one; water body when over one (both can show — bridges exist)
     this.els.road.textContent = [road && `🛣 ${road.ref}`, water && `🌊 ${water}`].filter(Boolean).join('   ');
-    this.els.speed.innerHTML = player.mode === 'WALK' ? '🚶' : `${player.speedMph} <small>mph</small>`;
+    this.els.speed.innerHTML = player.mode === 'WALK' ? '🚶'
+      : `${player.speedMph} <small>mph</small><div id="hud-odo">${Math.round(this.lastDist ?? 0).toLocaleString()} km</div>`;
     const icons = { DRIVE: '🚙', FLY: '✈️', WALK: '🚶' };
     this.els.mode.textContent = `${weatherIcon} ${clock} · ${icons[player.mode]} ${player.mode}${player.mode === 'FLY' ? ` — alt ${Math.round(player.pos.y * 100 / 1000 * 10) / 10} km` : ''} — V to change`;
     this.els.cities.textContent = counts.cities;
@@ -130,7 +145,7 @@ export class HUD {
     ctx.clearRect(0, 0, W, H);
     // zoomed window around player from the prerendered layer
     const [px, pz] = this.mapT(player.pos.x, player.pos.z);
-    const zoom = 2.4, sw = W / zoom, sh = H / zoom;
+    const zoom = this.zoomLevels[this.zoomIdx], sw = W / zoom, sh = H / zoom;
     ctx.drawImage(this.mapLayer, px - sw / 2, pz - sh / 2, sw, sh, 0, 0, W, H);
     // player arrow
     ctx.save();

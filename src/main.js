@@ -58,7 +58,8 @@ async function boot() {
   addEventListener('keydown', (e) => {
     if (e.code === 'KeyV') player.cycleMode();
     if (e.code === 'KeyM') hud.toggleBigMap();
-    if (e.code === 'KeyH') hud.toggleHelp();
+    if (e.code === 'KeyH') hud.toggleHelp(gameplay.save.stats);
+    if (e.code === 'KeyZ') hud.cycleZoom();
     if (e.code === 'KeyP') travel.toggle();
     if (e.code === 'Escape') travel.close();
     if (e.code === 'KeyN') hud.toast(audio.toggleMute() ? '🔇 Muted' : '🔊 Sound on');
@@ -89,14 +90,14 @@ async function boot() {
     traffic.setNight(ATMOS.night);
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y);
     audio.update(player, ATMOS);
-    const npcName = gameplay.update(dt, player.pos, ATMOS.night);
+    const npcName = gameplay.update(dt, player.pos, ATMOS.night, player.speed);
     hud.interactHint(npcName);
     // HUD text/minimap at ~12 Hz — nearestCity/nearestRoad every frame is wasteful
     hudTick += dt;
     if (hudTick > 0.08) {
       hudTick = 0;
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
-      hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon());
+      hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats);
     }
     renderer.render(scene, camera);
   });
