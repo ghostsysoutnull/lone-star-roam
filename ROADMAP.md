@@ -24,15 +24,13 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 ## Planned / candidate features
 
 ### High value, moderate effort
-- [ ] **Ambient traffic** — vehicles spawned on nearby highway polylines following
-  the real geometry; despawn beyond view radius (same pattern as `ScenerySystem`).
+- [x] ~~Ambient traffic~~ — done 2026-07-10: 70 pooled instanced vehicles on real
+  highways, both directions, tier-weighted density/speed. No player collision yet.
 - [x] ~~Rivers & lakes~~ — done 2026-07-10: 26 major named rivers (436 polylines) +
   6 big reservoirs (Amistad, Falcon, Texoma, Meredith, Red Bluff, Toledo Bend).
   Rio Grande/Red River render wide; border-river clipping uses a ~3.5 km dilation.
-- [ ] **Higher-resolution state border** — current border is only 150 points, so
-  land near wiggly borders (Red River at Texoma) falls outside the ground polygon
-  and shows the "outside" plane. Swap in Census cb_500k Texas boundary; also
-  improves river clipping.
+- [x] ~~Higher-resolution state border~~ — done 2026-07-10: Census 500k boundary,
+  1,517 in-game points; Texoma-area land and river clipping fixed.
 - [ ] **Day/night cycle** — sun angle + sky/fog color lerp; city buildings get
   emissive windows at night; Marfa Lights only visible after dark.
 - [ ] **Audio** — WebAudio engine hum tied to speed, wind in fly mode, collect chimes.
