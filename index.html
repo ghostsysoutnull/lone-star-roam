@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lone Star Roam — Texas Free Roam</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e14; font-family: system-ui, sans-serif; }
+  #app { position: fixed; inset: 0; }
+  canvas { display: block; }
+  .hud { position: fixed; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); user-select: none; pointer-events: none; }
+  #hud-topleft { top: 12px; left: 14px; font-size: 14px; line-height: 1.5; }
+  #hud-topleft .title { font-weight: 700; font-size: 16px; letter-spacing: .5px; }
+  #hud-score { top: 12px; right: 14px; text-align: right; font-size: 14px; line-height: 1.5; }
+  #hud-speed { bottom: 18px; right: 20px; font-size: 30px; font-weight: 700; }
+  #hud-speed small { font-size: 13px; font-weight: 400; opacity: .8; }
+  #hud-mode { bottom: 58px; right: 22px; font-size: 13px; opacity: .9; }
+  #minimap { position: fixed; left: 14px; bottom: 14px; width: 190px; height: 180px;
+    border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(10,14,20,.65); }
+  #bigmap { position: fixed; inset: 0; display: none; background: rgba(6,9,14,.92); z-index: 10; }
+  #bigmap canvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
+  #dialog { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); max-width: 560px; min-width: 320px;
+    background: rgba(12,16,24,.92); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 10px;
+    padding: 14px 18px; font-size: 15px; line-height: 1.45; display: none; z-index: 9; }
+  #dialog .npc-name { font-weight: 700; color: #ffd35c; margin-bottom: 4px; }
+  #dialog .hint { margin-top: 8px; font-size: 12px; opacity: .6; }
+  #toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: rgba(20,26,36,.92);
+    color: #ffd35c; padding: 10px 22px; border-radius: 24px; font-size: 15px; font-weight: 600;
+    opacity: 0; transition: opacity .3s; z-index: 9; pointer-events: none; }
+  #interact-hint { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); color: #fff;
+    background: rgba(12,16,24,.8); padding: 6px 14px; border-radius: 16px; font-size: 13px; display: none; z-index: 8; }
+  #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: #0b0e14; color: #fff; z-index: 20; }
+  #loading h1 { font-size: 30px; letter-spacing: 1px; margin: 0 0 8px; }
+  #loading h1 span { color: #ffd35c; }
+  #loading p { opacity: .7; margin: 4px 0; font-size: 14px; }
+  #help { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); background: rgba(12,16,24,.95);
+    color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 12px; padding: 22px 30px; z-index: 11;
+    display: none; font-size: 14px; line-height: 1.8; }
+  #help h2 { margin: 0 0 8px; color: #ffd35c; }
+  kbd { background: #2a3140; border-radius: 4px; padding: 1px 7px; font-family: inherit; font-size: 12px; margin-right: 4px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<div id="hud-topleft" class="hud">
+  <div class="title">🤠 LONE STAR ROAM</div>
+  <div id="hud-location">—</div>
+  <div id="hud-road"></div>
+</div>
+<div id="hud-score" class="hud">
+  <div>⭐ Cities <span id="score-cities">0</span>/132</div>
+  <div>🏛 Landmarks <span id="score-landmarks">0</span>/14</div>
+  <div>🌹 Roses <span id="score-roses">0</span>/300</div>
+</div>
+<div id="hud-speed" class="hud">0 <small>mph</small></div>
+<div id="hud-mode" class="hud">🚙 DRIVE — V to change</div>
+<canvas id="minimap" width="380" height="360"></canvas>
+<div id="bigmap"><canvas id="bigmap-canvas"></canvas></div>
+<div id="dialog"><div class="npc-name"></div><div class="npc-text"></div><div class="hint">E — continue / close</div></div>
+<div id="interact-hint"></div>
+<div id="toast"></div>
+
+<div id="help">
+  <h2>🤠 Lone Star Roam</h2>
+  <div><kbd>W</kbd><kbd>S</kbd> accelerate / brake &nbsp; <kbd>A</kbd><kbd>D</kbd> steer</div>
+  <div><kbd>V</kbd> switch Drive → Fly → Walk</div>
+  <div><kbd>Space</kbd>/<kbd>Ctrl</kbd> climb / descend (fly)</div>
+  <div><kbd>E</kbd> talk to NPCs &nbsp; <kbd>M</kbd> map &nbsp; <kbd>R</kbd> reset to road</div>
+  <div><kbd>H</kbd> toggle this help</div>
+  <div style="margin-top:8px;opacity:.7">Visit all 132 real cities, find 14 landmarks, collect yellow roses.</div>
+</div>
+
+<div id="loading">
+  <h1>🤠 LONE STAR <span>ROAM</span></h1>
+  <p>A scaled-down, geographically real Texas.</p>
+  <p id="loading-status">Loading Texas…</p>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
