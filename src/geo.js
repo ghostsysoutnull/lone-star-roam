@@ -30,6 +30,7 @@ export async function loadGeo(onStatus) {
   };
 
   buildRoadIndex();
+  buildRiverIndex();
   return GEO;
 }
 
@@ -76,6 +77,47 @@ function closestOnSeg(px, pz, a, b) {
   const L = dx * dx + dz * dz;
   const t = L ? Math.max(0, Math.min(1, ((px - a[0]) * dx + (pz - a[1]) * dz) / L)) : 0;
   return [a[0] + dx * t, a[1] + dz * t];
+}
+
+// --- Water: separate grid so rivers never count as roads for driving physics ---
+const riverGrid = new Map();
+function buildRiverIndex() {
+  for (const r of GEO.rivers) {
+    for (let i = 1; i < r.pts.length; i++) {
+      const seg = { a: r.pts[i - 1], b: r.pts[i], name: r.name };
+      const k = cellKey((seg.a[0] + seg.b[0]) / 2, (seg.a[1] + seg.b[1]) / 2);
+      if (!riverGrid.has(k)) riverGrid.set(k, []);
+      riverGrid.get(k).push(seg);
+    }
+  }
+}
+
+// Name of the water body at (x,z), or null. Lakes win over rivers (rivers feed lakes).
+export function waterAt(x, z) {
+  for (const lake of GEO.lakes) {
+    let inside = false;
+    const poly = lake.pts;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, zi] = poly[i], [xj, zj] = poly[j];
+      if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    }
+    if (inside) return lake.name;
+  }
+  const HALF = 1.4; // a bit over the widest river ribbon's half-width
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  let best = null, bestD = HALF * HALF;
+  for (let i = -1; i <= 1; i++) {
+    for (let j = -1; j <= 1; j++) {
+      const segs = riverGrid.get(`${cx + i},${cz + j}`);
+      if (!segs) continue;
+      for (const s of segs) {
+        const p = closestOnSeg(x, z, s.a, s.b);
+        const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
+        if (d < bestD) { bestD = d; best = s.name; }
+      }
+    }
+  }
+  return best;
 }
 
 export function nearestCity(x, z) {
