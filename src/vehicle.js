@@ -2,6 +2,7 @@
 // Arcade physics, third-person chase camera.
 import * as THREE from 'three';
 import { nearestRoad, nearestCity, inTexas } from './geo.js';
+import { ATMOS } from './sky.js';
 
 export const MODES = ['DRIVE', 'FLY', 'WALK'];
 
@@ -112,6 +113,9 @@ export class Player {
       this.speed *= Math.pow(0.1, dt);
     }
 
+    // headlights after dark
+    this.truck.userData.headlights.visible = ATMOS.night > 0.45;
+
     // Place avatar
     const avatar = this.mode === 'WALK' ? this.cowboy : this.truck;
     avatar.position.copy(this.pos);
@@ -158,7 +162,17 @@ function mkTruck() {
   const star = mkStarMesh(0.34, 0xffd35c);
   star.rotation.x = -Math.PI / 2;
   star.position.set(0, 0.94, -1.35);
-  g.add(bed, cab, star);
+  // headlights — emissive quads, toggled on after dark
+  const lights = new THREE.Group();
+  const lightMat = new THREE.MeshBasicMaterial({ color: 0xfff2c0 });
+  for (const x of [-0.55, 0.55]) {
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.18, 0.06), lightMat);
+    beam.position.set(x, 0.68, -1.82);
+    lights.add(beam);
+  }
+  lights.visible = false;
+  g.add(bed, cab, star, lights);
+  g.userData.headlights = lights;
   return g;
 }
 

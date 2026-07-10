@@ -10,7 +10,10 @@ built from actual OpenStreetMap highway geometry and the real state border.
 - **Scale**: 1 game unit = 100 m. Texas is ~125 km of drivable world, ~10 min border to border.
 - **Modes**: 🚙 drive a pickup, ✈️ fly (the truck sprouts wings), 🚶 walk as a cowboy.
 - **Collect**: visit all 132 cities (⭐), find 14 real landmarks (🏛 Alamo, Cadillac Ranch, Marfa Lights…),
-  gather 300 yellow roses (🌹) along the highways. Progress saves to localStorage.
+  gather 300 yellow roses (🌹), spot all 8 wildlife species (🦌). Progress saves to localStorage.
+- **Living world**: ambient traffic on the real highways, regional wildlife that flees you,
+  pumpjacks nodding across the Permian Basin, 12-minute day/night cycle (hold <kbd>T</kbd> to
+  fast-forward), and region-weighted weather — Gulf rain, Panhandle lightning, West Texas dust.
 - **NPCs**: 12 locals with Texas facts in the major cities.
 
 ## Run

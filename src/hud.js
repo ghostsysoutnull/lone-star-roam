@@ -102,7 +102,7 @@ export class HUD {
     this.els.interact.style.display = 'block';
   }
 
-  update(player, counts, road, water) {
+  update(player, counts, road, water, clock, weatherIcon) {
     // location line: nearest city + real distance
     const { city, dist } = nearestCity(player.pos.x, player.pos.z);
     const km = (dist * 0.1).toFixed(dist < 100 ? 1 : 0);
@@ -114,7 +114,7 @@ export class HUD {
     this.els.road.textContent = [road && `🛣 ${road.ref}`, water && `🌊 ${water}`].filter(Boolean).join('   ');
     this.els.speed.innerHTML = player.mode === 'WALK' ? '🚶' : `${player.speedMph} <small>mph</small>`;
     const icons = { DRIVE: '🚙', FLY: '✈️', WALK: '🚶' };
-    this.els.mode.textContent = `${icons[player.mode]} ${player.mode}${player.mode === 'FLY' ? ` — alt ${Math.round(player.pos.y * 100 / 1000 * 10) / 10} km` : ''} — V to change`;
+    this.els.mode.textContent = `${weatherIcon} ${clock} · ${icons[player.mode]} ${player.mode}${player.mode === 'FLY' ? ` — alt ${Math.round(player.pos.y * 100 / 1000 * 10) / 10} km` : ''} — V to change`;
     this.els.cities.textContent = counts.cities;
     this.els.landmarks.textContent = counts.landmarks;
     this.els.roses.textContent = counts.roses;

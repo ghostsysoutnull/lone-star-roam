@@ -19,6 +19,11 @@ export class CitySystem {
     this.boxGeo.translate(0, 0.5, 0); // scale from ground up
   }
 
+  // downtown windows glow after dark (one shared material — cheap and uniform)
+  setNight(f) {
+    this.buildingMat.emissive.setRGB(0.9 * f * 0.4, 0.75 * f * 0.4, 0.45 * f * 0.4);
+  }
+
   update(px, pz) {
     for (const c of GEO.cities) {
       const d = Math.hypot(c.x - px, c.z - pz);

@@ -1,6 +1,7 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
 import { GEO, seededRand, inTexas, nearestRoad } from './geo.js';
+import { ATMOS } from './sky.js';
 
 export function buildWorld(scene) {
   buildGround(scene);
@@ -189,7 +190,7 @@ class ScenerySystem {
     this.t += dt;
     for (const a of this.animated) {
       if (a.kind === 'pumpjack') a.obj.rotation.x = Math.sin(this.t * 1.4 + a.phase) * 0.22; // beam nods across its x pivot
-      else a.obj.rotation.z += dt * (1.6 + a.phase * 0.1); // windmill fan spins in its XY plane
+      else a.obj.rotation.z += dt * (1.6 + a.phase * 0.1) * ATMOS.wind; // windmills spin up when weather turns
     }
   }
 

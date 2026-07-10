@@ -96,6 +96,7 @@ function pickType(mix) {
 export class TrafficSystem {
   constructor(scene) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    this.mat = mat;
     this.meshes = {
       sedan: new THREE.InstancedMesh(mkSedan(), mat, POOL),
       pickup: new THREE.InstancedMesh(mkPickup(), mat, POOL),
@@ -124,6 +125,11 @@ export class TrafficSystem {
     this.tmpColor = new THREE.Color();
     this.candidates = [];
     this.candTimer = 0;
+  }
+
+  // faint glow at night so traffic stays visible (stand-in for headlights)
+  setNight(f) {
+    this.mat.emissive.setRGB(0.28 * f, 0.26 * f, 0.2 * f);
   }
 
   // refresh candidate polylines around the player (cheap, but not every frame)

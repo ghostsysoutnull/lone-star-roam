@@ -7,6 +7,7 @@ import { Player } from './vehicle.js';
 import { Gameplay } from './gameplay.js';
 import { TrafficSystem } from './traffic.js';
 import { AnimalSystem, SPECIES, SPECIES_COUNT } from './animals.js';
+import { SkySystem, ATMOS } from './sky.js';
 import { HUD } from './hud.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
@@ -27,11 +28,12 @@ async function boot() {
   // near=0.5: depth precision matters more than close-ups at this world scale (z-fighting)
   const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 30000);
 
-  // Golden-hour Texas light
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
   sun.position.set(-800, 900, 400);
-  scene.add(sun, new THREE.AmbientLight(0xc8d8e8, 0.9));
+  const ambient = new THREE.AmbientLight(0xc8d8e8, 0.9);
+  scene.add(sun, ambient);
 
+  const sky = new SkySystem(scene, sun, ambient);
   const scenery = buildWorld(scene);
   const cities = new CitySystem(scene);
   const player = new Player(scene, camera);
@@ -63,25 +65,28 @@ async function boot() {
 
   document.getElementById('loading').style.display = 'none';
   hud.toast('🤠 Welcome to Texas! Press H for controls.');
-  window.__game = { player, gameplay, GEO, animals }; // debug/testing hook
+  window.__game = { player, gameplay, GEO, animals, sky }; // debug/testing hook
 
   const clock = new THREE.Clock();
   let hudTick = 0;
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
     player.update(dt);
+    sky.update(dt, player.keys['KeyT'], player.pos.x, player.pos.z, player.pos.y);
     scenery.update(dt, player.pos.x, player.pos.z);
     cities.update(player.pos.x, player.pos.z);
+    cities.setNight(ATMOS.night);
     traffic.update(dt, player.pos.x, player.pos.z);
+    traffic.setNight(ATMOS.night);
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y);
-    const npcName = gameplay.update(dt, player.pos);
+    const npcName = gameplay.update(dt, player.pos, ATMOS.night);
     hud.interactHint(npcName);
     // HUD text/minimap at ~12 Hz — nearestCity/nearestRoad every frame is wasteful
     hudTick += dt;
     if (hudTick > 0.08) {
       hudTick = 0;
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
-      hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z));
+      hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon());
     }
     renderer.render(scene, camera);
   });

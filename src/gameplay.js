@@ -128,6 +128,7 @@ export class Gameplay {
       beam.position.y = 60;
       g.add(beam);
       g.userData.lm = lm;
+      if (lm.kind === 'lights') this.marfa = g; // the orbs only show after dark
       group.add(g);
     }
     this.scene.add(group);
@@ -178,10 +179,20 @@ export class Gameplay {
     }
   }
 
-  update(dt, pos) {
+  update(dt, pos, night = 0) {
     this.t += dt;
     // spin stars & bob roses
     for (const s of this.cityStars.children) s.rotation.y = this.t * 1.2;
+
+    // Marfa Lights: mysterious orbs, night only, gently drifting
+    if (this.marfa) {
+      const orbsOn = night > 0.55;
+      for (let i = 0; i < 3; i++) {
+        const orb = this.marfa.children[i];
+        orb.visible = orbsOn;
+        if (orbsOn) orb.position.y = 3 + i + Math.sin(this.t * 0.8 + i * 2.1) * 1.2;
+      }
+    }
 
     // city visit check (must be near ground level)
     if (pos.y < 12) {

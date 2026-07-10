@@ -33,8 +33,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   Rio Grande/Red River render wide; border-river clipping uses a ~3.5 km dilation.
 - [x] ~~Higher-resolution state border~~ — done 2026-07-10: Census 500k boundary,
   1,517 in-game points; Texoma-area land and river clipping fixed.
-- [ ] **Day/night cycle** — sun angle + sky/fog color lerp; city buildings get
-  emissive windows at night; Marfa Lights only visible after dark.
+- [x] ~~Day/night cycle~~ — done 2026-07-10: 12-min days (hold T to fast-forward),
+  keyframed sun/sky/fog palette, stars, city windows glow at night, headlights,
+  Marfa Lights orbs only appear after dark. HUD clock + weather icon.
 - [ ] **Audio** — WebAudio engine hum tied to speed, wind in fly mode, collect chimes.
 - [ ] **Gamepad support** — map Gamepad API axes/buttons alongside the keyboard.
 
@@ -50,7 +51,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   jobs using the real highway routing.
 - [ ] **County system** — all 254 county lines + name toast on crossing
   (TIGER data; adds a collect-all-counties meta-goal).
-- [ ] **Weather** — regional: Gulf storms, Panhandle wind, West Texas heat shimmer.
+- [x] ~~Weather~~ — done 2026-07-10: region-weighted states (Gulf rain, Panhandle
+  thunderstorms with lightning, West Texas dust storms) with ~9 s crossfades,
+  drifting instanced cloud layer, rain streaks, windmills spin up with the wind.
 
 - [x] ~~Wildlife & nature pass~~ — done 2026-07-10: 8 regional species (deer,
   longhorn, armadillo, jackrabbit, roadrunner, coyote, hog, vulture) with
