@@ -1,7 +1,7 @@
 // Procedural cities: street grids + skylines scaled by real population,
 // spawned/despawned by distance. Deterministic per city name.
 import * as THREE from 'three';
-import { GEO, seededRand, nearestRoad } from './geo.js';
+import { GEO, seededRand, nearestRoad, hAt } from './geo.js';
 
 const SPAWN_DIST = 600;
 
@@ -47,6 +47,7 @@ export class CitySystem {
     const rand = seededRand('city:' + city.name);
     const group = new THREE.Group();
     const R = cityRadius(city.pop);
+    const padY = hAt(city.x, city.z); // terrain is pad-flattened here by the pipeline
     const big = city.pop > 400000, mid = city.pop > 80000;
 
     // Metros with real OSM arterials ('street' tier) skip the fake grid entirely
@@ -75,7 +76,7 @@ export class CitySystem {
     }
     for (const g of streetGeoms) {
       const m = new THREE.Mesh(g, streetMat);
-      m.position.set(city.x, 0, city.z);
+      m.position.set(city.x, padY, city.z);
       group.add(m);
     }
 
@@ -103,7 +104,7 @@ export class CitySystem {
       const w = 0.9 + rand() * 1.6, dep = 0.9 + rand() * 1.6;
       // world position: rotate local by city rot
       const wx = city.x + lx * cos + lz * sin, wz = city.z - lx * sin + lz * cos;
-      m4.compose(new THREE.Vector3(wx, 0.1, wz), q, new THREE.Vector3(w, h, dep));
+      m4.compose(new THREE.Vector3(wx, hAt(wx, wz) + 0.1, wz), q, new THREE.Vector3(w, h, dep));
       inst.setMatrixAt(placed, m4);
       inst.setColorAt(placed, new THREE.Color(colors[Math.floor(rand() * colors.length)]));
       placed++;
@@ -112,7 +113,7 @@ export class CitySystem {
     group.add(inst);
 
     // City label — canvas sprite floating above downtown
-    group.add(mkLabel(city.name, city.x, maxH + 6, city.z, big ? 1.6 : 1));
+    group.add(mkLabel(city.name, city.x, padY + maxH + 6, city.z, big ? 1.6 : 1));
 
     this.scene.add(group);
     this.live.set(city.name, group);

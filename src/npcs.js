@@ -2,7 +2,7 @@
 // wandering every downtown. They face you, wave hello, gesture while talking,
 // and their dialog reacts to weather, the hour, and your progress.
 import * as THREE from 'three';
-import { GEO, seededRand, nearestRoad } from './geo.js';
+import { GEO, seededRand, nearestRoad, hAt } from './geo.js';
 import { cityRadius } from './cities.js';
 import { ATMOS } from './sky.js';
 
@@ -90,7 +90,7 @@ export class NPCSystem {
       const R = cityRadius(c.pop);
       const a = rand() * Math.PI * 2;
       const [px, pz] = roadShoulder(c.x + Math.cos(a) * R * 0.45, c.z + Math.sin(a) * R * 0.45, R);
-      g.position.set(px, 0, pz);
+      g.position.set(px, hAt(px, pz), pz);
       g.rotation.y = rand() * Math.PI * 2;
       addMarker(g, look.scale || 1);
       scene.add(g);
@@ -194,6 +194,7 @@ export class NPCSystem {
           const nz = g.position.z - Math.cos(n.dir) * 1.1 * dt;
           if (Math.hypot(nx - n.homeX, nz - n.homeZ) < 14 && !nearestRoad(nx, nz, 1.5)) {
             g.position.x = nx; g.position.z = nz;
+            g.position.y = hAt(nx, nz);
             g.rotation.y = n.dir;
           } else n.dir += Math.PI / 2;
         }
@@ -239,7 +240,7 @@ export class NPCSystem {
       const g = mkCharacter(randomLook(rand), rand);
       const a = rand() * Math.PI * 2, r = R * (0.2 + rand() * 0.5);
       const [x, z] = roadShoulder(city.x + Math.cos(a) * r, city.z + Math.sin(a) * r, R);
-      g.position.set(x, 0, z);
+      g.position.set(x, hAt(x, z), z);
       g.rotation.y = rand() * Math.PI * 2;
       this.scene.add(g);
       folk.push({

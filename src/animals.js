@@ -2,7 +2,7 @@
 // are simulated — grazers shuffle, wanderers amble, prey species flee the player.
 // First close encounter with each species goes into the critter log.
 import * as THREE from 'three';
-import { seededRand, inTexas, nearestRoad } from './geo.js';
+import { seededRand, inTexas, nearestRoad, hAt } from './geo.js';
 
 const CHUNK = 260, VIEW_CHUNKS = 2; // tighter ring than scenery — animals are simulated
 const ACTIVE_R = 150;               // only simulate within this range
@@ -66,7 +66,7 @@ export class AnimalSystem {
 
     if (spec.behavior === 'circle') { // vultures orbit their home point, high up
       a.phase += dt * 0.5;
-      a.g.position.set(a.homeX + Math.cos(a.phase) * 12, 16 + Math.sin(a.phase * 2.3) * 1.5, a.homeZ + Math.sin(a.phase) * 12);
+      a.g.position.set(a.homeX + Math.cos(a.phase) * 12, hAt(a.homeX, a.homeZ) + 16 + Math.sin(a.phase * 2.3) * 1.5, a.homeZ + Math.sin(a.phase) * 12);
       a.g.rotation.y = -a.phase - Math.PI / 2;
       return;
     }
@@ -99,7 +99,7 @@ export class AnimalSystem {
     }
     a.g.rotation.y = a.heading;
     // hop/bound bob for deer & rabbits while moving
-    a.g.position.y = moving && spec.bob ? Math.abs(Math.sin(this.t * 9 + a.phase)) * 0.35 : 0;
+    a.g.position.y = hAt(a.g.position.x, a.g.position.z) + (moving && spec.bob ? Math.abs(Math.sin(this.t * 9 + a.phase)) * 0.35 : 0);
   }
 
   move(a, speed, dt) {
@@ -129,7 +129,8 @@ export class AnimalSystem {
         const n = lo + ((rand() * (hi - lo + 1)) | 0);
         for (let i = 0; i < n; i++) {
           const g = mkAnimal(species, rand);
-          g.position.set(hx + (rand() - 0.5) * 8, 0, hz + (rand() - 0.5) * 8);
+          const ax = hx + (rand() - 0.5) * 8, az = hz + (rand() - 0.5) * 8;
+          g.position.set(ax, hAt(ax, az), az);
           g.rotation.y = rand() * Math.PI * 2;
           group.add(g);
           animals.push({

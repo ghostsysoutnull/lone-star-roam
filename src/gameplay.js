@@ -1,7 +1,7 @@
 // Gameplay: city visits, landmarks, yellow roses, critter log. Progress in localStorage.
 // (NPCs live in npcs.js.)
 import * as THREE from 'three';
-import { GEO, seededRand, nearestCity } from './geo.js';
+import { GEO, seededRand, nearestCity, hAt } from './geo.js';
 import { mkStarMesh } from './vehicle.js';
 import { cityRadius } from './cities.js';
 import { merge, tinted } from './traffic.js';
@@ -89,7 +89,7 @@ export class Gameplay {
     for (const c of GEO.cities) {
       if (this.save.cities.includes(c.name)) continue;
       const star = mkStarMesh(2.2, 0xffd35c);
-      star.position.set(c.x, 14 + cityRadius(c.pop) * 0.15, c.z);
+      star.position.set(c.x, hAt(c.x, c.z) + 14 + cityRadius(c.pop) * 0.15, c.z);
       star.userData.city = c.name;
       star.userData.baseY = star.position.y;
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -133,10 +133,11 @@ export class Gameplay {
     const m = new THREE.Matrix4();
     this.roseSpots = spots.map(([x, z], i) => {
       const taken = this.save.roses.includes(i);
-      m.makeScale(taken ? 0.001 : 1, taken ? 0.001 : 1, taken ? 0.001 : 1).setPosition(x, 0, z);
+      const gy = hAt(x, z);
+      m.makeScale(taken ? 0.001 : 1, taken ? 0.001 : 1, taken ? 0.001 : 1).setPosition(x, gy, z);
       inst.setMatrixAt(i, m);
       glow.setMatrixAt(i, m);
-      return { x, z, i, taken, phase: (x * 7 + z * 3) % 6.28 };
+      return { x, z, i, taken, gy, phase: (x * 7 + z * 3) % 6.28 };
     });
     this.scene.add(inst, glow);
     this.roseGlow = glow;
@@ -148,7 +149,7 @@ export class Gameplay {
     const group = new THREE.Group();
     for (const lm of LANDMARKS) {
       const g = mkLandmarkMesh(lm.kind);
-      g.position.set(lm.at[0], 0, lm.at[1]);
+      g.position.set(lm.at[0], hAt(lm.at[0], lm.at[1]), lm.at[1]);
       // beacon: tall thin light column, dimmed if collected
       const done = this.save.landmarks.includes(lm.name);
       const beam = new THREE.Mesh(
@@ -178,6 +179,7 @@ export class Gameplay {
   }
 
   update(dt, pos, night = 0, speed = 0) {
+    const agl = pos.y - hAt(pos.x, pos.z); // height above ground, not sea level
     this.t += dt;
 
     // play stats (1 game unit = 100 m real; speed*2.4 matches the HUD mph)
@@ -214,7 +216,7 @@ export class Gameplay {
       if (d2 > 200 * 200) continue;
       q4.setFromAxisAngle(up, this.t * 1.6 + r.phase);
       m4.compose(
-        new THREE.Vector3(r.x, Math.sin(this.t * 2 + r.phase) * 0.12, r.z),
+        new THREE.Vector3(r.x, r.gy + Math.sin(this.t * 2 + r.phase) * 0.12, r.z),
         q4, new THREE.Vector3(1, 1, 1)
       );
       this.roseSystem.setMatrixAt(r.i, m4);
@@ -242,7 +244,7 @@ export class Gameplay {
     }
 
     // city visit check (must be near ground level)
-    if (pos.y < 12) {
+    if (agl < 12) {
       const { city, dist } = nearestCity(pos.x, pos.z);
       if (city && dist < Math.max(6, cityRadius(city.pop) * 0.5) && !this.save.cities.includes(city.name)) {
         this.save.cities.push(city.name);
@@ -260,18 +262,18 @@ export class Gameplay {
     for (const r of this.roseSpots) {
       if (r.taken) continue;
       const d = (r.x - pos.x) ** 2 + (r.z - pos.z) ** 2;
-      if (d < 9 && pos.y < 6) {
+      if (d < 9 && agl < 6) {
         r.taken = true;
         this.save.roses.push(r.i);
         this.persist();
-        m.makeScale(0.001, 0.001, 0.001).setPosition(r.x, 0, r.z);
+        m.makeScale(0.001, 0.001, 0.001).setPosition(r.x, r.gy, r.z);
         this.roseSystem.setMatrixAt(r.i, m);
         this.roseGlow.setMatrixAt(r.i, m);
         this.roseSystem.instanceMatrix.needsUpdate = true;
         this.roseGlow.instanceMatrix.needsUpdate = true;
         this.onToast?.(`🌹 Yellow rose (${this.save.roses.length}/300)`);
         this.onCollect?.('rose');
-        this.burst(r.x, 1.2, r.z);
+        this.burst(r.x, r.gy + 1.2, r.z);
       }
     }
 
@@ -280,13 +282,13 @@ export class Gameplay {
       const lm = g.userData.lm;
       if (this.save.landmarks.includes(lm.name)) continue;
       const d = (g.position.x - pos.x) ** 2 + (g.position.z - pos.z) ** 2;
-      if (d < 20 * 20 && pos.y < 25) {
+      if (d < 20 * 20 && agl < 25) {
         this.save.landmarks.push(lm.name);
         this.persist();
         g.children[g.children.length - 1].material.color.set(0x557755);
         this.onToast?.(`🏛 ${lm.name} — ${lm.fact}`);
         this.onCollect?.('landmark');
-        this.burst(g.position.x, 2, g.position.z);
+        this.burst(g.position.x, g.position.y + 2, g.position.z);
       }
     }
 

@@ -31,6 +31,7 @@ Re-downloading OSM inputs: Overpass **POST fails (406) from this environment —
 - 1 game unit = 100 m real. +x = east, **north = −z** (matches Three.js camera convention).
 - Projection: equirectangular centered at 31°N, 99.5°W. Defined **twice**: in `tools/build-data.mjs` (`proj`) and inlined as `LL()` in `src/gameplay.js` (for landmark coordinates). If you change one, change both.
 - Heading 0 = north (−z); movement is `x -= sin(heading)·speed`, `z -= cos(heading)·speed`.
+- **Terrain**: real DEM in `data/elevation.bin` (uint16 meters, high bit = outside-Texas; grid constants duplicated between `tools/build-elevation.mjs` and `ELEV` in geo.js — keep in sync). `hAt(x,z)` (geo.js) is the single height source; vertical exaggeration (2.5×) is runtime-only in `VSCALE`, so retuning it needs no rebake. Everything that touches the ground must sample `hAt` — and altitude gameplay checks must use height *above ground* (`pos.y - hAt(...)`), not raw `pos.y`.
 - World is ~12,500 × 11,800 units. Player scale is deliberately non-realistic (truck ≈ 4 units ≈ 400 m "real") — mini-world style.
 
 ### Data flow

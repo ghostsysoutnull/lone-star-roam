@@ -1,18 +1,18 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, nearestRoad } from './geo.js';
+import { GEO, seededRand, inTexas, nearestRoad, hAt, outsideAt, ELEV } from './geo.js';
 import { ATMOS } from './sky.js';
 
 export function buildWorld(scene) {
   buildGround(scene);
   buildWater(scene);
   buildHighways(scene);
-  buildMountains(scene);
+  if (!ELEV.data) buildMountains(scene); // decorative cones only when no real terrain
   return new ScenerySystem(scene);
 }
 
 function buildGround(scene) {
-  // "Rest of the world" plane, faded
+  // "Rest of the world" plane, faded — backup beyond the elevation grid
   const outside = new THREE.Mesh(
     new THREE.PlaneGeometry(60000, 60000),
     new THREE.MeshLambertMaterial({ color: 0xb8a888 })
@@ -32,23 +32,76 @@ function buildGround(scene) {
   gulf.position.set(6500, -2.5, 5800);
   scene.add(gulf);
 
-  // Texas itself — ground built from the real border polygon
-  const shape = new THREE.Shape();
-  GEO.border.forEach(([x, z], i) => (i ? shape.lineTo(x, -z) : shape.moveTo(x, -z)));
-  const geo = new THREE.ShapeGeometry(shape);
-  geo.rotateX(-Math.PI / 2); // (x, y) -> (x, 0, -y) => back to our x,z
-  const ground = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x9aa568 }));
-  ground.position.y = 0;
-  scene.add(ground);
+  buildTerrain(scene);
 
+  buildCountyLines(scene);
+  buildBorderLine(scene);
+}
+
+// Real elevation terrain — one displaced grid, vertex-colored by height/region
+function buildTerrain(scene) {
+  const e = ELEV;
+  if (!e.data) { // no elevation data: fall back to the flat polygon
+    const shape = new THREE.Shape();
+    GEO.border.forEach(([x, z], i) => (i ? shape.lineTo(x, -z) : shape.moveTo(x, -z)));
+    const geo = new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2);
+    scene.add(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x9aa568 })));
+    return;
+  }
+  const W = e.w, H = e.h;
+  const pos = new Float32Array(W * H * 3);
+  const col = new Float32Array(W * H * 3);
+  const cLow = new THREE.Color(0x9aa568), cMid = new THREE.Color(0xa89a62), cHigh = new THREE.Color(0x8a6f52);
+  const cDry = new THREE.Color(0xc2a76b), cPine = new THREE.Color(0x5f8a4a), cOut = new THREE.Color(0xb8a888);
+  const c = new THREE.Color();
+  for (let j = 0; j < H; j++) {
+    for (let i = 0; i < W; i++) {
+      const x = e.minX + ((e.maxX - e.minX) * i) / (W - 1);
+      const z = e.minZ + ((e.maxZ - e.minZ) * j) / (H - 1);
+      const raw = e.data[j * W + i];
+      const m = raw & 0x7fff;
+      const out = !!(raw & 0x8000);
+      let y = m * 0.025;
+      if (out && m <= 2) y = -2; // offshore: dip under the gulf water plane
+      const k = (j * W + i) * 3;
+      pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
+      // color: height ramp, then region/outside tint
+      const t = Math.min(1, m / 2200);
+      if (t < 0.35) c.lerpColors(cLow, cMid, t / 0.35);
+      else c.lerpColors(cMid, cHigh, (t - 0.35) / 0.65);
+      if (x < -2200) c.lerp(cDry, 0.5);          // Trans-Pecos / far west
+      else if (x > 3400 && m < 200) c.lerp(cPine, 0.45); // piney east lowlands
+      if (out) c.lerp(cOut, 0.75);
+      col[k] = c.r; col[k + 1] = c.g; col[k + 2] = c.b;
+    }
+  }
+  const idx = [];
+  for (let j = 0; j < H - 1; j++) {
+    for (let i = 0; i < W - 1; i++) {
+      const a = j * W + i;
+      idx.push(a, a + W, a + 1, a + 1, a + W, a + W + 1);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true })));
+}
+
+function buildCountyLines(scene) {
   // County lines — faint ground lines you cross on the highway
   if (GEO.counties?.length) {
     const pos = [];
     for (const c of GEO.counties) {
       for (const ring of c.rings) {
         for (let i = 0; i < ring.length; i++) {
+          // subdivide + drape over the terrain
           const a = ring[i], b = ring[(i + 1) % ring.length];
-          pos.push(a[0], 0.14, a[1], b[0], 0.14, b[1]);
+          for (const [p, q] of subdivide(a, b, 25)) {
+            pos.push(p[0], hAt(p[0], p[1]) + 0.2, p[1], q[0], hAt(q[0], q[1]) + 0.2, q[1]);
+          }
         }
       }
     }
@@ -58,39 +111,44 @@ function buildGround(scene) {
     );
     scene.add(seg);
   }
-
-  // Border outline — subtle dark ridge so the state edge reads from the air
-  const borderPts = GEO.border.map(([x, z]) => new THREE.Vector3(x, 0.4, z));
-  borderPts.push(borderPts[0].clone());
-  const line = new THREE.Line(
-    new THREE.BufferGeometry().setFromPoints(borderPts),
-    new THREE.LineBasicMaterial({ color: 0x5c5138 })
-  );
-  scene.add(line);
-
-  // West Texas tint — dry overlay patch (approximate Trans-Pecos / Panhandle west)
-  const dry = new THREE.Mesh(
-    new THREE.PlaneGeometry(5200, 11000),
-    new THREE.MeshLambertMaterial({ color: 0xc2a76b, transparent: true, opacity: 0.55 })
-  );
-  dry.rotation.x = -Math.PI / 2;
-  dry.position.set(-4400, 0.05, -800);
-  scene.add(dry);
-  // East Texas piney green tint
-  const piney = new THREE.Mesh(
-    new THREE.PlaneGeometry(2600, 5200),
-    new THREE.MeshLambertMaterial({ color: 0x5f8a4a, transparent: true, opacity: 0.45 })
-  );
-  piney.rotation.x = -Math.PI / 2;
-  piney.position.set(4600, 0.05, -1400);
-  scene.add(piney);
 }
 
-// Flat ribbon mesh from an array of polylines (roads, rivers)
-function buildRibbons(scene, polylines, width, color, y) {
+function buildBorderLine(scene) {
+  // Border outline — subtle dark ridge so the state edge reads from the air
+  const borderPts = [];
+  const b = GEO.border;
+  for (let i = 0; i < b.length; i++) {
+    for (const [p] of subdivide(b[i], b[(i + 1) % b.length], 25)) {
+      borderPts.push(new THREE.Vector3(p[0], hAt(p[0], p[1]) + 0.45, p[1]));
+    }
+  }
+  borderPts.push(borderPts[0].clone());
+  scene.add(new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(borderPts),
+    new THREE.LineBasicMaterial({ color: 0x5c5138 })
+  ));
+}
+
+// split segment a->b into steps of at most `maxLen`, yielding [p,q] pairs
+function* subdivide(a, b, maxLen) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const n = Math.max(1, Math.ceil(L / maxLen));
+  for (let k = 0; k < n; k++) {
+    const p = [a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n];
+    const q = [a[0] + ((b[0] - a[0]) * (k + 1)) / n, a[1] + ((b[1] - a[1]) * (k + 1)) / n];
+    yield [p, q];
+  }
+}
+
+// Ribbon mesh draped over the terrain (roads, rivers). `yOff` keeps tier layering.
+function buildRibbons(scene, polylines, width, color, yOff) {
   const pos = [], idx = [];
-  for (const pts of polylines) {
-      const base = () => pos.length / 3;
+  for (const rawPts of polylines) {
+    // subdivide long segments so ribbons follow the terrain between data points
+    const pts = [rawPts[0]];
+    for (let i = 1; i < rawPts.length; i++) {
+      for (const [, q] of subdivide(rawPts[i - 1], rawPts[i], 12)) pts.push(q);
+    }
     const start = pos.length / 3;
     for (let i = 0; i < pts.length; i++) {
       // direction = average of adjacent segments
@@ -100,6 +158,7 @@ function buildRibbons(scene, polylines, width, color, y) {
       const L = Math.hypot(dx, dz) || 1;
       dx /= L; dz /= L;
       const nx = -dz * width / 2, nz = dx * width / 2; // left normal
+      const y = hAt(p[0], p[1]) + yOff;
       pos.push(p[0] + nx, y, p[1] + nz, p[0] - nx, y, p[1] - nz);
     }
     for (let i = 0; i < pts.length - 1; i++) {
@@ -138,7 +197,8 @@ function buildWater(scene) {
     const g = new THREE.ShapeGeometry(shape);
     g.rotateX(-Math.PI / 2);
     const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: WATER }));
-    mesh.position.y = 0.08;
+    // flat water at the lowest shoreline point (lakes sit in valleys)
+    mesh.position.y = Math.min(...lake.pts.map(([x, z]) => hAt(x, z))) + 0.15;
     scene.add(mesh);
   }
 }
@@ -253,7 +313,7 @@ class ScenerySystem {
         const obj = maker(rand);
         const s = 0.75 + rand() * 0.6;
         obj.scale.setScalar(s);
-        obj.position.set(x, 0, z);
+        obj.position.set(x, hAt(x, z), z);
         obj.rotation.y = rand() * Math.PI * 2;
         group.add(obj);
         if (obj.userData.animate) {

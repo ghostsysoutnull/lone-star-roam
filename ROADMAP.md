@@ -9,8 +9,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   real OSM arterials (fake grids removed there); all other cities keep seeded-procedural
   grids. Buildings everywhere are procedural. Full street-level precision statewide
   would be gigabytes of data.
-- **Flat terrain** — no elevation; the Hill Country is flat, mountains in the
-  Trans-Pecos are decorative cones, no Palo Duro depth.
+- **Terrain resolution ~3 km/cell** — hills roll and ranges rise, but canyon
+  walls (Palo Duro) read as steep slopes, not cliffs; a finer local grid or LOD
+  would be needed for crisp canyons.
 - **Only the biggest lakes** — Natural Earth 10m has just 6 reservoirs; mid-size
   lakes (Travis, Sam Rayburn, Livingston, Whitney) are missing. Rivers have no
   width variation along their course.
@@ -44,9 +45,12 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 - [ ] **Gamepad support** — map Gamepad API axes/buttons alongside the keyboard.
 
 ### Larger bets
-- [ ] **Terrain elevation** — heightmap sampled from real DEM (e.g., AWS Terrain
-  Tiles), roads draped onto it. Touches roads, physics, cities, scenery — the
-  biggest structural change on this list.
+- [x] ~~Terrain elevation~~ — done 2026-07-10: real AWS Terrarium DEM baked to a
+  420×400 grid (328 KB, city-pad flattening + outside-Texas mask baked in),
+  2.5× vertical exaggeration at runtime; displaced vertex-colored terrain,
+  draped roads/rivers/county lines, valley-height lakes, slope-pitched driving,
+  fly soft clamp, everything samples hAt(). Verified against real elevations
+  (El Paso 1130 m, Palo Duro floor 919 m vs rim).
 - [x] ~~Real arterial roads in major metros~~ — done 2026-07-10: `primary` statewide
   + `secondary` in the four big metro bboxes; four road tiers with per-tier speed caps.
 - [ ] **Real arterials in mid-size cities** — extend the metro `secondary` fetch to

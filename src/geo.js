@@ -23,6 +23,11 @@ export async function loadGeo(onStatus) {
   GEO.lakes = await get('lakes.json').catch(() => []);
   onStatus?.('Loading the night sky…');
   GEO.sky = await get('sky.json').catch(() => null); // real star catalog + constellations
+  onStatus?.('Raising the terrain…');
+  try {
+    const ab = await (await fetch('data/elevation.bin')).arrayBuffer();
+    ELEV.data = new Uint16Array(ab);
+  } catch { ELEV.data = null; }
   onStatus?.('Drawing county lines…');
   GEO.counties = await get('counties.json').catch(() => []);
   for (const c of GEO.counties) {
@@ -45,6 +50,36 @@ export async function loadGeo(onStatus) {
   buildRoadIndex();
   buildRiverIndex();
   return GEO;
+}
+
+// --- Real elevation (baked from AWS Terrarium DEM; constants mirror tools/build-elevation.mjs) ---
+export const ELEV = { data: null, w: 420, h: 400, minX: -6900, maxX: 5800, minZ: -6200, maxZ: 5800 };
+const VSCALE = 0.01 * 2.5; // 1:100 horizontal, 2.5x vertical exaggeration
+
+// terrain height in game units at (x,z) — bilinear over the baked grid
+export function hAt(x, z) {
+  const e = ELEV;
+  if (!e.data) return 0;
+  const fx = ((x - e.minX) / (e.maxX - e.minX)) * (e.w - 1);
+  const fz = ((z - e.minZ) / (e.maxZ - e.minZ)) * (e.h - 1);
+  const i = Math.max(0, Math.min(e.w - 2, Math.floor(fx)));
+  const j = Math.max(0, Math.min(e.h - 2, Math.floor(fz)));
+  const dx = Math.max(0, Math.min(1, fx - i)), dz = Math.max(0, Math.min(1, fz - j));
+  const m = (jj, ii) => e.data[jj * e.w + ii] & 0x7fff;
+  const v =
+    m(j, i) * (1 - dx) * (1 - dz) + m(j, i + 1) * dx * (1 - dz) +
+    m(j + 1, i) * (1 - dx) * dz + m(j + 1, i + 1) * dx * dz;
+  return v * VSCALE;
+}
+
+// outside-Texas mask at grid nodes (nearest neighbour is fine for tinting)
+export function outsideAt(x, z) {
+  const e = ELEV;
+  if (!e.data) return false;
+  const i = Math.round(((x - e.minX) / (e.maxX - e.minX)) * (e.w - 1));
+  const j = Math.round(((z - e.minZ) / (e.maxZ - e.minZ)) * (e.h - 1));
+  if (i < 0 || j < 0 || i >= e.w || j >= e.h) return true;
+  return !!(e.data[j * e.w + i] & 0x8000);
 }
 
 // --- Spatial grid over highway segments for nearest-road queries ---

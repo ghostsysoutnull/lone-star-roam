@@ -1,7 +1,7 @@
 // Player controller: DRIVE (pickup truck), FLY (truck sprouts wings + prop), WALK (cowboy).
 // Arcade physics, third-person chase camera, per-mode animation and night lights.
 import * as THREE from 'three';
-import { nearestRoad, nearestCity, inTexas } from './geo.js';
+import { nearestRoad, nearestCity, inTexas, hAt } from './geo.js';
 import { ATMOS } from './sky.js';
 
 export const MODES = ['DRIVE', 'FLY', 'WALK'];
@@ -126,7 +126,9 @@ export class Player {
       if (k['Space']) this.vy += 60 * dt;
       if (k['ControlLeft'] || k['ControlRight'] || k['ShiftLeft']) this.vy -= 60 * dt;
       this.vy *= Math.pow(0.2, dt);
-      this.pos.y = THREE.MathUtils.clamp(this.pos.y + this.vy * dt, 1.5, 280);
+      // soft clamp: skim the terrain, never crash into it
+      const floor = hAt(this.pos.x, this.pos.z) + 1.8;
+      this.pos.y = THREE.MathUtils.clamp(this.pos.y + this.vy * dt, floor, 300);
       this.pos.x -= Math.sin(this.heading) * this.speed * dt;
       this.pos.z -= Math.cos(this.heading) * this.speed * dt;
       this.tilt = steer * 0.5;
@@ -152,18 +154,29 @@ export class Player {
       this.speed *= Math.pow(0.1, dt);
     }
 
+    // ground modes ride the terrain
+    const ground = hAt(this.pos.x, this.pos.z);
+    if (this.mode !== 'FLY') this.pos.y = ground;
+    this.groundY = ground;
+
     // Place avatar
     const avatar = this.mode === 'WALK' ? this.cowboy : this.truck;
     avatar.position.copy(this.pos);
     avatar.rotation.set(0, this.heading, 0);
     avatar.rotateZ(this.tilt || 0);
     if (this.mode === 'FLY') avatar.rotateX(THREE.MathUtils.clamp(-this.vy * 0.012, -0.35, 0.35));
+    else {
+      // pitch with the slope (sample fore/aft along heading)
+      const fx = -Math.sin(this.heading), fz = -Math.cos(this.heading);
+      const dh = hAt(this.pos.x + fx * 2.2, this.pos.z + fz * 2.2) - hAt(this.pos.x - fx * 2.2, this.pos.z - fz * 2.2);
+      avatar.rotateX(THREE.MathUtils.clamp(Math.atan2(dh, 4.4), -0.5, 0.5) * (this.mode === 'DRIVE' ? 1 : 0.4));
+    }
 
     this.animate(dt, avatar, fwd, steer);
 
-    // blob shadow
-    this.shadow.position.set(this.pos.x, 0.06, this.pos.z);
-    const alt = this.mode === 'FLY' ? this.pos.y : 0;
+    // blob shadow projects onto the terrain
+    this.shadow.position.set(this.pos.x, ground + 0.08, this.pos.z);
+    const alt = this.mode === 'FLY' ? Math.max(0, this.pos.y - ground) : 0;
     const shScale = (this.mode === 'WALK' ? 0.5 : this.mode === 'FLY' ? 1.4 : 1) * (1 + alt * 0.01);
     this.shadow.scale.setScalar(shScale);
     this.shadow.material.opacity = 0.26 * Math.max(0, 1 - alt / 130);

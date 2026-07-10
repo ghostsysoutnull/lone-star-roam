@@ -17,6 +17,9 @@ built from actual OpenStreetMap highway geometry and the real state border.
 - **The real night sky**: 1,600 catalog stars with true positions/colors, 46 constellation
   figures, the celestial sphere rotating for Texas latitude (Polaris due north at 31°),
   a moon with automatic phases, and today's actual planet positions.
+- **Real terrain**: USGS/Terrarium elevation baked into the world (2.5× vertical) —
+  the Hill Country rolls, the Guadalupes rise, roads and rivers drape the relief,
+  and 254 county lines follow the ground.
 - **NPCs**: 12 locals with Texas facts in the major cities.
 
 ## Run

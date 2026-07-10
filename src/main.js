@@ -1,6 +1,6 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
-import { loadGeo, GEO, nearestRoad, waterAt, countyAt } from './geo.js';
+import { loadGeo, GEO, nearestRoad, waterAt, countyAt, hAt } from './geo.js';
 import { buildWorld } from './world.js';
 import { CitySystem } from './cities.js';
 import { Player } from './vehicle.js';
@@ -95,7 +95,7 @@ async function boot() {
     cities.setNight(ATMOS.night);
     traffic.update(dt, player.pos.x, player.pos.z);
     traffic.setNight(ATMOS.night);
-    animals.update(dt, player.pos.x, player.pos.z, player.pos.y);
+    animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed);
     hud.interactHint(npcs.update(dt, player.pos));

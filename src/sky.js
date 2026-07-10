@@ -3,7 +3,7 @@
 // Night sky is the real one: catalog stars + constellations on a celestial sphere
 // rotating for Texas latitude, moon with automatic phases, today's actual planets.
 import * as THREE from 'three';
-import { GEO } from './geo.js';
+import { GEO, hAt as GEO_hAt } from './geo.js';
 
 export const DAY_SECONDS = 720; // 12 min per full day
 const FF_SPEED = 80;            // hold T
@@ -351,7 +351,7 @@ export class SkySystem {
         }
       } else {
         d.y -= dt * 55;
-        if (d.y < 0.5 || Math.abs(d.x - px) > 100 || Math.abs(d.z - pz) > 100) d.y = -1;
+        if (d.y < GEO_hAt(d.x, d.z) + 0.5 || Math.abs(d.x - px) > 100 || Math.abs(d.z - pz) > 100) d.y = -1;
       }
       if (d.y >= 0) {
         active++;
@@ -372,7 +372,8 @@ export class SkySystem {
         this.onBolt?.();
         this.bolt.material.opacity = 1;
         const a2 = Math.random() * Math.PI * 2, r = 120 + Math.random() * 200;
-        this.bolt.position.set(px + Math.cos(a2) * r, 0, pz + Math.sin(a2) * r);
+        const bx2 = px + Math.cos(a2) * r, bz2 = pz + Math.sin(a2) * r;
+        this.bolt.position.set(bx2, GEO_hAt(bx2, bz2), bz2);
         this.bolt.rotation.y = Math.random() * Math.PI;
       }
     }

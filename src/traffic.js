@@ -3,7 +3,7 @@
 // Four vehicle types (sedan/pickup/suv/semi) as instanced merged geometries;
 // vertex colors bake wheels/windows dark so per-instance color tints only bodywork.
 import * as THREE from 'three';
-import { GEO } from './geo.js';
+import { GEO, hAt } from './geo.js';
 
 const POOL = 70;
 const SPAWN_MIN = 60, SPAWN_MAX = 300; // ring around player
@@ -253,7 +253,7 @@ export class TrafficSystem {
       const i = counts[car.type]++;
       this.q.setFromAxisAngle(this.up, Math.atan2(-dx, -dz));
       this.m4.compose(
-        new THREE.Vector3(x, 0.12, z), this.q,
+        new THREE.Vector3(x, hAt(x, z) + 0.12, z), this.q,
         new THREE.Vector3(car.scale, car.scale, car.scale)
       );
       mesh.setMatrixAt(i, this.m4);
