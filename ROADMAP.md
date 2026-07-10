@@ -25,7 +25,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 
 ### High value, moderate effort
 - [x] ~~Ambient traffic~~ — done 2026-07-10: 70 pooled instanced vehicles on real
-  highways, both directions, tier-weighted density/speed. No player collision yet.
+  highways, both directions, tier-weighted density/speed. Four vehicle types
+  (sedan/pickup/SUV/semi) with tier-dependent mix — semis haunt the interstates.
+  No player collision yet.
 - [x] ~~Rivers & lakes~~ — done 2026-07-10: 26 major named rivers (436 polylines) +
   6 big reservoirs (Amistad, Falcon, Texoma, Meredith, Red Bluff, Toledo Bend).
   Rio Grande/Red River render wide; border-river clipping uses a ~3.5 km dilation.
