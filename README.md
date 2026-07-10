@@ -3,8 +3,9 @@
 A single-page free-roam game set in a scaled-down but **geographically real Texas** —
 built from actual OpenStreetMap highway geometry and the real state border.
 
-- **Real geography**: every interstate and US highway is real OSM data (I-10, I-35, I-45, I-20…),
-  132 real cities at their true locations, sized by real population.
+- **Real geography**: four tiers of real OSM roads — interstates, US highways, state
+  highways statewide, plus real arterial streets in Houston/DFW/San Antonio/Austin —
+  and 132 real cities at their true locations, sized by real population.
 - **Scale**: 1 game unit = 100 m. Texas is ~125 km of drivable world, ~10 min border to border.
 - **Modes**: 🚙 drive a pickup, ✈️ fly (the truck sprouts wings), 🚶 walk as a cowboy.
 - **Collect**: visit all 132 cities (⭐), find 14 real landmarks (🏛 Alamo, Cadillac Ranch, Marfa Lights…),

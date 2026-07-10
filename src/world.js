@@ -16,7 +16,7 @@ function buildGround(scene) {
     new THREE.MeshLambertMaterial({ color: 0xb8a888 })
   );
   outside.rotation.x = -Math.PI / 2;
-  outside.position.y = -0.6;
+  outside.position.y = -5; // well below ground — near-coplanar giant planes z-fight at this world scale
   scene.add(outside);
 
   // Gulf of Mexico — big water plane hugging the SE coast
@@ -26,8 +26,8 @@ function buildGround(scene) {
   );
   gulf.rotation.x = -Math.PI / 2;
   gulf.rotation.z = -0.62; // align with coastline (runs SW–NE)
-  // centered offshore of the real coast
-  gulf.position.set(6500, -0.3, 5800);
+  // centered offshore of the real coast; between outside plane and ground
+  gulf.position.set(6500, -2.5, 5800);
   scene.add(gulf);
 
   // Texas itself — ground built from the real border polygon
@@ -87,7 +87,8 @@ function buildHighways(scene) {
       }
       for (let i = 0; i < pts.length - 1; i++) {
         const a = start + i * 2;
-        idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        // wound counter-clockwise viewed from +y so normals face up (front side)
+        idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
       }
     }
     const g = new THREE.BufferGeometry();
@@ -97,8 +98,12 @@ function buildHighways(scene) {
     const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color }));
     scene.add(mesh);
   };
-  build('motorway', 3.2, 0x3d3d46, 0.12); // interstates — wide dark asphalt
-  build('trunk', 2.0, 0x55534e, 0.1);     // US highways — narrower, lighter
+  build('motorway', 3.2, 0x33333c, 0.12); // interstates — wide dark asphalt
+  build('trunk', 2.0, 0x4a4843, 0.1);     // US highways — narrower
+  build('primary', 1.5, 0x5c584e, 0.09);  // state highways / FM connectors
+  build('street', 1.1, 0x565460, 0.14);   // real metro arterials — above city street quads
+  // center stripes on interstates so roads read clearly at driving height
+  build('motorway', 0.25, 0xd8c860, 0.16);
 }
 
 // Far-west mountain ranges (Guadalupe, Davis, Chisos) — decorative cones

@@ -45,8 +45,9 @@ function buildRoadIndex() {
   }
 }
 
-// Nearest point on any highway within `radius` (default 300 units = 30 km real)
-export function nearestRoad(x, z, radius = 300) {
+// Nearest point on any highway within `radius` (default 300 units = 30 km real).
+// Optional typeFilter: (type) => boolean, e.g. only streets.
+export function nearestRoad(x, z, radius = 300, typeFilter = null) {
   let best = null, bestD = radius * radius;
   const r = Math.ceil(radius / CELL);
   const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
@@ -55,6 +56,7 @@ export function nearestRoad(x, z, radius = 300) {
       const segs = roadGrid.get(`${cx + i},${cz + j}`);
       if (!segs) continue;
       for (const s of segs) {
+        if (typeFilter && !typeFilter(s.hw.type)) continue;
         const p = closestOnSeg(x, z, s.a, s.b);
         const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
         if (d < bestD) { bestD = d; best = { x: p[0], z: p[1], ref: s.hw.ref, type: s.hw.type, dist: Math.sqrt(d) }; }

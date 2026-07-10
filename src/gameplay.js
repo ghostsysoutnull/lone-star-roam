@@ -80,7 +80,8 @@ export class Gameplay {
   mkRoses() {
     const rand = seededRand('yellow-rose');
     const spots = [];
-    const hws = GEO.highways.filter((h) => h.pts.length > 4);
+    // motorway/trunk only — scatter must stay identical across data updates or saved rose indices break
+    const hws = GEO.highways.filter((h) => (h.type === 'motorway' || h.type === 'trunk') && h.pts.length > 4);
     while (spots.length < 300) {
       const h = hws[Math.floor(rand() * hws.length)];
       const i = 1 + Math.floor(rand() * (h.pts.length - 1));

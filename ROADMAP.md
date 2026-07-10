@@ -5,9 +5,10 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 
 ## Known limitations (v1)
 
-- **Procedural downtowns** — only interstates/US highways are survey-accurate OSM data;
-  city street grids and buildings are seeded-procedural, not real. Full street-level
-  precision statewide would be gigabytes of data.
+- **Procedural downtowns outside the big four metros** — Houston/DFW/SA/Austin have
+  real OSM arterials (fake grids removed there); all other cities keep seeded-procedural
+  grids. Buildings everywhere are procedural. Full street-level precision statewide
+  would be gigabytes of data.
 - **Flat terrain** — no elevation; the Hill Country is flat, mountains in the
   Trans-Pecos are decorative cones, no Palo Duro depth.
 - **No rivers or lakes** — Rio Grande border, Colorado, Brazos, and the big
@@ -36,8 +37,10 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 - [ ] **Terrain elevation** — heightmap sampled from real DEM (e.g., AWS Terrain
   Tiles), roads draped onto it. Touches roads, physics, cities, scenery — the
   biggest structural change on this list.
-- [ ] **Real arterial roads in major metros** — one extra OSM tier
-  (`primary`) for Houston/DFW/SA/Austin only, loaded per-metro on approach.
+- [x] ~~Real arterial roads in major metros~~ — done 2026-07-10: `primary` statewide
+  + `secondary` in the four big metro bboxes; four road tiers with per-tier speed caps.
+- [ ] **Real arterials in mid-size cities** — extend the metro `secondary` fetch to
+  El Paso, Corpus, Lubbock, Amarillo, McAllen bboxes (same pipeline).
 - [ ] **Missions/delivery gameplay** — "haul BBQ from Lockhart to Amarillo"-style
   jobs using the real highway routing.
 - [ ] **County system** — all 254 county lines + name toast on crossing

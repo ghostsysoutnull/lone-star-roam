@@ -39,9 +39,12 @@ export class HUD {
     GEO.border.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = '#c8b878'; ctx.lineWidth = 2; ctx.stroke();
+    const roadStyle = {
+      motorway: ['#c05040', 1.6], trunk: ['#907048', 0.8],
+      primary: ['#6a6a52', 0.5], street: ['#4c5258', 0.4],
+    };
     for (const h of GEO.highways) {
-      ctx.strokeStyle = h.type === 'motorway' ? '#c05040' : '#907048';
-      ctx.lineWidth = h.type === 'motorway' ? 1.6 : 0.8;
+      [ctx.strokeStyle, ctx.lineWidth] = roadStyle[h.type];
       ctx.beginPath();
       h.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
       ctx.stroke();

@@ -62,9 +62,11 @@ export class Player {
     const left = k['KeyA'] || k['ArrowLeft'], right = k['KeyD'] || k['ArrowRight'];
 
     if (this.mode === 'DRIVE') {
-      const onRoad = !!nearestRoad(this.pos.x, this.pos.z, 4);
-      const maxSpd = onRoad ? 46 : 20; // ~460 km/h scaled feel; offroad slower
-      const accel = onRoad ? 26 : 14;
+      const road = nearestRoad(this.pos.x, this.pos.z, 4);
+      // top speed by road tier; offroad is slow going
+      const caps = { motorway: 46, trunk: 38, primary: 33, street: 26 };
+      const maxSpd = road ? caps[road.type] : 20;
+      const accel = road ? 26 : 14;
       if (fwd) this.speed += accel * dt;
       else if (back) this.speed -= (this.speed > 0 ? 40 : 12) * dt;
       else this.speed *= Math.pow(0.35, dt); // coast friction

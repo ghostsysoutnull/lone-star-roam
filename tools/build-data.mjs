@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 // Build pipeline: raw OSM/GeoJSON -> compact game data (data/*.json)
-// Usage: node tools/build-data.mjs <us-states.json> <motorways.json> <trunks.json>
+// Usage: node tools/build-data.mjs <us-states.json> <motorways.json> <trunks.json> [primary.json] [metro-streets.json ...]
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const [statesPath, motorwaysPath, trunksPath] = process.argv.slice(2);
+const [statesPath, motorwaysPath, trunksPath, primaryPath, ...metroPaths] = process.argv.slice(2);
 
 // --- Projection: local equirectangular centered on Texas, 1 game unit = 100 m real ---
 const LAT0 = 31.0, LON0 = -99.5; // approx center of Texas
@@ -85,6 +85,8 @@ function loadWays(path, type) {
     }));
 }
 const ways = [...loadWays(motorwaysPath, 'motorway'), ...loadWays(trunksPath, 'trunk')];
+if (primaryPath) ways.push(...loadWays(primaryPath, 'primary'));
+for (const mp of metroPaths) ways.push(...loadWays(mp, 'street'));
 console.log(`Ways loaded: ${ways.length}`);
 
 // Chain ways sharing endpoints (same ref+type) into longer polylines
@@ -123,13 +125,21 @@ for (const [, group] of byGroup) {
 console.log(`Chains: ${chains.length}`);
 
 // Clip to Texas border (with small buffer via bbox pre-check), simplify, project
+// Per-tier simplification tolerance (deg) and minimum kept length (game units)
+const TIER = {
+  motorway: { tol: 0.0025, minLen: 15 },
+  trunk: { tol: 0.0025, minLen: 15 },
+  primary: { tol: 0.002, minLen: 8 },
+  street: { tol: 0.0008, minLen: 4 }, // metro arterials — keep short blocks and curves
+};
 const highways = [];
 for (const c of chains) {
+  const { tol } = TIER[c.type];
   // split chain into runs of points inside Texas
   let run = [];
   const flush = () => {
     if (run.length > 1) {
-      const s = simplify(run, 0.0025); // ~250 m tolerance
+      const s = simplify(run, tol);
       if (s.length > 1) highways.push({ ref: c.ref, type: c.type, pts: s.map(proj) });
     }
     run = [];
@@ -137,13 +147,12 @@ for (const c of chains) {
   for (const p of c.pts) (inPoly(p, borderDeg) ? run.push(p) : flush());
   flush();
 }
-// Drop tiny fragments (< ~1.5 km real length)
 const lenOf = (pts) => {
   let L = 0;
   for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
   return L;
 };
-const kept = highways.filter((h) => lenOf(h.pts) > 15); // game units (1 = 100 m)
+const kept = highways.filter((h) => lenOf(h.pts) > TIER[h.type].minLen);
 kept.sort((a, b) => lenOf(b.pts) - lenOf(a.pts));
 const totalPts = kept.reduce((s, h) => s + h.pts.length, 0);
 console.log(`Highways kept: ${kept.length} polylines, ${totalPts} pts`);

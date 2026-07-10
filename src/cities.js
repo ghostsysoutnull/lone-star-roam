@@ -1,7 +1,7 @@
 // Procedural cities: street grids + skylines scaled by real population,
 // spawned/despawned by distance. Deterministic per city name.
 import * as THREE from 'three';
-import { GEO, seededRand } from './geo.js';
+import { GEO, seededRand, nearestRoad } from './geo.js';
 
 const SPAWN_DIST = 600;
 
@@ -39,6 +39,9 @@ export class CitySystem {
     const R = cityRadius(city.pop);
     const big = city.pop > 400000, mid = city.pop > 80000;
 
+    // Metros with real OSM arterials ('street' tier) skip the fake grid entirely
+    const hasRealStreets = !!nearestRoad(city.x, city.z, 15, (t) => t === 'street');
+
     // Street grid — dark quads on the ground, slight random rotation per city
     const rot = rand() * Math.PI * 0.5;
     const cos = Math.cos(rot), sin = Math.sin(rot);
@@ -46,7 +49,7 @@ export class CitySystem {
     const blockSize = big ? 6 : 8;
     const nStreets = Math.max(3, Math.floor((R * 1.4) / blockSize));
     const streetGeoms = [];
-    for (let axis = 0; axis < 2; axis++) {
+    for (let axis = 0; axis < (hasRealStreets ? 0 : 2); axis++) {
       for (let i = -nStreets; i <= nStreets; i++) {
         const off = i * blockSize;
         if (Math.abs(off) > R * 1.15) continue;
@@ -77,9 +80,13 @@ export class CitySystem {
       // sample in disc, snap to block grid so buildings sit between streets
       const a = rand() * Math.PI * 2, rr = Math.sqrt(rand()) * R;
       let lx = Math.cos(a) * rr, lz = Math.sin(a) * rr;
-      const bx = Math.round(lx / blockSize) * blockSize, bz = Math.round(lz / blockSize) * blockSize;
-      lx = bx + (rand() - 0.5) * (blockSize - 2.2);
-      lz = bz + (rand() - 0.5) * (blockSize - 2.2);
+      if (!hasRealStreets) {
+        const bx = Math.round(lx / blockSize) * blockSize, bz = Math.round(lz / blockSize) * blockSize;
+        lx = bx + (rand() - 0.5) * (blockSize - 2.2);
+        lz = bz + (rand() - 0.5) * (blockSize - 2.2);
+      } else if (nearestRoad(city.x + lx * cos + lz * sin, city.z - lx * sin + lz * cos, 2)?.dist < 1.3) {
+        continue; // real streets: reject building samples that sit on any road
+      }
       const distFrac = Math.hypot(lx, lz) / R;
       const falloff = Math.max(0.06, Math.pow(1 - distFrac, 2.2));
       const h = Math.max(0.6, maxH * falloff * (0.35 + rand() * 0.9));

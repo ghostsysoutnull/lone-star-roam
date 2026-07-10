@@ -22,7 +22,8 @@ async function boot() {
   scene.background = new THREE.Color(0x9fc8e8);
   scene.fog = new THREE.Fog(0x9fc8e8, 250, 1400);
 
-  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 30000);
+  // near=0.5: depth precision matters more than close-ups at this world scale (z-fighting)
+  const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.5, 30000);
 
   // Golden-hour Texas light
   const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
