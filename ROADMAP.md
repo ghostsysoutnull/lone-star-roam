@@ -29,7 +29,14 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 - [x] ~~Ambient traffic~~ — done 2026-07-10: 70 pooled instanced vehicles on real
   highways, both directions, tier-weighted density/speed. Four vehicle types
   (sedan/pickup/SUV/semi) with tier-dependent mix — semis haunt the interstates.
-  No player collision yet.
+  Polish pass later that day: density now follows local road supply (in-ring
+  length x tier weight — deserts get a trickle, metros fill the pool), cars keep
+  following distance, brake/honk/pull around a lane-blocking player (sqrt braking
+  envelope; still no hard collision — deliberate), turn onto crossing roads at
+  polyline ends instead of vanishing (U-turn at dead ends), far-away cars recycle
+  on a TTL so the mix doesn't drift, night thins traffic toward ~50%-semi
+  interstates, rain slows everyone 35% and lights lamps, and rural off-interstate
+  traffic skews pickup.
 - [x] ~~Rivers & lakes~~ — done 2026-07-10: 26 major named rivers (436 polylines) +
   6 big reservoirs (Amistad, Falcon, Texoma, Meredith, Red Bluff, Toledo Bend).
   Rio Grande/Red River render wide; border-river clipping uses a ~3.5 km dilation.

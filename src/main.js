@@ -55,6 +55,7 @@ async function boot() {
   const trains = new TrainSystem(scene);
   const maritime = new MaritimeSystem(scene);
   trains.onHorn = () => audio.trainHorn();
+  traffic.onHonk = (type) => audio.honk(type);
   const ufo = new UFOSystem(scene, () => gameplay.ufoSighting());
   npcs.onDialog = (d) => hud.dialog(d);
   npcs.onTalk = () => audio.chime('dialog');
@@ -103,7 +104,7 @@ async function boot() {
 
   document.getElementById('loading').style.display = 'none';
   hud.toast('🤠 Welcome to Texas! Press H for controls.');
-  window.__game = { player, gameplay, GEO, animals, sky, npcs, trains, ufo }; // debug/testing hook
+  window.__game = { player, gameplay, GEO, animals, sky, npcs, trains, ufo, traffic }; // debug/testing hook
 
   const clock = new THREE.Clock();
   let hudTick = 0;
@@ -114,7 +115,7 @@ async function boot() {
     scenery.update(dt, player.pos.x, player.pos.z);
     cities.update(player.pos.x, player.pos.z);
     cities.setNight(ATMOS.night);
-    traffic.update(dt, player.pos.x, player.pos.z);
+    traffic.update(dt, player.pos.x, player.pos.z, player.pos.y);
     traffic.setNight(ATMOS.night);
     trains.update(dt, player.pos.x, player.pos.z);
     maritime.update(dt, clock.elapsedTime);

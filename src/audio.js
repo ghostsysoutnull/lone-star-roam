@@ -181,6 +181,19 @@ export class AudioSystem {
     }
   }
 
+  // traffic honk: cars give a friendly double-beep dyad; semis lean on the air horn
+  honk(type) {
+    if (!this.ctx || this.muted) return;
+    if (type === 'semi') {
+      for (const f of [220, 277]) this.note(f, 0, 0.65, 0.05, 'sawtooth');
+    } else {
+      for (const start of [0, 0.16]) {
+        this.note(345, start, 0.11, 0.045, 'sawtooth');
+        this.note(435, start, 0.11, 0.035, 'sawtooth');
+      }
+    }
+  }
+
   // freight horn: two-note minor chord, long-long blast
   trainHorn() {
     if (!this.ctx || this.muted) return;
