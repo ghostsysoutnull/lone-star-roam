@@ -69,6 +69,12 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   sights always available with smart arrivals (drive on road vs. fly at altitude,
   Marfa auto-arrives at night); cities unlock as fast-travel after first visit.
 
+- [x] ~~Real night sky~~ — done 2026-07-10: 1,627 catalog stars (d3-celestial,
+  mag ≤ 5) with B-V colors, 46 constellation figures + 15 labels, celestial sphere
+  rotating for 31° N (verified: Betelgeuse culminates due south at midnight at the
+  theoretically exact 66.4°), sun disc, Lambert moon with automatic phases
+  (8-game-day lunar month), and today's real planet positions via mean orbits.
+
 ### Polish backlog (small)
 - [x] ~~Bluebonnet patches along Hill Country roads~~ — done with the nature pass
 - [x] ~~More landmarks~~ — done 2026-07-10: Buc-ee's beaver, Stonehenge II,

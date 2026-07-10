@@ -14,6 +14,9 @@ built from actual OpenStreetMap highway geometry and the real state border.
 - **Living world**: ambient traffic on the real highways, regional wildlife that flees you,
   pumpjacks nodding across the Permian Basin, 12-minute day/night cycle (hold <kbd>T</kbd> to
   fast-forward), and region-weighted weather — Gulf rain, Panhandle lightning, West Texas dust.
+- **The real night sky**: 1,600 catalog stars with true positions/colors, 46 constellation
+  figures, the celestial sphere rotating for Texas latitude (Polaris due north at 31°),
+  a moon with automatic phases, and today's actual planet positions.
 - **NPCs**: 12 locals with Texas facts in the major cities.
 
 ## Run

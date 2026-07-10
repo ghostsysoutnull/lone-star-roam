@@ -21,6 +21,8 @@ export async function loadGeo(onStatus) {
   onStatus?.('Loading rivers…');
   GEO.rivers = await get('rivers.json').catch(() => []);
   GEO.lakes = await get('lakes.json').catch(() => []);
+  onStatus?.('Loading the night sky…');
+  GEO.sky = await get('sky.json').catch(() => null); // real star catalog + constellations
 
   const xs = GEO.border.map((p) => p[0]);
   const zs = GEO.border.map((p) => p[1]);
