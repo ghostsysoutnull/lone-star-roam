@@ -183,9 +183,9 @@ export class HUD {
     this.els.dialog.style.display = 'block';
   }
 
-  interactHint(name) {
-    if (!name) { this.els.interact.style.display = 'none'; return; }
-    this.els.interact.textContent = `E — talk to ${name}`;
+  interactHint(label) {
+    if (!label) { this.els.interact.style.display = 'none'; return; }
+    this.els.interact.textContent = `E — ${label}`;
     this.els.interact.style.display = 'block';
   }
 

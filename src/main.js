@@ -82,10 +82,14 @@ async function boot() {
     if (e.code === 'KeyR') player.resetToRoad();
     if (e.code === 'KeyE') {
       if (!npcs.interact(player.pos)) {
-        if (plaqueOpen) { hud.dialog(null); plaqueOpen = false; }
-        else {
-          const lm = gameplay.landmarkNear(player.pos);
-          if (lm) { hud.dialog({ name: '\u{1F4DC} ' + lm.name, text: lm.fact }); plaqueOpen = true; }
+        const lm = gameplay.landmarkNear(player.pos, 28);
+        if (lm && lm.name !== plaqueOpen) {
+          // open (or switch straight to) this landmark's marker
+          hud.dialog({ name: '\u{1F4DC} ' + lm.name, text: lm.fact });
+          plaqueOpen = lm.name;
+        } else if (plaqueOpen) {
+          hud.dialog(null);
+          plaqueOpen = false;
         }
       } else plaqueOpen = false;
     }
@@ -119,7 +123,14 @@ async function boot() {
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed);
-    hud.interactHint(npcs.update(dt, player.pos));
+    const npcName = npcs.update(dt, player.pos);
+    const lmNear = npcName ? null : gameplay.landmarkNear(player.pos, 28);
+    hud.interactHint(npcName ? `talk to ${npcName}` : lmNear && lmNear.name !== plaqueOpen ? 'read the historical marker' : null);
+    // walked away from an open plaque: close it
+    if (plaqueOpen && (!lmNear || lmNear.name !== plaqueOpen) && !gameplay.landmarkNear(player.pos, 40)) {
+      hud.dialog(null);
+      plaqueOpen = false;
+    }
     // HUD text/minimap at ~12 Hz — nearestCity/nearestRoad every frame is wasteful
     hudTick += dt;
     if (hudTick > 0.08) {
