@@ -58,6 +58,13 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   nearby (the Levelland effect); theremin proximity tone; secret 👽 counter on
   the help screen; townsfolk rumor lines.
 
+- [x] ~~UFO events~~ (see above) · ~~Landmark pass~~ — done 2026-07-10: 24 landmarks
+  (added Prada Marfa, Paris TX Eiffel + hat, Dinosaur Valley, AT&T Stadium,
+  Astrodome, Giant Boots), 10 meshes reworked, E-readable historical markers,
+  rotating ferris wheel, night-lit Reunion ball / El Paso star / Prada windows.
+- [x] ~~Compass~~ — done 2026-07-10: sliding tape top-center with cardinals,
+  degree readout, nearest-city pip; C toggles, preference persisted.
+
 ### Larger bets
 - [x] ~~Terrain elevation~~ — done 2026-07-10: real AWS Terrarium DEM baked to a
   420×400 grid (328 KB, city-pad flattening + outside-Texas mask baked in),
