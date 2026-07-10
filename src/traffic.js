@@ -19,7 +19,7 @@ const COLORS = [0xc23b3b, 0xd8d8d8, 0x3b62c2, 0x3f3f46, 0xc2953b, 0x4e7a4e, 0x8a
 const SEMI_COLORS = [0xc23b3b, 0x3b62c2, 0x3f7a3f, 0xd8a13b, 0x5e3b7a, 0xdddddd]; // cab colors; trailer baked near-white
 
 // --- tiny geometry kit: transformed, vertex-colored boxes/cylinders merged into one indexed geometry ---
-const tinted = (geo, hex) => {
+export const tinted = (geo, hex) => {
   const c = new THREE.Color(hex);
   const n = geo.attributes.position.count;
   const col = new Float32Array(n * 3);
@@ -30,15 +30,21 @@ const tinted = (geo, hex) => {
 const box = (w, h, d, x, y, z, hex) => tinted(new THREE.BoxGeometry(w, h, d).translate(x, y, z), hex);
 const wheel = (r, x, z) => tinted(new THREE.CylinderGeometry(r, r, 0.26, 8).rotateZ(Math.PI / 2).translate(x, r, z), 0x1e1e22);
 
-function merge(geos) {
+export function merge(geos) {
   const pos = [], nor = [], col = [], idx = [];
   for (const g of geos) {
     const base = pos.length / 3;
     pos.push(...g.attributes.position.array);
     nor.push(...g.attributes.normal.array);
     col.push(...g.attributes.color.array);
-    const gi = g.index.array;
-    for (let i = 0; i < gi.length; i++) idx.push(gi[i] + base);
+    if (g.index) {
+      const gi = g.index.array;
+      for (let i = 0; i < gi.length; i++) idx.push(gi[i] + base);
+    } else {
+      // non-indexed (e.g. IcosahedronGeometry) — vertices are already triangle-ordered
+      const n = g.attributes.position.count;
+      for (let i = 0; i < n; i++) idx.push(base + i);
+    }
     g.dispose();
   }
   const out = new THREE.BufferGeometry();

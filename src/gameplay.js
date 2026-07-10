@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GEO, seededRand, nearestCity } from './geo.js';
 import { mkStarMesh } from './vehicle.js';
 import { cityRadius } from './cities.js';
+import { merge, tinted } from './traffic.js';
 
 const SAVE_KEY = 'lonestar-roam-save-v1';
 
@@ -81,14 +82,21 @@ export class Gameplay {
 
   persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); }
 
-  // --- City stars: golden star hovering over each unvisited downtown ---
+  // --- City stars: golden star + glow halo hovering over each unvisited downtown ---
   mkCityStars() {
     const group = new THREE.Group();
+    const haloTex = mkHaloTexture();
     for (const c of GEO.cities) {
       if (this.save.cities.includes(c.name)) continue;
       const star = mkStarMesh(2.2, 0xffd35c);
       star.position.set(c.x, 14 + cityRadius(c.pop) * 0.15, c.z);
       star.userData.city = c.name;
+      star.userData.baseY = star.position.y;
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: haloTex, color: 0xffd35c, transparent: true, opacity: 0.5, depthWrite: false,
+      }));
+      halo.scale.set(9, 9, 1);
+      star.add(halo);
       group.add(star);
     }
     this.scene.add(group);
@@ -107,17 +115,31 @@ export class Gameplay {
       const [x, z] = h.pts[i];
       spots.push([x + (rand() - 0.5) * 3, z + (rand() - 0.5) * 3]);
     }
-    const geo = new THREE.IcosahedronGeometry(0.55, 0);
-    const mat = new THREE.MeshLambertMaterial({ color: 0xffdf3c, emissive: 0xbb9a00, emissiveIntensity: 0.5 });
+    // an actual rose: stem + leaf + layered bloom (one merged vertex-colored geometry)
+    const geo = merge([
+      tinted(new THREE.CylinderGeometry(0.05, 0.07, 1.0, 5).translate(0, 0.5, 0), 0x3a7a3a),
+      tinted(new THREE.BoxGeometry(0.3, 0.04, 0.14).translate(0.18, 0.55, 0), 0x4a8a45),
+      tinted(new THREE.IcosahedronGeometry(0.42, 0).translate(0, 1.15, 0), 0xffdf3c),
+      tinted(new THREE.IcosahedronGeometry(0.22, 0).translate(0, 1.42, 0), 0xffb820),
+    ]);
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x403000, flatShading: true });
     const inst = new THREE.InstancedMesh(geo, mat, spots.length);
+    // soft glow layer sharing the same matrices
+    const glow = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(0.62, 8, 6).translate(0, 1.2, 0),
+      new THREE.MeshBasicMaterial({ color: 0xffe36a, transparent: true, opacity: 0.22, depthWrite: false }),
+      spots.length
+    );
     const m = new THREE.Matrix4();
     this.roseSpots = spots.map(([x, z], i) => {
       const taken = this.save.roses.includes(i);
-      m.makeScale(taken ? 0.001 : 1, taken ? 0.001 : 1, taken ? 0.001 : 1).setPosition(x, 1.2, z);
+      m.makeScale(taken ? 0.001 : 1, taken ? 0.001 : 1, taken ? 0.001 : 1).setPosition(x, 0, z);
       inst.setMatrixAt(i, m);
-      return { x, z, i, taken };
+      glow.setMatrixAt(i, m);
+      return { x, z, i, taken, phase: (x * 7 + z * 3) % 6.28 };
     });
-    this.scene.add(inst);
+    this.scene.add(inst, glow);
+    this.roseGlow = glow;
     return inst;
   }
 
@@ -135,6 +157,7 @@ export class Gameplay {
       );
       beam.position.y = 60;
       g.add(beam);
+      (this.beams ??= []).push(beam);
       g.userData.lm = lm;
       if (lm.kind === 'lights') this.marfa = g; // the orbs only show after dark
       group.add(g);
@@ -188,6 +211,17 @@ export class Gameplay {
     }
   }
 
+  // quick expanding golden ring at a collect point
+  burst(x, y, z) {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.6, 0.85, 24).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xffd35c, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false })
+    );
+    ring.position.set(x, y, z);
+    this.scene.add(ring);
+    (this.bursts ??= []).push({ ring, age: 0 });
+  }
+
   update(dt, pos, night = 0, speed = 0) {
     this.t += dt;
 
@@ -198,8 +232,50 @@ export class Gameplay {
     st.top = Math.max(st.top, Math.abs(Math.round(speed * 2.4)));
     this.saveTimer += dt;
     if (this.saveTimer > 20) { this.saveTimer = 0; this.persist(); }
-    // spin stars & bob roses
-    for (const s of this.cityStars.children) s.rotation.y = this.t * 1.2;
+
+    // collect bursts: expand and fade
+    if (this.bursts) {
+      for (const b of this.bursts) {
+        b.age += dt;
+        const s = 1 + b.age * 14;
+        b.ring.scale.set(s, 1, s);
+        b.ring.material.opacity = Math.max(0, 0.85 * (1 - b.age / 0.7));
+        if (b.age > 0.7) { this.scene.remove(b.ring); b.ring.geometry.dispose(); b.ring.material.dispose(); }
+      }
+      this.bursts = this.bursts.filter((b) => b.age <= 0.7);
+    }
+
+    // landmark beacons pulse; NPC markers bob
+    if (this.beams) this.beams.forEach((b, i) => (b.material.opacity = 0.18 + 0.1 * Math.sin(this.t * 2 + i)));
+    this.npcs.forEach((n, i) => (n.children[3].position.y = 2.9 + Math.sin(this.t * 3 + i) * 0.2));
+
+    // roses near the player bob and spin (matrices touched only within range)
+    const m4 = this.tmpM4 ??= new THREE.Matrix4();
+    const q4 = this.tmpQ4 ??= new THREE.Quaternion();
+    const up = this.tmpUp ??= new THREE.Vector3(0, 1, 0);
+    let roseDirty = false;
+    for (const r of this.roseSpots) {
+      if (r.taken) continue;
+      const d2 = (r.x - pos.x) ** 2 + (r.z - pos.z) ** 2;
+      if (d2 > 200 * 200) continue;
+      q4.setFromAxisAngle(up, this.t * 1.6 + r.phase);
+      m4.compose(
+        new THREE.Vector3(r.x, Math.sin(this.t * 2 + r.phase) * 0.12, r.z),
+        q4, new THREE.Vector3(1, 1, 1)
+      );
+      this.roseSystem.setMatrixAt(r.i, m4);
+      this.roseGlow.setMatrixAt(r.i, m4);
+      roseDirty = true;
+    }
+    if (roseDirty) {
+      this.roseSystem.instanceMatrix.needsUpdate = true;
+      this.roseGlow.instanceMatrix.needsUpdate = true;
+    }
+    // stars spin and bob
+    for (const s of this.cityStars.children) {
+      s.rotation.y = this.t * 1.2;
+      s.position.y = s.userData.baseY + Math.sin(this.t * 1.4 + s.userData.baseY) * 0.8;
+    }
 
     // Marfa Lights: mysterious orbs, night only, gently drifting
     if (this.marfa) {
@@ -221,6 +297,7 @@ export class Gameplay {
         if (star) this.cityStars.remove(star);
         this.onToast?.(`⭐ ${city.name} visited! (${this.save.cities.length}/132)`);
         this.onCollect?.('city');
+        this.burst(pos.x, pos.y + 1.5, pos.z);
       }
     }
 
@@ -233,11 +310,14 @@ export class Gameplay {
         r.taken = true;
         this.save.roses.push(r.i);
         this.persist();
-        m.makeScale(0.001, 0.001, 0.001).setPosition(r.x, 1.2, r.z);
+        m.makeScale(0.001, 0.001, 0.001).setPosition(r.x, 0, r.z);
         this.roseSystem.setMatrixAt(r.i, m);
+        this.roseGlow.setMatrixAt(r.i, m);
         this.roseSystem.instanceMatrix.needsUpdate = true;
+        this.roseGlow.instanceMatrix.needsUpdate = true;
         this.onToast?.(`🌹 Yellow rose (${this.save.roses.length}/300)`);
         this.onCollect?.('rose');
+        this.burst(r.x, 1.2, r.z);
       }
     }
 
@@ -252,6 +332,7 @@ export class Gameplay {
         g.children[g.children.length - 1].material.color.set(0x557755);
         this.onToast?.(`🏛 ${lm.name} — ${lm.fact}`);
         this.onCollect?.('landmark');
+        this.burst(g.position.x, 2, g.position.z);
       }
     }
 
@@ -259,6 +340,20 @@ export class Gameplay {
     const near = this.npcNear(pos);
     return near && !this.activeNPC ? near.userData.npc.name : null;
   }
+}
+
+// radial-gradient glow sprite texture (shared by all star halos)
+function mkHaloTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 2, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,220,110,0.9)');
+  g.addColorStop(0.4, 'rgba(255,210,92,0.28)');
+  g.addColorStop(1, 'rgba(255,210,92,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(c);
 }
 
 function mkLandmarkMesh(kind) {
