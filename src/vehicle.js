@@ -108,7 +108,8 @@ export class Player {
       const road = nearestRoad(this.pos.x, this.pos.z, 4);
       // top speed by road tier; offroad is slow going
       const caps = { motorway: 46, trunk: 38, primary: 33, street: 26 };
-      const maxSpd = road ? caps[road.type] : 20;
+      const wet = 1 - Math.min(1, ATMOS.rain) * 0.22; // rain slows you like it slows traffic
+      const maxSpd = (road ? caps[road.type] : 20) * wet;
       const accel = road ? 26 : 14;
       if (fwd) this.speed += accel * dt;
       else if (back) { this.speed -= (this.speed > 0 ? 40 : 12) * dt; this.braking = this.speed > 0.5; }
@@ -356,7 +357,20 @@ function mkTruck() {
     g.add(b);
     brakes.push(b);
   }
-  g.userData = { headlights: lights, wheels, brakes };
+  // delivery cargo: crates + strap between the bed rails, shown while hauling
+  const cargo = new THREE.Group();
+  const crateMat = new THREE.MeshLambertMaterial({ color: 0x9a6a35, flatShading: true });
+  const big = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.55, 0.85), crateMat);
+  big.position.set(-0.1, 1.2, 1.25); // on the bed floor, clear of the cab (rear at z≈0.85)
+  const small = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.38, 0.5), new THREE.MeshLambertMaterial({ color: 0xb5854a, flatShading: true }));
+  small.position.set(0.05, 1.66, 1.05); // stacked on the big crate
+  const strap = new THREE.Mesh(new THREE.BoxGeometry(1.72, 0.05, 0.12), new THREE.MeshLambertMaterial({ color: 0x333944 }));
+  strap.position.set(0, 1.48, 1.4); // over the big crate, rail to rail
+  cargo.add(big, small, strap);
+  cargo.visible = false;
+  g.add(cargo);
+
+  g.userData = { headlights: lights, wheels, brakes, cargo };
   return g;
 }
 

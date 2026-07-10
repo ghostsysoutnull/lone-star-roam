@@ -46,6 +46,9 @@ export class Gameplay {
     this.save.stats ??= { dist: 0, time: 0, top: 0 }; // km real, seconds, mph
     this.save.counties ??= [];
     this.save.ufo ??= 0;
+    this.save.bank ??= 0;      // delivery earnings — pure score for now
+    this.save.jobsDone ??= 0;
+    this.save.job ??= null;    // active delivery, serialized by missions.js
     this.saveTimer = 0;
     this.countyNow = null;
     this.countyToastT = 0;
@@ -61,7 +64,7 @@ export class Gameplay {
     return {
       cities: this.save.cities.length, landmarks: this.save.landmarks.length,
       roses: this.save.roses.length, species: this.save.species.length,
-      counties: this.save.counties.length,
+      counties: this.save.counties.length, bank: this.save.bank,
     };
   }
 

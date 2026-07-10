@@ -88,8 +88,18 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   without rebuilding the statewide tiers (rose indices untouched). +1,157 polylines,
   +75 KB. Mission stays procedural — its nearest OSM secondary is outside its whole
   building disc, so the fake grid is the better render there.
-- [ ] **Missions/delivery gameplay** — "haul BBQ from Lockhart to Amarillo"-style
-  jobs using the real highway routing.
+- [x] ~~Missions/delivery gameplay~~ — done 2026-07-10: 💼 Jobs tab in the travel
+  menu offers 4 hauls between real cities (Texas-flavored cargo with themed
+  origins — brisket from Llano, boots from El Paso; 25% are 🔥 rush jobs at
+  +40% pay on a tighter clock). Drive to the origin to load (crates visible in
+  the truck bed), beat a distance-scaled deadline to the destination. Staying
+  out of the air all haul pays a ×1.5 road bonus; blowing the deadline halves
+  the payout; fast travel is locked while cargo is aboard. Bankroll is pure
+  score for now (HUD + help stats), saved under new keys (`bank`, `jobsDone`,
+  `job`) — rose RNG untouched. Rain now slows the player 22% like it slows
+  traffic. Deadline/pay knobs live at the top of `genOffers()` in
+  `src/missions.js`. Next: truck upgrades to spend the bankroll on, real
+  highway routing for route lines + road-distance pay.
 - [x] ~~County system~~ — done 2026-07-10: all 254 real county boundaries (Census
   500k, 143 KB), county in the HUD location line, crossing toasts + chime with
   zigzag debounce, collect-all-254 counter, faint ground lines + map lines.

@@ -33,11 +33,12 @@ const ICONS = [
 ];
 
 export class TravelMenu {
-  constructor(player, gameplay, sky, npcs, onToast) {
+  constructor(player, gameplay, sky, npcs, missions, onToast) {
     this.player = player;
     this.gameplay = gameplay;
     this.sky = sky;
     this.npcs = npcs;
+    this.missions = missions;
     this.onToast = onToast;
     this.tab = 'Cities';
     this.el = document.getElementById('travel');
@@ -46,7 +47,9 @@ export class TravelMenu {
     });
     this.el.querySelector('.poi-list').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-i]');
-      if (b && !b.disabled) this.go(this.current[+b.dataset.i]);
+      if (!b || b.disabled) return;
+      if (this.tab === 'Jobs') this.jobClick(b.dataset.i);
+      else this.go(this.current[+b.dataset.i]);
     });
   }
 
@@ -62,6 +65,9 @@ export class TravelMenu {
   render() {
     for (const t of this.el.querySelectorAll('.tabs button'))
       t.classList.toggle('active', t.dataset.tab === this.tab);
+    if (this.tab === 'Jobs') { this.renderJobs(); return; }
+    // teleporting with cargo aboard would gut the missions — lock travel mid-haul
+    const hauling = this.missions?.job?.phase === 'haul';
     const visited = new Set(this.gameplay.save.cities);
     const collected = new Set(this.gameplay.save.landmarks);
     if (this.tab === 'Cities') {
@@ -85,12 +91,41 @@ export class TravelMenu {
       this.current = ICONS;
     }
     this.el.querySelector('.poi-list').innerHTML = this.current
-      .map((p, i) => `<button data-i="${i}" ${p.locked ? 'disabled' : ''}>${p.star ? '⭐ ' : ''}${p.name}${p.locked ? ' 🔒' : ''}</button>`)
+      .map((p, i) => `<button data-i="${i}" ${p.locked || hauling ? 'disabled' : ''}>${p.star ? '⭐ ' : ''}${p.name}${p.locked ? ' 🔒' : ''}</button>`)
       .join('');
     this.el.querySelector('.hint').textContent =
-      this.tab === 'Cities' ? 'Locked cities unlock as fast-travel once you visit them.'
+      hauling ? '📦 Cargo aboard — finish (or abandon) your delivery before fast-traveling.'
+      : this.tab === 'Cities' ? 'Locked cities unlock as fast-travel once you visit them.'
       : this.tab === 'Folks' ? 'Meet the locals — you can drop in on anyone whose town you’ve visited.'
       : 'Click to travel.';
+  }
+
+  renderJobs() {
+    const m = this.missions;
+    const j = m.job;
+    const money = `💵 $${(this.gameplay.save.bank ?? 0).toLocaleString()} · ${this.gameplay.save.jobsDone ?? 0} deliveries`;
+    let html = `<div style="grid-column:1/-1;font-size:13px;opacity:.85;padding:2px 2px 4px">${money}</div>`;
+    if (j) {
+      const step = j.phase === 'pickup' ? `load in <b>${j.from}</b>` : `deliver to <b>${j.to}</b>`;
+      html += `<div style="grid-column:1/-1;background:#243046;border:1px solid rgba(255,211,92,.4);border-radius:8px;padding:10px 12px;font-size:13px">
+        ${j.icon} <b>${j.cargo}</b> — ${j.from} → ${j.to} · ${j.km} km · $${j.pay}${j.rush ? ' · 🔥 RUSH' : ''}<br>
+        <span style="opacity:.75">Now: ${step}</span></div>`;
+      html += `<button data-i="abandon" style="grid-column:1/-1">✖ Abandon this job</button>`;
+    }
+    html += m.offers
+      .map((o, i) => `<button data-i="${i}" ${j ? 'disabled' : ''}>${o.icon} <b>${o.cargo}</b> — ${o.from} → ${o.to}<br>
+        <small style="opacity:.75">${o.km} km · $${o.pay}${o.rush ? ' · 🔥 RUSH (tight clock, +40% pay)' : ''}</small></button>`)
+      .join('');
+    this.el.querySelector('.poi-list').innerHTML = html;
+    this.el.querySelector('.hint').textContent = j
+      ? 'One haul at a time — deliver it or abandon it to take another.'
+      : 'Take a job, load up at the origin, beat the clock. Stay out of the air for a ×1.5 road bonus; late pays half.';
+  }
+
+  jobClick(i) {
+    if (i === 'abandon') this.missions.abandon();
+    else this.missions.accept(this.missions.offers[+i]);
+    this.render();
   }
 
   go(poi) {

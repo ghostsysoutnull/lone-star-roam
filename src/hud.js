@@ -17,6 +17,8 @@ export class HUD {
       roses: document.getElementById('score-roses'),
       critters: document.getElementById('score-critters'),
       counties: document.getElementById('score-counties'),
+      bank: document.getElementById('score-bank'),
+      job: document.getElementById('hud-job'),
       toast: document.getElementById('toast'),
       dialog: document.getElementById('dialog'),
       interact: document.getElementById('interact-hint'),
@@ -97,12 +99,13 @@ export class HUD {
 
   toggleBigMap() { this.big.style.display = this.big.style.display === 'block' ? 'none' : 'block'; }
 
-  toggleHelp(stats, ufoCount = 0) {
+  toggleHelp(stats, ufoCount = 0, bank = 0, jobsDone = 0) {
     const open = this.els.help.style.display !== 'block';
     if (open && stats) {
       const h = Math.floor(stats.time / 3600), m = Math.floor((stats.time % 3600) / 60);
       document.getElementById('help-stats').textContent =
         `🚗 ${Math.round(stats.dist).toLocaleString()} km traveled · ⏱ ${h ? h + ' h ' : ''}${m} min · 🏁 top ${stats.top} mph` +
+        (jobsDone > 0 ? ` · 📦 ${jobsDone} hauls · 💵 $${bank.toLocaleString()}` : '') +
         (ufoCount > 0 ? ` · 👽 ${ufoCount}` : '');
     }
     this.els.help.style.display = open ? 'block' : 'none';
@@ -211,6 +214,10 @@ export class HUD {
     this.els.roses.textContent = counts.roses;
     this.els.critters.textContent = counts.species;
     this.els.counties.textContent = counts.counties;
+    this.els.bank.textContent = (counts.bank ?? 0).toLocaleString();
+    // active delivery line (set by main from missions.hudInfo)
+    this.els.job.textContent = this.mission?.text ?? '';
+    this.els.job.style.color = this.mission?.late ? '#ff7a66' : this.mission?.urgent ? '#ffb04a' : '#ffd35c';
 
     this.drawMini(player);
     this.drawCompass(player, city);
@@ -225,6 +232,13 @@ export class HUD {
     const [px, pz] = this.mapT(player.pos.x, player.pos.z);
     const zoom = this.zoomLevels[this.zoomIdx], sw = W / zoom, sh = H / zoom;
     ctx.drawImage(this.mapLayer, px - sw / 2, pz - sh / 2, sw, sh, 0, 0, W, H);
+    // delivery target: gold diamond, clamped to the edge as a direction pointer
+    if (this.mission?.target) {
+      const [tx, tz] = this.mapT(this.mission.target[0], this.mission.target[1]);
+      const mx = Math.max(10, Math.min(W - 10, (tx - px + sw / 2) * zoom));
+      const my = Math.max(10, Math.min(H - 10, (tz - pz + sh / 2) * zoom));
+      this.diamond(ctx, mx, my, 8);
+    }
     // player arrow
     ctx.save();
     ctx.translate(W / 2, H / 2);
@@ -241,8 +255,21 @@ export class HUD {
     ctx.drawImage(this.mapLayer, 0, 0, W, H);
     const sx = W / this.mapLayer.width, sy = H / this.mapLayer.height;
     const [px, pz] = this.mapT(player.pos.x, player.pos.z);
+    if (this.mission?.target) {
+      const [tx, tz] = this.mapT(this.mission.target[0], this.mission.target[1]);
+      this.diamond(ctx, tx * sx, tz * sy, 9);
+    }
     ctx.fillStyle = '#ffd35c';
     ctx.strokeStyle = '#000';
     ctx.beginPath(); ctx.arc(px * sx, pz * sy, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+  }
+
+  diamond(ctx, x, y, r) {
+    ctx.fillStyle = this.mission?.late ? '#ff7a66' : '#ffd35c';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
   }
 }

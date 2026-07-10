@@ -9,6 +9,7 @@ import { TrafficSystem } from './traffic.js';
 import { AnimalSystem, SPECIES, SPECIES_COUNT } from './animals.js';
 import { SkySystem, ATMOS } from './sky.js';
 import { TravelMenu } from './travel.js';
+import { MissionSystem } from './missions.js';
 import { AudioSystem } from './audio.js';
 import { NPCSystem } from './npcs.js';
 import { TrainSystem } from './trains.js';
@@ -51,7 +52,8 @@ async function boot() {
   gameplay.onToast = (m) => hud.toast(m);
   const audio = new AudioSystem();
   const npcs = new NPCSystem(scene, () => ({ night: ATMOS.night, weather: ATMOS.weather, counts: gameplay.counts() }));
-  const travel = new TravelMenu(player, gameplay, sky, npcs, (m) => hud.toast(m));
+  const missions = new MissionSystem(gameplay, player, (m) => hud.toast(m), (k) => audio.chime(k));
+  const travel = new TravelMenu(player, gameplay, sky, npcs, missions, (m) => hud.toast(m));
   const trains = new TrainSystem(scene);
   const maritime = new MaritimeSystem(scene);
   trains.onHorn = () => audio.trainHorn();
@@ -74,7 +76,7 @@ async function boot() {
   addEventListener('keydown', (e) => {
     if (e.code === 'KeyV') player.cycleMode();
     if (e.code === 'KeyM') hud.toggleBigMap();
-    if (e.code === 'KeyH') hud.toggleHelp(gameplay.save.stats, gameplay.save.ufo);
+    if (e.code === 'KeyH') hud.toggleHelp(gameplay.save.stats, gameplay.save.ufo, gameplay.save.bank, gameplay.save.jobsDone);
     if (e.code === 'KeyZ') hud.cycleZoom();
     if (e.code === 'KeyC') hud.toggleCompass();
     if (e.code === 'KeyP') travel.toggle();
@@ -104,7 +106,7 @@ async function boot() {
 
   document.getElementById('loading').style.display = 'none';
   hud.toast('🤠 Welcome to Texas! Press H for controls.');
-  window.__game = { player, gameplay, GEO, animals, sky, npcs, trains, ufo, traffic }; // debug/testing hook
+  window.__game = { player, gameplay, GEO, animals, sky, npcs, trains, ufo, traffic, missions }; // debug/testing hook
 
   const clock = new THREE.Clock();
   let hudTick = 0;
@@ -124,6 +126,7 @@ async function boot() {
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed);
+    missions.update(dt, player.pos, player.mode, player.pos.y - hAt(player.pos.x, player.pos.z));
     const npcName = npcs.update(dt, player.pos);
     const lmNear = npcName ? null : gameplay.landmarkNear(player.pos, 28);
     hud.interactHint(npcName ? `talk to ${npcName}` : lmNear && lmNear.name !== plaqueOpen ? 'read the historical marker' : null);
@@ -138,6 +141,7 @@ async function boot() {
       const county = countyAt(player.pos.x, player.pos.z);
       gameplay.enterCounty(county, hudTick);
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
+      hud.mission = missions.hudInfo(player.pos);
       hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading), county);
       hudTick = 0;
     }

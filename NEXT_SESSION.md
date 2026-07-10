@@ -14,51 +14,49 @@ Key facts:
 - Local dev: `python3 -m http.server 8317`; verify headlessly with Playwright from
   the scratchpad (`--no-sandbox --enable-unsafe-swiftshader`), driving the game via
   the `window.__game` debug hook (player/gameplay/sky/npcs/trains/ufo/animals/
-  traffic/GEO).
+  traffic/missions/GEO).
 - When I report something broken after an update, suspect my browser cache first
   (hard refresh) — python http.server sends no cache headers.
 - Verify at *natural* play values (ugly mid-drive headings, parked-truck
   distances, long-idle traffic mixes), not convenient ones — several bugs only
   showed up there.
 
-Everything through 2026-07-10 is shipped: real roads (arterials in 9 metros) /
-rivers/terrain/counties/rails, the real night sky, polished traffic (supply-based
-density, cars that brake/honk/pull around you, junction turns, night/rain/rural
-mixes), trains, ships, wildlife, weather, day/night, audio, NPCs + townsfolk,
-UFOs, 24 landmarks, travel menu, compass.
+Everything through 2026-07-10 is shipped, including **missions**: a 💼 Jobs tab
+in the travel menu (P) offers delivery hauls between real cities — load at the
+origin (crates ride in the truck bed), beat a distance-scaled deadline, earn a
+bankroll. ×1.5 road bonus for never flying, half pay when late, fast travel
+locked mid-haul, 🔥 rush jobs, rain slows the player 22%.
 
-Today I want to build **missions** — the last big feature, turning the sandbox
-into a game:
+Today's candidates (my pick order):
 
-- Delivery jobs between real cities: a job board in the travel menu (P) offering
-  hauls like "BBQ from Lockhart to Amarillo" — real origin, real destination,
-  distance-scaled pay and deadline.
-- Cargo rides visibly in the truck bed; deadline pressure interacts with what's
-  already there: night, weather (rain slows traffic and you), terrain.
-- Payout on delivery + a running bankroll in the save; spend it on truck upgrades
-  (top speed / acceleration / headlights?) or keep it as score at first — start
-  simple, one clean loop before any economy.
-- Persistence: extend the localStorage save carefully — never change the rose RNG
-  or city names; add new keys rather than reshaping existing ones.
-- Design for the fiction we have: NPCs could hand out flavored jobs later, but
-  v1 is the job board only. Keep FLY mode allowed but pay bonus for driving?
-  (decide at design time — discuss trade-offs with me before building).
+1. **Gamepad analog steering** (~1 hour, biggest driving-feel win) — Gamepad API
+   axes/buttons alongside the keyboard: left stick steer, triggers throttle/brake,
+   buttons for mode/interact/map. Poll in `Player.update`; keep keyboard working.
+2. **Truck upgrades** — something to spend the mission bankroll on: top speed /
+   acceleration / better headlights tiers, bought from the Jobs tab. Save under
+   new keys; apply as multipliers in the DRIVE branch of `vehicle.js`.
+3. **Big-map click-to-set-waypoint** — click on M-map → gold marker + compass pip
+   (the missions diamond in `hud.js` already does the marker pattern; generalize it).
 
-If missions stall or finish early, fallbacks: gamepad analog steering (Gamepad
-API, ~1 hour, biggest driving-feel win) or big-map click-to-set-waypoint.
+If those finish early: real highway A* routing (route lines on the map,
+road-distance mission pay), or mission variety (multi-stop hauls, fragile-cargo
+jobs that punish offroading).
 
 ---
 
 ## Notes for me (the human)
 
-- Playtest request from the traffic session: park on a busy freeway (I-35 Austin)
-  and judge the honk chorus — charming or annoying? Knobs: honk fuse times in the
-  blocking branch of `src/traffic.js`, overall density `DENSITY_DIVISOR` (190,
-  lower = busier), tier `weight`/`nightCut` table, pull-around patience (2.8 s).
-- Saves are per-browser (localStorage): localhost and the public URL have separate
-  progress.
+- **Playtest the missions loop**: take a short haul and a 🔥 rush job. Do
+  deadlines feel fair in rain/at night? Knobs in `src/missions.js` `genOffers()`:
+  deadline `dist / 24 + 60` (higher divisor = tighter), pay `50 + km × 1.2`,
+  rush odds 0.25. Payout multipliers live in `deliver()`.
+- Also still pending playtest: park on I-35 in Austin and judge the traffic honk
+  chorus — knobs in `src/traffic.js` (`DENSITY_DIVISOR` 190, honk fuse times,
+  2.8 s pull-around patience).
+- Saves are per-browser (localStorage): localhost and the public URL have
+  separate progress. Mission bankroll shows in the score panel (💵) and on H.
 - N mutes audio; C toggles compass; the 👽 counter only appears on H after a
   first sighting (hunt near Lubbock/Marfa past midnight, clear weather).
 - Adding real arterials to more cities (Waco, Laredo, Midland/Odessa…) is a
-  two-command job now: bbox + `tools/add-metro-streets.mjs` (header documents the
+  two-command job: bbox + `tools/add-metro-streets.mjs` (header documents the
   pattern; Overpass **GET** only, maps.mail.ru mirror for big queries).
