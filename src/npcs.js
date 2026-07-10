@@ -125,10 +125,10 @@ export class NPCSystem {
       this.dialogStep++;
       if (this.dialogStep >= this.convo.length) { this.activeNPC = null; this.onDialog?.(null); }
       else this.onDialog?.({ name: this.activeNPC.name, text: this.convo[this.dialogStep] });
-      return;
+      return true;
     }
     const n = this.npcNear(pos);
-    if (!n) return;
+    if (!n) return false;
     this.activeNPC = n;
     this.dialogStep = 0;
     n.wave = 1; // greet
@@ -152,6 +152,7 @@ export class NPCSystem {
     }
     this.onTalk?.();
     this.onDialog?.({ name: n.name, text: this.convo[0] });
+    return true;
   }
 
   update(dt, pos) {

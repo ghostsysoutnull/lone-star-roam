@@ -69,6 +69,7 @@ async function boot() {
   player.getObstacles = () =>
     [...cities.live.values()].map((g) => g.children.find((c) => c.isInstancedMesh)).filter(Boolean);
 
+  let plaqueOpen = false;
   addEventListener('keydown', (e) => {
     if (e.code === 'KeyV') player.cycleMode();
     if (e.code === 'KeyM') hud.toggleBigMap();
@@ -78,7 +79,15 @@ async function boot() {
     if (e.code === 'Escape') travel.close();
     if (e.code === 'KeyN') hud.toast(audio.toggleMute() ? '🔇 Muted' : '🔊 Sound on');
     if (e.code === 'KeyR') player.resetToRoad();
-    if (e.code === 'KeyE') npcs.interact(player.pos);
+    if (e.code === 'KeyE') {
+      if (!npcs.interact(player.pos)) {
+        if (plaqueOpen) { hud.dialog(null); plaqueOpen = false; }
+        else {
+          const lm = gameplay.landmarkNear(player.pos);
+          if (lm) { hud.dialog({ name: '\u{1F4DC} ' + lm.name, text: lm.fact }); plaqueOpen = true; }
+        }
+      } else plaqueOpen = false;
+    }
     if (e.code === 'Space') e.preventDefault();
   });
   addEventListener('resize', () => {
