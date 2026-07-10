@@ -62,7 +62,7 @@ function buildTerrain(scene) {
       const m = raw & 0x7fff;
       const out = !!(raw & 0x8000);
       let y = m * 0.025;
-      if (out && m <= 2) y = -2; // offshore: dip under the gulf water plane
+      if (out && m <= 2) y = -4; // offshore: dip *below* the gulf water plane (-2.5)
       const k = (j * W + i) * 3;
       pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
       // color: height ramp, then region/outside tint
@@ -183,6 +183,10 @@ function buildHighways(scene) {
   buildRibbons(scene, ofType('street'), 1.1, 0x565460, 0.14);   // real metro arterials — above city street quads
   // center stripes on interstates so roads read clearly at driving height
   buildRibbons(scene, ofType('motorway'), 0.25, 0xd8c860, 0.16);
+  // rail lines: gravel bed + steel band
+  const railPts = GEO.rails.map((r) => r.pts);
+  buildRibbons(scene, railPts, 1.5, 0x4a4440, 0.07);
+  buildRibbons(scene, railPts, 0.55, 0x8a8a90, 0.11);
 }
 
 // Rivers as blue ribbons, lakes as polygons — real geometry

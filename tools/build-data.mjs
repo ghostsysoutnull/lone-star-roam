@@ -312,6 +312,41 @@ if (flags.lakes) {
   console.log(`Lakes: ${lakes.map((l) => l.name).join(', ')}`);
 }
 
+// --- 5b. Rails: OSM main lines, chained like rivers ---
+let rails = [];
+if (flags.rails) {
+  const railWays = loadWays(flags.rails, 'rail');
+  const used = new Set();
+  const startMap = new Map();
+  for (let i = 0; i < railWays.length; i++) {
+    const k = key(railWays[i].pts[0]);
+    if (!startMap.has(k)) startMap.set(k, []);
+    startMap.get(k).push(i);
+  }
+  for (let i = 0; i < railWays.length; i++) {
+    if (used.has(i)) continue;
+    used.add(i);
+    const pts = [...railWays[i].pts];
+    for (;;) {
+      const nexts = (startMap.get(key(pts[pts.length - 1])) || []).filter((j) => !used.has(j));
+      if (!nexts.length) break;
+      used.add(nexts[0]);
+      pts.push(...railWays[nexts[0]].pts.slice(1));
+    }
+    let run = [];
+    const flush = () => {
+      if (run.length > 1) {
+        const s = simplify(run, 0.002);
+        if (s.length > 1 && lenOf(s.map(proj)) > 10) rails.push({ pts: s.map(proj) });
+      }
+      run = [];
+    };
+    for (const p of pts) (inPoly(p, borderDeg) ? run.push(p) : flush());
+    flush();
+  }
+  console.log(`Rails: ${rails.length} polylines, ${rails.reduce((s, r) => s + r.pts.length, 0)} pts`);
+}
+
 // --- 6. Counties: Census 500k boundaries, Texas only (STATE 48) ---
 let counties = [];
 if (flags.counties) {
@@ -339,7 +374,8 @@ writeFileSync(join(ROOT, 'data', 'cities.json'), JSON.stringify(cities));
 if (flags.rivers) writeFileSync(join(ROOT, 'data', 'rivers.json'), JSON.stringify(rivers));
 if (flags.lakes) writeFileSync(join(ROOT, 'data', 'lakes.json'), JSON.stringify(lakes));
 if (flags.counties) writeFileSync(join(ROOT, 'data', 'counties.json'), JSON.stringify(counties));
-for (const f of ['border.json', 'highways.json', 'cities.json', 'rivers.json', 'lakes.json', 'counties.json']) {
+if (flags.rails) writeFileSync(join(ROOT, 'data', 'rails.json'), JSON.stringify(rails));
+for (const f of ['border.json', 'highways.json', 'cities.json', 'rivers.json', 'lakes.json', 'counties.json', 'rails.json']) {
   const { statSync } = await import('fs');
   console.log(`data/${f}: ${(statSync(join(ROOT, 'data', f)).size / 1024).toFixed(0)} KB`);
 }

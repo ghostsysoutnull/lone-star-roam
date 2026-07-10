@@ -177,9 +177,9 @@ export class Player {
     // blob shadow projects onto the terrain
     this.shadow.position.set(this.pos.x, ground + 0.08, this.pos.z);
     const alt = this.mode === 'FLY' ? Math.max(0, this.pos.y - ground) : 0;
-    const shScale = (this.mode === 'WALK' ? 0.5 : this.mode === 'FLY' ? 1.4 : 1) * (1 + alt * 0.01);
+    const shScale = (this.mode === 'WALK' ? 0.5 : this.mode === 'FLY' ? 1.4 : 1) * (1 + alt * 0.004);
     this.shadow.scale.setScalar(shScale);
-    this.shadow.material.opacity = 0.26 * Math.max(0, 1 - alt / 130);
+    this.shadow.material.opacity = 0.26 * Math.max(0, 1 - alt / 80);
 
     // Chase camera
     const back2 = this.mode === 'FLY' ? 16 : this.mode === 'WALK' ? 7 : 11;

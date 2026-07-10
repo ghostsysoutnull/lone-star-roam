@@ -163,6 +163,16 @@ export class AudioSystem {
     }
   }
 
+  // freight horn: two-note minor chord, long-long blast
+  trainHorn() {
+    if (!this.ctx || this.muted) return;
+    for (const start of [0, 1.1]) {
+      for (const f of [311, 370, 466]) { // Eb-F#-Bb — the classic K5LA-ish chord
+        this.note(f, start, 0.85, 0.045, 'sawtooth');
+      }
+    }
+  }
+
   thunder() {
     if (!this.ctx || this.muted) return;
     const ctx = this.ctx;

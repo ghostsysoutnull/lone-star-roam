@@ -20,6 +20,8 @@ built from actual OpenStreetMap highway geometry and the real state border.
 - **Real terrain**: USGS/Terrarium elevation baked into the world (2.5× vertical) —
   the Hill Country rolls, the Guadalupes rise, roads and rivers drape the relief,
   and 254 county lines follow the ground.
+- **Working freight**: mile-long trains on the real rail network (horns and all),
+  container ports at the real five, ships and oil platforms out on the Gulf.
 - **NPCs**: 12 locals with Texas facts in the major cities.
 
 ## Run

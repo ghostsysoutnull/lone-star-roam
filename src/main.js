@@ -11,6 +11,8 @@ import { SkySystem, ATMOS } from './sky.js';
 import { TravelMenu } from './travel.js';
 import { AudioSystem } from './audio.js';
 import { NPCSystem } from './npcs.js';
+import { TrainSystem } from './trains.js';
+import { MaritimeSystem } from './maritime.js';
 import { HUD } from './hud.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
@@ -49,6 +51,9 @@ async function boot() {
   const audio = new AudioSystem();
   const npcs = new NPCSystem(scene, () => ({ night: ATMOS.night, weather: ATMOS.weather, counts: gameplay.counts() }));
   const travel = new TravelMenu(player, gameplay, sky, npcs, (m) => hud.toast(m));
+  const trains = new TrainSystem(scene);
+  const maritime = new MaritimeSystem(scene);
+  trains.onHorn = () => audio.trainHorn();
   npcs.onDialog = (d) => hud.dialog(d);
   npcs.onTalk = () => audio.chime('dialog');
   sky.onBolt = () => audio.thunder();
@@ -82,7 +87,7 @@ async function boot() {
 
   document.getElementById('loading').style.display = 'none';
   hud.toast('🤠 Welcome to Texas! Press H for controls.');
-  window.__game = { player, gameplay, GEO, animals, sky, npcs }; // debug/testing hook
+  window.__game = { player, gameplay, GEO, animals, sky, npcs, trains }; // debug/testing hook
 
   const clock = new THREE.Clock();
   let hudTick = 0;
@@ -95,6 +100,8 @@ async function boot() {
     cities.setNight(ATMOS.night);
     traffic.update(dt, player.pos.x, player.pos.z);
     traffic.setNight(ATMOS.night);
+    trains.update(dt, player.pos.x, player.pos.z);
+    maritime.update(dt, clock.elapsedTime);
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed);

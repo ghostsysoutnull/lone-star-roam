@@ -44,6 +44,13 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   gather feedback.
 - [ ] **Gamepad support** — map Gamepad API axes/buttons alongside the keyboard.
 
+- [x] ~~Freight & harbor~~ — done 2026-07-10: real OSM main-line rail network
+  (512 polylines, 64 KB) as draped gravel+steel ribbons; freight trains
+  (loco + 14–28 instanced cars, three car types) following the real geometry
+  with a synthesized K5LA-style horn on close passes; container ports with
+  cranes/stacks at 5 real port sites; cargo ships and tankers on a coastal
+  lane, shrimp boats off Padre, 7 offshore oil platforms with flares.
+
 ### Larger bets
 - [x] ~~Terrain elevation~~ — done 2026-07-10: real AWS Terrarium DEM baked to a
   420×400 grid (328 KB, city-pad flattening + outside-Texas mask baked in),
