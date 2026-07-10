@@ -114,7 +114,14 @@ export function nearestRoad(x, z, radius = 300, typeFilter = null) {
         if (typeFilter && !typeFilter(s.hw.type)) continue;
         const p = closestOnSeg(x, z, s.a, s.b);
         const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
-        if (d < bestD) { bestD = d; best = { x: p[0], z: p[1], ref: s.hw.ref, type: s.hw.type, dist: Math.sqrt(d) }; }
+        if (d < bestD) {
+          bestD = d;
+          const sl = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]) || 1;
+          best = {
+            x: p[0], z: p[1], ref: s.hw.ref, type: s.hw.type, dist: Math.sqrt(d),
+            tx: (s.b[0] - s.a[0]) / sl, tz: (s.b[1] - s.a[1]) / sl, // unit tangent (roadrunners sprint along it)
+          };
+        }
       }
     }
   }

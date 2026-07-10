@@ -11,7 +11,7 @@ const TALK_R = 6, FACE_R = 10;
 // name, city, look config, main lines (rotate per visit), fact
 const NAMED = [
   ['Willie', 'Austin', { hat: 'stetson', hatC: 0x22201c, braids: true, shirt: 0x2a2a2a, prop: 'guitar' },
-    ['Welcome to Austin! Keep it weird, partner.', 'Wrote a song about that highway you came in on.', 'Best breakfast tacos are wherever you are at sunrise.'],
+    ['Welcome to Austin! Keep it weird, partner.', 'Wrote a song about that highway you came in on.', 'Best breakfast tacos are wherever you are at sunrise.', 'Stick around till sundown — the bridge breathes bats.'],
     'Austin is the live music capital of the world — 250+ venues.'],
   ['Rosa', 'Houston', { dress: 0x1f7a72, hair: 0x2a2018, bun: true },
     ['Biggest city in Texas, and we still say howdy.', 'NASA’s just down the road — you can’t miss the rocket.', 'Try the kolaches. Trust me.'],
@@ -68,6 +68,8 @@ const TOWNSFOLK_LINES = [
   'That your truck? Nice one.', 'Sure could use some rain.', 'Hot enough for ya?', 'Tell ’em Marge sent you.',
   'You ever seen them lights out by Levelland? Me neither. Officially.',
   'My cousin swears the sky stalled his truck once, out west. He don’t drive at night no more.',
+  'Seen the bats pour outta that Austin bridge at sundown? River turns to smoke.',
+  'Rattlers out west been noisy this year. Mind where you park.',
 ];
 const TOWNSFOLK_NAMES = ['Earl', 'Ruby', 'Cole', 'June', 'Wade', 'Dolly', 'Buck', 'Lupe', 'Roy', 'Faye', 'Cash', 'Ida', 'Slim', 'Pearl'];
 
@@ -101,6 +103,17 @@ export class NPCSystem {
 
     // townsfolk — spawned per city by proximity
     this.townByCity = new Map();
+  }
+
+  // a horn blast nearby: folks jump and wave
+  startle(pos, r = 15) {
+    for (const n of this.all()) {
+      if (!n.g.visible) continue;
+      const d2 = (n.g.position.x - pos.x) ** 2 + (n.g.position.z - pos.z) ** 2;
+      if (d2 > r * r) continue;
+      n.wave = 0.9;
+      n.hop = 0.4;
+    }
   }
 
   // all interactable NPCs currently live
@@ -227,6 +240,13 @@ export class NPCSystem {
         u.la.rotation.x *= 0.9; u.ra.rotation.x *= 0.9;
       }
       if (u.marker) u.marker.position.y = u.markerY + Math.sin(this.t * 3 + (n.phase || 0)) * 0.2;
+
+      // startled hop (horn) — a quick jump, then settle back onto the terrain
+      if (n.hop > 0) {
+        n.hop -= dt;
+        const gy = hAt(g.position.x, g.position.z);
+        g.position.y = gy + (n.hop > 0 ? Math.abs(Math.sin(n.hop * 15)) * 0.3 : 0);
+      }
 
       // walked away mid-conversation
       if (talking && d2 > TALK_R * TALK_R * 4) { this.activeNPC = null; this.onDialog?.(null); }

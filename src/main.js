@@ -7,6 +7,7 @@ import { Player } from './vehicle.js';
 import { Gameplay } from './gameplay.js';
 import { TrafficSystem } from './traffic.js';
 import { AnimalSystem, SPECIES, SPECIES_COUNT } from './animals.js';
+import { BatSystem } from './bats.js';
 import { SkySystem, ATMOS } from './sky.js';
 import { TravelMenu } from './travel.js';
 import { MissionSystem } from './missions.js';
@@ -46,7 +47,8 @@ async function boot() {
   const player = new Player(scene, camera);
   const gameplay = new Gameplay(scene);
   const traffic = new TrafficSystem(scene);
-  const animals = new AnimalSystem(scene, (key) => gameplay.spotSpecies(key, SPECIES[key].name, SPECIES_COUNT));
+  const animals = new AnimalSystem(scene, (key) => gameplay.spotSpecies(key, SPECIES[key].name, SPECIES_COUNT, SPECIES[key].fact));
+  const bats = new BatSystem(scene, () => gameplay.spotSpecies('bat', SPECIES.bat.name, SPECIES_COUNT, SPECIES.bat.fact));
   const hud = new HUD();
 
   gameplay.onToast = (m) => hud.toast(m);
@@ -58,6 +60,7 @@ async function boot() {
   const maritime = new MaritimeSystem(scene);
   trains.onHorn = () => audio.trainHorn();
   traffic.onHonk = (type) => audio.honk(type);
+  animals.onSound = (kind) => audio[kind]?.();
   const ufo = new UFOSystem(scene, () => gameplay.ufoSighting());
   npcs.onDialog = (d) => hud.dialog(d);
   npcs.onTalk = () => audio.chime('dialog');
@@ -73,7 +76,15 @@ async function boot() {
     [...cities.live.values()].map((g) => g.children.find((c) => c.isInstancedMesh)).filter(Boolean);
 
   let plaqueOpen = false;
+  let hornCd = 0;
   addEventListener('keydown', (e) => {
+    // Space is the horn in DRIVE (climb in FLY): scatters critters, startles townsfolk
+    if (e.code === 'Space' && player.mode === 'DRIVE' && !e.repeat && performance.now() > hornCd) {
+      hornCd = performance.now() + 400;
+      audio.honk('player');
+      animals.scare(player.pos.x, player.pos.z, 26);
+      npcs.startle(player.pos, 15);
+    }
     if (e.code === 'KeyV') player.cycleMode();
     if (e.code === 'KeyM') hud.toggleBigMap();
     if (e.code === 'KeyH') hud.toggleHelp(gameplay.save.stats, gameplay.save.ufo, gameplay.save.bank, gameplay.save.jobsDone);
@@ -107,7 +118,7 @@ async function boot() {
 
   document.getElementById('loading').style.display = 'none';
   hud.toast('🤠 Welcome to Texas! Press H for controls.');
-  window.__game = { player, gameplay, GEO, animals, sky, npcs, trains, ufo, traffic, missions }; // debug/testing hook
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, traffic, missions }; // debug/testing hook
 
   const clock = new THREE.Clock();
   let hudTick = 0;
@@ -125,6 +136,7 @@ async function boot() {
     ufo.update(dt, player.pos.x, player.pos.z, player.pos.y);
     ATMOS.ufo = ufo.near;
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
+    bats.update(dt, player.pos.x, player.pos.z, sky.t);
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed);
     missions.update(dt, player.pos, player.mode, player.pos.y - hAt(player.pos.x, player.pos.z));

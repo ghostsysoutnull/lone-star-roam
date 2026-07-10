@@ -114,6 +114,19 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   graze/wander/flee/circle behaviors + critter log (8th collectible category);
   flora variance (multi-blob live oaks, tiered pines, mesquite, yucca), rocks,
   hay bales, animated Permian Basin pumpjacks and plains windmills.
+- [x] ~~Wildlife variety & polish~~ — done 2026-07-10 (same day, later): 15
+  species — added javelina, pronghorn (Panhandle), wild turkey (Hill Country),
+  alligator (east/coast, prefers riverbanks), rattlesnake (rare, west, rattles
+  when you get close), brown pelican (coast), and the **Austin bat emergence**
+  (`bats.js`): a 640-bat instanced ribbon pours from Congress Ave bridge every
+  dusk (sky.t 0.775–0.845). Region tables now match world.js boxes (plains/Hill
+  Country/coast get their own mixes). Behavior polish: **fixed a real bug where
+  fleeing animals charged the player** (heading was inverted), herd startle
+  ripples, jackrabbits zigzag, roadrunners sprint down highways (road tangent
+  from `nearestRoad`), legs animate, coyotes are nocturnal + howl (synth),
+  vultures/turkeys/pelicans are diurnal, deer rush at dusk. Player horn on
+  Space in DRIVE scatters critters and startles townsfolk. Critter-log toasts
+  now teach a fact per species. Counter 8 → 15 (additive save keys only).
 
 - [x] ~~Travel menu~~ — done 2026-07-10: P-key overlay; landmarks/nature/Texas-icon
   sights always available with smart arrivals (drive on road vs. fly at altitude,

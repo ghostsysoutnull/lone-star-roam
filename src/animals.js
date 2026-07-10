@@ -1,36 +1,75 @@
 // Regional wildlife: chunked spawning like scenery, but animals near the player
-// are simulated — grazers shuffle, wanderers amble, prey species flee the player.
-// First close encounter with each species goes into the critter log.
+// are simulated — grazers shuffle, herds startle together, prey species flee
+// (rabbits zigzag, roadrunners sprint down the highway), coyotes come out at
+// night and howl. First close encounter with each species goes into the
+// critter log with a fact. Region boxes mirror world.js scenery — keep in sync.
 import * as THREE from 'three';
-import { seededRand, inTexas, nearestRoad, hAt } from './geo.js';
+import { seededRand, inTexas, nearestRoad, hAt, waterAt } from './geo.js';
+import { ATMOS } from './sky.js';
 
 const CHUNK = 260, VIEW_CHUNKS = 2; // tighter ring than scenery — animals are simulated
 const ACTIVE_R = 150;               // only simulate within this range
 
+// nightMin/nightMax gate visibility by ATMOS.night (nocturnal / diurnal species).
+// 'bat' is spawned by the dusk event in bats.js, never by region tables.
 export const SPECIES = {
-  deer: { name: 'White-tailed Deer', speed: 14, fleeR: 16, behavior: 'flee', bob: true },
-  longhorn: { name: 'Longhorn', speed: 3, fleeR: 0, behavior: 'graze', bob: false },
-  armadillo: { name: 'Armadillo', speed: 3.5, fleeR: 6, behavior: 'flee', bob: false },
-  jackrabbit: { name: 'Jackrabbit', speed: 16, fleeR: 12, behavior: 'flee', bob: true },
-  roadrunner: { name: 'Roadrunner', speed: 18, fleeR: 10, behavior: 'flee', bob: false },
-  coyote: { name: 'Coyote', speed: 12, fleeR: 14, behavior: 'wander', bob: false },
-  hog: { name: 'Wild Hog', speed: 8, fleeR: 10, behavior: 'flee', bob: false },
-  vulture: { name: 'Turkey Vulture', speed: 8, fleeR: 0, behavior: 'circle', bob: false },
+  deer: { name: 'White-tailed Deer', speed: 14, fleeR: 16, behavior: 'flee', bob: true,
+    fact: 'Texas has more whitetails than any other state.' },
+  longhorn: { name: 'Longhorn', speed: 3, fleeR: 0, behavior: 'graze', bob: false,
+    fact: 'Horns can span over 8 feet tip to tip.' },
+  armadillo: { name: 'Armadillo', speed: 3.5, fleeR: 6, behavior: 'flee', bob: false,
+    fact: 'The state small mammal — always births quadruplets.' },
+  jackrabbit: { name: 'Jackrabbit', speed: 16, fleeR: 12, behavior: 'flee', bob: true, zigzag: true,
+    fact: 'Not a rabbit — a hare, hitting 40 mph.' },
+  roadrunner: { name: 'Roadrunner', speed: 18, fleeR: 10, behavior: 'flee', bob: false, roadSprint: true,
+    fact: 'Prefers sprinting to flying. Beep beep.' },
+  coyote: { name: 'Coyote', speed: 12, fleeR: 14, behavior: 'wander', bob: false, nightMin: 0.25,
+    fact: 'Their night chorus carries for miles.' },
+  hog: { name: 'Wild Hog', speed: 8, fleeR: 10, behavior: 'flee', bob: false,
+    fact: 'Millions roam Texas — brush country bulldozers.' },
+  vulture: { name: 'Turkey Vulture', speed: 8, fleeR: 0, behavior: 'circle', bob: false, nightMax: 0.55, orbitR: 12, orbitH: 16, orbitSpd: 0.5,
+    fact: 'Rides thermals for hours without a flap.' },
+  javelina: { name: 'Javelina', speed: 9, fleeR: 9, behavior: 'flee', bob: false,
+    fact: 'Not a pig — a collared peccary.' },
+  pronghorn: { name: 'Pronghorn', speed: 21, fleeR: 20, behavior: 'flee', bob: false,
+    fact: 'Fastest land animal in the Americas — 55 mph.' },
+  turkey: { name: 'Wild Turkey', speed: 7, fleeR: 9, behavior: 'flee', bob: false, nightMax: 0.6,
+    fact: 'Rio Grande turkeys roost in Hill Country oaks.' },
+  gator: { name: 'Alligator', speed: 1.5, fleeR: 0, behavior: 'lurk', bob: false,
+    fact: 'East Texas swamps hold half a million gators.' },
+  rattlesnake: { name: 'Rattlesnake', speed: 0, fleeR: 0, behavior: 'coil', bob: false,
+    fact: 'The rattle is a courtesy. Heed it.' },
+  pelican: { name: 'Brown Pelican', speed: 8, fleeR: 0, behavior: 'circle', bob: false, nightMax: 0.6, orbitR: 18, orbitH: 7, orbitSpd: 0.35,
+    fact: 'Plunge-dives with a stretchy pouch beak.' },
+  bat: { name: 'Mexican Free-tailed Bat', event: true,
+    fact: 'Austin hosts the largest urban bat colony on Earth.' },
 };
 export const SPECIES_COUNT = Object.keys(SPECIES).length;
 
-// regional spawn tables: [species, herd min, herd max, groups per chunk]
+// regional spawn tables: [species, herd min, herd max, groups per chunk, keep odds]
+// boxes mirror world.js (plains/Hill Country) — keep the two files consistent
 function regionTable(x, z) {
-  if (x < -2200) return [['jackrabbit', 1, 2, 1], ['roadrunner', 1, 1, 1], ['coyote', 1, 2, 1], ['vulture', 2, 4, 1]];
-  if (x > 3400) return [['deer', 2, 4, 1], ['hog', 2, 5, 1]];
-  if (z > 2600) return [['longhorn', 3, 6, 1], ['hog', 2, 4, 1], ['armadillo', 1, 2, 1]];
-  return [['deer', 2, 4, 1], ['longhorn', 3, 7, 1], ['armadillo', 1, 2, 1]];
+  if (x > 1800 && x + z > 5200) // Gulf coast & RGV marsh
+    return [['pelican', 2, 5, 1, 0.5], ['gator', 1, 2, 1, 0.3], ['longhorn', 3, 6, 1, 0.5], ['armadillo', 1, 2, 1, 0.5]];
+  if (z < -2300 && x > -3300 && x < 1600) // High Plains / Panhandle
+    return [['pronghorn', 3, 6, 1, 0.5], ['jackrabbit', 1, 2, 1, 0.55], ['coyote', 1, 2, 1, 0.5], ['vulture', 2, 4, 1, 0.5]];
+  if (x < -2200) // Trans-Pecos desert
+    return [['jackrabbit', 1, 2, 1, 0.55], ['roadrunner', 1, 1, 1, 0.55], ['coyote', 1, 2, 1, 0.55], ['vulture', 2, 4, 1, 0.55], ['javelina', 2, 5, 1, 0.4], ['rattlesnake', 1, 1, 1, 0.15]];
+  if (x > 3400) // Piney Woods
+    return [['deer', 2, 4, 1, 0.55], ['hog', 2, 5, 1, 0.55], ['turkey', 3, 7, 1, 0.4], ['gator', 1, 2, 1, 0.15]];
+  if (x > -900 && x < 1100 && z > -400 && z < 1500) // Hill Country
+    return [['deer', 2, 4, 1, 0.55], ['turkey', 3, 6, 1, 0.45], ['armadillo', 1, 2, 1, 0.5], ['longhorn', 3, 6, 1, 0.5]];
+  if (z > 2600) // South Texas brush
+    return [['longhorn', 3, 6, 1, 0.55], ['hog', 2, 4, 1, 0.55], ['armadillo', 1, 2, 1, 0.5], ['javelina', 2, 5, 1, 0.4]];
+  return [['deer', 2, 4, 1, 0.55], ['longhorn', 3, 7, 1, 0.55], ['armadillo', 1, 2, 1, 0.5], ['coyote', 1, 1, 1, 0.4]];
 }
 
 export class AnimalSystem {
   constructor(scene, onSpotted) {
     this.scene = scene;
     this.onSpotted = onSpotted; // (speciesKey) => void
+    this.onSound = null;        // (kind) => void — 'howl' | 'rattle' | 'gobble'
+    this.sndCd = {};            // per-kind cooldowns
     this.live = new Map(); // chunk key -> { group, animals: [] }
     this.t = 0;
   }
@@ -38,6 +77,7 @@ export class AnimalSystem {
   update(dt, px, pz, py = 0) {
     this.py = py;
     this.t += dt;
+    for (const k of Object.keys(this.sndCd)) this.sndCd[k] -= dt;
     const cx = Math.floor(px / CHUNK), cz = Math.floor(pz / CHUNK);
     const want = new Set();
     for (let i = -VIEW_CHUNKS; i <= VIEW_CHUNKS; i++)
@@ -50,12 +90,52 @@ export class AnimalSystem {
     }
     for (const k of want) if (!this.live.has(k)) this.spawn(k);
 
+    const night = ATMOS.night;
     for (const { animals } of this.live.values()) {
-      for (const a of animals) this.step(a, dt, px, pz);
+      for (const a of animals) {
+        // nocturnal/diurnal species keep their hours
+        const spec = SPECIES[a.species];
+        const vis = spec.nightMin != null ? night >= spec.nightMin
+          : spec.nightMax != null ? night <= spec.nightMax : true;
+        a.g.visible = vis;
+        if (vis) this.step(a, animals, dt, px, pz);
+      }
     }
   }
 
-  step(a, dt, px, pz) {
+  // player honked (or similar scare) at (px,pz): everything skittish bolts
+  scare(px, pz, r = 26) {
+    for (const { animals } of this.live.values()) {
+      for (const a of animals) {
+        if (!a.g.visible || !SPECIES[a.species].fleeR) continue; // longhorns are unimpressed
+        const dx = a.g.position.x - px, dz = a.g.position.z - pz;
+        if (dx * dx + dz * dz > r * r) continue;
+        this.flee(a, dx, dz, 0.4);
+      }
+    }
+  }
+
+  // put one animal to flight, directly away from (source at animal - d)
+  flee(a, dx, dz, jitter = 0) {
+    a.state = 'flee';
+    a.stateT = (SPECIES[a.species].roadSprint ? 2.5 : 1.5) + Math.random();
+    a.heading = Math.atan2(-dx, -dz) + (jitter ? (Math.random() - 0.5) * jitter : 0); // away
+    a.zigT = 0;
+    // roadrunner: make for the road and sprint along it, away from the threat
+    if (SPECIES[a.species].roadSprint) {
+      const r = nearestRoad(a.g.position.x, a.g.position.z, 20);
+      if (r) {
+        if (r.dist > 2) {
+          a.heading = Math.atan2(-(r.x - a.g.position.x), -(r.z - a.g.position.z)); // dash to the shoulder
+        } else {
+          const sgn = r.tx * dx + r.tz * dz >= 0 ? 1 : -1; // tangent half that leads away
+          a.heading = Math.atan2(-r.tx * sgn, -r.tz * sgn);
+        }
+      }
+    }
+  }
+
+  step(a, herd, dt, px, pz) {
     const dx = a.g.position.x - px, dz = a.g.position.z - pz;
     const d2 = dx * dx + dz * dz;
     if (d2 > ACTIVE_R * ACTIVE_R) return;
@@ -64,42 +144,77 @@ export class AnimalSystem {
     // critter log — close encounter at ground-ish level (no spotting from altitude)
     if (d2 < 24 * 24 && this.py < 15) this.onSpotted?.(a.species);
 
-    if (spec.behavior === 'circle') { // vultures orbit their home point, high up
-      a.phase += dt * 0.5;
-      a.g.position.set(a.homeX + Math.cos(a.phase) * 12, hAt(a.homeX, a.homeZ) + 16 + Math.sin(a.phase * 2.3) * 1.5, a.homeZ + Math.sin(a.phase) * 12);
+    // voices: lonesome howls at night, a rattle warning underfoot, distant gobbles
+    if (a.species === 'coyote' && ATMOS.night > 0.3 && d2 < 140 * 140) this.sound('howl', 22 + Math.random() * 20);
+    if (a.species === 'rattlesnake' && d2 < 9 * 9) this.sound('rattle', 2.5);
+    if (a.species === 'turkey' && d2 < 30 * 30) this.sound('gobble', 9 + Math.random() * 14);
+
+    if (spec.behavior === 'circle') { // vultures ride thermals, pelicans patrol low
+      a.phase += dt * spec.orbitSpd;
+      a.g.position.set(
+        a.homeX + Math.cos(a.phase) * spec.orbitR,
+        hAt(a.homeX, a.homeZ) + spec.orbitH + Math.sin(a.phase * 2.3) * 1.5,
+        a.homeZ + Math.sin(a.phase) * spec.orbitR
+      );
       a.g.rotation.y = -a.phase - Math.PI / 2;
+      a.g.rotation.z = 0.18; // banked into the turn
       return;
     }
+    if (spec.behavior === 'coil') return; // rattlesnakes hold their ground
 
     let moving = false;
     const dist = Math.sqrt(d2);
-    if (spec.fleeR && dist < spec.fleeR) {
-      // bolt directly away from the player
-      a.state = 'flee';
-      a.stateT = 1.5 + Math.random();
-      a.heading = Math.atan2(-dx, -dz) + Math.PI; // away
+    if (spec.fleeR && dist < spec.fleeR && a.state !== 'flee') {
+      this.flee(a, dx, dz);
+      // startle ripples through the herd
+      for (const b of herd) {
+        if (b === a || b.homeX !== a.homeX || b.state === 'flee' || !SPECIES[b.species].fleeR) continue;
+        const bd = (b.g.position.x - a.g.position.x) ** 2 + (b.g.position.z - a.g.position.z) ** 2;
+        if (bd < 25 * 25) this.flee(b, b.g.position.x - px, b.g.position.z - pz, 0.6);
+      }
     }
     if (a.state === 'flee') {
       a.stateT -= dt;
       if (a.stateT <= 0) a.state = 'idle';
       moving = true;
-      this.move(a, spec.speed, dt);
+      if (spec.zigzag) { // hares jink as they run
+        a.zigT -= dt;
+        if (a.zigT <= 0) { a.zigT = 0.3 + Math.random() * 0.25; a.heading += (Math.random() - 0.5) * 1.4; }
+      }
+      const onRoad = spec.roadSprint && nearestRoad(a.g.position.x, a.g.position.z, 3);
+      this.move(a, spec.speed * (onRoad ? 1.3 : 1), dt);
     } else {
       // idle/wander: occasionally pick a new direction and amble
       a.stateT -= dt;
       if (a.stateT <= 0) {
         a.stateT = 2 + Math.random() * 4;
-        a.ambling = Math.random() < (spec.behavior === 'graze' ? 0.3 : 0.6);
+        let p = spec.behavior === 'graze' ? 0.3 : spec.behavior === 'lurk' ? 0.12 : 0.6;
+        if (a.species === 'deer' && ATMOS.night > 0.15 && ATMOS.night < 0.6) p = 0.85; // crepuscular rush
+        a.ambling = Math.random() < p;
         a.heading = Math.random() * Math.PI * 2;
       }
       if (a.ambling) {
         moving = true;
-        this.move(a, spec.speed * (spec.behavior === 'graze' ? 1 : 0.35), dt);
+        this.move(a, spec.speed * (spec.behavior === 'graze' || spec.behavior === 'lurk' ? 1 : 0.35), dt);
       }
     }
     a.g.rotation.y = a.heading;
-    // hop/bound bob for deer & rabbits while moving
+    // legs swing while moving; hop/bound bob for deer & rabbits
+    if (a.legs) {
+      const rate = 4 + spec.speed * 0.6;
+      for (let i = 0; i < a.legs.length; i++) {
+        a.legs[i].rotation.x = moving
+          ? Math.sin(this.t * rate + a.phase + (i % 2) * Math.PI) * 0.45
+          : a.legs[i].rotation.x * Math.pow(0.005, dt);
+      }
+    }
     a.g.position.y = hAt(a.g.position.x, a.g.position.z) + (moving && spec.bob ? Math.abs(Math.sin(this.t * 9 + a.phase)) * 0.35 : 0);
+  }
+
+  sound(kind, cooldown) {
+    if ((this.sndCd[kind] ?? 0) > 0) return;
+    this.sndCd[kind] = cooldown;
+    this.onSound?.(kind);
   }
 
   move(a, speed, dt) {
@@ -108,8 +223,11 @@ export class AnimalSystem {
     // stay in Texas, off roads, and near home (leash)
     if (!inTexas(nx, nz)) { a.heading += Math.PI; return; }
     if (Math.hypot(nx - a.homeX, nz - a.homeZ) > 45) { a.heading += Math.PI / 2; return; }
-    const road = nearestRoad(nx, nz, 3);
-    if (road && a.state !== 'flee') { a.heading += Math.PI / 2; return; } // fleeing animals may cross roads
+    const spec = SPECIES[a.species];
+    if (!spec.roadSprint) { // roadrunners own the road
+      const road = nearestRoad(nx, nz, 3);
+      if (road && a.state !== 'flee') { a.heading += Math.PI / 2; return; } // fleeing animals may cross roads
+    }
     a.g.position.x = nx;
     a.g.position.z = nz;
   }
@@ -120,22 +238,28 @@ export class AnimalSystem {
     const group = new THREE.Group();
     const animals = [];
     const baseX = cx * CHUNK, baseZ = cz * CHUNK;
-    for (const [species, lo, hi, groups] of regionTable(baseX + CHUNK / 2, baseZ + CHUNK / 2)) {
+    for (const [species, lo, hi, groups, keep] of regionTable(baseX + CHUNK / 2, baseZ + CHUNK / 2)) {
       for (let gI = 0; gI < groups; gI++) {
-        if (rand() < 0.45) continue; // not every chunk has every species
-        const hx = baseX + rand() * CHUNK, hz = baseZ + rand() * CHUNK;
+        if (rand() > keep) continue; // not every chunk has every species
+        let hx = baseX + rand() * CHUNK, hz = baseZ + rand() * CHUNK;
+        if (species === 'gator') { // gators want water — try a few spots for a riverbank
+          for (let tries = 0; tries < 6; tries++) {
+            const wx = baseX + rand() * CHUNK, wz = baseZ + rand() * CHUNK;
+            if (waterAt(wx + 1.8, wz)) { hx = wx; hz = wz; break; }
+          }
+        }
         if (!inTexas(hx, hz)) continue;
         if (nearestRoad(hx, hz, 6)) continue; // herds keep off the highway
         const n = lo + ((rand() * (hi - lo + 1)) | 0);
         for (let i = 0; i < n; i++) {
-          const g = mkAnimal(species, rand);
+          const { g, legs } = mkAnimal(species, rand);
           const ax = hx + (rand() - 0.5) * 8, az = hz + (rand() - 0.5) * 8;
           g.position.set(ax, hAt(ax, az), az);
           g.rotation.y = rand() * Math.PI * 2;
           group.add(g);
           animals.push({
-            g, species, homeX: hx, homeZ: hz,
-            state: 'idle', stateT: rand() * 3, ambling: false,
+            g, legs, species, homeX: hx, homeZ: hz,
+            state: 'idle', stateT: rand() * 3, ambling: false, zigT: 0,
             heading: rand() * Math.PI * 2, phase: rand() * Math.PI * 2,
           });
         }
@@ -157,14 +281,17 @@ const box = (g, w, h, d, x, y, z, m) => {
 
 function mkAnimal(species, rand) {
   const g = new THREE.Group();
+  const legs = [];
+  const quadLegs = (positions, w, h, m) => {
+    for (const [x, z] of positions) legs.push(box(g, w, h, w, x, h / 2 + 0.02, z, m));
+  };
   switch (species) {
     case 'deer': {
       const tan = mat(0xa87a4a);
       box(g, 0.5, 0.5, 1.1, 0, 0.75, 0, tan);              // body
       box(g, 0.22, 0.5, 0.25, 0, 1.15, -0.55, tan);        // neck
       box(g, 0.26, 0.24, 0.4, 0, 1.45, -0.65, tan);        // head
-      for (const [x, z] of [[-0.16, -0.4], [0.16, -0.4], [-0.16, 0.4], [0.16, 0.4]])
-        box(g, 0.09, 0.55, 0.09, x, 0.28, z, tan);
+      quadLegs([[-0.16, -0.4], [0.16, -0.4], [-0.16, 0.4], [0.16, 0.4]], 0.09, 0.55, tan);
       if (rand() < 0.5) { // bucks get antlers
         const bone = mat(0xd8cbb0);
         box(g, 0.06, 0.3, 0.06, -0.12, 1.7, -0.6, bone);
@@ -179,8 +306,7 @@ function mkAnimal(species, rand) {
       box(g, 0.34, 0.34, 0.45, 0, 1.15, -0.9, hide);
       const horn = mat(0xe8dcc0);
       box(g, 1.9, 0.09, 0.09, 0, 1.38, -0.9, horn);          // the famous spread
-      for (const [x, z] of [[-0.26, -0.55], [0.26, -0.55], [-0.26, 0.55], [0.26, 0.55]])
-        box(g, 0.13, 0.55, 0.13, x, 0.28, z, hide);
+      quadLegs([[-0.26, -0.55], [0.26, -0.55], [-0.26, 0.55], [0.26, 0.55]], 0.13, 0.55, hide);
       break;
     }
     case 'armadillo': {
@@ -207,7 +333,7 @@ function mkAnimal(species, rand) {
       box(g, 0.04, 0.04, 0.22, 0, 0.55, -0.42, mat(0x3a3a30)); // beak
       const tail = box(g, 0.05, 0.3, 0.35, 0, 0.5, 0.3, feathers);
       tail.rotation.x = -0.7; // cocked-up tail
-      box(g, 0.05, 0.25, 0.05, 0, 0.12, 0, mat(0x3a3a30));
+      legs.push(box(g, 0.05, 0.25, 0.05, 0, 0.12, 0, mat(0x3a3a30)));
       break;
     }
     case 'coyote': {
@@ -218,8 +344,7 @@ function mkAnimal(species, rand) {
       box(g, 0.08, 0.16, 0.08, 0.07, 1.0, -0.55, fur);
       const tail = box(g, 0.12, 0.12, 0.5, 0, 0.45, 0.65, fur);
       tail.rotation.x = 0.4;
-      for (const [x, z] of [[-0.12, -0.35], [0.12, -0.35], [-0.12, 0.35], [0.12, 0.35]])
-        box(g, 0.08, 0.4, 0.08, x, 0.2, z, fur);
+      quadLegs([[-0.12, -0.35], [0.12, -0.35], [-0.12, 0.35], [0.12, 0.35]], 0.08, 0.4, fur);
       break;
     }
     case 'hog': {
@@ -227,8 +352,7 @@ function mkAnimal(species, rand) {
       box(g, 0.55, 0.5, 1.1, 0, 0.5, 0, bristle);
       box(g, 0.3, 0.3, 0.4, 0, 0.55, -0.7, bristle);
       box(g, 0.14, 0.12, 0.12, 0, 0.45, -0.95, mat(0x6a5248)); // snout
-      for (const [x, z] of [[-0.18, -0.35], [0.18, -0.35], [-0.18, 0.35], [0.18, 0.35]])
-        box(g, 0.1, 0.3, 0.1, x, 0.14, z, bristle);
+      quadLegs([[-0.18, -0.35], [0.18, -0.35], [-0.18, 0.35], [0.18, 0.35]], 0.1, 0.3, bristle);
       break;
     }
     case 'vulture': {
@@ -240,6 +364,79 @@ function mkAnimal(species, rand) {
       box(g, 0.1, 0.08, 0.12, 0, 0.02, -0.28, mat(0x8a3a3a)); // red head
       break;
     }
+    case 'javelina': {
+      const bristle = mat(0x585048);
+      box(g, 0.42, 0.4, 0.8, 0, 0.42, 0, bristle);
+      box(g, 0.28, 0.3, 0.35, 0, 0.45, -0.5, bristle);        // big wedge head
+      box(g, 0.1, 0.1, 0.1, 0, 0.35, -0.72, mat(0x3a342e));   // snout
+      box(g, 0.46, 0.12, 0.14, 0, 0.55, -0.32, mat(0x9a9080)); // the white collar
+      quadLegs([[-0.14, -0.25], [0.14, -0.25], [-0.14, 0.25], [0.14, 0.25]], 0.08, 0.24, bristle);
+      break;
+    }
+    case 'pronghorn': {
+      const tan = mat(0xc28a52);
+      box(g, 0.45, 0.45, 1.0, 0, 0.78, 0, tan);
+      box(g, 0.4, 0.2, 0.9, 0, 0.55, 0, mat(0xf0e8d8));       // white belly band
+      box(g, 0.2, 0.45, 0.22, 0, 1.12, -0.5, tan);            // neck
+      box(g, 0.22, 0.22, 0.35, 0, 1.4, -0.58, tan);           // head
+      box(g, 0.05, 0.22, 0.08, -0.08, 1.6, -0.52, mat(0x2a241e)); // pronged horns
+      box(g, 0.05, 0.22, 0.08, 0.08, 1.6, -0.52, mat(0x2a241e));
+      box(g, 0.3, 0.25, 0.12, 0, 0.85, 0.52, mat(0xf5f0e0));  // white rump patch
+      quadLegs([[-0.15, -0.35], [0.15, -0.35], [-0.15, 0.35], [0.15, 0.35]], 0.08, 0.58, tan);
+      break;
+    }
+    case 'turkey': {
+      const bronze = mat(0x4a3a28);
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.3, 7, 5), bronze);
+      body.scale.set(0.9, 1, 1.2);
+      body.position.y = 0.45;
+      g.add(body);
+      box(g, 0.09, 0.3, 0.09, 0, 0.75, -0.2, bronze);         // neck
+      box(g, 0.12, 0.12, 0.16, 0, 0.95, -0.26, mat(0x7a8a9a)); // bald blue-grey head
+      box(g, 0.05, 0.1, 0.05, 0, 0.85, -0.3, mat(0xaa3a3a));  // wattle
+      const fan = box(g, 0.7, 0.55, 0.06, 0, 0.65, 0.35, mat(0x5a4430)); // tail fan
+      fan.rotation.x = -0.5;
+      legs.push(
+        box(g, 0.05, 0.28, 0.05, -0.08, 0.15, 0, mat(0x8a6a4a)),
+        box(g, 0.05, 0.28, 0.05, 0.08, 0.15, 0, mat(0x8a6a4a))
+      );
+      break;
+    }
+    case 'gator': {
+      const scale = mat(0x3a5038);
+      box(g, 0.4, 0.22, 1.3, 0, 0.18, 0, scale);              // low-slung body
+      box(g, 0.26, 0.14, 0.7, 0, 0.14, -0.9, scale);          // flat snout
+      const tail = box(g, 0.22, 0.16, 0.9, 0, 0.16, 1.05, mat(0x32462f));
+      tail.rotation.y = 0.12;
+      for (const z of [-0.3, 0.1, 0.5]) box(g, 0.1, 0.08, 0.2, 0, 0.32, z, mat(0x2e4030)); // back ridge
+      box(g, 0.05, 0.06, 0.05, -0.09, 0.26, -0.75, mat(0xe8e0c0)); // eyes above the waterline
+      box(g, 0.05, 0.06, 0.05, 0.09, 0.26, -0.75, mat(0xe8e0c0));
+      quadLegs([[-0.24, -0.35], [0.24, -0.35], [-0.24, 0.55], [0.24, 0.55]], 0.09, 0.14, scale);
+      break;
+    }
+    case 'rattlesnake': {
+      const diamond = mat(0x8a7248);
+      const coil1 = new THREE.Mesh(new THREE.TorusGeometry(0.26, 0.08, 6, 12).rotateX(Math.PI / 2), diamond);
+      coil1.position.y = 0.08;
+      const coil2 = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.07, 6, 10).rotateX(Math.PI / 2), diamond);
+      coil2.position.y = 0.2;
+      g.add(coil1, coil2);
+      box(g, 0.12, 0.1, 0.18, 0, 0.36, -0.14, mat(0x7a6238)); // raised head
+      box(g, 0.06, 0.14, 0.06, 0.24, 0.2, 0.18, mat(0xd8cba8)); // the rattle, up and ready
+      break;
+    }
+    case 'pelican': {
+      const white = mat(0xe8e4da);
+      box(g, 0.24, 0.18, 0.6, 0, 0, 0, white);                // body
+      const l = box(g, 1.3, 0.03, 0.34, -0.7, 0.06, 0, white);
+      const r = box(g, 1.3, 0.03, 0.34, 0.7, 0.06, 0, white);
+      l.rotation.z = 0.12; r.rotation.z = -0.12;
+      box(g, 0.3, 0.03, 0.34, -1.32, 0.13, 0, mat(0x2a2622)); // dark wingtips
+      box(g, 0.3, 0.03, 0.34, 1.32, 0.13, 0, mat(0x2a2622));
+      box(g, 0.14, 0.14, 0.18, 0, 0.08, -0.36, white);        // head
+      box(g, 0.06, 0.05, 0.34, 0, 0.02, -0.58, mat(0xd8a04a)); // the famous beak
+      break;
+    }
   }
-  return g;
+  return { g, legs: legs.length ? legs : null };
 }

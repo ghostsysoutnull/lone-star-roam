@@ -89,11 +89,11 @@ export class Gameplay {
     this.onCollect?.('species');
   }
 
-  spotSpecies(key, label, total) {
+  spotSpecies(key, label, total, fact) {
     if (this.save.species.includes(key)) return;
     this.save.species.push(key);
     this.persist();
-    this.onToast?.(`🦌 ${label} spotted! (${this.save.species.length}/${total})`);
+    this.onToast?.(`🦌 ${label} (${this.save.species.length}/${total})${fact ? ` — ${fact}` : ''}`);
     this.onCollect?.('species');
   }
 

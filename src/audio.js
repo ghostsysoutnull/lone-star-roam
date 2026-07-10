@@ -183,17 +183,94 @@ export class AudioSystem {
     }
   }
 
-  // traffic honk: cars give a friendly double-beep dyad; semis lean on the air horn
+  // traffic honk: cars give a friendly double-beep dyad; semis lean on the air
+  // horn; the player's own horn is a brighter major-third tap
   honk(type) {
     if (!this.ctx || this.muted) return;
     if (type === 'semi') {
       for (const f of [220, 277]) this.note(f, 0, 0.65, 0.05, 'sawtooth');
+    } else if (type === 'player') {
+      for (const start of [0, 0.14]) {
+        this.note(392, start, 0.12, 0.06, 'sawtooth');
+        this.note(494, start, 0.12, 0.05, 'sawtooth');
+      }
     } else {
       for (const start of [0, 0.16]) {
         this.note(345, start, 0.11, 0.045, 'sawtooth');
         this.note(435, start, 0.11, 0.035, 'sawtooth');
       }
     }
+  }
+
+  // lonesome coyote: swoop up, quavering hold, fall away into the dark
+  howl() {
+    if (!this.ctx || this.muted) return;
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.type = 'sine';
+    const t0 = ctx.currentTime + 0.05;
+    o.frequency.setValueAtTime(340, t0);
+    o.frequency.exponentialRampToValueAtTime(680, t0 + 0.45);
+    o.frequency.setValueAtTime(680, t0 + 0.95);
+    o.frequency.exponentialRampToValueAtTime(420, t0 + 1.8);
+    const vib = ctx.createOscillator(); // the quaver
+    vib.frequency.value = 6.5;
+    const vibG = ctx.createGain();
+    vibG.gain.value = 14;
+    vib.connect(vibG).connect(o.frequency);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.035, t0 + 0.3);
+    g.gain.setValueAtTime(0.035, t0 + 1.2);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 2.0);
+    o.connect(g).connect(this.sfx);
+    o.start(t0); vib.start(t0);
+    o.stop(t0 + 2.1); vib.stop(t0 + 2.1);
+  }
+
+  // rattlesnake: pulsed high-frequency shaker — noise chopped at ~22 Hz
+  rattle() {
+    if (!this.ctx || this.muted) return;
+    const ctx = this.ctx;
+    const t0 = ctx.currentTime + 0.02;
+    const len = ctx.sampleRate * 1.3;
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass'; f.frequency.value = 4400; f.Q.value = 0.8;
+    const chop = ctx.createOscillator(); // amplitude chop = the rattle pulse
+    chop.type = 'square'; chop.frequency.value = 22;
+    const chopG = ctx.createGain();
+    chopG.gain.value = 0.5;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.045, t0 + 0.1);
+    g.gain.setValueAtTime(0.045, t0 + 1.0);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 1.3);
+    chop.connect(chopG).connect(g.gain);
+    src.connect(f).connect(g).connect(this.sfx);
+    src.start(t0); chop.start(t0);
+    src.stop(t0 + 1.35); chop.stop(t0 + 1.35);
+  }
+
+  // wild turkey: a quick descending warble
+  gobble() {
+    if (!this.ctx || this.muted) return;
+    const ctx = this.ctx;
+    const o = ctx.createOscillator();
+    o.type = 'triangle';
+    const t0 = ctx.currentTime + 0.02;
+    const steps = [300, 210, 320, 190, 280, 170, 240];
+    steps.forEach((f, i) => o.frequency.setValueAtTime(f, t0 + i * 0.075));
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.05, t0 + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6);
+    o.connect(g).connect(this.sfx);
+    o.start(t0); o.stop(t0 + 0.65);
   }
 
   // freight horn: two-note minor chord, long-long blast

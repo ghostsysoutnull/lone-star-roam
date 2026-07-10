@@ -26,7 +26,12 @@ in the travel menu (P) offers delivery hauls between real cities — load at the
 origin (crates ride in the truck bed), beat a distance-scaled deadline, earn a
 bankroll. ×1.5 road bonus for never flying, half pay when late, fast travel
 locked mid-haul, 🔥 rush jobs, rain slows the player 22%. Guidance: compass-tape
-diamond + G-toggled 3D guide arrow (both red when late).
+diamond + G-toggled 3D guide arrow (both red when late). Wildlife got a variety
+pass: 15 species (pronghorn/javelina/turkey/gator/rattlesnake/pelican + the
+Austin bat emergence at dusk), nocturnal/diurnal hours, herd startles, coyote
+howls, Space horn in DRIVE. A real bug fell out: fleeing animals had an
+inverted heading and were charging the player — distance-over-time assertions
+caught it where screenshots hadn't.
 
 Today's candidates (my pick order):
 
@@ -49,6 +54,11 @@ jobs that punish offroading).
 
 ## Notes for me (the human)
 
+- **Playtest the wildlife pass**: honk (Space) at a longhorn herd vs. a deer
+  herd; hunt the dusk bats in Austin (~18:40–20:15 game time, P → Cities →
+  Austin then fly east along the river); listen for the coyote howl at night in
+  the west; find the rattlesnake (rare, Trans-Pecos — it rattles first). Judge
+  the howl/rattle/gobble mix levels in `src/audio.js`.
 - **Playtest the missions loop**: take a short haul and a 🔥 rush job. Do
   deadlines feel fair in rain/at night? Knobs in `src/missions.js` `genOffers()`:
   deadline `dist / 24 + 60` (higher divisor = tighter), pay `50 + km × 1.2`,
