@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Lone Star Roam** — a single-page Three.js free-roam game over a 1:100-scale, geographically real Texas. Real OSM highway geometry + real border + 132 real cities; procedural downtowns, drive/fly/walk modes, collectibles, NPCs. No build step, no framework, no npm install — plain ES modules with Three.js from CDN (importmap in `index.html`).
 
-See `ROADMAP.md` for planned work and known limitations before proposing features.
+See `ROADMAP.md` for planned work and known limitations before proposing features. `AVIATION.md` is the active priority track (airports/air traffic/tower radio, 5 waves) — it runs ahead of ROADMAP.md candidates.
 
 ## Commands
 

@@ -34,7 +34,18 @@ landmarks (26 total), rumor lines.
 
 Today's candidates (my pick order):
 
-1. **Haunted Texas wave 2 — the apparitions** (planned & approved 2026-07-11;
+1. **Aviation wave 1 — Fields** (`AVIATION.md` is the new priority track,
+   all open calls decided 2026-07-11 — **read that doc before coding**; it
+   preempts everything below): static airports — curated ~20-site table with
+   real runway headings authored from OSM `aeroway=runway` geometry
+   (Overpass **GET**, not runway numbers), all-airport static geometry
+   merged by material (not per-site prop groups), pad-at-max-hAt + skirts +
+   ribbon-offset markings, night beacon + `ATMOS.wind` windsock, pure
+   `airportClear(x,z)` exclusions wired into cities.js placement /
+   ScenerySystem / `chapelAt`, ✈ glyphs on `renderMapLayer`, new
+   `tools/checks/aviation.mjs` suite (pad bounds, determinism,
+   building-exclusion, windsock).
+2. **Haunted Texas wave 2 — the apparitions** (planned & approved 2026-07-11;
    follow wave-1 patterns in haunts.js, +4 legends → 6):
    - **Ghost Stampede at Stampede Mesa** (~33.55 N, −101.17 W caprock rim near
      Crosbyton — the legend behind "Ghost Riders in the Sky"). Gate on
@@ -54,10 +65,10 @@ Today's candidates (my pick order):
      every confirmed one was a coyote with mange. So far.
    - Verify: parallel-heading + distance-band over time (El Muerto), rim
      displacement (stampede), vanish-on-approach opacity curves, horn-flee.
-2. **Gamepad analog steering** (~1 hour, biggest driving-feel win) — Gamepad
+3. **Gamepad analog steering** (~1 hour, biggest driving-feel win) — Gamepad
    API axes/buttons alongside keyboard; poll in `Player.update`;
    `t.stubGamepad` is already in the harness waiting.
-3. **Big-map click-to-set-waypoint** — generalize the mission target pipeline
+4. **Big-map click-to-set-waypoint** — generalize the mission target pipeline
    (map diamond + compass diamond + guide arrow) to a map click.
 
 Haunted Texas wave 3 (later): San Antonio ghost tracks push (~29.34 N,

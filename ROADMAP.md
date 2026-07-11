@@ -3,6 +3,11 @@
 Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 132 city stars, 14 landmarks, 300 roses, 12 NPCs, persistent progress.
 
+**Active priority track: `AVIATION.md`** — airports, AI air traffic, tower
+radio, rotorcraft, in 5 waves. Runs ahead of every candidate below until
+shipped or descoped (decided 2026-07-11); fold waves into this file as they
+ship.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin
