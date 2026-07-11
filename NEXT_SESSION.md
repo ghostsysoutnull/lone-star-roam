@@ -80,6 +80,10 @@ over sim time, dog follow as distance-over-time). Wave 2 (same session):
 📻 countdown on the HUD clock line + a toast when the forecast breaks. And
 the **paint shop** ($250 a coat): 7 truck colors as a swatch row, worn coat
 in `save.gear.paint`, recolors `truck.userData.bodyMat`. 53 checks green.
+Also a verify-speed pass: new `t.simStep(s[, autopilot])` harness helper steps
+player physics synchronously (player-physics only — render-loop systems still
+need `t.simWait`); full run dropped from ~6 min to ~2 min of checks, with the
+drive suite's walk-cap check kept on `simWait` as the frame-loop smoke test.
 
 Today's candidates (my pick order):
 

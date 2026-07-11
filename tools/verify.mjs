@@ -88,6 +88,40 @@ function mkT(page) {
         await page.waitForTimeout(60);
       }
     },
+    // advance player (+ dog) physics synchronously in ONE evaluate — ~instant
+    // vs. waiting on real frames (a sim second costs 6–9 wall seconds under
+    // SwiftShader). PLAYER PHYSICS ONLY: render-loop systems (missions clock,
+    // sky/weather blends, traffic, animals, flares) do not advance — keep
+    // simWait for checks that need those ticking. autopilot: true re-aims the
+    // truck along the nearest motorway every step (for speed-cap runs).
+    // Returns per-step aggregates: { maxSpeed, minAgl, maxGap (dog), types }.
+    simStep: (s, autopilot = false) => ev(`(() => {
+      const p = g.player, dt = 0.05;
+      let maxSpeed = 0, minAgl = Infinity, maxGap = 0;
+      const types = new Set();
+      for (let i = 0, n = Math.round(${s} / dt); i < n; i++) {
+        if (${autopilot}) {
+          const r = g.nearestRoad(p.pos.x, p.pos.z, 12, (ty) => ty === 'motorway');
+          if (r) {
+            let ax = r.x + r.tx * 8, az = r.z + r.tz * 8;
+            let h = Math.atan2(-(ax - p.pos.x), -(az - p.pos.z));
+            const d = ((h - p.heading) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
+            if (Math.abs(d) > Math.PI / 2) { // keep going the way we're already going
+              ax = r.x - r.tx * 8; az = r.z - r.tz * 8;
+              h = Math.atan2(-(ax - p.pos.x), -(az - p.pos.z));
+            }
+            p.heading = h;
+          }
+          types.add(r && r.dist < 4 ? r.type : 'offroad');
+        }
+        p.update(dt);
+        g.dog?.update(dt);
+        maxSpeed = Math.max(maxSpeed, p.speed);
+        minAgl = Math.min(minAgl, p.pos.y - g.hAt(p.pos.x, p.pos.z));
+        if (g.dog?.owned) maxGap = Math.max(maxGap, Math.hypot(g.dog.g.position.x - p.pos.x, g.dog.g.position.z - p.pos.z));
+      }
+      return { maxSpeed, minAgl, maxGap, types: [...types] };
+    })()`),
     // held movement keys: write player.keys directly — deterministic, no focus issues
     hold: (code, on = true) => ev(`g.player.keys['${code}'] = ${on}`),
     async release() { await ev(`g.player.keys = {}`); },

@@ -4,7 +4,7 @@
 // after dark — not just the perks numbers. Lacy is verified by distance over
 // time in WALK (the flee-heading lesson: a wrong sign sends her running away).
 
-// keep the truck on the motorway while flooring it (same trick as drive.mjs)
+// floor it down the empty I-10 (t.simStep autopilot keeps the truck aimed)
 async function motorwayTopSpeed(t) {
   await t.tp(-2767, 334); // empty I-10 west of Fort Stockton — no cross streets
   await t.ev(`(() => {
@@ -13,29 +13,9 @@ async function motorwayTopSpeed(t) {
     p.heading = Math.atan2(-r.tx, -r.tz);
   })()`);
   await t.hold('KeyW');
-  let maxSpeed = 0;
-  const t0 = await t.ev('g.player.simT');
-  const deadline = Date.now() + 120000;
-  while (Date.now() < deadline) {
-    const s = await t.ev(`(() => {
-      const p = g.player, r = g.nearestRoad(p.pos.x, p.pos.z, 12, (ty) => ty === 'motorway');
-      if (r) {
-        let ax = r.x + r.tx * 8, az = r.z + r.tz * 8;
-        let h = Math.atan2(-(ax - p.pos.x), -(az - p.pos.z));
-        const d = ((h - p.heading) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
-        if (Math.abs(d) > Math.PI / 2) {
-          ax = r.x - r.tx * 8; az = r.z - r.tz * 8;
-          h = Math.atan2(-(ax - p.pos.x), -(az - p.pos.z));
-        }
-        p.heading = h;
-      }
-      return { spd: r && r.dist < 4 ? p.speed : 0, tm: p.simT };
-    })()`);
-    maxSpeed = Math.max(maxSpeed, s.spd);
-    if (s.tm - t0 > 5) break;
-    await t.wait(0.06);
-  }
+  const { maxSpeed, types } = await t.simStep(5, true);
   await t.release();
+  t.ok(types.includes('motorway'), `never on a motorway (saw: ${types})`);
   return maxSpeed;
 }
 
@@ -93,7 +73,7 @@ export default async function shop(t) {
     await t.tp(spot.x, spot.z);
     await t.ev('g.player.heading = 3.7');
     await t.hold('KeyW');
-    await t.simWait(2.3);
+    await t.simStep(2.3);
     const spd = await t.ev('g.player.speed');
     await t.release();
     const cap = 32 * (1 - Math.min(1, await t.ev('g.ATMOS.rain')) * 0.08);
@@ -137,17 +117,11 @@ export default async function shop(t) {
     await t.tp(pos.x, pos.z, 'WALK');
     await t.ev('g.player.heading = 2.1'); // ugly natural heading
     await t.hold('KeyW');
-    const t0 = await t.ev('g.player.simT');
-    let maxD = 0;
-    while ((await t.ev('g.player.simT')) - t0 < 6) {
-      maxD = Math.max(maxD, await t.ev(
-        'Math.hypot(g.dog.g.position.x - g.player.pos.x, g.dog.g.position.z - g.player.pos.z)'));
-      await t.wait(0.15);
-    }
+    const { maxGap } = await t.simStep(6); // simStep steps the dog alongside the player
     await t.release();
-    t.ok(maxD < 10, `dog lost the cowboy mid-walk (gap hit ${maxD.toFixed(1)})`); // inverted heading ⇒ runs away
+    t.ok(maxGap < 10, `dog lost the cowboy mid-walk (gap hit ${maxGap.toFixed(1)})`); // inverted heading ⇒ runs away
     t.ok(await t.ev('g.dog.g.parent !== g.player.truck'), 'dog still parented to the hidden truck');
-    await t.simWait(2.5); // player stopped — she comes to heel
+    await t.simStep(2.5); // player stopped — she comes to heel
     const d = await t.ev('Math.hypot(g.dog.g.position.x - g.player.pos.x, g.dog.g.position.z - g.player.pos.z)');
     t.ok(d > 1.2 && d < 4.5, `settled ${d.toFixed(1)} units away, expected ≈2.6`);
     await t.ev(`g.player.setMode('DRIVE')`);
@@ -156,7 +130,7 @@ export default async function shop(t) {
   await t.check('weather radio: forecast on the HUD, then the weather arrives', async () => {
     await t.setWeather('clear');
     // a pending forecast means nothing without the radio
-    await t.ev(`(g.sky.forecast = 'storm', g.sky.forecastT = 8, g.sky.nextPick = 300)`);
+    await t.ev(`(g.sky.forecast = 'storm', g.sky.forecastT = 4, g.sky.nextPick = 300)`);
     await t.wait(0.5); // ≥1 HUD tick at 12 Hz
     t.ok(!(await t.ev(`g.hud.els.mode.textContent.includes('📻')`)), 'forecast shown without the radio');
     await t.ev('g.gameplay.save.bank = 400');
