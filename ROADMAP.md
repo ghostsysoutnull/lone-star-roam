@@ -64,7 +64,12 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   Marfa, Aurora 1897). Light formations + a hovering saucer with rim lights and
   ground beam that darts away when approached; engine sputter + headlight flicker
   nearby (the Levelland effect); theremin proximity tone; secret 👽 counter on
-  the help screen; townsfolk rumor lines.
+  the help screen; townsfolk rumor lines. Encounter rework 2026-07-11: the
+  saucer now *stalks* the player in every mode (36-unit standoff, low over the
+  road like the real Levelland reports, terrain-aware height), hovers 40–70 s,
+  and the flicker actually fires at the standoff — plus it now reaches the
+  walk lantern and the plane's nav lights/engine. Debug menu starts it
+  in-hover instantly.
 
 - [x] ~~UFO events~~ (see above) · ~~Landmark pass~~ — done 2026-07-10: 24 landmarks
   (added Prada Marfa, Paris TX Eiffel + hat, Dinosaur Valley, AT&T Stadium,

@@ -33,7 +33,7 @@ export function initDebug({ player, sky, haunts, ufo, hud }) {
       hud.toast('👻 Haunting the nearest cemetery');
     },
     ghostFires() { actions.night(); tp(EROCK[0] + 30, EROCK[1], Math.PI / 2); },
-    saucer() { actions.night(); ufo.startSaucer(player.pos.x, player.pos.z); },
+    saucer() { actions.night(); ufo.startSaucer(player.pos.x, player.pos.z, true); }, // immediate: hovers at the standoff now
     formation() { actions.night(); ufo.startFormation(player.pos.x, player.pos.z); },
     bats() { sky.t = 0.79; tp(BRIDGE[0] - 40, BRIDGE[1], -Math.PI / 2); },
   };

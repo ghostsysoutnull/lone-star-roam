@@ -11,6 +11,7 @@ export default async function debug(t) {
   });
 
   await t.check('haunt-cemetery forces wisps through the real loop', async () => {
+    await t.tp(100, 550); // Hill Country ranchland — chapel odds are 0 in the far-west desert
     await t.ev('g.debug.actions.hauntCemetery()');
     await t.until('g.haunts.force && g.haunts.haunted && g.haunts.wisps.visible', 15000);
     await t.until('g.haunts.wispMat.opacity > 0.15', 5000);

@@ -157,4 +157,38 @@ export default async function lights(t) {
     await t.until(`g.flares.charges === 0`, 8000);
     await t.ev(`(g.flares.flares.forEach((f) => g.flares.snuff(f.slot)), g.flares.flares.length = 0, g.flares.charges = 3, g.player.setMode('DRIVE'))`);
   });
+
+  await t.check('saucer starts hovering immediately, stalks the player, stays above terrain', async () => {
+    await t.setNight();
+    // high-elevation spot (Davis range foothills) — regression for the old absolute-y hover
+    await t.tp(-4900, 750);
+    await t.ev('g.ufo.startSaucer(g.player.pos.x, g.player.pos.z, true)');
+    const s0 = await t.ev(`(() => { const s = g.ufo.saucer.position; return { state: g.ufo.state, hoverT: g.ufo.hoverT, agl: s.y - g.hAt(s.x, s.z) }; })()`);
+    t.ok(s0.state === 'hover', `immediate start not hovering: ${s0.state}`);
+    t.ok(s0.hoverT >= 40, `encounter too short: ${s0.hoverT.toFixed(1)}s`);
+    t.ok(s0.agl > 8 && s0.agl < 60, `saucer not above the terrain: agl ${s0.agl.toFixed(1)}`); // 13 nominal, minus bob/lerp lag
+    // drive off 150 units — the saucer must close back to its standoff and hold
+    await t.tp(-4900 + 150, 750);
+    await t.until('Math.hypot(g.ufo.saucer.position.x - g.player.pos.x, g.ufo.saucer.position.z - g.player.pos.z) < 60', 8000);
+    const d = await t.sample('Math.hypot(g.ufo.saucer.position.x - g.player.pos.x, g.ufo.saucer.position.z - g.player.pos.z)', 5, 300);
+    t.ok(Math.max(...d) < 60, `lost its mark mid-stalk: ${d.map((v) => v.toFixed(0)).join(',')}`);
+    // in FLY it rides above the plane, not down at ground level
+    const gy = await t.ev('g.hAt(g.player.pos.x, g.player.pos.z)');
+    await t.tp(-4900 + 150, 750, 'FLY', gy + 80);
+    await t.until('g.ufo.saucer.position.y > g.player.pos.y', 8000);
+    await t.ev(`g.player.setMode('DRIVE')`);
+  });
+
+  await t.check('Levelland effect: headlights AND the lantern really flicker near the saucer', async () => {
+    await t.until('g.ufo.near > 0.5', 8000); // stalking standoff sits inside the effect
+    const heads = await t.sample('g.player.truck.userData.headlights.visible', 30, 40);
+    t.ok(heads.includes(false), 'headlights never flickered off');
+    t.ok(heads.includes(true), 'headlights never came back on');
+    await t.ev(`g.player.setMode('WALK')`);
+    const lamp = await t.sample('g.player.cowboy.userData.lampLight.intensity', 30, 40);
+    t.ok(lamp.some((i) => i === 0), 'lantern never flickered out');
+    t.ok(lamp.some((i) => i > 5), 'lantern never lit at all');
+    await t.ev(`(g.ufo.end(), g.player.setMode('DRIVE'))`);
+    await t.setDay(); // leave the world in daylight
+  });
 }

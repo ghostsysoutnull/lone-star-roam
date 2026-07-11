@@ -3,6 +3,7 @@
 // Get close and your engine sputters and headlights flicker, like Levelland.
 import * as THREE from 'three';
 import { ATMOS } from './sky.js';
+import { hAt } from './geo.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 // the real hotspots
@@ -28,6 +29,8 @@ export class UFOSystem {
     this.rollT = 30;
     this.t = 0;
     this.near = 0; // 0..1 proximity factor read by audio/vehicle (engine trouble)
+    this.stalkA = 0; // bearing of the hover standoff around the player
+    this.tgt = new THREE.Vector3();
   }
 
   mkSaucer() {
@@ -103,30 +106,42 @@ export class UFOSystem {
       return;
     }
 
-    // saucer states: approach -> hover -> dart
+    // saucer states: approach -> hover (stalking the player) -> dart
     const s = this.saucer;
     const d = Math.hypot(s.position.x - px, s.position.z - pz);
     this.rim.rotation.y = this.t * 2.2;
 
+    // stalk target: a standoff beside the player, above THEIR ground — or just
+    // above the plane in FLY. The bearing tracks the saucer's own side of the
+    // player (plus a slow circle), so the chase never crosses over the player
+    // and self-triggers the too-close dart.
+    // low and close, like the Levelland reports — high enough to clear the
+    // truck, low enough to sit inside the chase camera's view, not overhead
+    this.stalkA = Math.atan2(s.position.z - pz, s.position.x - px) + dt * 0.12;
+    const tx = px + Math.cos(this.stalkA) * 36, tz = pz + Math.sin(this.stalkA) * 36;
+    // clear the higher of the two grounds (hillsides), or ride above the plane
+    this.tgt.set(tx, Math.max(Math.max(hAt(px, pz), hAt(tx, tz)) + 13, py + 12) + Math.sin(this.t * 0.9) * 2, tz);
+
     if (this.state === 'approach') {
-      s.position.lerp(this.hoverPos, Math.min(1, dt * 0.7));
-      if (s.position.distanceTo(this.hoverPos) < 6) { this.state = 'hover'; this.hoverT = 18 + Math.random() * 20; }
+      s.position.lerp(this.tgt, Math.min(1, dt * 0.7));
+      if (s.position.distanceTo(this.tgt) < 12) { this.state = 'hover'; this.hoverT = 40 + Math.random() * 30; }
     } else if (this.state === 'hover') {
       this.hoverT -= dt;
-      s.position.y = this.hoverPos.y + Math.sin(this.t * 0.9) * 2.5;
+      s.position.lerp(this.tgt, Math.min(1, dt * 2.2)); // shadows the player in any mode
       s.rotation.z = Math.sin(this.t * 0.7) * 0.06;
-      // the beam sweeps on and off
-      this.beam.visible = Math.sin(this.t * 0.35) > 0.3;
+      // the beam sweeps on and off — length measured to the real terrain,
+      // and only down where the ground is close enough to reach
+      const beamLen = s.position.y - hAt(s.position.x, s.position.z);
+      this.beam.visible = beamLen > 2 && beamLen < 60 && Math.sin(this.t * 0.35) > 0.3;
       if (this.beam.visible) {
-        const len = s.position.y;
-        this.beam.scale.set(1, len, 1);
-        this.beam.position.y = -len / 2;
+        this.beam.scale.set(1, beamLen, 1);
+        this.beam.position.y = -beamLen / 2;
       }
-      // Levelland effect within 90 units; sighting registered within 130
-      if (d < 90) this.near = Math.min(1, (90 - d) / 60);
+      // Levelland effect: strong at the stalking standoff; sighting within 130
+      if (d < 60) this.near = Math.min(1, (60 - d) / 40);
       if (d < 130 && !this.sighted) { this.sighted = true; this.onSighting?.(); }
-      // approached too close, or lingered too long: dart away
-      if (d < 42 || this.hoverT <= 0) {
+      // pressed too close, or lingered too long: dart away
+      if (d < 18 || this.hoverT <= 0) {
         this.state = 'dart';
         const a = Math.random() * Math.PI * 2;
         this.dartVel = new THREE.Vector3(Math.cos(a) * 260, 90, Math.sin(a) * 260);
@@ -139,14 +154,21 @@ export class UFOSystem {
     }
   }
 
-  startSaucer(px, pz) {
-    this.state = 'approach';
+  // immediate: skip the distant approach and start hovering at the standoff
+  // (the debug menu wants the encounter now, not in a minute)
+  startSaucer(px, pz, immediate = false) {
     this.sighted = false;
-    const a = Math.random() * Math.PI * 2;
-    this.saucer.position.set(px + Math.cos(a) * 420, 150, pz + Math.sin(a) * 420);
-    // hover near (but not over) the player
-    const b = Math.random() * Math.PI * 2;
-    this.hoverPos = new THREE.Vector3(px + Math.cos(b) * 90, 45 + Math.random() * 25, pz + Math.sin(b) * 90);
+    this.stalkA = Math.random() * Math.PI * 2;
+    if (immediate) {
+      this.state = 'hover';
+      this.hoverT = 40 + Math.random() * 30;
+      const sx = px + Math.cos(this.stalkA) * 36, sz = pz + Math.sin(this.stalkA) * 36;
+      this.saucer.position.set(sx, Math.max(hAt(px, pz), hAt(sx, sz)) + 13, sz);
+    } else {
+      this.state = 'approach';
+      const a = Math.random() * Math.PI * 2;
+      this.saucer.position.set(px + Math.cos(a) * 420, hAt(px, pz) + 130, pz + Math.sin(a) * 420);
+    }
     this.saucer.visible = true;
     this.saucer.rotation.set(0, 0, 0);
   }

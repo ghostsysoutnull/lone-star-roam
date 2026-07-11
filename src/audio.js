@@ -131,7 +131,7 @@ export class AudioSystem {
       set(this.engOsc.frequency, 95 + spd * 0.5);
       set(this.engSub.frequency, 47 + spd * 0.25);
       set(this.engineFilter.frequency, 500 + spd * 3);
-      set(this.engineGain.gain, 0.07 + (spd / 150) * 0.05);
+      set(this.engineGain.gain, (0.07 + (spd / 150) * 0.05) * sputter, 0.03); // the Levelland effect grounds planes too
     } else {
       set(this.engineGain.gain, 0);
     }

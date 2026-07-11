@@ -314,9 +314,9 @@ export class Player {
       w.prop.rotation.z += dt * (14 + this.speed * 1.1);
       w.blur.visible = this.speed > 55;
       w.blur.rotation.z += dt * 3;
-      const navOn = night;
-      w.navL.visible = w.navR.visible = navOn;
-      w.strobe.visible = navOn && (performance.now() % 1200) < 110;
+      // nav lights ride headlights.visible so the UFO flicker kills them too
+      w.navL.visible = w.navR.visible = lightsOn;
+      w.strobe.visible = lightsOn && (performance.now() % 1200) < 110;
       // contrail at speed/altitude
       this.puffTimer -= dt;
       if (this.speed > 70 && this.pos.y > 25 && this.puffTimer <= 0) {
@@ -339,9 +339,10 @@ export class Player {
         for (const part of [c.ll, c.rl, c.la, c.ra]) part.rotation.x *= Math.pow(0.01, dt);
         c.la.rotation.z = 0.06 * Math.sin(performance.now() * 0.0012); // idle sway
       }
-      // lantern glows after dark
-      c.lampGlow.visible = night;
-      c.lampLight.intensity = night ? 14 + Math.sin(this.walkPhase * 2) * 1.5 : 0;
+      // lantern glows after dark — and the UFO Levelland flicker reaches it too
+      const lampOn = night && !(ATMOS.ufo > 0 && Math.random() < ATMOS.ufo * 0.35);
+      c.lampGlow.visible = lampOn;
+      c.lampLight.intensity = lampOn ? 14 + Math.sin(this.walkPhase * 2) * 1.5 : 0;
     }
 
     // puff pool

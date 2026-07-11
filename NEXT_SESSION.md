@@ -73,6 +73,12 @@ landmark with night glow, painted-church landmark (St. Mary's High Hill).
   `` ` `` (backquote) — buttons for day/night/midnight, haunt the nearest
   cemetery, ghost fires, saucer/Lubbock lights, the bat show, and weather picks.
   Not available without the URL param (public build stays honest).
+- **Playtest the reworked UFO encounter** (debug 🛸 button starts it instantly):
+  the saucer now shadows you low and close in all three modes for 40–70 s —
+  judge the standoff/height (the `tgt` block in `src/ufo.js`: 36 units out,
+  13 above ground) and whether the headlight/lantern flicker reads. Try it
+  walking (lantern), driving (headlights + engine sputter), and flying
+  (nav lights + prop sputter).
 - **Playtest Haunted Texas**: drive ranch roads west of Llano at night till you
   find a glowing cemetery (roughly 1 chapel per 10 chunks; they also show by
   day — white steeple by the road), or just use the debug menu. Judge: wisp size/brightness at parked
