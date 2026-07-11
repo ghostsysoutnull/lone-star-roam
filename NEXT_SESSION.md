@@ -29,18 +29,23 @@ Key facts:
 - **Ask before coding** — present the wave's implementation plan and wait
   for the go-ahead.
 
-Task: **Aviation wave 2 — Departures** (full spec in `AVIATION.md`; wave 1
-Fields shipped 2026-07-11). Summary: `src/aviation.js` `AviationSystem` —
-seeded per-game-day flight schedule (`seededRand('avn:APT:day:slot')`, new
-stream), gate→taxi→takeoff→cruise→land lifecycle between real airport pairs,
-aircraft as InstancedMesh types (airliner ~6 u tier 1, GA single ~3 u tiers
-2–3), altitudes below the cloud deck, ≤4 fixed-wing near the player, night
-thins to rare red-eyes, storm/dust ground stops from live `ATMOS`.
-Runway-in-use must come from the existing `windFrom(day)` stream
-(airports.js) + `ATMOS.wind` speed. Verify: schedule determinism, departure
-*gains* AGL over sim time / arrival loses it, never-despawn-in-sight,
-ground-stop under forced storm, `plane-moves` real-rAF sentinel. Debug
-action: `departure now`.
+Task: **Aviation wave 3 — Tower radio, the flagship** (full spec in
+`AVIATION.md`; waves 1–2 shipped 2026-07-11). Summary: audio.js
+`radio(text, opts)` — squelch click + syllabic gibberish burst (sawtooth
+~120 Hz through a wobbling ~900 Hz bandpass, ~4 Hz syllable AM), constant
+volume while receivable, ducks under the engine, **no TTS**. HUD subtitle
+line (rem-based, ~5 s fade, one-line queue). Receivable in FLY within ~250 u
+of a towered field, or anywhere with the shop's aviation band radio (~$500
+→ `perks.avionics`). Content is all true sim state: ATIS from
+`runwayInUse`/`windFrom` + live `ATMOS`/`sky.forecast`; AI ops narrated off
+`aviation.flights` phase edges (slots carry `n` for "Lone Star N"
+callsigns); player flow radar-contact → cleared-to-land → touchdown →
+**logbook stamp** (`save.airports`, additive key — the 10th collectible, ✈️
+row + counts); go-around when the player parks on the runway (reuse the
+wave-2 `divert` machinery); `ATMOS.ufo` chops radio gain + one spooky
+template. Verify at natural values: ugly off-axis approach, parked-short
+distance, stamp exactly once, not receivable in DRIVE without the perk,
+subtitle DOM text, ATIS wind matches the seeded runway-in-use.
 
 Session end (per wave): fold the shipped wave into ROADMAP.md, advance the
 Task block above to the next wave, run `node tools/verify.mjs`, then commit.

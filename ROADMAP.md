@@ -21,6 +21,28 @@ ship.
   layer. `tools/checks/aviation.mjs`: 11 checks incl. per-runway raycast and
   a real-rAF beacon sentinel.
 
+- [x] ~~Aviation wave 2 — Departures~~ — done 2026-07-11: `src/aviation.js`
+  `AviationSystem`. The schedule is a pure seeded function of the game day
+  (`avn:` stream; 12/5/2 daytime slots by tier + 0–2 tier-1 night red-eyes),
+  departures only — arrivals emerge from other fields' flights arriving, and
+  the live system just *materializes* flights within 380 units of the player
+  (≤4 airborne fixed-wing) as two InstancedMesh types (airliner ~6 u for
+  tier-1 pairs, GA single ~3 u otherwise) over real weighted route pairs
+  (Love–Hobby shuttle, DFW spokes, feeders, strip hops). Full lifecycle
+  gate→taxi→hold→roll→climb→cruise→final→rollout→park; closed-form
+  trajectories (quadratic roll, distance-based climb/cruise/descend profile,
+  cruise capped under the y-130 cloud deck, terrain-scanned); materialized
+  flights advance by dt so ground stops (storm/dust hold departures, arrivals
+  go around + recycle) and rain-slow taxi accumulate as pure delay.
+  Runway-in-use = `runwayInUse(a, day)` (airports.js, argmax into
+  `windFrom`); parked flights retire only unwatched (trains idiom), airborne
+  despawn beyond 900 (the schedule flies on parametrically). Night strobes
+  are unlit vertex-color lamps; contrail puffs at jet cruise. Debug
+  🛫/🛬 actions; 9 new checks (schedule purity/shape, into-wind argmax,
+  measured roll acceleration + monotone climb, measured descent to an
+  on-runway touchdown, ground stop + go-around, watched-park persistence,
+  airborne cap, real-rAF plane-moves sentinel).
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

@@ -97,33 +97,25 @@ life) — do not "fix" that.
   world); building-exclusion (spawn Dallas, assert no instance matrix inside
   Love's footprint); windsock tracks a forced `ATMOS.wind` change.
 
-### Wave 2 — Departures (fixed-wing AI)
+### Wave 2 — Departures (fixed-wing AI) — ✅ shipped 2026-07-11
 
-- `src/aviation.js` `AviationSystem`: seeded per-game-day schedule
-  (`seededRand('avn:APT:day:slot')` — new seed stream, never touch existing
-  ones). Slots vary by tier; night keeps only sparse tier-1 red-eyes.
-- Flight lifecycle: spawn at gate → taxi → hold → takeoff roll → climb →
-  cruise leg toward a real destination airport → descend → land → taxi in →
-  park, despawn only unwatched (trains idiom) or beyond 180 units (traffic
-  idiom). Distant flights are just two waypoints + altitude profile — no
-  pathfinding.
-- Aircraft as InstancedMesh types (traffic idiom): airliner (~6 units,
-  tier 1), regional/GA single (~3, tiers 2–3), later heli + blimp. Contrail
-  puffs at cruise; nav strobes at night (emissive, no lights).
-- Altitudes: pattern 8–12 AGL, regional hops 60–90, airliners ~100–120 —
-  below the cloud deck (sky.js clouds ride y 130–200), below FLY's 300
-  ceiling so the player can climb above traffic.
-- Weather ops: `storm`/`dust` at the field = ground stop (no departures,
-  arrivals divert into the fog and recycle); rain slows taxi. All read live
-  `ATMOS`/weather, same as traffic.
-- Runway-in-use: per-day seeded wind *direction* (direction isn't modeled in
-  ATMOS — derive seeded per day, speed from `ATMOS.wind`); pick the runway
-  end best aligned into wind. ATIS and AI ops share it.
-- Verify: schedule determinism (two evals, same day → identical slots);
-  **departure gains AGL over sim time** and arrival loses it (charging-deer
-  lesson: assert measured motion, not state flags); never-despawn-in-sight;
-  ground-stop under forced storm; one real-loop sentinel (`plane-moves` via
-  actual rAF, like cars-move).
+Shipped as specced (details folded into ROADMAP.md). Notes for later waves:
+- **The schedule is departures-only and pure** (`daySchedule(day)`, `avn:`
+  stream); arrivals emerge from other fields' flights. Wave-3 radio narrates
+  *materialized* flights (`aviation.flights[i].st.ph` phase strings: taxi /
+  hold / roll / climb / cruise / descend / final / rollout / taxiin / park /
+  divert / done) — event-edges on those phases are the clearance hooks.
+- Each slot already carries `n` ("Lone Star N") for wave-3 callsigns.
+- `runwayInUse(a, day)` lives in airports.js beside `windFrom` — ATIS must
+  read both, never re-derive. Day key everywhere is `Math.floor(sky.days)`
+  (rolls at 9 am, same as the windsock — accepted quirk).
+- Materialized flights advance by **dt**, the parametric scan by **sky.days**;
+  ground-stop/rain delay accumulates in that gap and is dropped unobserved on
+  far dematerialization. Forced flights (`force('departure'|'arrival')`,
+  debug 🛫/🛬) bypass the schedule but respect the airborne cap (≤4).
+- Go-around exists (`divert` phase, storm/dust on final) — wave 3's
+  "traffic holding on the runway" go-around should reuse the same divert
+  machinery, triggered by the player parked on the pavement instead.
 
 ### Wave 3 — Tower radio (the flagship)
 

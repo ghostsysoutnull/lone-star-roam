@@ -8,7 +8,7 @@ import { EROCK } from './haunts.js';
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
 
-export function initDebug({ player, sky, haunts, ufo, hud }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -36,6 +36,14 @@ export function initDebug({ player, sky, haunts, ufo, hud }) {
     saucer() { actions.night(); ufo.startSaucer(player.pos.x, player.pos.z, true); }, // immediate: hovers at the standoff now
     formation() { actions.night(); ufo.startFormation(player.pos.x, player.pos.z); },
     bats() { sky.t = 0.79; tp(BRIDGE[0] - 40, BRIDGE[1], -Math.PI / 2); },
+    departure() {
+      const f = aviation.force('departure');
+      hud.toast(f ? `🛫 ${f.sl.from} departure, Lone Star ${f.sl.n} to ${f.sl.dest}` : '🛫 No field in range');
+    },
+    arrival() {
+      const f = aviation.force('arrival');
+      hud.toast(f ? `🛬 Lone Star ${f.sl.n} inbound from ${f.sl.from}` : '🛬 No field in range / sky full');
+    },
   };
   for (const w of ['clear', 'clouds', 'rain', 'storm', 'dust']) actions[w] = () => setWeather(w);
 
@@ -44,6 +52,7 @@ export function initDebug({ player, sky, haunts, ufo, hud }) {
       ['day', '🌞 Day'], ['night', '🌙 Night'], ['midnight', '🕛 Midnight'],
       ['hauntCemetery', '👻 Haunt cemetery'], ['ghostFires', '🔥 Ghost fires'],
       ['saucer', '🛸 Saucer'], ['formation', '✨ Lubbock lights'], ['bats', '🦇 Bat show'],
+      ['departure', '🛫 Departure'], ['arrival', '🛬 Arrival'],
       ['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'], ['storm', '⛈ Storm'], ['dust', '🌪 Dust'],
     ];
     const el = document.createElement('div');

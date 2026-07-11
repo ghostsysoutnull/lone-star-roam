@@ -91,6 +91,28 @@ for (const a of AIRPORTS) {
   const M = MARGIN[a.tier];
   a.foot = { u0: u0 - M, u1: u1 + M, v0: v0 - M, v1: v1 + M };
   a.maxR = Math.hypot(Math.max(-a.foot.u0, a.foot.u1), Math.max(-a.foot.v0, a.foot.v1));
+
+  // apron anchor + gate (pure, at module load — aviation.js parks planes here
+  // without meshes): between the runways where there are two, pushed off the
+  // pavement where there's one; scan across V for a clear terminal spot
+  const prim = a.rws.reduce((x, y) => (y.hl > x.hl ? y : x));
+  a.prim = prim;
+  const mean = a.rws.reduce((m, r) => [m[0] + r.cx / a.rws.length, m[1] + r.cz / a.rws.length], [0, 0]);
+  const pvx = -a.az, pvz = a.ax;
+  let anchor = null;
+  for (const k of [0, 6, -6, 10, -10, 14, -14, 18, -18]) {
+    const x = mean[0] + pvx * k + (a.rws.length === 1 ? pvx * (prim.w / 2 + 5) : 0);
+    const z = mean[1] + pvz * k + (a.rws.length === 1 ? pvz * (prim.w / 2 + 5) : 0);
+    if (clearOfRunways(a, x, z, 3.5)) { anchor = [x, z]; break; }
+  }
+  a.anchor = anchor ?? [mean[0] + pvx * (prim.w / 2 + 6), mean[1] + pvz * (prim.w / 2 + 6)];
+  // gate: beside the terminal on the runway side, clear of all pavement
+  const vPrim = (prim.cx - a.anchor[0]) * pvx + (prim.cz - a.anchor[1]) * pvz;
+  a.gate = a.anchor;
+  for (const dv of [4 * Math.sign(vPrim || 1), -4 * Math.sign(vPrim || 1), 0]) {
+    const gx = a.anchor[0] + pvx * dv, gz = a.anchor[1] + pvz * dv;
+    if (clearOfRunways(a, gx, gz, 1.5)) { a.gate = [gx, gz]; break; }
+  }
 }
 
 // true when (x,z) is outside every airport footprint — placement systems call
@@ -133,6 +155,24 @@ export function airportLayout() {
 // ATMOS has speed but no direction; waves 2/3 (runway-in-use, ATIS) must read
 // this same stream so the windsock never disagrees with the tower
 export const windFrom = (day) => Math.floor(seededRand('avnwind:' + Math.floor(day))() * 36) * 10;
+
+// the runway end in use on `day`: departures roll (and arrivals land) from the
+// end whose takeoff heading points best into windFrom(day). Ties break toward
+// the longer runway, then table order — deterministic; AI ops use this now and
+// wave-3 ATIS must read it too, never re-derive
+export function runwayInUse(a, day) {
+  const w = windFrom(day) * D2R;
+  const wx = Math.sin(w), wz = -Math.cos(w); // compass deg → world dir (flying into the wind)
+  let best = null, score = -1e9;
+  for (const r of a.rws) for (const s of [1, -1]) {
+    const al = (r.dx * wx + r.dz * wz) * s + r.hl * 1e-4;
+    if (al > score) { score = al; best = { r, s }; }
+  }
+  const { r, s } = best;
+  return { r, hdg: (s > 0 ? r.hdg : r.hdg + 180) % 360,
+    tx: r.cx - r.dx * r.hl * s, tz: r.cz - r.dz * r.hl * s, // threshold the roll starts from
+    dx: r.dx * s, dz: r.dz * s };                           // takeoff/landing world direction
+}
 
 // a point is clear of every runway corridor by `rad` (keeps our own terminal
 // and hangars off the pavement, crossing-runway fields included)
@@ -183,18 +223,9 @@ export class AirportSystem {
           rect(flats.mark, r, e * (r.hl - 1.2), s * r.w, 1.7, 0.2, y + 0.16); // threshold bars
       }
 
-      // apron anchor: between the runways where there are two, pushed off the
-      // pavement where there's one; scan across V for a clear terminal spot
-      const prim = a.rws.reduce((x, r) => (r.hl > x.hl ? r : x));
-      const mean = a.rws.reduce((m, r) => [m[0] + r.cx / a.rws.length, m[1] + r.cz / a.rws.length], [0, 0]);
+      // apron anchor: computed pure at module load (aviation.js parks planes there)
+      const prim = a.prim, anchor = a.anchor;
       const pvx = -a.az, pvz = a.ax;
-      let anchor = null;
-      for (const k of [0, 6, -6, 10, -10, 14, -14, 18, -18]) {
-        const x = mean[0] + pvx * k + (a.rws.length === 1 ? pvx * (prim.w / 2 + 5) : 0);
-        const z = mean[1] + pvz * k + (a.rws.length === 1 ? pvz * (prim.w / 2 + 5) : 0);
-        if (clearOfRunways(a, x, z, 3.5)) { anchor = [x, z]; break; }
-      }
-      anchor ??= [mean[0] + pvx * (prim.w / 2 + 6), mean[1] + pvz * (prim.w / 2 + 6)];
       const rot = Math.atan2(-a.az, a.ax); // boxes align to the primary runway
       const B = (du, dv, sx, sy, sz, color, yBase = 0) => {
         const x = anchor[0] + a.ax * du + pvx * dv, z = anchor[1] + a.az * du + pvz * dv;
