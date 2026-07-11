@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { GEO, seededRand, inTexas, nearestRoad, nearestCity, hAt, outsideAt, ELEV } from './geo.js';
 import { ATMOS } from './sky.js';
 import { cityRadius } from './cities.js';
+import { airportClear } from './airports.js';
 
 export function buildWorld(scene) {
   buildGround(scene);
@@ -267,7 +268,7 @@ export function chapelAt(cx, cz) {
     const away = 7 + rand() * 2; // set back from the shoulder
     const x = road.x + ((sx - road.x) / road.dist) * away;
     const z = road.z + ((sz - road.z) / road.dist) * away;
-    if (!inTexas(x, z)) continue;
+    if (!inTexas(x, z) || !airportClear(x, z)) continue;
     const near = nearestRoad(x, z, 6); // a second road may pass closer than the one we anchored to
     if (near && near.dist < 5) continue;
     const { city, dist } = nearestCity(x, z);
@@ -362,6 +363,7 @@ class ScenerySystem {
           x = road.x + ((x - road.x) / (road.dist || 1)) * away;
           z = road.z + ((z - road.z) / (road.dist || 1)) * away;
         } else if (road && road.dist < 3) continue;
+        if (!airportClear(x, z)) continue; // fields keep their footprints bare
         const obj = maker(rand);
         const s = 0.75 + rand() * 0.6;
         obj.scale.setScalar(s);

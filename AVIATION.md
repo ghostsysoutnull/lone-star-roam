@@ -59,7 +59,14 @@ Each wave is one session-sized, independently shippable, and ends with new
 checks in a `tools/checks/aviation.mjs` suite (plus MODULES.md/ROADMAP.md
 updates). Ship order matters: fields before traffic before radio.
 
-### Wave 1 — Fields (static airports)
+### Wave 1 — Fields (static airports) — ✅ shipped 2026-07-11
+
+Shipped as specced (details folded into ROADMAP.md). Notes for later waves:
+`windFrom(day)` (the `avnwind:` stream) already exists and drives the
+windsocks — runway-in-use and ATIS must read it, not roll their own; the
+strips are Terlingua + Marfa + 6666 Ranch + Armstrong Ranch; real roads/rails
+still cross some footprints (International Parkway through DFW is true to
+life) — do not "fix" that.
 
 - `src/airports.js`: curated `AIRPORTS` table (~20 sites, hardcoded `LL()`),
   three tiers:

@@ -1,5 +1,6 @@
 // HUD: minimap + fullscreen map (border/highways pre-rendered once), text readouts, toasts, dialog.
 import { GEO, nearestCity } from './geo.js';
+import { AIRPORTS } from './airports.js';
 
 export class HUD {
   constructor() {
@@ -86,6 +87,14 @@ export class HUD {
       h.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
       ctx.stroke();
     }
+    // airfields under the city dots — ✈ small for ranch strips
+    ctx.fillStyle = '#8fc4f0'; ctx.textAlign = 'center';
+    for (const apt of AIRPORTS) {
+      ctx.font = `${apt.tier === 3 ? 10 : 14}px system-ui`;
+      const [px, pz] = T(apt.at[0], apt.at[1]);
+      ctx.fillText('✈', px, pz + 4);
+    }
+    ctx.textAlign = 'left';
     ctx.fillStyle = '#e8e0c8';
     for (const city of GEO.cities) {
       const [px, pz] = T(city.x, city.z);

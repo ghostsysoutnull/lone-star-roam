@@ -29,15 +29,18 @@ Key facts:
 - **Ask before coding** — present the wave's implementation plan and wait
   for the go-ahead.
 
-Task: **Aviation wave 1 — Fields** (full spec in `AVIATION.md`). Summary:
-static airports — curated ~20-site table with real runway headings authored
-from OSM `aeroway=runway` geometry (Overpass **GET**, not runway numbers),
-all-airport static geometry merged by material (not per-site prop groups),
-pad-at-max-hAt + skirts + ribbon-offset markings, night beacon +
-`ATMOS.wind` windsock, pure `airportClear(x,z)` exclusions wired into
-cities.js placement / ScenerySystem / `chapelAt`, ✈ glyphs on
-`renderMapLayer`, new `tools/checks/aviation.mjs` suite (pad bounds,
-determinism, building-exclusion, windsock).
+Task: **Aviation wave 2 — Departures** (full spec in `AVIATION.md`; wave 1
+Fields shipped 2026-07-11). Summary: `src/aviation.js` `AviationSystem` —
+seeded per-game-day flight schedule (`seededRand('avn:APT:day:slot')`, new
+stream), gate→taxi→takeoff→cruise→land lifecycle between real airport pairs,
+aircraft as InstancedMesh types (airliner ~6 u tier 1, GA single ~3 u tiers
+2–3), altitudes below the cloud deck, ≤4 fixed-wing near the player, night
+thins to rare red-eyes, storm/dust ground stops from live `ATMOS`.
+Runway-in-use must come from the existing `windFrom(day)` stream
+(airports.js) + `ATMOS.wind` speed. Verify: schedule determinism, departure
+*gains* AGL over sim time / arrival loses it, never-despawn-in-sight,
+ground-stop under forced storm, `plane-moves` real-rAF sentinel. Debug
+action: `departure now`.
 
 Session end (per wave): fold the shipped wave into ROADMAP.md, advance the
 Task block above to the next wave, run `node tools/verify.mjs`, then commit.

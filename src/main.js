@@ -20,6 +20,7 @@ import { MaritimeSystem } from './maritime.js';
 import { UFOSystem } from './ufo.js';
 import { FlareSystem } from './flares.js';
 import { DogSystem } from './dog.js';
+import { AirportSystem, AIRPORTS, airportClear, airportLayout, windFrom } from './airports.js';
 import { applyGear } from './shop.js';
 import { HUD } from './hud.js';
 
@@ -48,6 +49,7 @@ async function boot() {
 
   const sky = new SkySystem(scene, sun, ambient);
   const scenery = buildWorld(scene);
+  const airports = new AirportSystem(scene);
   const cities = new CitySystem(scene);
   const player = new Player(scene, camera);
   const gameplay = new Gameplay(scene);
@@ -139,7 +141,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, airports, AIRPORTS, airportClear, airportLayout, windFrom, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -148,6 +150,7 @@ async function boot() {
     player.update(dt);
     sky.update(dt, player.keys['KeyT'], player.pos.x, player.pos.z, player.pos.y);
     scenery.update(dt, player.pos.x, player.pos.z);
+    airports.update(dt, sky.days);
     cities.update(player.pos.x, player.pos.z);
     cities.setNight(ATMOS.night);
     traffic.update(dt, player.pos.x, player.pos.z, player.pos.y);

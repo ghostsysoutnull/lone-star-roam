@@ -2,6 +2,7 @@
 // spawned/despawned by distance. Deterministic per city name.
 import * as THREE from 'three';
 import { GEO, seededRand, nearestRoad, hAt } from './geo.js';
+import { airportClear } from './airports.js';
 
 const SPAWN_DIST = 600;
 
@@ -66,6 +67,10 @@ export class CitySystem {
         if (Math.abs(off) > R * 1.15) continue;
         const len = 2 * Math.sqrt(Math.max(0, R * R * 1.3 - off * off));
         if (len < blockSize) continue;
+        // strips never pave over an airport (check center + both ends)
+        const scx = city.x + (axis ? cos * off : sin * off), scz = city.z + (axis ? -sin * off : cos * off);
+        const sdx = axis ? sin : cos, sdz = axis ? cos : -sin;
+        if (![0, -1, 1].every((s) => airportClear(scx + sdx * s * len / 2, scz + sdz * s * len / 2))) continue;
         const g = new THREE.PlaneGeometry(axis ? 1.1 : len, axis ? len : 1.1);
         g.rotateX(-Math.PI / 2);
         g.rotateY(rot);
@@ -104,6 +109,7 @@ export class CitySystem {
       const w = 0.9 + rand() * 1.6, dep = 0.9 + rand() * 1.6;
       // world position: rotate local by city rot
       const wx = city.x + lx * cos + lz * sin, wz = city.z - lx * sin + lz * cos;
+      if (!airportClear(wx, wz)) continue; // Love Field sits inside Dallas' disc
       m4.compose(new THREE.Vector3(wx, hAt(wx, wz) + 0.1, wz), q, new THREE.Vector3(w, h, dep));
       inst.setMatrixAt(placed, m4);
       inst.setColorAt(placed, new THREE.Color(colors[Math.floor(rand() * colors.length)]));

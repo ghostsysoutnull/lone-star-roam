@@ -8,6 +8,19 @@ radio, rotorcraft, in 5 waves. Runs ahead of every candidate below until
 shipped or descoped (decided 2026-07-11); fold waves into this file as they
 ship.
 
+- [x] ~~Aviation wave 1 — Fields~~ — done 2026-07-11: 20 real airports
+  (7 hubs / 9 regional / 4 strips incl. Terlingua's dirt strip and the 6666 +
+  Armstrong ranch strips) with true runway headings/lengths/offsets authored
+  from OSM `aeroway=runway` geometry. All static geometry in 8 global meshes
+  (merged pads/skirts/runways/markings + one buildings InstancedMesh);
+  terrain-topping pads with draped skirts; night-gated rotating beacons;
+  windsocks on live `ATMOS.wind` + seeded per-day direction (`avnwind:` — the
+  stream waves 2/3 must reuse for runway-in-use/ATIS). Pure `airportClear(x,z)`
+  excludes footprints from city buildings/fake grids, scenery chunks, and
+  chapel sites (Love Field sits clean inside Dallas). ✈ glyphs on the map
+  layer. `tools/checks/aviation.mjs`: 11 checks incl. per-runway raycast and
+  a real-rAF beacon sentinel.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin
