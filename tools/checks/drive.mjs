@@ -2,7 +2,6 @@
 // (DRIVE caps{}, WALK 4.5, FLY floor hAt+1.8); rain multiplies caps by
 // (1 - rain*0.22), so expected values are computed from live ATMOS.rain.
 // All waits are SIM seconds (t.simWait) — headless frames run slow.
-// TODO(rain): force a weather state to pin the wet path — needs a sky.js hook.
 
 // Keep the truck on a real highway like a player would: steer toward a point
 // ahead on the road (lateral drift self-corrects) while holding W.
@@ -81,6 +80,18 @@ export default async function drive(t) {
     const cap = 20 * (1 - Math.min(1, await t.ev('g.ATMOS.rain')) * 0.22);
     t.ok(spd <= cap + 0.5, `over offroad cap: ${spd.toFixed(1)} > ${cap.toFixed(1)}`);
     t.ok(spd >= cap * 0.8, `never neared offroad cap: ${spd.toFixed(1)}`);
+  });
+
+  await t.check('rain slows the offroad cap by 22%', async () => {
+    // same road-free bubble as above; the truck barely moved during that check
+    await t.setWeather('rain');
+    await t.ev('(g.player.speed = 0, g.player.heading = 3.7)');
+    await t.hold('KeyW');
+    await t.simWait(2.5);
+    const spd = await t.ev('g.player.speed');
+    await t.release();
+    await t.setWeather('clear');
+    t.near(spd, 20 * 0.78, 1.2, 'wet offroad cap');
   });
 
   await t.check('steering turns at an ugly mid-drive heading', async () => {

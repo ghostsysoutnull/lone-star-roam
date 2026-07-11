@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { GEO, hAt } from './geo.js';
 import { merge, tinted } from './traffic.js';
+import { ATMOS } from './sky.js';
 
 const MAX_TRAINS = 3;
 const SPAWN_R = 350, DESPAWN_R = 1200; // despawn only beyond fog — never in plain sight
@@ -53,6 +54,18 @@ export class TrainSystem {
       m.frustumCulled = false;
       scene.add(m);
     }
+    // loco headlight beams at night — same fake-cone trick as the truck (vehicle.js)
+    const beamGeo = new THREE.ConeGeometry(1.0, 10, 10, 1, true).rotateX(Math.PI / 2);
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: 0xfff3cc, transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending,
+      depthWrite: false, side: THREE.DoubleSide,
+    });
+    this.beams = Array.from({ length: MAX_TRAINS }, () => {
+      const b = new THREE.Mesh(beamGeo, beamMat);
+      b.visible = false;
+      scene.add(b);
+      return b;
+    });
     // rails with bbox + lazy cumulative arc lengths
     this.rails = GEO.rails.map((r) => {
       let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
@@ -159,10 +172,22 @@ export class TrainSystem {
         );
         mesh.setMatrixAt(i, this.m4);
         mesh.setColorAt(i, this.col.set(c === 0 ? tr.locoColor : tr.cars[c - 1].color));
+        // loco headlight: beam cone ahead of the nose after dark
+        if (c === 0) {
+          const beam = this.beams[i];
+          beam.visible = ATMOS.night > 0.45;
+          if (beam.visible) {
+            const L = Math.hypot(dx, dz) || 1;
+            const fx = (dx * tr.dir) / L, fz = (dz * tr.dir) / L;
+            beam.position.set(x + fx * 7.6, hAt(x, z) + 1.4, z + fz * 7.6);
+            beam.rotation.y = Math.atan2(-fx, -fz);
+          }
+        }
       }
     }
     this.trains = this.trains.filter((t) => !t.dead);
 
+    for (let j = counts.loco; j < this.beams.length; j++) this.beams[j].visible = false;
     this.m4.makeScale(0, 0, 0);
     for (const [type, mesh] of Object.entries(this.meshes)) {
       for (let j = counts[type]; j < mesh.instanceMatrix.count; j++) mesh.setMatrixAt(j, this.m4);

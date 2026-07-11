@@ -3,21 +3,10 @@
 // looked right in screenshots. Species specs come from g.SPECIES
 // (fleeR = skittish, nightMin/nightMax = nocturnal/diurnal hours).
 
-// find a sky.t where pred(ATMOS.night) holds — KEYS are keyframed, so probe
-async function findTime(t, pred, candidates) {
-  for (const v of candidates) {
-    await t.setTime(v);
-    await t.wait(0.25);
-    if (pred(await t.ev('g.ATMOS.night'))) return v;
-  }
-  throw new Error(`no sky.t in [${candidates}] satisfied the light condition`);
-}
-
 export default async function wildlife(t) {
   // rural Hill Country west of Austin: deer herds, daytime species
   const austin = await t.ev(`(() => { const c = g.GEO.cities.find((c) => c.name === 'Austin'); return { x: c.x, z: c.z }; })()`);
-  const day = (n) => n < 0.1, night = (n) => n > 0.7;
-  await findTime(t, day, [0.3, 0.35, 0.45, 0.25]);
+  await t.setDay();
   await t.tp(austin.x - 300, austin.z - 40);
   await t.wait(0.5); // chunks spawn on the next update
 
@@ -79,7 +68,7 @@ export default async function wildlife(t) {
   });
 
   await t.check('animals honor their hours (night)', async () => {
-    await findTime(t, night, [0.98, 0.02, 0.95, 0.05, 0.0]);
+    await t.setNight();
     await t.wait(0.4);
     const { total, wrong } = await t.ev(`(() => {
       const night = g.ATMOS.night;
@@ -94,6 +83,6 @@ export default async function wildlife(t) {
       return { total, wrong };
     })()`);
     t.ok(wrong === 0, `${wrong}/${total} animals ignore their hours at night`);
-    await findTime(t, day, [0.3, 0.35, 0.45, 0.25]); // leave the world in daylight
+    await t.setDay(); // leave the world in daylight
   });
 }

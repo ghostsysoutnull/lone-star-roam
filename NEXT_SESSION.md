@@ -40,7 +40,12 @@ wildlife — 34 checks green, including the full mission payout loop and the
 flee-distance regression), `t.stubGamepad`/`t.key` input stubs ready for the
 gamepad feature, screenshot policy + session-workflow rules in CLAUDE.md,
 plan + status in `TOKEN_EFFICIENCY.md` (only M4, the module index, remains).
-**Ask before coding** — present the plan and wait for the go-ahead.
+Also shipped: **night vehicle lights** (fake additive decals — truck headlight
+pool + beams, rain-boosted; brake glow; plane landing light under 16 AGL;
+freight loco beams) with a `lights` suite; `t.setWeather`/`setDay`/`setNight`
+harness helpers. Opacity knobs in vehicle.js `animate()` if the look needs
+tuning by eye. **Ask before coding** — present the plan and wait for the
+go-ahead.
 
 Today's candidates (my pick order):
 

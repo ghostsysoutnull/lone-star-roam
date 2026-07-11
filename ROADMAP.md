@@ -146,6 +146,11 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   click-to-set-waypoint still open.
 - [x] ~~Odometer + play stats~~ — done: live odometer under the speedo;
   distance/time/top-speed on the help screen, persisted with the save
+- [x] ~~Night vehicle lights~~ — done 2026-07-10: fake additive decals, no scene
+  lights (Lambert-on-coarse-terrain pools go blotchy): truck headlight ground
+  pool + beam cones (brighter in rain), brake glow, plane landing light gated
+  on height above ground, freight loco headlight beams. All follow ATMOS and
+  inherit the UFO Levelland flicker via headlights.visible.
 - [ ] Mobile touch controls (virtual stick + buttons)
 
 ## Non-goals

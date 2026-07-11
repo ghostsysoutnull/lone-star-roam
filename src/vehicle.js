@@ -38,6 +38,18 @@ export class Player {
     );
     scene.add(this.shadow);
 
+    // fake light decals: headlight pool (drive), landing pool (fly low), brake glow.
+    // No real lights — sky.js owns the rig, and spot pools on coarse Lambert
+    // terrain go blotchy. Additive discs hugging hAt, like the blob shadow.
+    const poolGeo = new THREE.CircleGeometry(1, 22).rotateX(-Math.PI / 2);
+    const poolMat = (hex) => new THREE.MeshBasicMaterial({
+      color: hex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    this.lightPool = new THREE.Mesh(poolGeo, poolMat(0xffe8b0));
+    this.brakePool = new THREE.Mesh(poolGeo, poolMat(0xff2a20));
+    this.lightPool.visible = this.brakePool.visible = false;
+    scene.add(this.lightPool, this.brakePool);
+
     // shared puff pool: exhaust (drive) + contrail (fly)
     this.puffs = [];
     const puffGeo = new THREE.SphereGeometry(0.16, 5, 4);
@@ -220,6 +232,51 @@ export class Player {
     u.headlights.visible = night && this.mode !== 'WALK' && !(ATMOS.ufo > 0 && Math.random() < ATMOS.ufo * 0.35);
     for (const b of u.brakes) b.material.color.setHex(this.braking ? 0xff3322 : 0x441111);
 
+    // fake light decals: fade in with dusk instead of popping at the night bool,
+    // and follow headlights.visible so the UFO Levelland flicker kills them too
+    const nf = THREE.MathUtils.smoothstep(ATMOS.night, 0.4, 0.65);
+    const lightsOn = u.headlights.visible;
+    const fwdX = -Math.sin(this.heading), fwdZ = -Math.cos(this.heading);
+    this.lightPool.visible = this.brakePool.visible = false;
+    u.beams.visible = false;
+    this.wings.userData.landing.visible = false;
+
+    if (this.mode === 'DRIVE') {
+      u.beams.visible = lightsOn;
+      if (lightsOn) {
+        u.beams.children[0].material.opacity = 0.07 + Math.min(1, ATMOS.rain) * 0.12;
+        const px = this.pos.x + fwdX * 5.2, pz = this.pos.z + fwdZ * 5.2;
+        this.lightPool.visible = true;
+        this.lightPool.position.set(px, hAt(px, pz) + 0.12, pz);
+        this.lightPool.rotation.y = this.heading;
+        this.lightPool.scale.set(1.9, 1, 3.1);
+        this.lightPool.material.opacity = 0.26 * nf;
+      }
+      if (this.braking && nf > 0.02) {
+        const bx = this.pos.x - fwdX * 2.6, bz = this.pos.z - fwdZ * 2.6;
+        this.brakePool.visible = true;
+        this.brakePool.position.set(bx, hAt(bx, bz) + 0.14, bz);
+        this.brakePool.rotation.y = this.heading;
+        this.brakePool.scale.set(1.5, 1, 1.0);
+        this.brakePool.material.opacity = 0.22 * nf;
+      }
+    } else if (this.mode === 'FLY') {
+      const agl = this.pos.y - this.groundY;
+      const landOn = lightsOn && agl < 16;
+      this.wings.userData.landing.visible = landOn;
+      if (landOn) {
+        const f = 1 - agl / 16;
+        this.wings.userData.landing.material.opacity = (0.06 + Math.min(1, ATMOS.rain) * 0.08) * (0.4 + 0.6 * f);
+        const ahead = 4 + agl * 1.1;
+        const px = this.pos.x + fwdX * ahead, pz = this.pos.z + fwdZ * ahead;
+        this.lightPool.visible = true;
+        this.lightPool.position.set(px, hAt(px, pz) + 0.12, pz);
+        this.lightPool.rotation.y = this.heading;
+        this.lightPool.scale.set(2.6, 1, 3.4);
+        this.lightPool.material.opacity = 0.22 * nf * f;
+      }
+    }
+
     if (this.mode === 'DRIVE') {
       // wheels spin; fronts steer
       const spin = (this.speed / 0.36) * dt;
@@ -351,6 +408,21 @@ function mkTruck() {
   }
   lights.visible = false;
   g.add(lights);
+  // headlight beam cones — apex at the lamp, open base forward; barely-there
+  // on clear nights, cutting through the rain when ATMOS.rain rises
+  const beamGeo = new THREE.ConeGeometry(0.85, 7, 12, 1, true).rotateX(Math.PI / 2);
+  const beamMat = new THREE.MeshBasicMaterial({
+    color: 0xfff3cc, transparent: true, opacity: 0.06, blending: THREE.AdditiveBlending,
+    depthWrite: false, side: THREE.DoubleSide,
+  });
+  const beams = new THREE.Group();
+  for (const x of [-0.55, 0.55]) {
+    const b = new THREE.Mesh(beamGeo, beamMat);
+    b.position.set(x, 0.66, -1.82 - 3.5);
+    beams.add(b);
+  }
+  beams.visible = false;
+  g.add(beams);
   const brakes = [];
   for (const x of [-0.72, 0.72]) {
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.05), new THREE.MeshBasicMaterial({ color: 0x441111 }));
@@ -371,7 +443,7 @@ function mkTruck() {
   cargo.visible = false;
   g.add(cargo);
 
-  g.userData = { headlights: lights, wheels, brakes, cargo };
+  g.userData = { headlights: lights, wheels, brakes, cargo, beams };
   return g;
 }
 
@@ -421,7 +493,20 @@ function mkWings() {
   navL.visible = navR.visible = strobe.visible = false;
   g.add(navL, navR, strobe);
 
-  g.userData = { prop, blur, navL, navR, strobe };
+  // landing light: nose cone pitched toward the strip, shown only low at night
+  const landing = new THREE.Mesh(
+    new THREE.ConeGeometry(1.5, 11, 12, 1, true).rotateX(Math.PI / 2),
+    new THREE.MeshBasicMaterial({
+      color: 0xfff3cc, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending,
+      depthWrite: false, side: THREE.DoubleSide,
+    })
+  );
+  landing.position.set(0, 0.7, -2.0 - 5.5);
+  landing.rotation.x = -0.2; // dip the far end toward the ground
+  landing.visible = false;
+  g.add(landing);
+
+  g.userData = { prop, blur, navL, navR, strobe, landing };
   return g;
 }
 

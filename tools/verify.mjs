@@ -97,6 +97,25 @@ function mkT(page) {
       dispatchEvent(new KeyboardEvent('keyup', { code: c }));
     }, code),
     setTime: (v) => ev(`g.sky.t = ${v}`),
+    // find a sky.t that gives daylight / deep night (KEYS are keyframed — probe)
+    async findLight(pred, candidates) {
+      for (const v of candidates) {
+        await t.setTime(v);
+        await page.waitForTimeout(250);
+        if (pred(await ev('g.ATMOS.night'))) return v;
+      }
+      throw new Error(`no sky.t in [${candidates}] satisfied the light condition`);
+    },
+    setDay: () => t.findLight((n) => n < 0.1, [0.3, 0.35, 0.45, 0.25]),
+    setNight: () => t.findLight((n) => n > 0.7, [0.98, 0.02, 0.95, 0.05, 0.0]),
+    // pin the weather (clear/clouds/rain/storm/dust) — sky.update rewrites ATMOS
+    // every frame, so tests must force the state machine, not ATMOS.rain.
+    // Poll until ATMOS reflects it: a wall-clock sleep loses to slow frames,
+    // and consumers (player.update) read it one frame later still.
+    async setWeather(name) {
+      await ev(`(g.sky.weather = g.sky.target = '${name}', g.sky.blend = 1, g.sky.nextPick = 120)`);
+      await t.until(`g.ATMOS.weather === '${name}'`, 10000);
+    },
     // poll an expression until truthy — for phase transitions with their own cadence
     async until(expr, ms = 15000, every = 150) {
       const deadline = Date.now() + ms;
