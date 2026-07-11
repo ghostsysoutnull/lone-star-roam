@@ -139,7 +139,7 @@ ship.
   visible **9th collectible** (`save.legends`, 👻 HUD row, minor-key chime),
   witnessed via `haunts.js` → `gameplay.spotLegend`. Two new landmarks
   (Terlingua Ghost Town, Presidio La Bahía — 24 → 26) + three townsfolk rumor
-  lines that hint at the haunts. Waves 2–3 planned (see NEXT_SESSION.md):
+  lines that hint at the haunts. Waves 2–3 planned (see BACKLOG.md):
   the storm-gated Ghost Stampede at Stampede Mesa, El Muerto, La Llorona,
   chupacabra, ghost tracks, town churches, the Blue Ghost.
 - [x] ~~County system~~ — done 2026-07-10: all 254 real county boundaries (Census

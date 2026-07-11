@@ -225,4 +225,5 @@ updates). Ship order matters: fields before traffic before radio.
 3. **Military color**: in, as wave 5 (optional color after the core waves;
    no weapons, ever).
 4. **Doc home**: this file at repo root; pointer lines in ROADMAP.md and
-   CLAUDE.md; NEXT_SESSION.md's top candidate tracks the current wave.
+   CLAUDE.md; NEXT_SESSION.md's Task block tracks the current wave, and all
+   queued non-aviation work lives in BACKLOG.md.

@@ -74,7 +74,7 @@ Headless tests keep passing at *convenient* values while play breaks at *natural
 ### Session workflow
 - Expose every new system on `window.__game` at birth (main.js) — testability is free at creation, expensive to retrofit.
 - Never change `seededRand` seed strings: determinism is what makes bugs cheaply reproducible, and players' saves + spatial memory depend on it.
-- Session end: update `NEXT_SESSION.md` (candidates + gotchas only — ROADMAP.md holds history) and run `node tools/verify.mjs` before the final commit.
+- Session end: update `NEXT_SESSION.md` (current task + gotchas only — queued work lives in BACKLOG.md, history in ROADMAP.md) and run `node tools/verify.mjs` before the final commit.
 
 ### Performance patterns to preserve
 - All roads are a handful of merged meshes (one per tier: motorway/trunk/primary/street + stripe), built once — not chunked, not per-polyline. Tiers also drive speed caps (`vehicle.js`) and map styling (`hud.js`). Cities near a `street`-tier road skip their fake procedural grid (`hasRealStreets` in `cities.js`).
