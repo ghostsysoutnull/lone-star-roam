@@ -22,11 +22,12 @@ line numbers rot, names don't). Architecture & gotchas stay in CLAUDE.md.
 - `cities.js` — `CitySystem`: `spawn` (InstancedMesh buildings, `hasRealStreets`), `setNight` (window glow), `cityRadius` (visit radii).
 - `flares.js` — `FlareSystem`: `fire`/`snuff`/`update` (ballistic→chute phases; `LIGHT_I`/`BURN`/`CHUTE_FALL`/recharge knobs at top).
 - `trains.js` / `maritime.js` / `ufo.js` / `bats.js` — `TrainSystem` (`arcInit`/`at` arc-length follow, `mkLoco`), `MaritimeSystem` (`laneAt`, `buildPorts`/`buildPlatforms`/`buildShips`), `UFOSystem` (`hotspotBoost`, `startSaucer`/`startFormation`), `BatSystem` (dusk window on `sky.t`).
-- `haunts.js` — `LEGENDS`/`LEGEND_COUNT`, `HauntSystem.update` (wisp arm/fade, ghost fires, midnight bell via `lastBell`; gates/radii knobs at top: `WISP_ODDS`/`NIGHT_MIN`/`FADE_*`/`WATCH_*`/`BELL_R`); chapel sites come from world.js `chapelAt`/`chapelSitesNear`.
+- `haunts.js` — `LEGENDS`/`LEGEND_COUNT`/`EROCK`, `HauntSystem.update` (wisp arm/fade, ghost fires, midnight bell via `lastBell`, debug `force` flag; gates/radii knobs at top: `WISP_ODDS`/`NIGHT_MIN`/`FADE_*`/`WATCH_*`/`BELL_R`); chapel sites come from world.js `chapelAt`/`chapelSitesNear`.
+- `debug.js` — `initDebug` playtest menu (`?debug=1` + backquote): `actions` table (day/night/midnight, `hauntCemetery`, `ghostFires`, `saucer`/`formation`, `bats`, weather picks) always on `__game.debug`; only the panel is URL-gated.
 - `main.js` — `boot`: system construction order, keydown map (horn/interact/travel/…), render loop (update call order, 12 Hz `hudTick` block, `__skipRender` gate), `window.__game` exposure.
 
 ## tools/
 
 - `verify.mjs` — harness: `check`, `t.ev/tp/wait/simWait/simStep/step/hold/release/key/until/setTime/setDay/setNight/setWeather/sample/shot/stubGamepad`; compact output default, `-v` verbose; `__skipRender` set at boot.
-- `checks/*.mjs` — suites: drive/haunts/hud/lights/missions/shop/traffic/wildlife (one default-export async fn each).
+- `checks/*.mjs` — suites: debug/drive/haunts/hud/lights/missions/shop/traffic/wildlife (one default-export async fn each; debug runs first alphabetically and must restore daylight/clear weather).
 - `build-data.mjs` (`proj` — duplicated as `LL` in gameplay.js/travel.js), `build-elevation.mjs` (grid consts ↔ `ELEV`), `build-sky.mjs`, `add-metro-streets.mjs` (append-only), `status.sh`.

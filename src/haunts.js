@@ -11,7 +11,7 @@ import { ATMOS } from './sky.js';
 import { chapelSitesNear } from './world.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
-const EROCK = LL(30.5064, -98.8198); // Enchanted Rock — the landmark's granite dome
+export const EROCK = LL(30.5064, -98.8198); // Enchanted Rock — the landmark's granite dome (debug menu teleports here)
 
 // the legends log — gameplay counts these as the 9th collectible category
 export const LEGENDS = {
@@ -37,6 +37,7 @@ export class HauntSystem {
     this.t = 0;
     this.scanT = 0;
     this.site = null;      // nearest chapel/cemetery site (from chapelSitesNear)
+    this.force = false;    // debug menu: haunt tonight regardless of the roll
     this.siteKey = null;
     this.cemY = 0;
     this.haunted = false;  // tonight's roll for the current site
@@ -87,8 +88,8 @@ export class HauntSystem {
         this.cemY = hAt(best.cemX, best.cemZ);
         this.watchT = 0;
       }
-      // tonight's haunting, rolled per site + game day
-      this.haunted = !!best && seededRand(`wisp:${best.key}:${Math.floor(days)}`)() < WISP_ODDS;
+      // tonight's haunting, rolled per site + game day (debug force overrides)
+      this.haunted = !!best && (this.force || seededRand(`wisp:${best.key}:${Math.floor(days)}`)() < WISP_ODDS);
     }
 
     // midnight bell: skyT wraps past 0 with a chapel in earshot

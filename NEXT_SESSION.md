@@ -69,9 +69,13 @@ landmark with night glow, painted-church landmark (St. Mary's High Hill).
 
 ## Notes for me (the human)
 
+- **Debug menu for playtesting**: open http://localhost:8317/?debug=1 and press
+  `` ` `` (backquote) — buttons for day/night/midnight, haunt the nearest
+  cemetery, ghost fires, saucer/Lubbock lights, the bat show, and weather picks.
+  Not available without the URL param (public build stays honest).
 - **Playtest Haunted Texas**: drive ranch roads west of Llano at night till you
   find a glowing cemetery (roughly 1 chapel per 10 chunks; they also show by
-  day — white steeple by the road). Judge: wisp size/brightness at parked
+  day — white steeple by the road), or just use the debug menu. Judge: wisp size/brightness at parked
   distance (`SphereGeometry(0.26…)` + opacity 0.85 in `src/haunts.js`), the
   approach-fade feel (`FADE_NEAR/FADE_FULL`), the midnight bell mix
   (`bell()` in `src/audio.js`), and whether ~50% haunted nights (`WISP_ODDS`)

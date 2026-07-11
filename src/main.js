@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { loadGeo, GEO, nearestRoad, waterAt, countyAt, hAt, inTexas, seededRand } from './geo.js';
 import { buildWorld, chapelSitesNear } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
+import { initDebug } from './debug.js';
 import { CitySystem } from './cities.js';
 import { Player } from './vehicle.js';
 import { Gameplay } from './gameplay.js';
@@ -79,6 +80,7 @@ async function boot() {
   player.onStep = () => audio.step();
   const flares = new FlareSystem(scene, player);
   flares.onSound = (kind) => audio.flare(kind);
+  const debug = initDebug({ player, sky, haunts, ufo, hud }); // panel only with ?debug=1; actions drive the verify suite
   player.flares = flares; // hud reads the rack count off the player
 
   // Spawn on I-35 just south of Austin
@@ -137,7 +139,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
