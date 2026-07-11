@@ -121,7 +121,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, traffic, missions, travel, hud, nearestRoad, inTexas, hAt, ATMOS, clock };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, traffic, missions, travel, hud, nearestRoad, inTexas, hAt, ATMOS, clock, SPECIES };
 
   let hudTick = 0;
   renderer.setAnimationLoop(() => {

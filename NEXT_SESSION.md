@@ -35,11 +35,11 @@ inverted heading and were charging the player — distance-over-time assertions
 caught it where screenshots hadn't.
 
 Session 4 (2026-07-10, later) shipped the **token-efficiency pass** instead of
-features: `tools/verify.mjs` harness + `drive` suite (8 checks green), screenshot
-policy and session-workflow rules in CLAUDE.md, plan + status in
-`TOKEN_EFFICIENCY.md`. Still open there: M2 (missions/wildlife/traffic/hud
-suites — grow one per feature session; `stubGamepad` lands with the gamepad
-feature) and M4 (module "where things live" index, next CLAUDE.md touch).
+features: `tools/verify.mjs` harness + 5 suites (drive/hud/missions/traffic/
+wildlife — 34 checks green, including the full mission payout loop and the
+flee-distance regression), `t.stubGamepad`/`t.key` input stubs ready for the
+gamepad feature, screenshot policy + session-workflow rules in CLAUDE.md,
+plan + status in `TOKEN_EFFICIENCY.md` (only M4, the module index, remains).
 **Ask before coding** — present the plan and wait for the go-ahead.
 
 Today's candidates (my pick order):

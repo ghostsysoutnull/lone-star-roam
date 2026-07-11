@@ -97,6 +97,27 @@ function mkT(page) {
       dispatchEvent(new KeyboardEvent('keyup', { code: c }));
     }, code),
     setTime: (v) => ev(`g.sky.t = ${v}`),
+    // poll an expression until truthy — for phase transitions with their own cadence
+    async until(expr, ms = 15000, every = 150) {
+      const deadline = Date.now() + ms;
+      while (Date.now() < deadline) {
+        if (await ev(expr)) return;
+        await page.waitForTimeout(every);
+      }
+      throw new Error(`until timed out: ${expr.slice(0, 80)}`);
+    },
+    // install a standard-mapping gamepad stub; mutate window.__pad from tests
+    // (axes[0..3], buttons[i].pressed/.value) — ready for the gamepad feature
+    async stubGamepad() {
+      await page.evaluate(() => {
+        window.__pad = {
+          index: 0, id: 'stub', connected: true, mapping: 'standard', timestamp: 0,
+          axes: [0, 0, 0, 0],
+          buttons: Array.from({ length: 17 }, () => ({ pressed: false, touched: false, value: 0 })),
+        };
+        navigator.getGamepads = () => [window.__pad];
+      });
+    },
     // time series of an expression — assert on trends, not snapshots
     async sample(expr, n = 10, dtMs = 200) {
       const out = [];

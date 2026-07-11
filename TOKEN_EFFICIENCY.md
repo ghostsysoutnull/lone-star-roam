@@ -4,11 +4,11 @@ Goal: make each dev session spend tokens on *building*, not on re-authoring test
 scripts, re-reading files, and re-describing output. Five problem areas, phased
 so each milestone pays off on its own.
 
-Status 2026-07-10: **M1 done** (`tools/verify.mjs` + `drive` suite, 8 checks green),
-**M3 done** (policy + `t.shot` helper), **M5 done** (CLAUDE.md session-workflow
-section). M2 grows a suite per feature session (missions/wildlife/traffic/hud
-still to write; `stubGamepad` lands with the gamepad feature). M4 (module index)
-next time CLAUDE.md is touched.
+Status 2026-07-10: **M1, M2, M3, M5 done** — `tools/verify.mjs` + 5 suites
+(drive/hud/missions/traffic/wildlife, 34 checks green), input stubs
+(`t.stubGamepad`, `t.key`), screenshot policy + `t.shot`, CLAUDE.md
+session-workflow section. Each new feature adds checks to a suite. Only **M4**
+(module "where things live" index) remains — next time CLAUDE.md is touched.
 
 Hard-won harness lessons (already codified in CLAUDE.md): wait in physics time
 (`player.simT`), not wall time — headless runs 2–3× slower than the wall clock;
