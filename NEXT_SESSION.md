@@ -46,10 +46,14 @@ pool read flat in play, so DRIVE now runs a **real PointLight** ahead of the
 nose (`player.headLight`, lantern-style — DRIVE/WALK are exclusive so it's
 still one dynamic light total), rain-boosted, plus the fake beam cones; knobs
 (intensity/height/lead) in vehicle.js `animate()` DRIVE branch. FLY keeps the
-decal landing pool (under 16 AGL); freight locos keep beam cones. Session
-boot/pre-commit status is one command now: **`tools/status.sh`** (git sync +
-dirty tree + NEXT_SESSION freshness + syntax). **Ask before coding** — present
-the plan and wait for the go-ahead.
+decal landing pool (under 16 AGL); freight locos keep beam cones. The plane
+also got **illumination flares** (F in FLY): a recharging 3-flare rack,
+ballistic tracer → chute pops at apex → slow wind-drifting descent, real
+pooled PointLights (fixed count, no shader recompiles) lighting the terrain
+~14 s; knobs at the top of `src/flares.js`. Session boot/pre-commit status is
+one command now: **`tools/status.sh`** (git sync + dirty tree + NEXT_SESSION
+freshness + syntax). **Ask before coding** — present the plan and wait for
+the go-ahead.
 
 Today's candidates (my pick order):
 
@@ -84,6 +88,12 @@ jobs that punish offroading).
 - Also still pending playtest: park on I-35 in Austin and judge the traffic honk
   chorus — knobs in `src/traffic.js` (`DENSITY_DIVISOR` 190, honk fuse times,
   2.8 s pull-around patience).
+- **Playtest the flares**: fly low at night, fire (F) over dark country and
+  over a town; judge brightness/burn time/sink rate (knobs atop
+  `src/flares.js`: `LIGHT_I` 55, `BURN` 14, `CHUTE_FALL` 2.1, rack recharge
+  10 s) and the launch thump / ignite spark mix (`audio.js` `flare()`). Also
+  judge the new truck headlight throw at night (intensity 30 in vehicle.js
+  `animate()` DRIVE branch).
 - Saves are per-browser (localStorage): localhost and the public URL have
   separate progress. Mission bankroll shows in the score panel (💵) and on H.
 - N mutes audio; C toggles compass; the 👽 counter only appears on H after a

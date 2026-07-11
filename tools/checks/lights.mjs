@@ -103,4 +103,56 @@ export default async function lights(t) {
     await t.setWeather('clear');
     await t.setDay(); // leave the world in daylight
   });
+
+  await t.check('flare: dark parabolic tracer, ignites at apex, chute sinks slow + drifts downwind', async () => {
+    await t.setNight(); // physics is time-agnostic; the SHOT judgment needs the dark
+    const gy = await t.ev(`g.hAt(${austin.x}, ${austin.z + 12})`);
+    await t.tp(austin.x, austin.z + 12, 'FLY', gy + 40);
+    await t.ev(`(g.player.heading = 2.41, g.player.speed = 60)`); // natural mid-flight values
+    t.ok(await t.ev(`g.flares.fire()`), 'fire() refused with a full rack');
+    await t.ev(`g.player.speed = 6`); // throttle back so the SHOT keeps the flare in frame
+    const s0 = await t.ev(`(() => { const f = g.flares.flares[0]; return { phase: f.phase, vy: f.vy, y: f.y, i: f.slot.light.intensity }; })()`);
+    t.ok(s0.phase === 'ballistic' && s0.vy > 0, `no upward ballistic launch: ${JSON.stringify(s0)}`);
+    t.ok(s0.i === 0, `tracer already casts light: ${s0.i}`);
+    await t.until(`g.flares.flares[0]?.phase === 'chute'`, 20000);
+    await t.until(`g.flares.flares[0]?.burn > 0.5`, 15000); // past the ignition fade-in
+    // sample twice in flare-internal time: sink rate, light, wind drift
+    const grab = `(() => { const f = g.flares.flares[0]; return { t: f.t, x: f.x, y: f.y, z: f.z, i: f.slot.light.intensity }; })()`;
+    const a = await t.ev(grab);
+    t.ok(a.y > gy + 41, `never rose above the launch height: apex ${a.y.toFixed(1)} vs ${(gy + 40.5).toFixed(1)}`);
+    t.ok(a.i > 15, `ignited flare too dim: ${a.i.toFixed(1)}`);
+    await t.until(`g.flares.flares[0]?.t > ${a.t + 2}`, 25000);
+    const b = await t.ev(grab);
+    t.near((a.y - b.y) / (b.t - a.t), 2.1, 0.5, 'chute sink rate');
+    // wind drift matches the cloud layer's +x-biased direction (clear sky: wind 1)
+    t.ok(b.x - a.x > 0.3, `no downwind drift: dx=${(b.x - a.x).toFixed(2)}`);
+    // launch threw it well ahead of the plane: forward = (-sin h, -cos h)
+    const fwd = (b.x - austin.x) * -Math.sin(2.41) + (b.z - (austin.z + 12)) * -Math.cos(2.41);
+    t.ok(fwd > 10, `flare not ahead of the launch point (fwd=${fwd.toFixed(1)})`);
+    if (process.env.SHOT) await t.shot('flare-chute-night');
+    await t.setDay();
+  });
+
+  await t.check('flare rack: FLY-only, 3 charges, oldest snuffed on overflow, recharges', async () => {
+    await t.ev(`(g.flares.flares.forEach((f) => g.flares.snuff(f.slot)), g.flares.flares.length = 0, g.flares.charges = 3, g.flares.recharge = 0)`);
+    await t.ev(`g.player.setMode('DRIVE')`);
+    t.ok(!(await t.ev(`g.flares.fire()`)), 'fired from DRIVE');
+    const gy = await t.ev(`g.hAt(g.player.pos.x, g.player.pos.z)`);
+    await t.tp(austin.x, austin.z + 12, 'FLY', gy + 40);
+    t.ok(await t.ev(`g.flares.fire() && g.flares.fire() && g.flares.fire()`), 'rack refused a charge');
+    const s = await t.ev(`({ n: g.flares.flares.length, c: g.flares.charges, used: g.flares.pool.filter((p) => p.used).length })`);
+    t.ok(s.n === 3 && s.c === 0 && s.used === 3, `full volley wrong: ${JSON.stringify(s)}`);
+    t.ok(!(await t.ev(`g.flares.fire()`)), 'fired on an empty rack');
+    await t.ev(`g.flares.charges = 1`); // grant one: overflow must snuff the oldest, not grow past 3
+    t.ok(await t.ev(`g.flares.fire()`), 'refused with a charge in the rack');
+    const o = await t.ev(`({ n: g.flares.flares.length, used: g.flares.pool.filter((p) => p.used).length })`);
+    t.ok(o.n === 3 && o.used === 3, `overflow grew the pool: ${JSON.stringify(o)}`);
+    // recharge ticks a charge back (pre-wound: 10 s of physics time is slow headless)
+    await t.ev(`(g.flares.charges = 0, g.flares.recharge = 9.9)`);
+    await t.until(`g.flares.charges >= 1`, 15000);
+    // the real F keydown path fires too (spends the recharged charge)
+    await t.key('KeyF');
+    await t.until(`g.flares.charges === 0`, 8000);
+    await t.ev(`(g.flares.flares.forEach((f) => g.flares.snuff(f.slot)), g.flares.flares.length = 0, g.flares.charges = 3, g.player.setMode('DRIVE'))`);
+  });
 }

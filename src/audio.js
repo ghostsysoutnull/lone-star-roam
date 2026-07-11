@@ -202,6 +202,19 @@ export class AudioSystem {
     }
   }
 
+  // flare rack: hollow launch thump, then a bright little spark when the
+  // chute pops and the charge ignites
+  flare(kind) {
+    if (!this.ctx || this.muted) return;
+    if (kind === 'launch') {
+      this.note(110, 0, 0.18, 0.09, 'sine');
+      this.note(55, 0, 0.28, 0.06, 'sine');
+    } else {
+      this.note(1560, 0, 0.06, 0.022, 'triangle');
+      this.note(2090, 0.04, 0.05, 0.016, 'triangle');
+    }
+  }
+
   // lonesome coyote: swoop up, quavering hold, fall away into the dark
   howl() {
     if (!this.ctx || this.muted) return;

@@ -16,6 +16,7 @@ import { NPCSystem } from './npcs.js';
 import { TrainSystem } from './trains.js';
 import { MaritimeSystem } from './maritime.js';
 import { UFOSystem } from './ufo.js';
+import { FlareSystem } from './flares.js';
 import { HUD } from './hud.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
@@ -67,6 +68,9 @@ async function boot() {
   sky.onBolt = () => audio.thunder();
   gameplay.onCollect = (kind) => audio.chime(kind);
   player.onStep = () => audio.step();
+  const flares = new FlareSystem(scene, player);
+  flares.onSound = (kind) => audio.flare(kind);
+  player.flares = flares; // hud reads the rack count off the player
 
   // Spawn on I-35 just south of Austin
   const austin = GEO.cities.find((c) => c.name === 'Austin');
@@ -121,7 +125,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, traffic, missions, travel, hud, nearestRoad, inTexas, hAt, ATMOS, clock, SPECIES };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, traffic, missions, travel, flares, hud, nearestRoad, inTexas, hAt, ATMOS, clock, SPECIES };
 
   let hudTick = 0;
   renderer.setAnimationLoop(() => {
@@ -136,6 +140,7 @@ async function boot() {
     trains.update(dt, player.pos.x, player.pos.z);
     maritime.update(dt, clock.elapsedTime);
     ufo.update(dt, player.pos.x, player.pos.z, player.pos.y);
+    flares.update(dt);
     ATMOS.ufo = ufo.near;
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
     bats.update(dt, player.pos.x, player.pos.z, sky.t);

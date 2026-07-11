@@ -218,7 +218,7 @@ export class HUD {
     this.els.speed.innerHTML = player.mode === 'WALK' ? '🚶'
       : `${player.speedMph} <small>mph</small><div id="hud-odo">${Math.round(this.lastDist ?? 0).toLocaleString()} km</div>`;
     const icons = { DRIVE: '🚙', FLY: '✈️', WALK: '🚶' };
-    this.els.mode.textContent = `${weatherIcon} ${clock} · ${icons[player.mode]} ${player.mode}${player.mode === 'FLY' ? ` — alt ${Math.round(player.pos.y * 100 / 1000 * 10) / 10} km` : ''} — V to change`;
+    this.els.mode.textContent = `${weatherIcon} ${clock} · ${icons[player.mode]} ${player.mode}${player.mode === 'FLY' ? ` — alt ${Math.round(player.pos.y * 100 / 1000 * 10) / 10} km · F 🧨×${player.flares?.charges ?? 0}` : ''} — V to change`;
     this.els.cities.textContent = counts.cities;
     this.els.landmarks.textContent = counts.landmarks;
     this.els.roses.textContent = counts.roses;
