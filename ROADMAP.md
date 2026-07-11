@@ -119,6 +119,19 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   7 Texas-flavored truck colors as a swatch row in the Shop tab, worn coat
   in `save.gear.paint`, applied to the shared body material
   (`truck.userData.bodyMat`).
+- [x] ~~Haunted Texas, wave 1~~ — done 2026-07-11: country chapels + fenced
+  cemeteries seeded through ranch country (`chapelAt` in world.js — pure chunk
+  function, ~6–10% of eligible chunks, always ≥5 units off the road and outside
+  town footprints). At deep night, ~half of cemetery-nights (seeded per
+  site+day) grow drifting **cemetery lights** that fade as you approach;
+  **Enchanted Rock's ghost fires** (real Tonkawa legend) flicker on the dome;
+  the nearest chapel **bell tolls at midnight** (new synth). Legends are the
+  visible **9th collectible** (`save.legends`, 👻 HUD row, minor-key chime),
+  witnessed via `haunts.js` → `gameplay.spotLegend`. Two new landmarks
+  (Terlingua Ghost Town, Presidio La Bahía — 24 → 26) + three townsfolk rumor
+  lines that hint at the haunts. Waves 2–3 planned (see NEXT_SESSION.md):
+  the storm-gated Ghost Stampede at Stampede Mesa, El Muerto, La Llorona,
+  chupacabra, ghost tracks, town churches, the Blue Ghost.
 - [x] ~~County system~~ — done 2026-07-10: all 254 real county boundaries (Census
   500k, 143 KB), county in the HUD location line, crossing toasts + chime with
   zigzag debounce, collect-all-254 counter, faint ground lines + map lines.

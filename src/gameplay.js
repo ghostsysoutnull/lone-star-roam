@@ -35,6 +35,8 @@ export const LANDMARKS = [
   { name: 'AT&T Stadium', at: LL(32.7473, -97.0945), kind: 'stadium', fact: 'Jerry World — its arches are among the longest single-span roofs on Earth.' },
   { name: 'The Astrodome', at: LL(29.6847, -95.4107), kind: 'astrodome', fact: 'The Eighth Wonder of the World — first domed stadium, birthplace of AstroTurf.' },
   { name: 'World’s Largest Cowboy Boots', at: LL(29.6042, -98.4919), kind: 'boots', fact: '35-foot ostrich-skin boots guarding a San Antonio mall since 1979.' },
+  { name: 'Terlingua Ghost Town', at: LL(29.3211, -103.6158), kind: 'terlingua', fact: 'A quicksilver boomtown gone quiet near Big Bend; its old cemetery still hosts a Día de los Muertos every fall.' },
+  { name: 'Presidio La Bahía', at: LL(28.6470, -97.3844), kind: 'presidio', fact: 'Spanish fort at Goliad, 1749. After the massacre of Fannin’s men here in 1836, many say the garrison never mustered out.' },
 ];
 export const LANDMARK_COUNT = LANDMARKS.length;
 
@@ -50,6 +52,7 @@ export class Gameplay {
     this.save.jobsDone ??= 0;
     this.save.job ??= null;    // active delivery, serialized by missions.js
     this.save.gear ??= {};     // shop purchase levels by item id (shop.js)
+    this.save.legends ??= [];  // haunts witnessed (haunts.js LEGENDS keys)
     this.saveTimer = 0;
     this.countyNow = null;
     this.countyToastT = 0;
@@ -66,6 +69,7 @@ export class Gameplay {
       cities: this.save.cities.length, landmarks: this.save.landmarks.length,
       roses: this.save.roses.length, species: this.save.species.length,
       counties: this.save.counties.length, bank: this.save.bank,
+      legends: this.save.legends.length,
     };
   }
 
@@ -96,6 +100,14 @@ export class Gameplay {
     this.persist();
     this.onToast?.(`🦌 ${label} (${this.save.species.length}/${total})${fact ? ` — ${fact}` : ''}`);
     this.onCollect?.('species');
+  }
+
+  spotLegend(key, label, total, fact) {
+    if (this.save.legends.includes(key)) return;
+    this.save.legends.push(key);
+    this.persist();
+    this.onToast?.(`👻 ${label} (${this.save.legends.length}/${total})${fact ? ` — ${fact}` : ''}`);
+    this.onCollect?.('legend');
   }
 
   persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); }
@@ -690,6 +702,44 @@ function mkLandmarkMesh(kind) {
         const band = add(new THREE.Mesh(new THREE.CylinderGeometry(0.98, 0.98, 0.35, 10), trim));
         band.position.set(x, 4.2, 0);
       }
+      break;
+    }
+    case 'terlingua': {
+      // roofless adobe ruins at odd heights, and the famous little graveyard
+      const adobe = new THREE.MeshLambertMaterial({ color: 0xc2a582, flatShading: true });
+      box(3, 1.2, 0.25, -2.5, 0.6, -1, adobe);
+      box(0.25, 0.9, 2.2, -4, 0.45, 0, adobe);
+      box(2.2, 0.7, 0.25, -2.2, 0.35, 1.4, adobe);
+      box(0.25, 1.4, 1.8, -1.2, 0.7, -0.2, adobe);
+      box(2.6, 1.0, 0.25, 2.2, 0.5, -2.2, adobe);
+      box(0.25, 0.8, 1.6, 3.4, 0.4, -1.2, adobe);
+      const wood = new THREE.MeshLambertMaterial({ color: 0x6a5a42 });
+      for (const [x, z, r] of [[1.2, 2.2, 0.2], [2.4, 2.8, -0.15], [3.2, 1.8, 0.1], [1.8, 3.4, -0.25], [4, 2.6, 0.3]]) {
+        box(0.1, 0.8, 0.1, x, 0.4, z, wood).rotation.z = r;   // weathered crosses
+        box(0.45, 0.09, 0.1, x, 0.62, z, wood).rotation.z = r;
+      }
+      for (const [x, z] of [[0.8, 3], [2.9, 3.6]]) {          // rock cairn graves
+        const cairn = add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), new THREE.MeshLambertMaterial({ color: 0x8a8378, flatShading: true })));
+        cairn.position.set(x, 0.15, z);
+        cairn.scale.y = 0.6;
+      }
+      break;
+    }
+    case 'presidio': {
+      // the Goliad quadrangle and the chapel of Our Lady of Loreto
+      const lime = new THREE.MeshLambertMaterial({ color: 0xe0d6bc, flatShading: true });
+      box(9, 1.5, 0.5, 0, 0.75, -4.5, lime);                  // curtain walls
+      box(9, 1.5, 0.5, 0, 0.75, 4.5, lime);
+      box(0.5, 1.5, 9, -4.5, 0.75, 0, lime);
+      box(0.5, 1.5, 9, 4.5, 0.75, 0, lime);
+      const bastion = add(new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.2, 2.2, 8), lime));
+      bastion.position.set(-4.5, 1.1, -4.5);
+      box(2.4, 2.2, 3.6, 1.5, 1.1, 0, lime);                  // the chapel
+      box(2.4, 1.3, 0.3, 1.5, 2.85, -1.65, lime);             // espadaña bell wall
+      const bell = add(new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.32, 8), new THREE.MeshLambertMaterial({ color: 0x8a7a30 })));
+      bell.position.set(1.5, 2.9, -1.65);
+      box(0.06, 0.5, 0.06, 1.5, 3.7, -1.65, lime);            // cross
+      box(0.28, 0.06, 0.06, 1.5, 3.8, -1.65, lime);
       break;
     }
   }

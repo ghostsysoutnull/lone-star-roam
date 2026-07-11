@@ -16,6 +16,7 @@ export class HUD {
       landmarks: document.getElementById('score-landmarks'),
       roses: document.getElementById('score-roses'),
       critters: document.getElementById('score-critters'),
+      legends: document.getElementById('score-legends'),
       counties: document.getElementById('score-counties'),
       bank: document.getElementById('score-bank'),
       job: document.getElementById('hud-job'),
@@ -236,6 +237,7 @@ export class HUD {
     this.els.landmarks.textContent = counts.landmarks;
     this.els.roses.textContent = counts.roses;
     this.els.critters.textContent = counts.species;
+    this.els.legends.textContent = counts.legends ?? 0;
     this.els.counties.textContent = counts.counties;
     this.els.bank.textContent = (counts.bank ?? 0).toLocaleString();
     // active delivery line (set by main from missions.hudInfo)

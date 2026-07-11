@@ -13,69 +13,76 @@ Key facts:
 - **Live & public**: https://ghostsysoutnull.github.io/lone-star-roam/ — every push
   to `main` deploys there within ~2 min, so verify before committing.
 - Local dev: `python3 -m http.server 8317`; verify headlessly with
-  **`node tools/verify.mjs`** — full run ~25 s for all 53 checks, compact
-  output (`-v` for per-check lines with durations). Add checks to
-  `tools/checks/*.mjs`, never throwaway scripts. Sim waits are cheap:
-  `t.simStep` (player physics) / `t.step` (any system) run synchronously, and
-  the harness skips rendering (`__skipRender`) — full rules incl. the
+  **`node tools/verify.mjs`** — full run ~35 s for all 63 checks, compact
+  output (`-v` for per-check lines). Add checks to `tools/checks/*.mjs`,
+  never throwaway scripts. Sim waits are cheap: `t.simStep` / `t.step` run
+  synchronously and the harness skips rendering — full rules incl. the
   one-real-loop-sentinel-per-system requirement in CLAUDE.md
   "Verification rules".
 - When I report something broken after an update, suspect my browser cache first
   (hard refresh — python http.server sends no cache headers).
 - Verify at *natural* play values (ugly mid-drive headings, parked-truck
-  distances, long-idle traffic mixes), not convenient ones — several bugs only
-  showed up there.
+  distances), not convenient ones — several bugs only showed up there.
 - **Ask before coding** — present the plan and wait for the go-ahead.
 
 State: everything through 2026-07-11 is shipped — ROADMAP.md holds the full
-list. Latest additions: the **🛒 Shop** (3-tier engine/tires/headlights
-upgrades as `player.perks`, Lacy the Blue Lacy truck dog, weather radio with a
-25–45 s `sky.forecast` window, paint shop with 7 truck colors) and a verify
-harness speed pass (steppers + `__skipRender` + compact output: 6 min → ~25 s).
+list. Latest: **Haunted Texas wave 1** (`src/haunts.js`) — seeded country
+chapels + cemeteries (`chapelAt` in world.js), night cemetery lights with
+approach-fade, Enchanted Rock ghost fires, midnight chapel bell, 👻 Legends as
+the visible 9th collectible (`save.legends`), Terlingua + Presidio La Bahía
+landmarks (26 total), rumor lines.
 
 Today's candidates (my pick order):
 
-1. **Gamepad analog steering** (~1 hour, biggest driving-feel win) — Gamepad API
-   axes/buttons alongside the keyboard: left stick steer, triggers throttle/brake,
-   buttons for mode/interact/map. Poll in `Player.update`; keep keyboard working.
+1. **Haunted Texas wave 2 — the apparitions** (planned & approved 2026-07-11;
+   follow wave-1 patterns in haunts.js, +4 legends → 6):
+   - **Ghost Stampede at Stampede Mesa** (~33.55 N, −101.17 W caprock rim near
+     Crosbyton — the legend behind "Ghost Riders in the Sky"). Gate on
+     **storm weather + deep night**: translucent emissive longhorns
+     (~24, instanced) + a rider looping a hand-laid rim path (maritime-lane
+     idiom), `fog: false` to punch through storm fog, opacity pulses with
+     sky.js lightning. The marquee event.
+   - **El Muerto** — headless-rider *silhouette* in the south brush country,
+     UFO-style rare rolls with a hotspot near San Diego/Ben Bolt (~27.7 N,
+     −98.2 W); gallops parallel at 60–90 units, darts away if pressed (saucer
+     state machine on a horse); synth hoofbeats by distance.
+   - **La Llorona** — white figure + synth wail at hand-laid riverbank anchors
+     (Rio Grande, San Antonio River, Woman Hollering Creek I-10 crossing
+     ~29.56 N, −98.06 W); vanishes on approach.
+   - **Chupacabra** — night lurker near the real Cuero/Elmendorf sightings;
+     mangy hairless-coyote build, flees the horn (`scare` idiom). Fact:
+     every confirmed one was a coyote with mange. So far.
+   - Verify: parallel-heading + distance-band over time (El Muerto), rim
+     displacement (stampede), vanish-on-approach opacity curves, horn-flee.
+2. **Gamepad analog steering** (~1 hour, biggest driving-feel win) — Gamepad
+   API axes/buttons alongside keyboard; poll in `Player.update`;
    `t.stubGamepad` is already in the harness waiting.
-2. **Big-map click-to-set-waypoint** — click on M-map → target marker. The whole
-   rendering stack already exists for missions (map diamond + compass-tape diamond
-   in `hud.js` via `hud.mission`, 3D guide arrow in `missions.js`); generalize
-   "current target" so a map click feeds the same pipeline.
-3. **Mission variety** — multi-stop hauls, fragile-cargo jobs that punish
-   offroading; with upgrades in, the economy can support bigger payouts.
+3. **Big-map click-to-set-waypoint** — generalize the mission target pipeline
+   (map diamond + compass diamond + guide arrow) to a map click.
 
-If those finish early: real highway A* routing (route lines on the map,
-road-distance mission pay), or more shop lines (rose dowser that pings near
-uncollected roses was the brainstorm favorite).
+Haunted Texas wave 3 (later): San Antonio ghost tracks push (~29.34 N,
+−98.44 W — only event touching player physics; strict no-push-by-day check),
+town churches in `cities.js` (reuse `mkChapel`), USS Lexington "Blue Ghost"
+landmark with night glow, painted-church landmark (St. Mary's High Hill).
 
 ---
 
 ## Notes for me (the human)
 
-- **Playtest the shop loop**: earn a few hauls, buy engine I and tires I —
-  does the speed gain *feel* worth $350? Prices/effects are knob arrays at the
-  top of `src/shop.js`. Buy Lacy, honk at a herd, then park, walk (V) and watch
-  her hop out and heel; judge the yip mix level (`bark()` in `src/audio.js`)
-  and the crate perch during a haul.
-- **Playtest shop wave 2**: buy the radio and drive the Gulf coast (weather
-  flips often there) — is the 25–45 s warning window (`forecastT` in sky.js)
-  long enough to be useful mid-haul? Try a couple of paint coats; judge the
-  maroon and black in daylight vs. night (hexes in `PAINTS`, `src/shop.js`).
-- **Playtest the missions loop**: deadlines fair in rain/at night? Knobs in
-  `src/missions.js` `genOffers()`: deadline `dist / 24 + 60`, pay `50 + km × 1.2`,
-  rush odds 0.25; payout multipliers in `deliver()`.
-- Still pending playtest: traffic honk chorus parked on I-35 in Austin
-  (`src/traffic.js` knobs); flares at night over dark country (`src/flares.js`
-  knobs + `audio.js` `flare()`); truck headlight throw (intensity in vehicle.js
-  `animate()` DRIVE branch); wildlife voices mix (`howl`/`rattle`/`gobble` in
-  `src/audio.js`); UI scale at 170%+ on 1080p (compass tape may crowd the top —
-  cap it if playtest says so).
+- **Playtest Haunted Texas**: drive ranch roads west of Llano at night till you
+  find a glowing cemetery (roughly 1 chapel per 10 chunks; they also show by
+  day — white steeple by the road). Judge: wisp size/brightness at parked
+  distance (`SphereGeometry(0.26…)` + opacity 0.85 in `src/haunts.js`), the
+  approach-fade feel (`FADE_NEAR/FADE_FULL`), the midnight bell mix
+  (`bell()` in `src/audio.js`), and whether ~50% haunted nights (`WISP_ODDS`)
+  feels right. Enchanted Rock fires: fly there after dark, watch from the base.
+- Terlingua + Presidio La Bahía are in the travel menu Landmarks tab if you
+  don't want to drive to Big Bend.
+- **Playtest the shop loop** (still pending): engine I + tires I worth $350?
+  Lacy's yips, crate perch, weather-radio window, paint colors at night —
+  knobs in `src/shop.js` / `src/sky.js` (`forecastT`) / `src/audio.js`.
+- Still pending playtest: traffic honk chorus on I-35, flares at night,
+  headlight throw, wildlife voices mix, UI scale at 170%+ on 1080p.
 - Saves are per-browser (localStorage): localhost and the public URL have
-  separate progress. Mission bankroll shows in the score panel (💵) and on H.
-- N mutes audio; C toggles compass; the 👽 counter only appears on H after a
-  first sighting (hunt near Lubbock/Marfa past midnight, clear weather).
-- Adding real arterials to more cities (Waco, Laredo, Midland/Odessa…) is a
-  two-command job: bbox + `tools/add-metro-streets.mjs` (header documents the
-  pattern; Overpass **GET** only, maps.mail.ru mirror for big queries).
+  separate progress. 👻 Legends row is always visible in the score panel.
+- N mutes audio; the 👽 counter appears on H after a first sighting.

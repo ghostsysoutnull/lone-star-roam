@@ -70,6 +70,9 @@ const TOWNSFOLK_LINES = [
   'My cousin swears the sky stalled his truck once, out west. He don’t drive at night no more.',
   'Seen the bats pour outta that Austin bridge at sundown? River turns to smoke.',
   'Rattlers out west been noisy this year. Mind where you park.',
+  'Old cemetery down the farm road glows some nights. Ain’t nobody mows it after dark.',
+  'They say Enchanted Rock groans when it cools at night. The Tonkawa saw fires up top, too.',
+  'My meemaw won’t drive past that old fort at Goliad after sundown. Won’t say why, neither.',
 ];
 const TOWNSFOLK_NAMES = ['Earl', 'Ruby', 'Cole', 'June', 'Wade', 'Dolly', 'Buck', 'Lupe', 'Roy', 'Faye', 'Cash', 'Ida', 'Slim', 'Pearl'];
 

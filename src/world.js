@@ -1,7 +1,8 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, nearestRoad, hAt, outsideAt, ELEV } from './geo.js';
+import { GEO, seededRand, inTexas, nearestRoad, nearestCity, hAt, outsideAt, ELEV } from './geo.js';
 import { ATMOS } from './sky.js';
+import { cityRadius } from './cities.js';
 
 export function buildWorld(scene) {
   buildGround(scene);
@@ -246,6 +247,53 @@ const inHillCountry = (x, z) => x > -900 && x < 1100 && z > -400 && z < 1500;
 const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2f });
 const leaf = (hex) => new THREE.MeshLambertMaterial({ color: hex, flatShading: true });
 
+// A country chapel + fenced cemetery for the occasional lucky chunk. Pure
+// function of the chunk key (its own seed stream — the scenery RNG order is
+// untouched), so haunts.js can locate sites without spawning any meshes.
+// Sites sit just off a farm road (≥5 units clear — driving caps change within
+// 4 of any road) and never inside a town footprint.
+export function chapelAt(cx, cz) {
+  const midX = cx * CHUNK + CHUNK / 2, midZ = cz * CHUNK + CHUNK / 2;
+  let odds = 0.1; // central ranchland / Hill Country
+  if (inPermian(midX, midZ) || midX < -2200) odds = 0;      // oil patch & far-west desert
+  else if (midX > 3400 || inPlains(midX, midZ)) odds = 0.08; // piney woods, high plains
+  else if (midZ > 2600) odds = 0.06;                         // south brush country
+  const rand = seededRand(`chapel${cx},${cz}`);
+  if (rand() >= odds) return null;
+  for (let i = 0; i < 4; i++) { // a few tries for a lawful spot
+    const sx = cx * CHUNK + rand() * CHUNK, sz = cz * CHUNK + rand() * CHUNK;
+    const road = nearestRoad(sx, sz, 25);
+    if (!road || road.dist < 0.5) continue;
+    const away = 7 + rand() * 2; // set back from the shoulder
+    const x = road.x + ((sx - road.x) / road.dist) * away;
+    const z = road.z + ((sz - road.z) / road.dist) * away;
+    if (!inTexas(x, z)) continue;
+    const near = nearestRoad(x, z, 6); // a second road may pass closer than the one we anchored to
+    if (near && near.dist < 5) continue;
+    const { city, dist } = nearestCity(x, z);
+    if (city && dist < cityRadius(city.pop) + 20) continue;
+    const rot = Math.atan2(-(road.x - x), -(road.z - z)); // door faces the road
+    // the cemetery sits beside the chapel, along the road — pick the clear side
+    for (const side of [1, -1]) {
+      const cemX = x + Math.cos(rot) * 7 * side, cemZ = z - Math.sin(rot) * 7 * side;
+      if (inTexas(cemX, cemZ) && !nearestRoad(cemX, cemZ, 5)) return { x, z, rot, cemX, cemZ, key: `${cx},${cz}` };
+    }
+  }
+  return null;
+}
+
+// every chapel/cemetery site within `range` chunks of a point — for haunts.js
+export function chapelSitesNear(px, pz, range = 2) {
+  const cx = Math.floor(px / CHUNK), cz = Math.floor(pz / CHUNK);
+  const out = [];
+  for (let i = -range; i <= range; i++)
+    for (let j = -range; j <= range; j++) {
+      const s = chapelAt(cx + i, cz + j);
+      if (s) out.push(s);
+    }
+  return out;
+}
+
 class ScenerySystem {
   constructor(scene) {
     this.scene = scene;
@@ -326,6 +374,21 @@ class ScenerySystem {
           group.userData.animated.push(entry);
         }
       }
+    }
+
+    // the occasional country chapel + cemetery (site is chunk-seeded — chapelAt)
+    const site = chapelAt(cx, cz);
+    if (site) {
+      const chapel = mkChapel();
+      chapel.scale.setScalar(1.5); // mini-world church, not a shed
+      chapel.position.set(site.x, hAt(site.x, site.z), site.z);
+      chapel.rotation.y = site.rot;
+      const cem = mkCemetery(rand);
+      cem.position.set(site.cemX, hAt(site.cemX, site.cemZ), site.cemZ);
+      cem.rotation.y = site.rot;
+      const oak = mkLiveOak(rand); // a shade tree between them
+      oak.position.set((site.x + site.cemX) / 2, hAt(site.x, site.z), (site.z + site.cemZ) / 2 + 4);
+      group.add(chapel, cem, oak);
     }
     this.scene.add(group);
     this.live.set(key, group);
@@ -497,6 +560,77 @@ function mkPumpjack(rand) {
   g.add(beam);
   g.userData.animate = beam;
   g.userData.kind = 'pumpjack';
+  return g;
+}
+
+// Little white country church: gabled nave, steeple, cross — door on local -z
+function mkChapel() {
+  const g = new THREE.Group();
+  g.userData.kind = 'chapel';
+  const white = new THREE.MeshLambertMaterial({ color: 0xf2efe6, flatShading: true });
+  const shingle = new THREE.MeshLambertMaterial({ color: 0x5a5450, flatShading: true });
+  const nave = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.6, 3.4), white);
+  nave.position.y = 0.8;
+  // gable roof: a 3-sided prism laid on its side, one edge up — eaves sit just
+  // below the wall tops so the white walls stay visible
+  const roofG = new THREE.CylinderGeometry(1.35, 1.35, 3.7, 3, 1);
+  roofG.rotateX(-Math.PI / 2);
+  const roof = new THREE.Mesh(roofG, shingle);
+  roof.position.y = 2.15;
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(0.6, 3.6, 0.6), white);
+  tower.position.set(0, 1.8, -1.55); // steeple clears the ridge
+  const spire = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.0, 4), shingle);
+  spire.position.set(0, 4.1, -1.55);
+  const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.55, 0.06), white);
+  crossV.position.set(0, 4.85, -1.55);
+  const crossH = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, 0.06), white);
+  crossH.position.set(0, 4.95, -1.55);
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.85, 0.08), new THREE.MeshLambertMaterial({ color: 0x4a3828 }));
+  door.position.set(0, 0.45, -1.88);
+  g.add(nave, roof, tower, spire, crossV, crossH, door);
+  return g;
+}
+
+// Fenced family cemetery: leaning headstones and the founder's obelisk
+function mkCemetery(rand) {
+  const g = new THREE.Group();
+  g.userData.kind = 'cemetery';
+  const iron = new THREE.MeshLambertMaterial({ color: 0x3a3a40 });
+  const W = 5.5, D = 4.5;
+  // the plot itself — dry-grass ground so the graveyard reads from the road
+  const plot = new THREE.Mesh(new THREE.PlaneGeometry(W + 0.8, D + 0.8), new THREE.MeshLambertMaterial({ color: 0x8f8668 }));
+  plot.rotation.x = -Math.PI / 2;
+  plot.position.y = 0.06;
+  g.add(plot);
+  for (const [w, d, x, z] of [[W, 0.08, 0, -D / 2], [W, 0.08, 0, D / 2], [0.08, D, -W / 2, 0], [0.08, D, W / 2, 0]]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.06, d), iron);
+    rail.position.set(x, 0.42, z);
+    g.add(rail);
+  }
+  for (const [x, z] of [[-W / 2, -D / 2], [W / 2, -D / 2], [-W / 2, D / 2], [W / 2, D / 2]]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 0.1), iron);
+    post.position.set(x, 0.28, z);
+    g.add(post);
+  }
+  const n = 8 + ((rand() * 9) | 0);
+  const stones = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.36, 0.62, 0.1),
+    new THREE.MeshLambertMaterial({ color: 0xb8b2a4, flatShading: true }), n);
+  const m4 = new THREE.Matrix4(), e = new THREE.Euler(), q = new THREE.Quaternion();
+  const v = new THREE.Vector3(), s = new THREE.Vector3();
+  for (let i = 0; i < n; i++) {
+    const col = i % 4, row = (i / 4) | 0;
+    v.set(-1.6 + col * 1.05 + (rand() - 0.5) * 0.3, 0.26, -1.4 + row * 0.95 + (rand() - 0.5) * 0.25);
+    e.set((rand() - 0.5) * 0.16, (rand() - 0.5) * 0.2, (rand() - 0.5) * 0.22); // a century of lean
+    q.setFromEuler(e);
+    s.set(1, 0.7 + rand() * 0.6, 1);
+    m4.compose(v, q, s);
+    stones.setMatrixAt(i, m4);
+  }
+  g.add(stones);
+  const obelisk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.16, 1.1, 4), new THREE.MeshLambertMaterial({ color: 0xcac4b6, flatShading: true }));
+  obelisk.position.set(1.9, 0.55, 1.6);
+  g.add(obelisk);
   return g;
 }
 

@@ -1,7 +1,8 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
-import { loadGeo, GEO, nearestRoad, waterAt, countyAt, hAt, inTexas } from './geo.js';
-import { buildWorld } from './world.js';
+import { loadGeo, GEO, nearestRoad, waterAt, countyAt, hAt, inTexas, seededRand } from './geo.js';
+import { buildWorld, chapelSitesNear } from './world.js';
+import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { CitySystem } from './cities.js';
 import { Player } from './vehicle.js';
 import { Gameplay } from './gameplay.js';
@@ -68,6 +69,9 @@ async function boot() {
   traffic.onHonk = (type) => audio.honk(type);
   animals.onSound = (kind) => audio[kind]?.();
   const ufo = new UFOSystem(scene, () => gameplay.ufoSighting());
+  const haunts = new HauntSystem(scene,
+    (k) => gameplay.spotLegend(k, LEGENDS[k].name, LEGEND_COUNT, LEGENDS[k].fact),
+    (d) => audio.bell(d));
   npcs.onDialog = (d) => hud.dialog(d);
   npcs.onTalk = () => audio.chime('dialog');
   sky.onBolt = () => audio.thunder();
@@ -133,7 +137,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, traffic, missions, travel, dog, flares, hud, nearestRoad, inTexas, hAt, ATMOS, clock, SPECIES };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -149,6 +153,7 @@ async function boot() {
     trains.update(dt, player.pos.x, player.pos.z);
     maritime.update(dt, clock.elapsedTime);
     ufo.update(dt, player.pos.x, player.pos.z, player.pos.y);
+    haunts.update(dt, player.pos.x, player.pos.z, sky.t, sky.days);
     flares.update(dt);
     dog.update(dt);
     ATMOS.ufo = ufo.near;

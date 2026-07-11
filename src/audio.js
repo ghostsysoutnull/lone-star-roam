@@ -169,6 +169,7 @@ export class AudioSystem {
       load: [[220, 0, 0.12, 0.12], [330, 0.1, 0.2, 0.08], [440, 0.2, 0.3, 0.08]],
       cash: [[880, 0, 0.1, 0.08], [1109, 0.08, 0.1, 0.08], [1319, 0.16, 0.12, 0.09], [1760, 0.24, 0.45, 0.1]],
       buy: [[659, 0, 0.1, 0.07], [880, 0.09, 0.12, 0.08], [1319, 0.18, 0.35, 0.09]],
+      legend: [[392, 0, 0.55, 0.06], [466, 0.18, 0.55, 0.06], [587, 0.36, 1.0, 0.07]], // minor rise — something's out there
     };
     for (const [f, w, d, g] of SONGS[kind] || []) this.note(f, w, d, g ?? 0.1, 'triangle');
   }
@@ -307,6 +308,19 @@ export class AudioSystem {
     g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6);
     o.connect(g).connect(this.sfx);
     o.start(t0); o.stop(t0 + 0.65);
+  }
+
+  // country chapel bell at midnight: hum + prime + minor-third tierce
+  // partials with long decays, tolled three times, faded by distance
+  bell(dist = 0) {
+    if (!this.ctx || this.muted) return;
+    const v = Math.max(0.012, 0.08 * (1 - dist / 220));
+    for (const start of [0, 1.7, 3.4]) {
+      this.note(220, start, 2.8, v, 'sine');                  // prime
+      this.note(110, start, 3.4, v * 0.6, 'sine');            // hum
+      this.note(262, start + 0.01, 1.6, v * 0.35, 'sine');    // tierce — the churchy shimmer
+      this.note(524, start + 0.01, 0.4, v * 0.18, 'triangle'); // clapper strike
+    }
   }
 
   // freight horn: two-note minor chord, long-long blast
