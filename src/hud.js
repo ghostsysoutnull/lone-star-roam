@@ -29,6 +29,11 @@ export class HUD {
     this.zoomIdx = 1;
     this.compass = document.getElementById('compass');
     if (localStorage.getItem('lonestar-compass') === 'off') this.compass.style.display = 'none';
+    // UI scale: CSS is rem-based (1rem = 10px at 100%), so one root font-size drives it all
+    this.uiScales = [0.9, 1, 1.15, 1.3];
+    const savedScale = this.uiScales.indexOf(parseFloat(localStorage.getItem('lonestar-ui-scale')));
+    this.uiIdx = savedScale === -1 ? 1 : savedScale;
+    this.applyUiScale();
     const s = Math.min(innerWidth, innerHeight) - 60;
     this.bigCanvas.width = s; this.bigCanvas.height = s * 0.95;
     this.toastTimer = null;
@@ -112,6 +117,16 @@ export class HUD {
   }
 
   cycleZoom() { this.zoomIdx = (this.zoomIdx + 1) % this.zoomLevels.length; }
+
+  applyUiScale() { document.documentElement.style.fontSize = 10 * this.uiScales[this.uiIdx] + 'px'; }
+
+  // step the UI scale up/down (dir ±1), clamp at the ends; returns the label for the toast
+  uiScale(dir) {
+    this.uiIdx = Math.max(0, Math.min(this.uiScales.length - 1, this.uiIdx + dir));
+    this.applyUiScale();
+    localStorage.setItem('lonestar-ui-scale', this.uiScales[this.uiIdx]);
+    return Math.round(this.uiScales[this.uiIdx] * 100) + '%';
+  }
 
   toggleCompass() {
     const off = this.compass.style.display !== 'none';

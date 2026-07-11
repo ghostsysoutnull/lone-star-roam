@@ -5,33 +5,36 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lone Star Roam — Texas Free Roam</title>
 <style>
+  /* UI scale: 1rem = 10px at 100%; hud.js retunes the root size (+/- keys) */
+  html { font-size: 10px; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0e14; font-family: system-ui, sans-serif; }
+  body { font-size: 1.4rem; }
   #app { position: fixed; inset: 0; }
   canvas { display: block; }
   .hud { position: fixed; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); user-select: none; pointer-events: none; }
-  #hud-topleft { top: 12px; left: 14px; font-size: 14px; line-height: 1.5; }
-  #hud-topleft .title { font-weight: 700; font-size: 16px; letter-spacing: .5px; }
-  #hud-score { top: 12px; right: 14px; text-align: right; font-size: 14px; line-height: 1.5; }
-  #hud-speed { bottom: 18px; right: 20px; font-size: 30px; font-weight: 700; }
-  #hud-speed small { font-size: 13px; font-weight: 400; opacity: .8; }
-  #hud-odo { font-size: 12px; font-weight: 400; opacity: .65; text-align: right; }
-  #hud-mode { bottom: 58px; right: 22px; font-size: 13px; opacity: .9; }
-  #compass { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: 340px; height: 40px;
+  #hud-topleft { top: 12px; left: 14px; font-size: 1.4rem; line-height: 1.5; }
+  #hud-topleft .title { font-weight: 700; font-size: 1.6rem; letter-spacing: .5px; }
+  #hud-score { top: 12px; right: 14px; text-align: right; font-size: 1.4rem; line-height: 1.5; }
+  #hud-speed { bottom: 18px; right: 20px; font-size: 3rem; font-weight: 700; }
+  #hud-speed small { font-size: 1.3rem; font-weight: 400; opacity: .8; }
+  #hud-odo { font-size: 1.2rem; font-weight: 400; opacity: .65; text-align: right; }
+  #hud-mode { bottom: 58px; right: 22px; font-size: 1.3rem; opacity: .9; }
+  #compass { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: 34rem; height: 4rem;
     border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(10,14,20,.55); }
-  #minimap { position: fixed; left: 14px; bottom: 14px; width: 190px; height: 180px;
+  #minimap { position: fixed; left: 14px; bottom: 14px; width: 19rem; height: 18rem;
     border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(10,14,20,.65); }
   #bigmap { position: fixed; inset: 0; display: none; background: rgba(6,9,14,.92); z-index: 10; }
   #bigmap canvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
-  #dialog { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); max-width: 560px; min-width: 320px;
+  #dialog { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); max-width: 56rem; min-width: 32rem;
     background: rgba(12,16,24,.92); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 10px;
-    padding: 14px 18px; font-size: 15px; line-height: 1.45; display: none; z-index: 9; }
+    padding: 14px 18px; font-size: 1.5rem; line-height: 1.45; display: none; z-index: 9; }
   #dialog .npc-name { font-weight: 700; color: #ffd35c; margin-bottom: 4px; }
-  #dialog .hint { margin-top: 8px; font-size: 12px; opacity: .6; }
+  #dialog .hint { margin-top: 8px; font-size: 1.2rem; opacity: .6; }
   #toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: rgba(20,26,36,.92);
-    color: #ffd35c; padding: 10px 22px; border-radius: 24px; font-size: 15px; font-weight: 600;
+    color: #ffd35c; padding: 10px 22px; border-radius: 24px; font-size: 1.5rem; font-weight: 600;
     opacity: 0; transition: opacity .3s; z-index: 9; pointer-events: none; }
   #interact-hint { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); color: #fff;
-    background: rgba(12,16,24,.8); padding: 6px 14px; border-radius: 16px; font-size: 13px; display: none; z-index: 8; }
+    background: rgba(12,16,24,.8); padding: 6px 14px; border-radius: 16px; font-size: 1.3rem; display: none; z-index: 8; }
   #loading { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: #0b0e14; color: #fff; z-index: 20; }
   #loading h1 { font-size: 30px; letter-spacing: 1px; margin: 0 0 8px; }
@@ -39,23 +42,23 @@
   #loading p { opacity: .7; margin: 4px 0; font-size: 14px; }
   #help { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); background: rgba(12,16,24,.95);
     color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 12px; padding: 22px 30px; z-index: 11;
-    display: none; font-size: 14px; line-height: 1.8; }
+    display: none; font-size: 1.4rem; line-height: 1.8; }
   #help h2 { margin: 0 0 8px; color: #ffd35c; }
-  #travel { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(640px, 92vw);
+  #travel { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(64rem, 92vw);
     max-height: 78vh; background: rgba(12,16,24,.96); color: #fff; border: 1px solid rgba(255,255,255,.2);
     border-radius: 12px; padding: 18px 22px; z-index: 12; display: none; flex-direction: column; }
-  #travel h2 { margin: 0 0 10px; color: #ffd35c; font-size: 18px; }
+  #travel h2 { margin: 0 0 10px; color: #ffd35c; font-size: 1.8rem; }
   #travel .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
   #travel .tabs button { background: #222a38; color: #cdd6e4; border: 1px solid rgba(255,255,255,.15);
-    border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 13px; }
+    border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 1.3rem; }
   #travel .tabs button.active { background: #3d5a8a; color: #fff; }
   #travel .poi-list { overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-right: 4px; }
   #travel .poi-list button { background: #1a2230; color: #e6ecf5; border: 1px solid rgba(255,255,255,.1);
-    border-radius: 8px; padding: 8px 12px; cursor: pointer; text-align: left; font-size: 13px; }
+    border-radius: 8px; padding: 8px 12px; cursor: pointer; text-align: left; font-size: 1.3rem; }
   #travel .poi-list button:hover:not(:disabled) { background: #2c3c58; }
   #travel .poi-list button:disabled { opacity: .38; cursor: default; }
-  #travel .hint { margin-top: 10px; font-size: 12px; opacity: .55; }
-  kbd { background: #2a3140; border-radius: 4px; padding: 1px 7px; font-family: inherit; font-size: 12px; margin-right: 4px; }
+  #travel .hint { margin-top: 10px; font-size: 1.2rem; opacity: .55; }
+  kbd { background: #2a3140; border-radius: 4px; padding: 1px 7px; font-family: inherit; font-size: 1.2rem; margin-right: 4px; }
 </style>
 </head>
 <body>
@@ -65,7 +68,7 @@
   <div class="title">🤠 LONE STAR ROAM</div>
   <div id="hud-location">—</div>
   <div id="hud-road"></div>
-  <div id="hud-sky" style="font-size:12.5px;opacity:.75"></div>
+  <div id="hud-sky" style="font-size:1.25rem;opacity:.75"></div>
   <div id="hud-job" style="color:#ffd35c;font-weight:600"></div>
 </div>
 <div id="hud-score" class="hud">
@@ -108,7 +111,7 @@
   <div><kbd>T</kbd> hold to fast-forward time (12-min days)</div>
   <div><kbd>P</kbd> travel &amp; job board — take delivery hauls, fast-travel to sights</div>
   <div><kbd>N</kbd> mute / unmute sound &nbsp; <kbd>Z</kbd> minimap zoom &nbsp; <kbd>C</kbd> compass &nbsp; <kbd>G</kbd> guide arrow</div>
-  <div><kbd>H</kbd> toggle this help</div>
+  <div><kbd>H</kbd> toggle this help &nbsp; <kbd>+</kbd><kbd>−</kbd> UI text size</div>
   <div style="margin-top:8px;opacity:.7">Visit all 132 real cities, find 24 landmarks, collect roses, spot the critters.</div>
   <div id="help-stats" style="margin-top:6px;color:#ffd35c"></div>
 </div>

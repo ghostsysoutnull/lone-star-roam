@@ -54,6 +54,26 @@ export default async function hud(t) {
     t.ok(on.disp !== 'none' && on.pref === 'on', `on state: ${JSON.stringify(on)}`);
   });
 
+  await t.check('+/- steps the UI scale, resizes HUD text, persists', async () => {
+    const px = () => t.ev(`({
+      root: parseFloat(getComputedStyle(document.documentElement).fontSize),
+      hud: parseFloat(getComputedStyle(document.getElementById('hud-topleft')).fontSize),
+      map: parseFloat(getComputedStyle(document.getElementById('minimap')).width),
+      pref: localStorage['lonestar-ui-scale'] ?? null,
+    })`);
+    const base = await px();
+    await t.key('Equal');
+    const up = await px();
+    await t.key('Minus');
+    const back = await px();
+    t.near(up.root, base.root * 1.15, 0.1, 'root font did not step up 15%');
+    t.near(up.hud, base.hud * 1.15, 0.3, 'HUD text did not follow the root scale');
+    t.near(up.map, base.map * 1.15, 0.5, 'minimap CSS size did not follow');
+    t.ok(up.pref === '1.15', `pref not persisted: ${up.pref}`);
+    t.near(back.root, base.root, 0.1, 'minus did not step back down');
+    t.ok(back.pref === '1', `pref after minus: ${back.pref}`);
+  });
+
   await t.check('H shows help; money appears once hauling starts', async () => {
     await t.key('KeyH');
     const { disp, stats, jobsDone } = await t.ev(

@@ -104,10 +104,10 @@ export class TravelMenu {
     const m = this.missions;
     const j = m.job;
     const money = `💵 $${(this.gameplay.save.bank ?? 0).toLocaleString()} · ${this.gameplay.save.jobsDone ?? 0} deliveries`;
-    let html = `<div style="grid-column:1/-1;font-size:13px;opacity:.85;padding:2px 2px 4px">${money}</div>`;
+    let html = `<div style="grid-column:1/-1;font-size:1.3rem;opacity:.85;padding:2px 2px 4px">${money}</div>`;
     if (j) {
       const step = j.phase === 'pickup' ? `load in <b>${j.from}</b>` : `deliver to <b>${j.to}</b>`;
-      html += `<div style="grid-column:1/-1;background:#243046;border:1px solid rgba(255,211,92,.4);border-radius:8px;padding:10px 12px;font-size:13px">
+      html += `<div style="grid-column:1/-1;background:#243046;border:1px solid rgba(255,211,92,.4);border-radius:8px;padding:10px 12px;font-size:1.3rem">
         ${j.icon} <b>${j.cargo}</b> — ${j.from} → ${j.to} · ${j.km} km · $${j.pay}${j.rush ? ' · 🔥 RUSH' : ''}<br>
         <span style="opacity:.75">Now: ${step}</span></div>`;
       html += `<button data-i="abandon" style="grid-column:1/-1">✖ Abandon this job</button>`;
