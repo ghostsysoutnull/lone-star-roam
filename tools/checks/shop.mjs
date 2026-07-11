@@ -137,8 +137,10 @@ export default async function shop(t) {
     const bank = await buyOut(t, 'radio', 1);
     t.ok(bank === 0, 'radio price not deducted exactly');
     await t.until(`g.hud.els.mode.textContent.includes('📻')`, 8000);
-    // the forecast lands: target flips to storm and ATMOS follows
-    await t.until(`g.ATMOS.weather === 'storm'`, 30000);
+    // the forecast lands: step the sky through the countdown (setWeather keeps
+    // the real-loop sentinel for sky wiring) — target flips and ATMOS follows
+    await t.step(10, 'g.sky.update(dt, false, g.player.pos.x, g.player.pos.z, g.player.pos.y)', `g.ATMOS.weather === 'storm'`);
+    t.ok((await t.ev('g.ATMOS.weather')) === 'storm', 'forecast never landed');
     t.ok(!(await t.ev('g.sky.forecast')), 'forecast not cleared after arrival');
     await t.setWeather('clear');
   });

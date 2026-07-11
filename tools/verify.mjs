@@ -1,15 +1,16 @@
 // Headless verification harness — boots the game once, runs named check suites.
 //
-//   node tools/verify.mjs [suite…]        # no args = every suite in tools/checks/
+//   node tools/verify.mjs [-v] [suite…]   # no args = every suite in tools/checks/
 //   node tools/verify.mjs drive missions
 //
 // One-time setup (deps live OUTSIDE the repo, shared across sessions):
 //   mkdir -p ~/.cache/lonestar-verify && cd ~/.cache/lonestar-verify && npm i playwright-core
 //   (browser: any chromium in ~/.cache/ms-playwright — `npx playwright install chromium`)
 //
-// Output contract: exactly one line per check (PASS/FAIL), tiny summary, exit 1
-// on any failure. Suites assert NUMBERS at natural play values — screenshots are
-// a last resort (t.shot), never the pass/fail signal.
+// Output contract: compact by default — one summary line per suite plus full
+// detail for any FAIL; -v prints every check (durations shown when ≥1 s).
+// Exit 1 on any failure. Suites assert NUMBERS at natural play values —
+// screenshots are a last resort (t.shot), never the pass/fail signal.
 import { createServer } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
@@ -53,15 +54,18 @@ function serve() {
 }
 
 // --- check runner ---
+const VERBOSE = process.argv.includes('-v');
 let passed = 0, failed = 0;
 async function check(name, fn) {
+  const t0 = Date.now();
+  const dur = () => { const s = (Date.now() - t0) / 1000; return s >= 1 ? ` (${s.toFixed(1)}s)` : ''; };
   try {
     await fn();
     passed++;
-    console.log(`PASS ${name}`);
+    if (VERBOSE) console.log(`PASS ${name}${dur()}`);
   } catch (e) {
     failed++;
-    console.log(`FAIL ${name} — ${String(e.message || e).split('\n')[0]}`);
+    console.log(`FAIL ${name} — ${String(e.message || e).split('\n')[0]}${dur()}`);
   }
 }
 
@@ -122,6 +126,18 @@ function mkT(page) {
       }
       return { maxSpeed, minAgl, maxGap, types: [...types] };
     })()`),
+    // step any render-loop system synchronously: body runs once per dt tick,
+    // e.g. t.step(5, 'g.flares.update(dt)') or with an early-exit condition
+    // t.step(20, 'g.sky.update(dt, false, 0, 0, 0)', "g.ATMOS.weather === 'rain'").
+    // Returns elapsed sim seconds. Same caveat family as simStep — and keep one
+    // real-loop sentinel check per system (walk-cap, cars-move, rack-recharge,
+    // setWeather) so a broken main.js wiring can't hide behind the steppers.
+    step: (s, body, cond = 'false') => ev(`(() => {
+      const dt = 0.05;
+      let i = 0;
+      for (const n = Math.round(${s} / dt); i < n && !(${cond}); i++) { ${body}; }
+      return i * dt;
+    })()`),
     // held movement keys: write player.keys directly — deterministic, no focus issues
     hold: (code, on = true) => ev(`g.player.keys['${code}'] = ${on}`),
     async release() { await ev(`g.player.keys = {}`); },
@@ -151,7 +167,7 @@ function mkT(page) {
       await t.until(`g.ATMOS.weather === '${name}'`, 10000);
     },
     // poll an expression until truthy — for phase transitions with their own cadence
-    async until(expr, ms = 15000, every = 150) {
+    async until(expr, ms = 15000, every = 60) {
       const deadline = Date.now() + ms;
       while (Date.now() < deadline) {
         if (await ev(expr)) return;
@@ -180,11 +196,15 @@ function mkT(page) {
       }
       return out;
     },
-    // last resort, for genuinely visual judgments only
+    // last resort, for genuinely visual judgments only — drawing is off during
+    // tests (__skipRender), so let one real frame render first
     async shot(name) {
       mkdirSync(SHOTS, { recursive: true });
       const p = join(SHOTS, `${name}.png`);
+      await page.evaluate('window.__skipRender = 0');
+      await page.waitForTimeout(700); // a SwiftShader frame or two
       await page.screenshot({ path: p });
+      await page.evaluate('window.__skipRender = 1');
       console.log(`     shot: ${p}`);
     },
   };
@@ -192,7 +212,7 @@ function mkT(page) {
 }
 
 // --- main ---
-const wanted = process.argv.slice(2);
+const wanted = process.argv.slice(2).filter((a) => a !== '-v');
 const suiteDir = join(ROOT, 'tools/checks');
 const all = (await readdir(suiteDir)).filter((f) => f.endsWith('.mjs')).map((f) => f.replace('.mjs', ''));
 const suites = wanted.length ? wanted : all;
@@ -205,17 +225,23 @@ const browser = await chromium.launch({
   args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
 });
 // small viewport: SwiftShader fill rate directly limits sim fps
-const page = await browser.newPage({ viewport: { width: 800, height: 450 } });
+const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
 page.on('pageerror', (e) => console.log(`     pageerror: ${String(e).split('\n')[0]}`));
 
 try {
   await page.goto(`http://127.0.0.1:${srv.address().port}/`);
   await page.waitForFunction('window.__game && document.getElementById("loading").style.display === "none"', null, { timeout: 60000 });
+  // skip the ~300 ms SwiftShader draw: the loop still runs every system update
+  // at full rAF speed, sim time tracks wall time, and evaluates return fast
+  await page.evaluate('window.__skipRender = 1');
   await page.waitForTimeout(500); // first frames: chunks spawn, ATMOS settles
   const t = mkT(page);
   for (const s of suites) {
-    console.log(`— ${s}`);
+    if (VERBOSE) console.log(`— ${s}`);
+    const p0 = passed, f0 = failed, s0 = Date.now();
     await (await import(join(suiteDir, s + '.mjs'))).default(t);
+    const fails = failed - f0;
+    console.log(`${s}: ${passed - p0} passed${fails ? `, ${fails} FAILED` : ''}, ${((Date.now() - s0) / 1000).toFixed(1)}s`);
   }
 } finally {
   await browser.close();

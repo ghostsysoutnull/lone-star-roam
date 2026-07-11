@@ -102,7 +102,7 @@ export default async function drive(t) {
   await t.check('walk speed caps at 4.5 (real render loop)', async () => {
     await t.tp(austin.x - 300, austin.z - 40, 'WALK');
     await t.hold('KeyW');
-    await t.simWait(1.5); // deliberately NOT simStep — the frame-loop smoke test
+    await t.simWait(0.8); // deliberately NOT simStep — the frame-loop smoke test (cap reached in 0.25 sim s)
     const spd = await t.ev('g.player.speed');
     await t.release();
     t.near(spd, 4.5, 0.2, 'walk speed');

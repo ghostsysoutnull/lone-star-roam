@@ -1,14 +1,16 @@
 // Ambient traffic: density follows local road supply, cars ride real polylines
-// and actually move. Candidates refresh every 2s (wall dt), spawns fill toward
-// targetAlive next frames — waits are wall-time here, not physics-time.
+// and actually move. Candidates refresh every 2s (of traffic-sim dt), so the
+// pool-fill waits step traffic.update synchronously; "cars actually move" stays
+// on the real render loop as this system's wiring sentinel.
 
 const aliveCount = (t) => t.ev('g.traffic.cars.filter((c) => c.alive).length');
+const stepTraffic = (t, s) => t.step(s, 'g.traffic.update(dt, g.player.pos.x, g.player.pos.z, g.player.pos.y)');
 
 export default async function traffic(t) {
   const austin = await t.ev(`(() => { const c = g.GEO.cities.find((c) => c.name === 'Austin'); return { x: c.x, z: c.z }; })()`);
 
   await t.tp(austin.x, austin.z + 12);
-  await t.wait(4); // candidate refresh (2s cadence) + pool fill
+  await stepTraffic(t, 4); // candidate refresh (2s cadence) + pool fill
   const metro = await aliveCount(t);
 
   await t.check('metro roads fill the pool', async () => {
@@ -21,9 +23,9 @@ export default async function traffic(t) {
     t.ok(off === 0, `${off} cars off the centerline`);
   });
 
-  await t.check('cars actually move', async () => {
+  await t.check('cars actually move (real render loop)', async () => {
     const before = await t.ev(`g.traffic.cars.filter((c) => c.alive).slice(0, 8).map((c) => [c.cx, c.cz])`);
-    await t.wait(2);
+    await t.wait(2); // deliberately wall time — the frame-loop wiring sentinel
     const after = await t.ev(`g.traffic.cars.filter((c) => c.alive).slice(0, 8).map((c) => [c.cx, c.cz])`);
     const moved = before.filter((p, i) => after[i] && Math.hypot(after[i][0] - p[0], after[i][1] - p[1]) > 0.5).length;
     t.ok(moved >= Math.min(4, before.length), `only ${moved}/${before.length} sampled cars moved`);
@@ -38,7 +40,7 @@ export default async function traffic(t) {
     })()`);
     t.ok(spot, 'no road-poor spot found');
     await t.tp(spot.x, spot.z);
-    await t.wait(5); // old cars despawn (>DESPAWN), candidates refresh
+    await stepTraffic(t, 5); // old cars despawn (>DESPAWN), candidates refresh
     const desert = await aliveCount(t);
     t.ok(desert < Math.max(3, metro * 0.4), `desert has ${desert} cars vs metro ${metro}`);
   });

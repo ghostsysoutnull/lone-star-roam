@@ -4,11 +4,20 @@ Goal: make each dev session spend tokens on *building*, not on re-authoring test
 scripts, re-reading files, and re-describing output. Five problem areas, phased
 so each milestone pays off on its own.
 
-Status 2026-07-10: **M1, M2, M3, M5 done** — `tools/verify.mjs` + 5 suites
-(drive/hud/missions/traffic/wildlife, 34 checks green), input stubs
-(`t.stubGamepad`, `t.key`), screenshot policy + `t.shot`, CLAUDE.md
-session-workflow section. Each new feature adds checks to a suite. Only **M4**
-(module "where things live" index) remains — next time CLAUDE.md is touched.
+Status 2026-07-11: **all milestones done.** M1–M3, M5 (2026-07-10):
+`tools/verify.mjs` + suites, input stubs (`t.stubGamepad`, `t.key`),
+screenshot policy + `t.shot`, CLAUDE.md session-workflow section. M4
+(2026-07-11): `MODULES.md` — per-module grep anchors, pointed to from
+CLAUDE.md's module graph. Same day, beyond the original plan:
+- **Compact verify output** (M1's ≤40-line acceptance re-met at 53 checks):
+  one summary line per suite + FAIL detail; `-v` for per-check lines with
+  durations ≥1 s — profiling is free, no more timestamp pipelines.
+- **Steppers + render skip**: `t.simStep`/`t.step` run physics synchronously
+  in-page; `__skipRender` skips only the ~300 ms SwiftShader draw while every
+  system still ticks at full rAF speed. Full verify: 6 min → ~25 s wall.
+  Rule: one real-loop sentinel per system (CLAUDE.md "Verification rules").
+- **NEXT_SESSION.md dieted** to its own rule (candidates + gotchas, no
+  session-history paragraphs — ROADMAP.md holds history).
 
 Hard-won harness lessons (already codified in CLAUDE.md): wait in physics time
 (`player.simT`), not wall time — headless runs 2–3× slower than the wall clock;

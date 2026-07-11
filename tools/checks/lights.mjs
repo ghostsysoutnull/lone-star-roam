@@ -114,14 +114,16 @@ export default async function lights(t) {
     const s0 = await t.ev(`(() => { const f = g.flares.flares[0]; return { phase: f.phase, vy: f.vy, y: f.y, i: f.slot.light.intensity }; })()`);
     t.ok(s0.phase === 'ballistic' && s0.vy > 0, `no upward ballistic launch: ${JSON.stringify(s0)}`);
     t.ok(s0.i === 0, `tracer already casts light: ${s0.i}`);
-    await t.until(`g.flares.flares[0]?.phase === 'chute'`, 20000);
-    await t.until(`g.flares.flares[0]?.burn > 0.5`, 15000); // past the ignition fade-in
+    // the descent is flare-internal physics — step it synchronously (the rack
+    // check below keeps a real-loop recharge wait as this system's sentinel)
+    await t.step(20, 'g.flares.update(dt)', `g.flares.flares[0]?.phase === 'chute'`);
+    await t.step(15, 'g.flares.update(dt)', `g.flares.flares[0]?.burn > 0.5`); // past the ignition fade-in
     // sample twice in flare-internal time: sink rate, light, wind drift
     const grab = `(() => { const f = g.flares.flares[0]; return { t: f.t, x: f.x, y: f.y, z: f.z, i: f.slot.light.intensity }; })()`;
     const a = await t.ev(grab);
     t.ok(a.y > gy + 41, `never rose above the launch height: apex ${a.y.toFixed(1)} vs ${(gy + 40.5).toFixed(1)}`);
     t.ok(a.i > 15, `ignited flare too dim: ${a.i.toFixed(1)}`);
-    await t.until(`g.flares.flares[0]?.t > ${a.t + 2}`, 25000);
+    await t.step(5, 'g.flares.update(dt)', `g.flares.flares[0]?.t > ${a.t + 2}`);
     const b = await t.ev(grab);
     t.near((a.y - b.y) / (b.t - a.t), 2.1, 0.5, 'chute sink rate');
     // wind drift matches the cloud layer's +x-biased direction (clear sky: wind 1)

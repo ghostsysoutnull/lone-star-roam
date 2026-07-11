@@ -179,7 +179,10 @@ async function boot() {
       hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading), county, player.perks.radio ? sky.forecastLine() : null);
       hudTick = 0;
     }
-    renderer.render(scene, camera);
+    // headless verify sets __skipRender: every system above still ticks at full
+    // rAF speed, only the SwiftShader draw (~300 ms/frame) is skipped; t.shot
+    // clears it for one frame when a screenshot genuinely needs pixels
+    if (!window.__skipRender) renderer.render(scene, camera);
   });
 }
 

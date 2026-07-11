@@ -27,7 +27,8 @@ export default async function hud(t) {
   await t.check('speed readout tracks mph = |speed|·2.4', async () => {
     await t.until(`g.hud.els.speed.textContent.includes('0')`, 8000); // parked
     await t.hold('KeyW');
-    await t.simWait(1.5);
+    await t.simStep(1.5); // instantly at the road cap; W stays held so it sits there
+    await t.until(`parseInt(g.hud.els.speed.textContent) > 0`, 8000); // let a 12 Hz tick land
     const { txt, spd } = await t.ev(`({ txt: g.hud.els.speed.textContent, spd: g.player.speed })`);
     await t.release();
     const shown = parseInt(txt.match(/\d+/)?.[0] ?? '-1', 10);
