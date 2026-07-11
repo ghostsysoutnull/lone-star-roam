@@ -14,8 +14,10 @@ See `ROADMAP.md` for planned work and known limitations before proposing feature
 # Run (ES modules require http, not file://)
 python3 -m http.server 8317    # then open http://localhost:8317
 
-# Syntax-check all modules (no test suite exists)
-for f in src/*.js tools/*.mjs; do node --check "$f"; done
+# Session status in one call: git sync + dirty tree + recent commits +
+# NEXT_SESSION.md freshness + syntax check of all modules. Run at session
+# start instead of separate git/node commands, and again before committing.
+tools/status.sh
 
 # Rebuild geo data (only needed if changing the pipeline; inputs are NOT in the repo)
 node tools/build-data.mjs <us-states.json> <tx-motorways.json> <tx-trunks.json>

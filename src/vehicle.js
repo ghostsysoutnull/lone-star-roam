@@ -38,9 +38,18 @@ export class Player {
     );
     scene.add(this.shadow);
 
-    // fake light decals: headlight pool (drive), landing pool (fly low), brake glow.
-    // No real lights — sky.js owns the rig, and spot pools on coarse Lambert
-    // terrain go blotchy. Additive discs hugging hAt, like the blob shadow.
+    // real headlight (DRIVE only): one PointLight hung ahead of the nose — the
+    // lantern (mkCowboy) proved a single short-range dynamic light is affordable,
+    // and DRIVE/WALK are exclusive so the scene never pays for more than one.
+    // Omni, so it reads as thrown light, not a beam — the beam cones sell direction.
+    // Knobs: intensity/height/lead in animate()'s DRIVE branch.
+    this.headLight = new THREE.PointLight(0xffe4b8, 0, 34, 1.6);
+    this.headLight.visible = false;
+    scene.add(this.headLight);
+
+    // fake light decals: landing pool (fly low) + brake glow. A decal headlight
+    // pool shipped once and read flat (lit nothing, buried itself on slopes —
+    // terrain triangles are ~30 units); DRIVE now uses the real light above.
     const poolGeo = new THREE.CircleGeometry(1, 22).rotateX(-Math.PI / 2);
     const poolMat = (hex) => new THREE.MeshBasicMaterial({
       color: hex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false,
@@ -238,6 +247,8 @@ export class Player {
     const lightsOn = u.headlights.visible;
     const fwdX = -Math.sin(this.heading), fwdZ = -Math.cos(this.heading);
     this.lightPool.visible = this.brakePool.visible = false;
+    this.headLight.visible = false;
+    this.headLight.intensity = 0;
     u.beams.visible = false;
     this.wings.userData.landing.visible = false;
 
@@ -245,12 +256,13 @@ export class Player {
       u.beams.visible = lightsOn;
       if (lightsOn) {
         u.beams.children[0].material.opacity = 0.07 + Math.min(1, ATMOS.rain) * 0.12;
-        const px = this.pos.x + fwdX * 5.2, pz = this.pos.z + fwdZ * 5.2;
-        this.lightPool.visible = true;
-        this.lightPool.position.set(px, hAt(px, pz) + 0.12, pz);
-        this.lightPool.rotation.y = this.heading;
-        this.lightPool.scale.set(1.9, 1, 3.1);
-        this.lightPool.material.opacity = 0.26 * nf;
+        // real headlight: leads the nose (a touch farther at speed), hovers at
+        // lamp height so terrain/scenery ahead genuinely brighten
+        const lead = 4.6 + Math.min(1, Math.abs(this.speed) / 24) * 2.4;
+        const px = this.pos.x + fwdX * lead, pz = this.pos.z + fwdZ * lead;
+        this.headLight.visible = true;
+        this.headLight.position.set(px, hAt(px, pz) + 1.4, pz);
+        this.headLight.intensity = (30 + Math.min(1, ATMOS.rain) * 12) * nf;
       }
       if (this.braking && nf > 0.02) {
         const bx = this.pos.x - fwdX * 2.6, bz = this.pos.z - fwdZ * 2.6;

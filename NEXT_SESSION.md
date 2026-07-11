@@ -40,12 +40,16 @@ wildlife — 34 checks green, including the full mission payout loop and the
 flee-distance regression), `t.stubGamepad`/`t.key` input stubs ready for the
 gamepad feature, screenshot policy + session-workflow rules in CLAUDE.md,
 plan + status in `TOKEN_EFFICIENCY.md` (only M4, the module index, remains).
-Also shipped: **night vehicle lights** (fake additive decals — truck headlight
-pool + beams, rain-boosted; brake glow; plane landing light under 16 AGL;
-freight loco beams) with a `lights` suite; `t.setWeather`/`setDay`/`setNight`
-harness helpers. Opacity knobs in vehicle.js `animate()` if the look needs
-tuning by eye. **Ask before coding** — present the plan and wait for the
-go-ahead.
+Also shipped: **night vehicle lights** with a `lights` suite and
+`t.setWeather`/`setDay`/`setNight` harness helpers. The truck's decal ground
+pool read flat in play, so DRIVE now runs a **real PointLight** ahead of the
+nose (`player.headLight`, lantern-style — DRIVE/WALK are exclusive so it's
+still one dynamic light total), rain-boosted, plus the fake beam cones; knobs
+(intensity/height/lead) in vehicle.js `animate()` DRIVE branch. FLY keeps the
+decal landing pool (under 16 AGL); freight locos keep beam cones. Session
+boot/pre-commit status is one command now: **`tools/status.sh`** (git sync +
+dirty tree + NEXT_SESSION freshness + syntax). **Ask before coding** — present
+the plan and wait for the go-ahead.
 
 Today's candidates (my pick order):
 
