@@ -165,7 +165,7 @@ export default async function lights(t) {
     await t.ev('g.ufo.startSaucer(g.player.pos.x, g.player.pos.z, true)');
     const s0 = await t.ev(`(() => { const s = g.ufo.saucer.position; return { state: g.ufo.state, hoverT: g.ufo.hoverT, agl: s.y - g.hAt(s.x, s.z) }; })()`);
     t.ok(s0.state === 'hover', `immediate start not hovering: ${s0.state}`);
-    t.ok(s0.hoverT >= 40, `encounter too short: ${s0.hoverT.toFixed(1)}s`);
+    t.ok(s0.hoverT >= 120, `encounter too short: ${s0.hoverT.toFixed(1)}s`);
     t.ok(s0.agl > 8 && s0.agl < 60, `saucer not above the terrain: agl ${s0.agl.toFixed(1)}`); // 13 nominal, minus bob/lerp lag
     // drive off 150 units — the saucer must close back to its standoff and hold
     await t.tp(-4900 + 150, 750);

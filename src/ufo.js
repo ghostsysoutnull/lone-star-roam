@@ -124,7 +124,7 @@ export class UFOSystem {
 
     if (this.state === 'approach') {
       s.position.lerp(this.tgt, Math.min(1, dt * 0.7));
-      if (s.position.distanceTo(this.tgt) < 12) { this.state = 'hover'; this.hoverT = 40 + Math.random() * 30; }
+      if (s.position.distanceTo(this.tgt) < 12) { this.state = 'hover'; this.hoverT = 120 + Math.random() * 90; }
     } else if (this.state === 'hover') {
       this.hoverT -= dt;
       s.position.lerp(this.tgt, Math.min(1, dt * 2.2)); // shadows the player in any mode
@@ -161,7 +161,7 @@ export class UFOSystem {
     this.stalkA = Math.random() * Math.PI * 2;
     if (immediate) {
       this.state = 'hover';
-      this.hoverT = 40 + Math.random() * 30;
+      this.hoverT = 120 + Math.random() * 90;
       const sx = px + Math.cos(this.stalkA) * 36, sz = pz + Math.sin(this.stalkA) * 36;
       this.saucer.position.set(sx, Math.max(hAt(px, pz), hAt(sx, sz)) + 13, sz);
     } else {
