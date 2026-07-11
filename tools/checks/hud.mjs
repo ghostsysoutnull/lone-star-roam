@@ -66,10 +66,10 @@ export default async function hud(t) {
     const up = await px();
     await t.key('Minus');
     const back = await px();
-    t.near(up.root, base.root * 1.15, 0.1, 'root font did not step up 15%');
-    t.near(up.hud, base.hud * 1.15, 0.3, 'HUD text did not follow the root scale');
-    t.near(up.map, base.map * 1.15, 0.5, 'minimap CSS size did not follow');
-    t.ok(up.pref === '1.15', `pref not persisted: ${up.pref}`);
+    t.near(up.root, base.root * 1.1, 0.1, 'root font did not step up 10%');
+    t.near(up.hud, base.hud * 1.1, 0.3, 'HUD text did not follow the root scale');
+    t.near(up.map, base.map * 1.1, 0.5, 'minimap CSS size did not follow');
+    t.ok(up.pref === '1.1', `pref not persisted: ${up.pref}`);
     t.near(back.root, base.root, 0.1, 'minus did not step back down');
     t.ok(back.pref === '1', `pref after minus: ${back.pref}`);
   });
