@@ -98,6 +98,7 @@ export class Player {
 
   update(dt) {
     dt = Math.min(dt, 0.05);
+    this.simT = (this.simT ?? 0) + dt; // physics-time for tests: headless frames run slower than the wall clock
     const k = this.keys;
     const fwd = k['KeyW'] || k['ArrowUp'], back = k['KeyS'] || k['ArrowDown'];
     const left = k['KeyA'] || k['ArrowLeft'], right = k['KeyD'] || k['ArrowRight'];

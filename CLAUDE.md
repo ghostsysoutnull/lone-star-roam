@@ -21,7 +21,13 @@ for f in src/*.js tools/*.mjs; do node --check "$f"; done
 node tools/build-data.mjs <us-states.json> <tx-motorways.json> <tx-trunks.json>
 ```
 
-Headless verification (no system browser here): `npm install playwright` in a scratch dir, `npx playwright install chromium`, launch with `--no-sandbox --enable-unsafe-swiftshader` for WebGL. The game exposes `window.__game = { player, gameplay, GEO }` for test scripts — teleport via `player.pos.set(x, 0, z)`, switch modes via `player.setMode('WALK')`.
+Headless verification: `node tools/verify.mjs [suite…]` — checked-in harness (own static server + cached Chromium), suites in `tools/checks/*.mjs`, one PASS/FAIL line per check. One-time setup: `cd ~/.cache/lonestar-verify && npm i playwright-core` (browser from `~/.cache/ms-playwright`). The game exposes everything on `window.__game` (player, all systems, `nearestRoad`/`inTexas`/`hAt`, `ATMOS`, `clock`) — teleport via `player.pos.set(x, 0, z)`, switch modes via `player.setMode('WALK')`.
+
+Verification rules:
+- **Assert numbers, not pixels**: positions, speeds, headings, save state, DOM text. Screenshots (`t.shot`) only for genuinely visual judgments (composition, color, animation feel), max one per judgment, never the pass/fail signal — the charging-deer bug passed screenshot review and failed a distance-over-time assertion.
+- **Wait in physics time, not wall time**: headless frames run ~5–15 fps and `Player.update` clamps dt at 0.05, so wall-clock waits under-simulate 2–3×. Use `t.simWait(s)` (polls `player.simT`); expected values that depend on weather must read live `ATMOS`.
+- **Location matters**: caps/behaviors change when the player strays within 4 units of any road — pick test spots with a road-free bubble covering the whole run, and use the empty I-10 west stretch (≈ x −2767, z 334) for clean motorway runs; Austin's real arterials clamp speed mid-run.
+- New feature → add checks to an existing suite (or a new `tools/checks/<suite>.mjs`), don't write throwaway scripts. Run the full suite before committing — pushes deploy to GitHub Pages.
 
 Re-downloading OSM inputs: Overpass **POST fails (406) from this environment — use GET** (`curl -sG --data-urlencode 'data=…'`). The `maps.mail.ru/osm/tools/overpass` mirror handles the large bbox queries when `overpass-api.de` is busy.
 
@@ -55,6 +61,11 @@ Re-downloading OSM inputs: Overpass **POST fails (406) from this environment —
 
 ### Verification lesson (learned twice)
 Headless tests keep passing at *convenient* values while play breaks at *natural* ones: the compass was only ever tested at heading 0/90 (on the tick grid), plaques only at close walk distance (inside a too-small radius). When verifying HUD/interaction features, always test at ugly mid-drive values and at the distance a player actually parks (the collect-toast radius).
+
+### Session workflow
+- Expose every new system on `window.__game` at birth (main.js) — testability is free at creation, expensive to retrofit.
+- Never change `seededRand` seed strings: determinism is what makes bugs cheaply reproducible, and players' saves + spatial memory depend on it.
+- Session end: update `NEXT_SESSION.md` (candidates + gotchas only — ROADMAP.md holds history) and run `node tools/verify.mjs` before the final commit.
 
 ### Performance patterns to preserve
 - All roads are a handful of merged meshes (one per tier: motorway/trunk/primary/street + stripe), built once — not chunked, not per-polyline. Tiers also drive speed caps (`vehicle.js`) and map styling (`hud.js`). Cities near a `street`-tier road skip their fake procedural grid (`hasRealStreets` in `cities.js`).

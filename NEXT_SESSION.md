@@ -11,10 +11,11 @@ free-roam Texas game. Read `CLAUDE.md` (architecture + commands + gotchas) and
 Key facts:
 - **Live & public**: https://ghostsysoutnull.github.io/lone-star-roam/ — every push
   to `main` deploys there within ~2 min, so verify before committing.
-- Local dev: `python3 -m http.server 8317`; verify headlessly with Playwright from
-  the scratchpad (`--no-sandbox --enable-unsafe-swiftshader`), driving the game via
-  the `window.__game` debug hook (player/gameplay/sky/npcs/trains/ufo/animals/
-  traffic/missions/GEO).
+- Local dev: `python3 -m http.server 8317`; verify headlessly with
+  **`node tools/verify.mjs [suite…]`** (checked-in harness; deps persist in
+  `~/.cache/lonestar-verify`). Add checks to `tools/checks/*.mjs`, never write
+  throwaway Playwright scripts. Wait in physics time (`t.simWait`), assert
+  numbers not screenshots — full rules in CLAUDE.md "Verification rules".
 - When I report something broken after an update, suspect my browser cache first
   (hard refresh) — python http.server sends no cache headers.
 - Verify at *natural* play values (ugly mid-drive headings, parked-truck
@@ -32,6 +33,14 @@ Austin bat emergence at dusk), nocturnal/diurnal hours, herd startles, coyote
 howls, Space horn in DRIVE. A real bug fell out: fleeing animals had an
 inverted heading and were charging the player — distance-over-time assertions
 caught it where screenshots hadn't.
+
+Session 4 (2026-07-10, later) shipped the **token-efficiency pass** instead of
+features: `tools/verify.mjs` harness + `drive` suite (8 checks green), screenshot
+policy and session-workflow rules in CLAUDE.md, plan + status in
+`TOKEN_EFFICIENCY.md`. Still open there: M2 (missions/wildlife/traffic/hud
+suites — grow one per feature session; `stubGamepad` lands with the gamepad
+feature) and M4 (module "where things live" index, next CLAUDE.md touch).
+**Ask before coding** — present the plan and wait for the go-ahead.
 
 Today's candidates (my pick order):
 
