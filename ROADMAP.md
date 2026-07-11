@@ -156,6 +156,12 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   recharging 3-flare rack; ballistic tracer arc, ignites at apex, sinks under a
   parachute drifting with the wind, real pooled PointLights (fixed count — no
   shader recompiles) sweep the terrain for ~14 s; burns out where it lands.
+- [x] ~~UI text size setting~~ — done 2026-07-10: +/- steps all HUD/menu text
+  ±10% (90%–200%), persisted (`lonestar-ui-scale`, separate from the save).
+  One root font-size drives it: all UI CSS is rem-based (1rem = 10px at 100%),
+  minimap/compass/dialog/travel panels sized in rem so they grow with their
+  text. Compass tape crowds the top corners at 170%+ on 1080p — cap it if
+  playtest says so.
 - [ ] Mobile touch controls (virtual stick + buttons)
 
 ## Non-goals

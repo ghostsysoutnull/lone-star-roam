@@ -55,6 +55,15 @@ one command now: **`tools/status.sh`** (git sync + dirty tree + NEXT_SESSION
 freshness + syntax). **Ask before coding** — present the plan and wait for
 the go-ahead.
 
+Session 5 (2026-07-10, later still) shipped the **UI text size setting** (QoL):
++/- (or numpad) steps all HUD/menu text ±10% from 90% to 200%, persisted in
+`lonestar-ui-scale` (separate from the save). Mechanism: all UI CSS in
+`index.html` is now **rem-based** (1rem = 10px at 100%) and `hud.uiScale`
+retunes the root font-size — so any new UI styles must use rem for font sizes
+and panel dimensions (rule recorded in CLAUDE.md's hud.js bullet). Minimap/
+compass/dialog/travel panels grow with the text (canvas labels scale sharply
+for free — they render at 2× and are displayed via CSS size). Pushed live.
+
 Today's candidates (my pick order):
 
 1. **Gamepad analog steering** (~1 hour, biggest driving-feel win) — Gamepad API
@@ -94,6 +103,10 @@ jobs that punish offroading).
   10 s) and the launch thump / ignite spark mix (`audio.js` `flare()`). Also
   judge the new truck headlight throw at night (intensity 30 in vehicle.js
   `animate()` DRIVE branch).
+- **Playtest the UI scale**: tap +/- through the range; at 170%+ on 1080p the
+  compass tape starts crowding the top-left location text and the score panel —
+  decide whether to cap the compass width (slight text stretch) or stop panel
+  growth past ~150% while fonts keep growing.
 - Saves are per-browser (localStorage): localhost and the public URL have
   separate progress. Mission bankroll shows in the score panel (💵) and on H.
 - N mutes audio; C toggles compass; the 👽 counter only appears on H after a
