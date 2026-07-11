@@ -51,11 +51,13 @@ export default async function shop(t) {
       g.gameplay.save.bank = 0;
       g.travel.tab = 'Shop'; g.travel.render();
       const btns = [...document.querySelectorAll('#travel .poi-list button')];
+      const swatches = btns.filter((b) => b.dataset.i.startsWith('paint:'));
       g.travel.buyItem('engine');
-      return { n: btns.length, disabled: btns.every((b) => b.disabled),
+      return { n: btns.length - swatches.length, sw: swatches.length, disabled: btns.every((b) => b.disabled),
                lvl: g.gameplay.save.gear.engine ?? 0, bank: g.gameplay.save.bank };
     })()`);
-    t.ok(r.n === 4, `${r.n} shop items rendered, expected 4`);
+    t.ok(r.n === 5, `${r.n} shop items rendered, expected 5`);
+    t.ok(r.sw === 7, `${r.sw} paint swatches rendered, expected 7`);
     t.ok(r.disabled, 'an unaffordable item was clickable');
     t.ok(r.lvl === 0 && r.bank === 0, `broke purchase went through (lvl ${r.lvl}, bank ${r.bank})`);
   });
@@ -151,9 +153,41 @@ export default async function shop(t) {
     await t.ev(`g.player.setMode('DRIVE')`);
   });
 
+  await t.check('weather radio: forecast on the HUD, then the weather arrives', async () => {
+    await t.setWeather('clear');
+    // a pending forecast means nothing without the radio
+    await t.ev(`(g.sky.forecast = 'storm', g.sky.forecastT = 8, g.sky.nextPick = 300)`);
+    await t.wait(0.5); // ≥1 HUD tick at 12 Hz
+    t.ok(!(await t.ev(`g.hud.els.mode.textContent.includes('📻')`)), 'forecast shown without the radio');
+    await t.ev('g.gameplay.save.bank = 400');
+    const bank = await buyOut(t, 'radio', 1);
+    t.ok(bank === 0, 'radio price not deducted exactly');
+    await t.until(`g.hud.els.mode.textContent.includes('📻')`, 8000);
+    // the forecast lands: target flips to storm and ATMOS follows
+    await t.until(`g.ATMOS.weather === 'storm'`, 30000);
+    t.ok(!(await t.ev('g.sky.forecast')), 'forecast not cleared after arrival');
+    await t.setWeather('clear');
+  });
+
+  await t.check('paint shop: $250 a coat, truck recolors, same coat rejected', async () => {
+    const hex1 = await t.ev(`(() => {
+      g.gameplay.save.bank = 500;
+      g.travel.tab = 'Shop'; g.travel.render();
+      g.travel.buyItem('paint:1');
+      return g.player.truck.userData.bodyMat.color.getHex();
+    })()`);
+    t.ok(hex1 === 0xbf5700, `burnt orange not applied (got #${hex1.toString(16)})`);
+    t.ok((await t.ev('g.gameplay.save.bank')) === 250, 'coat price not deducted exactly');
+    await t.ev(`g.travel.buyItem('paint:1')`); // already wearing it — must bounce
+    t.ok((await t.ev('g.gameplay.save.bank')) === 250, 'repaint in the same color charged');
+    await t.ev(`g.travel.buyItem('paint:5')`);
+    t.ok((await t.ev('g.player.truck.userData.bodyMat.color.getHex()')) === 0x23262c, 'second coat not applied');
+    t.ok((await t.ev('g.gameplay.save.bank')) === 0, 'second coat not charged');
+  });
+
   await t.check('gear levels persist in the save', async () => {
     const gear = await t.ev(`JSON.parse(localStorage['lonestar-roam-save-v1']).gear`);
-    for (const [id, lvl] of [['engine', 3], ['tires', 3], ['lights', 3], ['dog', 1]])
+    for (const [id, lvl] of [['engine', 3], ['tires', 3], ['lights', 3], ['dog', 1], ['radio', 1], ['paint', 5]])
       t.ok(gear?.[id] === lvl, `gear.${id} = ${gear?.[id]}, expected ${lvl}`);
   });
 }

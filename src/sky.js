@@ -25,11 +25,11 @@ const KEYS = [
 
 // weather archetypes: cloud coverage, fog range multiplier, fog/sky tint + strength, wind, rain, lightning
 const WEATHER = {
-  clear: { clouds: 0.12, fogMul: 1.0, tint: 0x9fc8e8, tintK: 0, wind: 1, rain: 0, bolts: false, icon: '☀️' },
-  clouds: { clouds: 0.7, fogMul: 0.85, tint: 0x9aa5b0, tintK: 0.35, wind: 1.6, rain: 0, bolts: false, icon: '⛅' },
-  rain: { clouds: 0.95, fogMul: 0.5, tint: 0x707a85, tintK: 0.65, wind: 2.2, rain: 1, bolts: false, icon: '🌧️' },
-  storm: { clouds: 1, fogMul: 0.38, tint: 0x555a66, tintK: 0.8, wind: 3, rain: 1.6, bolts: true, icon: '⛈️' },
-  dust: { clouds: 0.25, fogMul: 0.22, tint: 0xc29a5a, tintK: 0.85, wind: 2.6, rain: 0, bolts: false, icon: '🌪️' },
+  clear: { clouds: 0.12, fogMul: 1.0, tint: 0x9fc8e8, tintK: 0, wind: 1, rain: 0, bolts: false, icon: '☀️', name: 'clear skies' },
+  clouds: { clouds: 0.7, fogMul: 0.85, tint: 0x9aa5b0, tintK: 0.35, wind: 1.6, rain: 0, bolts: false, icon: '⛅', name: 'cloud cover' },
+  rain: { clouds: 0.95, fogMul: 0.5, tint: 0x707a85, tintK: 0.65, wind: 2.2, rain: 1, bolts: false, icon: '🌧️', name: 'rain' },
+  storm: { clouds: 1, fogMul: 0.38, tint: 0x555a66, tintK: 0.8, wind: 3, rain: 1.6, bolts: true, icon: '⛈️', name: 'a thunderstorm' },
+  dust: { clouds: 0.25, fogMul: 0.22, tint: 0xc29a5a, tintK: 0.85, wind: 2.6, rain: 0, bolts: false, icon: '🌪️', name: 'a dust storm' },
 };
 // regional weather odds — Gulf drizzle, Panhandle storms, West Texas dust
 const ODDS = {
@@ -72,6 +72,8 @@ export class SkySystem {
     this.target = 'clear';
     this.blend = 1;       // 1 = fully at target
     this.nextPick = 60;
+    this.forecast = null; // picked-but-not-arrived state — the weather-radio window
+    this.forecastT = 0;
     this.boltT = 5;
     this.flash = 0;
 
@@ -249,8 +251,16 @@ export class SkySystem {
       this.nextPick = 90 + Math.random() * 90;
       const odds = ODDS[regionOf(px, pz)];
       let r = Math.random();
-      for (const [w, p] of odds) { r -= p; if (r <= 0) { this.target = w; break; } }
-      if (this.target !== this.weather) this.blend = 0;
+      let pick = this.target;
+      for (const [w, p] of odds) { r -= p; if (r <= 0) { pick = w; break; } }
+      // announce first, arrive later: the change holds as a forecast for a
+      // spell (only weather-radio owners see it), then blends in as before
+      if (pick !== this.target) { this.forecast = pick; this.forecastT = 25 + Math.random() * 20; }
+    }
+    if (this.forecast && (this.forecastT -= dt) <= 0) {
+      this.target = this.forecast;
+      this.forecast = null;
+      this.blend = 0;
     }
     if (this.blend < 1) {
       this.blend = Math.min(1, this.blend + dt / 9); // ~9 s crossfade
@@ -384,6 +394,13 @@ export class SkySystem {
     const h = Math.floor(h24), m = Math.floor((h24 - h) * 60);
     return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
+
+  // weather-radio readouts (gated on the shop perk by main.js)
+  forecastLine() {
+    return this.forecast ? `📻 ${WEATHER[this.forecast].icon} in ${Math.max(1, Math.ceil(this.forecastT))}s` : null;
+  }
+
+  forecastName() { return this.forecast ? WEATHER[this.forecast].name : null; }
 
   weatherIcon() {
     if (ATMOS.night > 0.6 && this.target === 'clear') return '🌙';

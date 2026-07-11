@@ -113,7 +113,7 @@ function mkT(page) {
     // Poll until ATMOS reflects it: a wall-clock sleep loses to slow frames,
     // and consumers (player.update) read it one frame later still.
     async setWeather(name) {
-      await ev(`(g.sky.weather = g.sky.target = '${name}', g.sky.blend = 1, g.sky.nextPick = 120)`);
+      await ev(`(g.sky.weather = g.sky.target = '${name}', g.sky.blend = 1, g.sky.nextPick = 120, g.sky.forecast = null)`);
       await t.until(`g.ATMOS.weather === '${name}'`, 10000);
     },
     // poll an expression until truthy — for phase transitions with their own cadence

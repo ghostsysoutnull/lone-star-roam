@@ -111,8 +111,14 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   of Texas, `src/dog.js`): rides the truck bed facing backward, perches on the
   cargo crates mid-haul, hops out and heels to the cowboy in WALK, tail never
   stops, and yips a beat after the horn. Purchase levels in `save.gear`
-  (new key only). 7-check `shop` verify suite measures the upgrades as
-  driven speeds, not stat reads.
+  (new key only). 9-check `shop` verify suite measures the upgrades as
+  driven speeds, not stat reads. Wave 2 (same day): **weather radio** ($400)
+  — weather picks now hold as a 25–45 s `sky.forecast` before blending in
+  (invisible without the radio); owners get a 📻 HUD countdown + a toast when
+  the forecast breaks. And the **paint shop** ($250 a coat, repeatable):
+  7 Texas-flavored truck colors as a swatch row in the Shop tab, worn coat
+  in `save.gear.paint`, applied to the shared body material
+  (`truck.userData.bodyMat`).
 - [x] ~~County system~~ — done 2026-07-10: all 254 real county boundaries (Census
   500k, 143 KB), county in the HUD location line, crossing toasts + chime with
   zigzag debounce, collect-all-254 counter, faint ground lines + map lines.

@@ -73,8 +73,13 @@ in WALK, yips a beat after the Space horn. Mechanism: `save.gear` (new save
 key) → `applyGear()` in `src/shop.js` → `player.perks` multipliers read by
 vehicle.js's DRIVE branch; all price/effect knobs at the top of `shop.js`.
 New modules `shop.js`/`dog.js` (both in CLAUDE.md's module graph), `dog` on
-`__game`, 7-check `shop` verify suite (upgrades asserted as *driven* speeds
-over sim time, dog follow as distance-over-time). 51 checks green.
+`__game`, `shop` verify suite (upgrades asserted as *driven* speeds
+over sim time, dog follow as distance-over-time). Wave 2 (same session):
+**weather radio** ($400) — weather picks now hold as `sky.forecast` for
+25–45 s before blending (no visible change without the radio); owners get a
+📻 countdown on the HUD clock line + a toast when the forecast breaks. And
+the **paint shop** ($250 a coat): 7 truck colors as a swatch row, worn coat
+in `save.gear.paint`, recolors `truck.userData.bodyMat`. 53 checks green.
 
 Today's candidates (my pick order):
 
@@ -102,6 +107,10 @@ uncollected roses was the brainstorm favorite).
   top of `src/shop.js`. Buy Lacy, honk at a herd, then park, walk (V) and watch
   her hop out and heel; judge the yip mix level (`bark()` in `src/audio.js`)
   and the crate perch during a haul.
+- **Playtest wave 2**: buy the radio and drive the Gulf coast (weather flips
+  often there) — is the 25–45 s warning window (`forecastT` in sky.js) long
+  enough to be useful mid-haul? Try a couple of paint coats; judge the maroon
+  and black in daylight vs. night (hexes in `PAINTS`, `src/shop.js`).
 - **Playtest the wildlife pass**: honk (Space) at a longhorn herd vs. a deer
   herd; hunt the dusk bats in Austin (~18:40–20:15 game time, P → Cities →
   Austin then fly east along the river); listen for the coyote howl at night in

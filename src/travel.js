@@ -3,7 +3,7 @@
 // arrival: cities land you on a road in drive mode, sights hover in fly mode.
 import { GEO, nearestRoad } from './geo.js';
 import { LANDMARKS } from './gameplay.js';
-import { SHOP, ROMAN, buy, applyGear, gearLevel } from './shop.js';
+import { SHOP, ROMAN, PAINTS, PAINT_PRICE, buy, buyPaint, applyGear, gearLevel } from './shop.js';
 
 // same projection as the data pipeline
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
@@ -141,26 +141,40 @@ export class TravelMenu {
       const maxed = lvl >= item.prices.length;
       const multi = item.prices.length > 1;
       const owned = !lvl ? '' : multi ? ` ${ROMAN[lvl - 1]}` : ' ✔';
-      const line = maxed ? (multi ? 'Fully upgraded' : 'She rides with you') : item.tiers[lvl];
+      const line = maxed ? (item.done ?? 'Fully upgraded') : item.tiers[lvl];
       const price = maxed ? '' : ` · $${item.prices[lvl]}`;
       const cant = maxed || save.bank < item.prices[lvl];
       return `<button data-i="${item.id}" ${cant ? 'disabled' : ''}>${item.icon} <b>${item.name}</b>${owned}<br>
         <small style="opacity:.75">${line}${price}</small></button>`;
     }).join('');
+    // paint shop: repeatable — swatch row, the worn coat outlined
+    const cur = save.gear.paint ?? 0;
+    html += `<div style="grid-column:1/-1;background:#243046;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 12px;font-size:1.3rem">
+      🎨 <b>Paint shop</b> — $${PAINT_PRICE} a coat · wearing ${PAINTS[cur].name}<br>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${PAINTS.map((p, i) =>
+        `<button data-i="paint:${i}" title="${p.name}" ${i === cur || save.bank < PAINT_PRICE ? 'disabled' : ''}
+          style="width:2.8rem;height:2rem;padding:0;border-radius:5px;background:#${p.hex.toString(16).padStart(6, '0')};${i === cur ? 'outline:2px solid #ffd35c' : ''}"></button>`).join('')}
+      </div></div>`;
     this.el.querySelector('.poi-list').innerHTML = html;
     this.el.querySelector('.hint').textContent =
       'Deliveries pay for upgrades — effects apply instantly and persist with your save.';
   }
 
   buyItem(id) {
-    const r = buy(this.gameplay.save, id);
-    if (!r) return;
+    if (id.startsWith('paint:')) {
+      const r = buyPaint(this.gameplay.save, +id.slice(6));
+      if (!r) return;
+      this.onToast?.(`🎨 Fresh coat of ${r.name} (−$${r.price})`);
+    } else {
+      const r = buy(this.gameplay.save, id);
+      if (!r) return;
+      const tier = r.item.prices.length > 1 ? ` ${ROMAN[r.lvl - 1]}` : '';
+      this.onToast?.(id === 'dog'
+        ? `🐕 Lacy hops in the bed — she's your dog now (−$${r.price})`
+        : `${r.item.icon} ${r.item.name}${tier} installed (−$${r.price})`);
+    }
     this.gameplay.persist();
     applyGear(this.gameplay.save, this.player, this.dog);
-    const tier = r.item.prices.length > 1 ? ` ${ROMAN[r.lvl - 1]}` : '';
-    this.onToast?.(id === 'dog'
-      ? `🐕 Lacy hops in the bed — she's your dog now (−$${r.price})`
-      : `${r.item.icon} ${r.item.name}${tier} installed (−$${r.price})`);
     this.onChime?.('buy');
     this.render();
   }

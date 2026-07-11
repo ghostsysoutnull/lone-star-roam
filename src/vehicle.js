@@ -457,7 +457,7 @@ function mkTruck() {
   cargo.visible = false;
   g.add(cargo);
 
-  g.userData = { headlights: lights, wheels, brakes, cargo, beams };
+  g.userData = { headlights: lights, wheels, brakes, cargo, beams, bodyMat: body };
   return g;
 }
 

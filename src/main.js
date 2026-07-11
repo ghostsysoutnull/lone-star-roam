@@ -136,6 +136,7 @@ async function boot() {
   window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, traffic, missions, travel, dog, flares, hud, nearestRoad, inTexas, hAt, ATMOS, clock, SPECIES };
 
   let hudTick = 0;
+  let lastForecast = null; // weather-radio announcement edge detector
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
     player.update(dt);
@@ -171,7 +172,11 @@ async function boot() {
       gameplay.enterCounty(county, hudTick);
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
       hud.mission = missions.hudInfo(player.pos);
-      hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading), county);
+      if (sky.forecast !== lastForecast) { // weather radio breaks in on a fresh forecast
+        if (sky.forecast && player.perks.radio) hud.toast(`📻 Weather radio: ${sky.forecastName()} rolling in`);
+        lastForecast = sky.forecast;
+      }
+      hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading), county, player.perks.radio ? sky.forecastLine() : null);
       hudTick = 0;
     }
     renderer.render(scene, camera);
