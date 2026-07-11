@@ -100,8 +100,19 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
   traffic. Guidance: target diamond on the compass tape + a floating 3D guide
   arrow over the player (G toggles, preference persisted); both turn red when
   late. Deadline/pay knobs live at the top of `genOffers()` in
-  `src/missions.js`. Next: truck upgrades to spend the bankroll on, real
-  highway routing for route lines + road-distance pay.
+  `src/missions.js`. Next: real highway routing for route lines +
+  road-distance pay.
+- [x] ~~Shop: truck upgrades + Lacy~~ — done 2026-07-11: 🛒 Shop tab in the
+  travel menu spends the mission bankroll. Three 3-tier upgrade lines at
+  $350/$900/$1800 — engine (+8/16/24% road top speed), ranch tires (offroad
+  cap 20→32, rain drag 22%→8%), headlights (real-lamp intensity 30→80) —
+  applied as `player.perks` (vehicle.js reads perks, never the save; balance
+  knobs atop `src/shop.js`). Plus **Lacy the Blue Lacy** ($750, the state dog
+  of Texas, `src/dog.js`): rides the truck bed facing backward, perches on the
+  cargo crates mid-haul, hops out and heels to the cowboy in WALK, tail never
+  stops, and yips a beat after the horn. Purchase levels in `save.gear`
+  (new key only). 7-check `shop` verify suite measures the upgrades as
+  driven speeds, not stat reads.
 - [x] ~~County system~~ — done 2026-07-10: all 254 real county boundaries (Census
   500k, 143 KB), county in the HUD location line, crossing toasts + chime with
   zigzag debounce, collect-all-254 counter, faint ground lines + map lines.

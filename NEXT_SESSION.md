@@ -64,27 +64,44 @@ and panel dimensions (rule recorded in CLAUDE.md's hud.js bullet). Minimap/
 compass/dialog/travel panels grow with the text (canvas labels scale sharply
 for free — they render at 2× and are displayed via CSS size). Pushed live.
 
+Session 6 (2026-07-11) shipped the **Shop** — the bankroll finally buys things.
+🛒 Shop tab in the travel menu (P): three 3-tier upgrade lines at $350/900/1800
+(engine +8/16/24% road top speed; ranch tires offroad 20→32 + rain drag
+22%→8%; headlights 30→80 lamp intensity) and **Lacy the Blue Lacy** ($750) —
+rides the truck bed, perches on the cargo crates mid-haul, heels to the cowboy
+in WALK, yips a beat after the Space horn. Mechanism: `save.gear` (new save
+key) → `applyGear()` in `src/shop.js` → `player.perks` multipliers read by
+vehicle.js's DRIVE branch; all price/effect knobs at the top of `shop.js`.
+New modules `shop.js`/`dog.js` (both in CLAUDE.md's module graph), `dog` on
+`__game`, 7-check `shop` verify suite (upgrades asserted as *driven* speeds
+over sim time, dog follow as distance-over-time). 51 checks green.
+
 Today's candidates (my pick order):
 
 1. **Gamepad analog steering** (~1 hour, biggest driving-feel win) — Gamepad API
    axes/buttons alongside the keyboard: left stick steer, triggers throttle/brake,
    buttons for mode/interact/map. Poll in `Player.update`; keep keyboard working.
-2. **Truck upgrades** — something to spend the mission bankroll on: top speed /
-   acceleration / better headlights tiers, bought from the Jobs tab. Save under
-   new keys; apply as multipliers in the DRIVE branch of `vehicle.js`.
-3. **Big-map click-to-set-waypoint** — click on M-map → target marker. The whole
+   `t.stubGamepad` is already in the harness waiting.
+2. **Big-map click-to-set-waypoint** — click on M-map → target marker. The whole
    rendering stack already exists for missions (map diamond + compass-tape diamond
    in `hud.js` via `hud.mission`, 3D guide arrow in `missions.js`); generalize
    "current target" so a map click feeds the same pipeline.
+3. **Mission variety** — multi-stop hauls, fragile-cargo jobs that punish
+   offroading; with upgrades in, the economy can support bigger payouts.
 
 If those finish early: real highway A* routing (route lines on the map,
-road-distance mission pay), or mission variety (multi-stop hauls, fragile-cargo
-jobs that punish offroading).
+road-distance mission pay), or more shop lines (rose dowser that pings near
+uncollected roses was the brainstorm favorite).
 
 ---
 
 ## Notes for me (the human)
 
+- **Playtest the shop loop**: earn a few hauls, buy engine I and tires I —
+  does the speed gain *feel* worth $350? Prices/effects are knob arrays at the
+  top of `src/shop.js`. Buy Lacy, honk at a herd, then park, walk (V) and watch
+  her hop out and heel; judge the yip mix level (`bark()` in `src/audio.js`)
+  and the crate perch during a haul.
 - **Playtest the wildlife pass**: honk (Space) at a longhorn herd vs. a deer
   herd; hunt the dusk bats in Austin (~18:40–20:15 game time, P → Cities →
   Austin then fly east along the river); listen for the coyote howl at night in

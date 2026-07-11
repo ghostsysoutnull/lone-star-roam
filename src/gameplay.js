@@ -49,6 +49,7 @@ export class Gameplay {
     this.save.bank ??= 0;      // delivery earnings — pure score for now
     this.save.jobsDone ??= 0;
     this.save.job ??= null;    // active delivery, serialized by missions.js
+    this.save.gear ??= {};     // shop purchase levels by item id (shop.js)
     this.saveTimer = 0;
     this.countyNow = null;
     this.countyToastT = 0;

@@ -22,6 +22,8 @@ export class Player {
     this.prevSpeed = 0;
     this.pitchVis = 0;
     this.braking = false;
+    // stock drive stats; shop.js applyGear() overwrites these with upgrade tiers
+    this.perks = { engineCap: 1, offroadCap: 20, offroadAccel: 14, rainDrag: 0.22, lightI: 30 };
 
     this.truck = mkTruck();
     this.wings = mkWings();
@@ -130,9 +132,9 @@ export class Player {
       const road = nearestRoad(this.pos.x, this.pos.z, 4);
       // top speed by road tier; offroad is slow going
       const caps = { motorway: 46, trunk: 38, primary: 33, street: 26 };
-      const wet = 1 - Math.min(1, ATMOS.rain) * 0.22; // rain slows you like it slows traffic
-      const maxSpd = (road ? caps[road.type] : 20) * wet;
-      const accel = road ? 26 : 14;
+      const wet = 1 - Math.min(1, ATMOS.rain) * this.perks.rainDrag; // rain slows you like it slows traffic
+      const maxSpd = (road ? caps[road.type] * this.perks.engineCap : this.perks.offroadCap) * wet;
+      const accel = road ? 26 : this.perks.offroadAccel;
       if (fwd) this.speed += accel * dt;
       else if (back) { this.speed -= (this.speed > 0 ? 40 : 12) * dt; this.braking = this.speed > 0.5; }
       else this.speed *= Math.pow(0.35, dt); // coast friction
@@ -262,7 +264,7 @@ export class Player {
         const px = this.pos.x + fwdX * lead, pz = this.pos.z + fwdZ * lead;
         this.headLight.visible = true;
         this.headLight.position.set(px, hAt(px, pz) + 1.4, pz);
-        this.headLight.intensity = (30 + Math.min(1, ATMOS.rain) * 12) * nf;
+        this.headLight.intensity = (this.perks.lightI + Math.min(1, ATMOS.rain) * 12) * nf;
       }
       if (this.braking && nf > 0.02) {
         const bx = this.pos.x - fwdX * 2.6, bz = this.pos.z - fwdZ * 2.6;

@@ -168,6 +168,7 @@ export class AudioSystem {
       county: [[784, 0, 0.15, 0.06], [988, 0.08, 0.22, 0.06]],
       load: [[220, 0, 0.12, 0.12], [330, 0.1, 0.2, 0.08], [440, 0.2, 0.3, 0.08]],
       cash: [[880, 0, 0.1, 0.08], [1109, 0.08, 0.1, 0.08], [1319, 0.16, 0.12, 0.09], [1760, 0.24, 0.45, 0.1]],
+      buy: [[659, 0, 0.1, 0.07], [880, 0.09, 0.12, 0.08], [1319, 0.18, 0.35, 0.09]],
     };
     for (const [f, w, d, g] of SONGS[kind] || []) this.note(f, w, d, g ?? 0.1, 'triangle');
   }
@@ -212,6 +213,28 @@ export class AudioSystem {
     } else {
       this.note(1560, 0, 0.06, 0.022, 'triangle');
       this.note(2090, 0.04, 0.05, 0.016, 'triangle');
+    }
+  }
+
+  // Lacy: a bright little double-yip — pitch whips up then falls back
+  bark() {
+    if (!this.ctx || this.muted) return;
+    const ctx = this.ctx;
+    for (const start of [0, 0.19]) {
+      const o = ctx.createOscillator();
+      o.type = 'square';
+      const t0 = ctx.currentTime + start;
+      o.frequency.setValueAtTime(480, t0);
+      o.frequency.exponentialRampToValueAtTime(920, t0 + 0.05);
+      o.frequency.exponentialRampToValueAtTime(560, t0 + 0.11);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t0);
+      g.gain.linearRampToValueAtTime(0.038, t0 + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.13);
+      o.connect(g).connect(this.sfx);
+      o.start(t0); o.stop(t0 + 0.15);
+      // a low chesty "ruff" under the yip
+      this.note(170, start, 0.09, 0.03, 'sine');
     }
   }
 

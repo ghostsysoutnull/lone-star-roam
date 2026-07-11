@@ -17,6 +17,8 @@ import { TrainSystem } from './trains.js';
 import { MaritimeSystem } from './maritime.js';
 import { UFOSystem } from './ufo.js';
 import { FlareSystem } from './flares.js';
+import { DogSystem } from './dog.js';
+import { applyGear } from './shop.js';
 import { HUD } from './hud.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
@@ -56,7 +58,10 @@ async function boot() {
   const audio = new AudioSystem();
   const npcs = new NPCSystem(scene, () => ({ night: ATMOS.night, weather: ATMOS.weather, counts: gameplay.counts() }));
   const missions = new MissionSystem(scene, gameplay, player, (m) => hud.toast(m), (k) => audio.chime(k));
-  const travel = new TravelMenu(player, gameplay, sky, npcs, missions, (m) => hud.toast(m));
+  const dog = new DogSystem(scene, player);
+  dog.onBark = () => audio.bark();
+  applyGear(gameplay.save, player, dog); // saved shop upgrades take effect at boot
+  const travel = new TravelMenu(player, gameplay, sky, npcs, missions, dog, (m) => hud.toast(m), (k) => audio.chime(k));
   const trains = new TrainSystem(scene);
   const maritime = new MaritimeSystem(scene);
   trains.onHorn = () => audio.trainHorn();
@@ -88,6 +93,7 @@ async function boot() {
       audio.honk('player');
       animals.scare(player.pos.x, player.pos.z, 26);
       npcs.startle(player.pos, 15);
+      dog.honked();
     }
     if (e.code === 'KeyV') player.cycleMode();
     if (e.code === 'KeyM') hud.toggleBigMap();
@@ -127,7 +133,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, traffic, missions, travel, flares, hud, nearestRoad, inTexas, hAt, ATMOS, clock, SPECIES };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, traffic, missions, travel, dog, flares, hud, nearestRoad, inTexas, hAt, ATMOS, clock, SPECIES };
 
   let hudTick = 0;
   renderer.setAnimationLoop(() => {
@@ -143,6 +149,7 @@ async function boot() {
     maritime.update(dt, clock.elapsedTime);
     ufo.update(dt, player.pos.x, player.pos.z, player.pos.y);
     flares.update(dt);
+    dog.update(dt);
     ATMOS.ufo = ufo.near;
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
     bats.update(dt, player.pos.x, player.pos.z, sky.t);

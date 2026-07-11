@@ -3,6 +3,7 @@
 // arrival: cities land you on a road in drive mode, sights hover in fly mode.
 import { GEO, nearestRoad } from './geo.js';
 import { LANDMARKS } from './gameplay.js';
+import { SHOP, ROMAN, buy, applyGear, gearLevel } from './shop.js';
 
 // same projection as the data pipeline
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
@@ -33,13 +34,15 @@ const ICONS = [
 ];
 
 export class TravelMenu {
-  constructor(player, gameplay, sky, npcs, missions, onToast) {
+  constructor(player, gameplay, sky, npcs, missions, dog, onToast, onChime) {
     this.player = player;
     this.gameplay = gameplay;
     this.sky = sky;
     this.npcs = npcs;
     this.missions = missions;
+    this.dog = dog;
     this.onToast = onToast;
+    this.onChime = onChime;
     this.tab = 'Cities';
     this.el = document.getElementById('travel');
     this.el.querySelector('.tabs').addEventListener('click', (e) => {
@@ -49,6 +52,7 @@ export class TravelMenu {
       const b = e.target.closest('button[data-i]');
       if (!b || b.disabled) return;
       if (this.tab === 'Jobs') this.jobClick(b.dataset.i);
+      else if (this.tab === 'Shop') this.buyItem(b.dataset.i);
       else this.go(this.current[+b.dataset.i]);
     });
   }
@@ -66,6 +70,7 @@ export class TravelMenu {
     for (const t of this.el.querySelectorAll('.tabs button'))
       t.classList.toggle('active', t.dataset.tab === this.tab);
     if (this.tab === 'Jobs') { this.renderJobs(); return; }
+    if (this.tab === 'Shop') { this.renderShop(); return; }
     // teleporting with cargo aboard would gut the missions — lock travel mid-haul
     const hauling = this.missions?.job?.phase === 'haul';
     const visited = new Set(this.gameplay.save.cities);
@@ -125,6 +130,38 @@ export class TravelMenu {
   jobClick(i) {
     if (i === 'abandon') this.missions.abandon();
     else this.missions.accept(this.missions.offers[+i]);
+    this.render();
+  }
+
+  renderShop() {
+    const save = this.gameplay.save;
+    let html = `<div style="grid-column:1/-1;font-size:1.3rem;opacity:.85;padding:2px 2px 4px">💵 $${(save.bank ?? 0).toLocaleString()}</div>`;
+    html += SHOP.map((item) => {
+      const lvl = gearLevel(save, item.id);
+      const maxed = lvl >= item.prices.length;
+      const multi = item.prices.length > 1;
+      const owned = !lvl ? '' : multi ? ` ${ROMAN[lvl - 1]}` : ' ✔';
+      const line = maxed ? (multi ? 'Fully upgraded' : 'She rides with you') : item.tiers[lvl];
+      const price = maxed ? '' : ` · $${item.prices[lvl]}`;
+      const cant = maxed || save.bank < item.prices[lvl];
+      return `<button data-i="${item.id}" ${cant ? 'disabled' : ''}>${item.icon} <b>${item.name}</b>${owned}<br>
+        <small style="opacity:.75">${line}${price}</small></button>`;
+    }).join('');
+    this.el.querySelector('.poi-list').innerHTML = html;
+    this.el.querySelector('.hint').textContent =
+      'Deliveries pay for upgrades — effects apply instantly and persist with your save.';
+  }
+
+  buyItem(id) {
+    const r = buy(this.gameplay.save, id);
+    if (!r) return;
+    this.gameplay.persist();
+    applyGear(this.gameplay.save, this.player, this.dog);
+    const tier = r.item.prices.length > 1 ? ` ${ROMAN[r.lvl - 1]}` : '';
+    this.onToast?.(id === 'dog'
+      ? `🐕 Lacy hops in the bed — she's your dog now (−$${r.price})`
+      : `${r.item.icon} ${r.item.name}${tier} installed (−$${r.price})`);
+    this.onChime?.('buy');
     this.render();
   }
 
