@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { nearestRoad, nearestCity, inTexas, hAt } from './geo.js';
 import { ATMOS } from './sky.js';
+import { groundYAt } from './airports.js';
 
 export const MODES = ['DRIVE', 'FLY', 'WALK'];
 
@@ -151,8 +152,8 @@ export class Player {
       if (k['Space']) this.vy += 60 * dt;
       if (k['ControlLeft'] || k['ControlRight'] || k['ShiftLeft']) this.vy -= 60 * dt;
       this.vy *= Math.pow(0.2, dt);
-      // soft clamp: skim the terrain, never crash into it
-      const floor = hAt(this.pos.x, this.pos.z) + 1.8;
+      // soft clamp: skim the terrain (or airport pad), never crash into it
+      const floor = (groundYAt(this.pos.x, this.pos.z) ?? hAt(this.pos.x, this.pos.z)) + 1.8;
       this.pos.y = THREE.MathUtils.clamp(this.pos.y + this.vy * dt, floor, 300);
       this.pos.x -= Math.sin(this.heading) * this.speed * dt;
       this.pos.z -= Math.cos(this.heading) * this.speed * dt;
@@ -179,8 +180,8 @@ export class Player {
       this.speed *= Math.pow(0.1, dt);
     }
 
-    // ground modes ride the terrain
-    const ground = hAt(this.pos.x, this.pos.z);
+    // ground modes ride the terrain (or an airport pad's flat plateau)
+    const ground = groundYAt(this.pos.x, this.pos.z) ?? hAt(this.pos.x, this.pos.z);
     if (this.mode !== 'FLY') this.pos.y = ground;
     this.groundY = ground;
 
@@ -193,7 +194,8 @@ export class Player {
     else {
       // pitch with the slope (sample fore/aft along heading)
       const fx = -Math.sin(this.heading), fz = -Math.cos(this.heading);
-      const dh = hAt(this.pos.x + fx * 2.2, this.pos.z + fz * 2.2) - hAt(this.pos.x - fx * 2.2, this.pos.z - fz * 2.2);
+      const gAt = (x, z) => groundYAt(x, z) ?? hAt(x, z);
+      const dh = gAt(this.pos.x + fx * 2.2, this.pos.z + fz * 2.2) - gAt(this.pos.x - fx * 2.2, this.pos.z - fz * 2.2);
       avatar.rotateX(THREE.MathUtils.clamp(Math.atan2(dh, 4.4), -0.5, 0.5) * (this.mode === 'DRIVE' ? 1 : 0.4));
     }
 

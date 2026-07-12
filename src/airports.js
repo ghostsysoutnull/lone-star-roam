@@ -150,6 +150,19 @@ function padYOf(a) {
   return maxH + 0.06;
 }
 
+const padYCache = new Map();
+// ground height for player/NPC placement: the field's flat pad surface when
+// (x,z) is inside its footprint (memoized — this runs every frame), else null
+// so callers fall back to raw hAt. Mirrors what aviation.js does for parked
+// aircraft via airportLayout()'s padY.
+export function groundYAt(x, z) {
+  const a = fieldNear(x, z);
+  if (!a) return null;
+  let y = padYCache.get(a.id);
+  if (y === undefined) { y = padYOf(a); padYCache.set(a.id, y); }
+  return y;
+}
+
 // helipad spot at a field — apron beside the parked-jet anchor, clear of
 // runways (A4 medical pad stops land here). Pure; single-site padY scan.
 export function padAt(id) {

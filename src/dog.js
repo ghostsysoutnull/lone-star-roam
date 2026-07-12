@@ -4,6 +4,7 @@
 // save.gear.dog is set (shop.js applyGear → setOwned).
 import * as THREE from 'three';
 import { hAt } from './geo.js';
+import { groundYAt } from './airports.js';
 
 const FOLLOW_D = 2.6; // trail distance behind the cowboy
 const CATCHUP = 2.2;  // speed per unit of gap
@@ -83,7 +84,7 @@ export class DogSystem {
         this.g.rotation.set(0, Math.atan2(-(p.pos.x - this.g.position.x), -(p.pos.z - this.g.position.z)), 0);
         for (const l of this.legs) l.rotation.x *= Math.pow(0.005, dt);
       }
-      this.g.position.y = hAt(this.g.position.x, this.g.position.z);
+      this.g.position.y = groundYAt(this.g.position.x, this.g.position.z) ?? hAt(this.g.position.x, this.g.position.z);
     }
     this.tail.rotation.y = Math.sin(this.t * 9) * 0.35; // the tail never stops
   }
