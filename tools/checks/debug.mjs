@@ -57,6 +57,24 @@ export default async function debug(t) {
     await t.ev('g.military.despawnAll()');
   });
 
+  await t.check('heli debug action cycles kinds instead of picking randomly', async () => {
+    const kinds = await t.ev(`(() => {
+      g.heli.despawnAll();
+      const seen = [];
+      for (let i = 0; i < 4; i++) {
+        g.heli.despawnAll(); // one at a time so the cap never blocks a forced kind
+        g.debug.actions.heli();
+        const c = g.heli.candidates.find((x) => x.flying);
+        seen.push(c.kind);
+      }
+      return seen;
+    })()`);
+    t.ok(kinds.length === 4 && new Set(kinds).size === 4, `expected 4 distinct kinds in order, got ${kinds.join(',')}`);
+    t.ok(kinds[0] === 'medical' && kinds[1] === 'news' && kinds[2] === 'coastguard' && kinds[3] === 'army',
+      `expected medical,news,coastguard,army in that order, got ${kinds.join(',')}`);
+    await t.ev('g.heli.despawnAll()');
+  });
+
   await t.check('charter debug action forces a real charter job through missions.js', async () => {
     await t.ev('g.debug.actions.charter()');
     t.ok((await t.ev('g.missions.job?.kind')) === 'charter', 'charter debug action did not start a charter job');

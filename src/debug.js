@@ -17,6 +17,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
   const setWeather = (name) => { sky.weather = sky.target = name; sky.blend = 1; sky.nextPick = 120; sky.forecast = null; };
 
   const actions = {
+    _heliIdx: 0, // cycles medical→news→coastguard→army→… on repeated 🚁 Heli presses, instead of a random pick
     day() { sky.t = 0.35; haunts.force = false; },
     night() { sky.t = 0.98; },
     midnight() { sky.t = 0.998; }, // the bell tolls on the wrap — park near a chapel first
@@ -46,7 +47,8 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     },
     heli() {
       const kinds = ['medical', 'news', 'coastguard', 'army'];
-      const k = kinds[Math.floor(Math.random() * kinds.length)];
+      const k = kinds[actions._heliIdx % kinds.length];
+      actions._heliIdx++;
       const ok = heli.force(k);
       if (!ok) return hud.toast('🚁 Sky already at the rotorcraft cap');
       const c = heli.candidates.find((x) => x.kind === k && x.flying);
