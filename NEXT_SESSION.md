@@ -57,9 +57,11 @@ engine** (new `chatter.js`: scanner frame, per-type voice registers for
 all 4 heli kinds + jets + GA, template pools filled from live context so
 lines are factual by construction, ~25–45 s budget with ops preempting
 casual, rare player-reference delight lines, callsign+route subtitle
-header, per-type synth voice — design settled with Bruno 2026-07-12), and
-medical-heli pad stops at the home city's field (new `padstop:` stream,
-cap accounting unchanged). Wave B (airport
+header, per-type synth voice — design settled with Bruno 2026-07-12), **visual identity** (aircraft
+proximity tags sharing the scanner's ~60-unit window, tier-1/2 gate sign
+boards via one canvas atlas, big-map airport codes drawn in `drawBig` —
+all three approved 2026-07-12), and medical-heli pad stops at the home
+city's field (new `padstop:` stream, cap accounting unchanged). Wave B (airport
 bystander NPCs + heli-aware/context-enriched townsfolk chatter) queued
 behind it in the same spec.
 Other à-la-carte candidates, both already scoped in with Bruno's

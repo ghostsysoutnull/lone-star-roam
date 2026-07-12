@@ -125,6 +125,33 @@ the tower unprofessional.
   sortie that already holds its slot. Radio: the touchdown/lift edges
   feed A3 ("Lifeguard 3, on the pad at Love Field").
 
+### A5. Visual identity (`hud.js`, `airports.js`) — added 2026-07-12
+
+Radio covers the ears; these three cover the eyes, at each distance a
+player meets the aviation layer: in the sky, on the ground, on the map.
+
+- **Aircraft tags** (`hud.js`): a small screen-projected label over any
+  airborne source within the same ~60-unit window the scanner hears,
+  fading with distance, updated at the HUD's 12 Hz: helis
+  `LIFEGUARD 3 · Medical`, jets `LONE STAR 23 · AUS → LBB`, GA tails
+  `N42TX`, military `NASA 9-0-1`. Enumerates the *same* source list
+  the chatter engine scans (aviation flights + helis + military) — one
+  enumeration, two consumers. Rem-based sizing per the UI-scale rule.
+  This **supersedes open call 3** ("GA tails radio-only") — no look-at
+  picker needed, proximity does the job.
+- **Airport gate signs** (`airports.js`): an entrance sign board at
+  each tier-1/2 field's gate (16 fields) with name + code, real
+  airport-monument style. Text via one shared canvas atlas (all signs
+  in one texture, one draw call — a 9th global mesh alongside the
+  existing 8). Modestly emissive after dark, night-gated on
+  `ATMOS.night` exactly like the beacons (sky.js still owns all
+  lights). Tier-3 ranch strips stay unsigned — a dirt strip with a
+  monument sign would be wrong.
+- **Map codes** (`hud.js`): airport codes next to the ✈ icons, drawn
+  in `drawBig` at draw time (20 labels, map redraws are occasional) —
+  *not* baked into the shared offscreen layer, so the minimap stays
+  uncluttered.
+
 ## Wave B — people
 
 ### B1. Airport bystanders (`npcs.js`, `airports.js`)
@@ -198,6 +225,12 @@ mid-transit helis, not conveniently on-station).
   the dwell, then AGL rising again — position-over-time, not a
   snapshot. Regression: airborne cap still holds at 2 with a stopped
   heli holding its slot.
+- **A5**: force a heli, park inside the tag window → tag DOM node
+  exists and its text carries the kind; teleport beyond the window →
+  gone; a forced jet's tag contains its slot's real route. Signs:
+  exactly one sign per tier-1/2 field (count = 16), each within a few
+  units of its field's `gate`, none at tier-3. Map codes: assert the
+  label list `drawBig` consumes (data, not pixels).
 - **B1**: force an arrival into a field, interact with the waiting
   bystander → dialog mentions the flight's origin city; empty sky →
   no aviation line; bystanders hidden at `ATMOS.night > 0.6`.
@@ -218,6 +251,9 @@ mid-transit helis, not conveniently on-station).
    behavior, seeded + hard-throttled, never hostile.
 4. **Audio**: per-type synth voice character (pitch/rate), every line
    voiced.
+5. **Visual identity — all three** (2026-07-12): aircraft proximity
+   tags, tier-1/2 gate signs, big-map airport codes (A5). Supersedes
+   open call 3.
 
 ## Open calls
 
@@ -228,9 +264,8 @@ mid-transit helis, not conveniently on-station).
    Chopper 5 / Rescue 6-0 / Hood 2-1), not real operator brands; the
    game uses real *places* freely but has no precedent for real
    company brands.
-3. **GA tails beyond the radio** — proposal: radio-only v1; showing a
-   tail number when visually tracking a plane needs a "look at"
-   picker that doesn't exist and isn't worth inventing here.
+3. ~~**GA tails beyond the radio**~~ — superseded by settled call 5:
+   proximity tags (A5) show tails visually, no look-at picker needed.
 4. **Pad stops for other kinds** — proposal: medical only; news
    refueling stops are plausible but add nothing observably new once
    medical demonstrates the mechanic.
