@@ -35,79 +35,142 @@ const UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
 // InstancedMesh instance (so "how many rotor instances rendered" is a real,
 // countable proxy for blade count — see rotorCount below).
 const KINDS = ['medical', 'news', 'coastguard', 'army'];
-// rotorY is the mast height (world Y = candidate.y + rotorY) — must clear
-// the tallest point of that kind's own body geometry (fin/nose/canopy),
-// with a little headroom so the disc visibly floats above the fuselage
-// instead of skewering it. Kept as real per-kind data, not one shared
-// constant, since the four bodies are no longer the same height.
+// rotorMargin is headroom above the body's own bounding-box top (computed
+// per kind in the constructor, once the real geometry exists — see rotorY
+// below) — real per-kind data since the four bodies are no longer the same
+// height, and derived from the actual mesh instead of hand-guessed so a
+// future body reshape can't silently bury the mast again.
 const HELI_CONFIG = {
-  medical: { blades: 2, rotorR: 1.7, rotorY: 1.35 },    // standard diameter
-  news: { blades: 2, rotorR: 1.4, rotorY: 1.2 },        // lightest airframe, smallest disc
-  coastguard: { blades: 2, rotorR: 1.9, rotorY: 1.5 },  // medium diameter, bigger cabin
-  army: { blades: 4, rotorR: 2.3, rotorY: 1.5 },        // 4-blade cross, largest — the at-a-distance tell
+  medical: { blades: 2, rotorR: 1.7, rotorMargin: 0.15 },    // standard diameter
+  news: { blades: 2, rotorR: 1.4, rotorMargin: 0.12 },       // lightest airframe, smallest disc
+  coastguard: { blades: 2, rotorR: 1.9, rotorMargin: 0.15 }, // medium diameter, bigger cabin
+  army: { blades: 4, rotorR: 2.3, rotorMargin: 0.15 },       // 4-blade cross, largest — the at-a-distance tell
 };
 const BODY_POOL = { medical: 4, news: 4, coastguard: 1, army: 2 };
 const ROTOR_POOL = Object.fromEntries(KINDS.map((k) => [k, BODY_POOL[k] * HELI_CONFIG[k].blades]));
 
 const W = 0xf2f0ea, GLASS = 0x8fa8bc, DARK = 0x2a2a30, RED = 0xcc2222;
 
+// A lofted fuselage: chained tapered-cylinder frustums along Z (nose -z →
+// tail +z), each segment's radii matching its neighbor at the seam for a
+// continuous taper — the same trick the tail boom always used, chained
+// instead of single, so the cabin reads as a rounded/tapering hull instead
+// of a flat-sided box. openEnded on every segment: two coincident end caps
+// would sit exactly on top of each other at each internal seam and z-fight;
+// skipping all caps is invisible from outside since the tube never opens to
+// view at this scale. xScale/yScale flatten the circular cross-section into
+// an oval (real fuselages read wider than tall) without more radial segments.
+function mkLoft(segs, radials, xScale, yScale, y, color) {
+  const parts = [];
+  let z = segs[0].z0;
+  for (const s of segs) {
+    parts.push(tinted(
+      new THREE.CylinderGeometry(s.r1, s.r0, s.len, radials, 1, true)
+        .scale(xScale, yScale, 1)
+        .rotateX(Math.PI / 2)
+        .translate(0, y, z + s.len / 2),
+      color));
+    z += s.len;
+  }
+  return parts;
+}
+
+// Two flat glass panels canted back and splayed outward from a center
+// ridge — the two-piece flat windscreen real light helicopters use, instead
+// of one flat box facing straight down the nose.
+function mkWedge(w, h, y, z, tiltX, splayY, color) {
+  const panel = (side) => tinted(
+    new THREE.BoxGeometry(w / 2, h, 0.03)
+      .translate(side * w / 4, 0, 0)
+      .rotateX(tiltX)
+      .rotateY(side * splayY)
+      .translate(0, y, z),
+    color);
+  return [panel(1), panel(-1)];
+}
+
+// The small fairing where the rotor mast passes through the roof — without
+// it the hub floats with nothing visually connecting it to the body.
+const mkMastFairing = (r0, r1, h, y, z, color) =>
+  tinted(new THREE.CylinderGeometry(r1, r0, h, 8).translate(0, y, z), color);
+
 function mkMedicalBody() {
-  // Airbus H135 / Bell 407 ref: tapered nose cone, red-cross panel, short hoist arm.
+  // Airbus H135 / Bell 407 ref: sleek tapered loft, red-cross panel, short hoist arm.
   return merge([
-    tinted(new THREE.BoxGeometry(0.95, 0.85, 1.6).translate(0, 0.7, 0.1), W),
-    tinted(new THREE.ConeGeometry(0.48, 0.9, 8).rotateX(Math.PI / 2).translate(0, 0.72, -0.95), W),
-    tinted(new THREE.BoxGeometry(0.7, 0.55, 0.6).translate(0, 0.85, -0.55), GLASS),
+    ...mkLoft([
+      { r0: 0.04, r1: 0.40, len: 0.35, z0: -1.15 },
+      { r0: 0.40, r1: 0.46, len: 0.55, z0: -0.80 },
+      { r0: 0.46, r1: 0.20, len: 0.85, z0: -0.25 },
+    ], 8, 1.15, 0.95, 0.65, W),
+    ...mkWedge(0.62, 0.42, 0.95, -0.6, Math.PI / 3.2, 0.35, GLASS),
+    mkMastFairing(0.24, 0.15, 0.32, 1.02, -0.05, W),
     tinted(new THREE.CylinderGeometry(0.16, 0.1, 2.1, 8).rotateX(Math.PI / 2).translate(0, 0.6, 1.55), W),
     tinted(new THREE.BoxGeometry(0.05, 0.5, 0.42).translate(0, 0.95, 2.55), 0xffffff), // fin — full tint (livery)
     tinted(new THREE.BoxGeometry(0.04, 0.04, 0.42).translate(0.24, 0.8, 2.5), DARK),   // tail rotor
     tinted(new THREE.CylinderGeometry(0.05, 0.06, 0.55, 8).translate(-0.32, 0.18, 0.5), DARK),
     tinted(new THREE.CylinderGeometry(0.05, 0.06, 0.55, 8).translate(0.32, 0.18, 0.5), DARK),
     tinted(new THREE.BoxGeometry(0.75, 0.05, 0.1).translate(0, 0.14, 0.5), DARK),
-    tinted(new THREE.BoxGeometry(0.5, 0.28, 0.02).translate(0.48, 0.7, 0.15), RED),   // cross panel, bar 1
-    tinted(new THREE.BoxGeometry(0.16, 0.5, 0.02).translate(0.48, 0.7, 0.15), RED),   // cross panel, bar 2
-    tinted(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6).rotateZ(Math.PI / 2).translate(0, 1.15, -0.2), DARK), // hoist arm
+    tinted(new THREE.BoxGeometry(0.5, 0.28, 0.02).translate(0.48, 0.68, 0.05), RED),   // cross panel, bar 1
+    tinted(new THREE.BoxGeometry(0.16, 0.5, 0.02).translate(0.48, 0.68, 0.05), RED),   // cross panel, bar 2
+    tinted(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6).rotateZ(Math.PI / 2).translate(0, 1.1, -0.5), DARK), // hoist arm
   ]);
 }
 
 function mkNewsBody() {
-  // Smallest/lightest of the four; nose camera ball is the signature tell.
+  // Smallest/lightest of the four; slimmer loft, no mast fairing (visually minimal), camera ball is the tell.
   return merge([
-    tinted(new THREE.BoxGeometry(0.8, 0.7, 1.5).translate(0, 0.65, 0.1), W),
-    tinted(new THREE.BoxGeometry(0.6, 0.5, 0.55).translate(0, 0.8, -0.5), GLASS),
+    ...mkLoft([
+      { r0: 0.03, r1: 0.32, len: 0.3, z0: -1.05 },
+      { r0: 0.32, r1: 0.36, len: 0.45, z0: -0.75 },
+      { r0: 0.36, r1: 0.15, len: 0.75, z0: -0.30 },
+    ], 8, 1.1, 0.9, 0.6, W),
+    ...mkWedge(0.5, 0.34, 0.85, -0.55, Math.PI / 3.4, 0.3, GLASS),
     tinted(new THREE.CylinderGeometry(0.14, 0.09, 1.9, 8).rotateX(Math.PI / 2).translate(0, 0.55, 1.4), W),
     tinted(new THREE.BoxGeometry(0.04, 0.32, 0.3).translate(0, 0.85, 2.3), 0xffffff), // simplified fin
     tinted(new THREE.BoxGeometry(0.03, 0.03, 0.3).translate(0.2, 0.72, 2.28), DARK),  // tail rotor
     tinted(new THREE.CylinderGeometry(0.045, 0.055, 0.5, 8).translate(-0.28, 0.16, 0.45), DARK),
     tinted(new THREE.CylinderGeometry(0.045, 0.055, 0.5, 8).translate(0.28, 0.16, 0.45), DARK),
     tinted(new THREE.BoxGeometry(0.65, 0.05, 0.1).translate(0, 0.12, 0.45), DARK),
-    tinted(new THREE.SphereGeometry(0.13, 8, 6).translate(0, 0.55, -1.15), DARK),      // camera ball
-    tinted(new THREE.CylinderGeometry(0.03, 0.03, 0.25, 6).translate(0, 0.68, -1.05), DARK), // camera mount
+    tinted(new THREE.SphereGeometry(0.13, 8, 6).translate(0, 0.5, -1.05), DARK),      // camera ball
+    tinted(new THREE.CylinderGeometry(0.03, 0.03, 0.25, 6).translate(0, 0.62, -0.95), DARK), // camera mount
   ]);
 }
 
 function mkCoastGuardBody() {
-  // MH-65 Dolphin ref: bigger cabin, hemisphere nose, rescue hoist boom + basket.
+  // MH-65 Dolphin ref: fuller/rounder loft with a blunt nose (no separate hemisphere
+  // needed — the loft's own nose radius does the job), rescue hoist boom + basket.
   return merge([
-    tinted(new THREE.BoxGeometry(1.1, 0.95, 1.85).translate(0, 0.75, 0.15), W),
-    tinted(new THREE.SphereGeometry(0.55, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2).translate(0, 0.75, -0.9), W), // hemisphere nose
-    tinted(new THREE.BoxGeometry(0.85, 0.62, 0.7).translate(0, 0.92, -0.4), GLASS),
+    ...mkLoft([
+      { r0: 0.22, r1: 0.50, len: 0.35, z0: -1.25 },
+      { r0: 0.50, r1: 0.58, len: 0.65, z0: -0.90 },
+      { r0: 0.58, r1: 0.24, len: 1.0, z0: -0.25 },
+    ], 10, 1.2, 1.0, 0.7, W),
+    ...mkWedge(0.78, 0.5, 1.05, -0.75, Math.PI / 3, 0.4, GLASS),
+    mkMastFairing(0.3, 0.18, 0.4, 1.15, -0.05, W),
     tinted(new THREE.CylinderGeometry(0.18, 0.11, 2.3, 8).rotateX(Math.PI / 2).translate(0, 0.65, 1.7), W),
     tinted(new THREE.BoxGeometry(0.05, 0.55, 0.46).translate(0, 1.0, 2.8), 0xffffff), // fin
     tinted(new THREE.BoxGeometry(0.04, 0.04, 0.46).translate(0.26, 0.85, 2.75), DARK), // tail rotor
     tinted(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 8).translate(-0.36, 0.2, 0.55), DARK),
     tinted(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 8).translate(0.36, 0.2, 0.55), DARK),
     tinted(new THREE.BoxGeometry(0.85, 0.05, 0.1).translate(0, 0.15, 0.55), DARK),
-    tinted(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6).rotateZ(Math.PI / 2).translate(0.65, 0.85, 0.2), DARK), // hoist boom
-    tinted(new THREE.BoxGeometry(0.18, 0.22, 0.18).translate(0.9, 0.55, 0.2), DARK),   // hoist basket
+    tinted(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6).rotateZ(Math.PI / 2).translate(0.65, 0.85, 0.1), DARK), // hoist boom
+    tinted(new THREE.BoxGeometry(0.18, 0.22, 0.18).translate(0.9, 0.55, 0.1), DARK),   // hoist basket
   ]);
 }
 
 function mkArmyBody() {
-  // UH-60 ref: boxiest/largest cabin, stub-wing fuel tanks, portholes (no glass canopy), tail wheel.
+  // UH-60 ref: boxiest/largest — a 6-sided (faceted, not round) loft with minimal
+  // taper, stub-wing fuel tanks, portholes (no glass canopy), tail wheel.
   return merge([
-    tinted(new THREE.BoxGeometry(1.15, 0.95, 1.9).translate(0, 0.72, 0.1), W),
-    tinted(new THREE.CylinderGeometry(0.1, 0.1, 0.35, 8).rotateZ(Math.PI / 2).translate(-0.45, 0.9, -0.45), DARK), // porthole L
-    tinted(new THREE.CylinderGeometry(0.1, 0.1, 0.35, 8).rotateZ(Math.PI / 2).translate(0.45, 0.9, -0.45), DARK),  // porthole R
+    ...mkLoft([
+      { r0: 0.34, r1: 0.52, len: 0.3, z0: -1.2 },  // short blunt chamfer, not a real point
+      { r0: 0.52, r1: 0.54, len: 0.9, z0: -0.9 },  // long near-cylindrical cabin — utilitarian, not tapered
+      { r0: 0.54, r1: 0.26, len: 0.9, z0: 0.0 },
+    ], 6, 1.25, 1.0, 0.62, W),
+    ...mkWedge(0.9, 0.55, 1.02, -0.85, Math.PI / 2.6, 0.15, GLASS), // upright, narrow splay — utilitarian, not swept
+    mkMastFairing(0.34, 0.22, 0.42, 1.1, 0.0, W),
+    tinted(new THREE.CylinderGeometry(0.1, 0.1, 0.35, 8).rotateZ(Math.PI / 2).translate(-0.45, 0.85, -0.5), DARK), // porthole L
+    tinted(new THREE.CylinderGeometry(0.1, 0.1, 0.35, 8).rotateZ(Math.PI / 2).translate(0.45, 0.85, -0.5), DARK),  // porthole R
     tinted(new THREE.CylinderGeometry(0.2, 0.13, 2.2, 8).rotateX(Math.PI / 2).translate(0, 0.62, 1.65), W),
     tinted(new THREE.BoxGeometry(0.06, 0.6, 0.5).translate(0, 1.0, 2.7), 0xffffff), // fin
     tinted(new THREE.BoxGeometry(0.05, 0.05, 0.5).translate(0.28, 0.85, 2.65), DARK), // tail rotor
@@ -186,12 +249,13 @@ export class HeliSystem {
     this.simT = 0; // accumulates in the real loop — wiring sentinel
     this.meshes = {};
     this.rotorCount = {};
-    this.config = HELI_CONFIG; // exposed read-only for verify (rotorY-clears-body checks)
+    this.rotorY = {}; // derived per kind from each body's real bounding box — see mast-fairing comment above
     for (const kind of KINDS) {
       const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
       const rotorMat = new THREE.MeshBasicMaterial({ vertexColors: true });
       const bodyGeo = BODY_GEO[kind]();
-      bodyGeo.computeBoundingBox(); // so the rotor mast height can be verified to actually clear the fuselage/fin/canopy
+      bodyGeo.computeBoundingBox(); // so the mast height is guaranteed to clear the actual fuselage/fin/canopy, not a hand-guessed number
+      this.rotorY[kind] = bodyGeo.boundingBox.max.y + HELI_CONFIG[kind].rotorMargin;
       const body = new THREE.InstancedMesh(bodyGeo, mat, BODY_POOL[kind]);
       const rotor = new THREE.InstancedMesh(mkHeliRotorBlade(HELI_CONFIG[kind].rotorR), rotorMat, ROTOR_POOL[kind]);
       body.frustumCulled = false;
@@ -298,7 +362,7 @@ export class HeliSystem {
     }
     for (const kind of KINDS) {
       const { body, rotor } = this.meshes[kind];
-      const cfg = HELI_CONFIG[kind], list = lists[kind], blades = cfg.blades, tint = TINT[kind];
+      const cfg = HELI_CONFIG[kind], rotorY = this.rotorY[kind], list = lists[kind], blades = cfg.blades, tint = TINT[kind];
       let bi = 0, ri = 0;
       for (; bi < list.length && bi < BODY_POOL[kind]; bi++) {
         const it = list[bi];
@@ -307,7 +371,7 @@ export class HeliSystem {
         body.setColorAt(bi, this.col.set(tint));
         for (let b = 0; b < blades && ri < ROTOR_POOL[kind]; b++, ri++) {
           const bladeAng = this.t * 22 + (2 * Math.PI * b) / blades;
-          this.m4.compose(new THREE.Vector3(it.x, it.y + cfg.rotorY, it.z), this.q.setFromAxisAngle(UP, bladeAng), ONE);
+          this.m4.compose(new THREE.Vector3(it.x, it.y + rotorY, it.z), this.q.setFromAxisAngle(UP, bladeAng), ONE);
           rotor.setMatrixAt(ri, this.m4);
         }
       }

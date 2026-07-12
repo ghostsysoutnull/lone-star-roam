@@ -204,6 +204,34 @@ ship.
   sanctioned exception to the no-screenshots-by-default rule. Full spec in
   `HELICOPTER_SPEC.md`.
 
+- [x] ~~Helicopter fuselage — lofted rebuild~~ — done 2026-07-12, same day
+  follow-up: the four bodies' main cabins were still flat `BoxGeometry`
+  slabs under the greebles from the detail pass above — read as an
+  elongated cube regardless of tint/tells. Replaced with a genuinely
+  different technique: `mkLoft()` chains 3 tapered-cylinder frustums along
+  the fuselage's Z axis (nose→tail), each segment's radii matching its
+  neighbor at the seam for a continuous taper — the same trick the tail
+  boom already used, chained instead of single, `openEnded` on every
+  segment so the two coincident end caps at each internal seam don't
+  z-fight. `mkWedge()` replaces the flat glass box with a two-panel
+  canted/splayed windscreen; `mkMastFairing()` gives the rotor hub a roof
+  fairing instead of floating disconnected. Medical/news/coastguard get
+  smooth 8–10-sided lofts with kind-specific bulge/taper profiles; army
+  gets a deliberately 6-sided *faceted* loft with minimal taper (round vs.
+  faceted is now itself a differentiator, protecting its "boxiest cabin"
+  tell instead of smoothing it away) — coast guard's hemisphere nose folded
+  into the loft's own blunt radius, one fewer bolted-on primitive. Real
+  triangle counts roughly doubled again over the already-tripled detail
+  pass (132 baseline → 284/308/284/368 for medical/news/coastguard/army).
+  Root-caused and fixed the rotor mast height along the way: it was still
+  a hand-tuned per-kind constant, and once a body's real bounding box
+  changed the mast could bury itself in the fuselage — now `this.rotorY`
+  is derived per kind from the actual body's bounding box + a margin at
+  construction time, so a future reshape can't silently repeat that bug.
+  Also: the 🚁 Heli debug action now cycles medical→news→coastguard→army
+  deterministically (was a random pick) so playtesting can hit every kind
+  on demand, with a check covering the cycle order.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

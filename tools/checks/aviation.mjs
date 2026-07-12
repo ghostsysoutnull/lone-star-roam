@@ -779,7 +779,7 @@ export default async function aviation(t) {
     // fuselage instead of on top of it for some kinds — assert real numbers, not a shot
     const r = await t.ev(`(() => {
       const ks = ['medical', 'news', 'coastguard', 'army'];
-      return ks.map((k) => ({ k, rotorY: g.heli.config[k].rotorY, bodyTop: g.heli.meshes[k].body.geometry.boundingBox.max.y }));
+      return ks.map((k) => ({ k, rotorY: g.heli.rotorY[k], bodyTop: g.heli.meshes[k].body.geometry.boundingBox.max.y }));
     })()`);
     for (const { k, rotorY, bodyTop } of r)
       t.ok(rotorY > bodyTop, `${k} rotor mast (${rotorY}) doesn't clear its body top (${bodyTop})`);
@@ -818,7 +818,7 @@ export default async function aviation(t) {
         return { x: c.x, z: c.z, y: c.y ?? (g.hAt(c.x, c.z) + 30) };
       })()`);
       if (pos) {
-        await t.tp(pos.x + 20, pos.z + 20, 'FLY', 15);
+        await t.tp(pos.x + 12, pos.z + 12, 'FLY', 15);
         await t.ev(`g.player.heading = Math.atan2(-(${pos.x} - g.player.pos.x), -(${pos.z} - g.player.pos.z))`);
         await t.wait(0.3);
         await t.shot(`heli-${k}`);

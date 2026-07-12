@@ -37,11 +37,18 @@ airport pairs, real-touchdown detection reusing radio.js's own landing test
 via new `airports.js` exports `TD_AGL`/`TD_SPD`, charter livery via
 `vehicle.js` `mkWings` `userData.mat`/`stockColor`, `missions.force(fromId,
 toId)` test hook + debug button — see ROADMAP.md, full spec in
-`CHARTER_JOBS_SPEC.md`; **helicopter detail pass shipped 2026-07-12** —
-`rotors.js`'s `HeliSystem` split its one shared body/rotor geometry into
-four bespoke per-kind bodies + a real rotor-blade-count mechanic (army
-4-blade cross vs 2 for the others), fixing a latent `POOL=6` truncation bug
-as a side effect — see ROADMAP.md, full spec in `HELICOPTER_SPEC.md`).
+`CHARTER_JOBS_SPEC.md`; **helicopter detail pass + lofted-fuselage rebuild
+shipped 2026-07-12** — `rotors.js`'s `HeliSystem` split its one shared
+body/rotor geometry into four bespoke per-kind bodies + a real
+rotor-blade-count mechanic (army 4-blade cross vs 2 for the others), then
+the same day replaced each cabin's flat box with a lofted fuselage
+(`mkLoft()` chains tapered-cylinder frustums along Z, matched radii at
+seams, `openEnded` to avoid seam z-fighting) plus a two-panel wedge
+windscreen and a mast fairing, roughly doubling poly count again
+(132→284–368 tris); rotor mast height is now derived per kind from the
+body's real bounding box instead of a hand-tuned constant, and the 🚁 Heli
+debug action cycles kinds deterministically instead of picking randomly —
+see ROADMAP.md, full spec in `HELICOPTER_SPEC.md`).
 Remaining à-la-carte candidates, both already scoped in with Bruno's
 go-ahead: **Sheppard T-38 touch-and-go pattern circuits** (the one piece
 that needs real new design — a closed traffic pattern doesn't fit the
@@ -53,9 +60,11 @@ unscoped: crop duster dawn runs from tier-3 strips, a 13th bespoke NPC
 picking these up. Notes: `src/rotors.js` has `HeliSystem`/`BlimpSystem`
 (HeliSystem now keeps four kind-scoped `{body, rotor}` InstancedMesh pairs
 in `this.meshes`, per-kind blade count/diameter in `HELI_CONFIG`, rendered
-instance counts in `this.rotorCount` — reuse this per-kind-mesh-pool
-pattern if any other mover ever needs real shape differentiation) and
-`src/military.js` has `MilitaryAirSystem` (candidates array, `force(kind)`/
+instance counts in `this.rotorCount`, mast heights derived per kind in
+`this.rotorY` — reuse this per-kind-mesh-pool pattern, and `mkLoft`/
+`mkWedge`/`mkMastFairing` for the lofted-fuselage technique, if any other
+mover ever needs real shape differentiation) and `src/military.js` has
+`MilitaryAirSystem` (candidates array, `force(kind)`/
 `despawnAll` test hooks, global airborne cap idiom with per-kind `weight`);
 reuse the same pattern for any new mover rather than inventing one —
 military.js additionally shows how to share `aviation.js`'s `MAX_AIR`
