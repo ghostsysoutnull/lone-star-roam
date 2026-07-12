@@ -377,7 +377,7 @@ export class HUD {
   }
 
   drawInterstateShield(ctx, cx, cy, { num, tag }, night) {
-    const w = 103, h = 113, top = cy - h / 2;
+    const w = 86, h = 94, top = cy - h / 2;
     const path = (ox = 0, oy = 0) => {
       const X = (v) => cx + v + ox, Y = (v) => top + v + oy;
       ctx.beginPath();
@@ -414,9 +414,9 @@ export class HUD {
     // 3-char refs (I 410/610/635, I 35W/35E/69E) need to shrink to fit the
     // shield's narrowing lower half — don't just test the convenient 2-digit case
     const label = num + (tag ?? '');
-    let size = 44;
+    let size = 36;
     ctx.font = `bold ${size}px system-ui`;
-    while (ctx.measureText(label).width > w * 0.62 && size > 22) {
+    while (ctx.measureText(label).width > w * 0.62 && size > 18) {
       size -= 3;
       ctx.font = `bold ${size}px system-ui`;
     }
@@ -427,7 +427,7 @@ export class HUD {
   }
 
   drawUsShield(ctx, cx, cy, { num }, night) {
-    const w = 97, h = 107, top = cy - h / 2;
+    const w = 81, h = 88, top = cy - h / 2;
     const path = (ox = 0, oy = 0) => {
       const pts = [
         [cx - w * 0.22, top], [cx + w * 0.22, top],
@@ -455,17 +455,17 @@ export class HUD {
       ctx.stroke();
       this.bevelStroke(ctx, path);
     }
-    ctx.font = 'bold 17px system-ui';
+    ctx.font = 'bold 14px system-ui';
     if (night) this.amberText(ctx, 'US', cx, top + h * 0.3);
     else { ctx.fillStyle = '#111'; ctx.fillText('US', cx, top + h * 0.3); }
-    ctx.font = 'bold 41px system-ui';
+    ctx.font = 'bold 34px system-ui';
     if (night) this.amberText(ctx, num, cx, top + h * 0.78);
     else { ctx.fillStyle = '#111'; ctx.fillText(num, cx, top + h * 0.78); }
     if (night) this.nightWireframe(ctx, path, cx - w / 2, top, w, h);
   }
 
   drawCircleShield(ctx, cx, cy, { num, label }, night) {
-    const r = 47;
+    const r = 39;
     const path = (ox = 0, oy = 0) => {
       ctx.beginPath();
       ctx.arc(cx + ox, cy + oy, r, 0, Math.PI * 2);
@@ -488,13 +488,13 @@ export class HUD {
     }
     const txt = (t, x, y) => (night ? this.amberText(ctx, t, x, y) : (ctx.fillStyle = '#111', ctx.fillText(t, x, y)));
     if (label) {
-      ctx.font = 'bold 17px system-ui';
-      txt(label, cx, cy - 12);
-      ctx.font = `bold ${num.length > 3 ? 28 : 35}px system-ui`;
-      txt(num, cx, cy + 24);
+      ctx.font = 'bold 14px system-ui';
+      txt(label, cx, cy - 10);
+      ctx.font = `bold ${num.length > 3 ? 23 : 29}px system-ui`;
+      txt(num, cx, cy + 20);
     } else {
-      ctx.font = `bold ${num.length > 2 ? 35 : 43}px system-ui`;
-      txt(num, cx, cy + 16);
+      ctx.font = `bold ${num.length > 2 ? 29 : 36}px system-ui`;
+      txt(num, cx, cy + 13);
     }
     if (night) this.nightWireframe(ctx, path, cx - r, cy - r, r * 2, r * 2);
   }
