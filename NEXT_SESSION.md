@@ -13,9 +13,8 @@ anchors — prefer grep + a targeted read over whole-file reads. `ROADMAP.md`
 is history; `BACKLOG.md` holds all queued non-aviation work.
 
 Key facts:
-- **Live & public**: https://ghostsysoutnull.github.io/lone-star-roam/ —
-  every push to `main` deploys there within ~2 min, so verify before
-  committing.
+- **Repo is private, GitHub Pages is deleted** (intentional, as of
+  2026-07-12) — the game is not currently live/public. Verify locally only.
 - Local dev: `python3 -m http.server 8317`; verify headlessly with
   **`node tools/verify.mjs`** (compact; `-v` for per-check lines). Add
   checks to `tools/checks/*.mjs`, never throwaway scripts. Sim waits are
