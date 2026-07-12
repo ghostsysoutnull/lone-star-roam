@@ -363,13 +363,6 @@ export class HUD {
     path();
     ctx.lineWidth = 2.8;
     ctx.stroke();
-    ctx.globalAlpha = 0.45;  // fainter interior lattice
-    ctx.shadowBlur = 3;
-    ctx.beginPath();
-    ctx.moveTo(x, y); ctx.lineTo(x + w, y + h);
-    ctx.moveTo(x + w, y); ctx.lineTo(x, y + h);
-    ctx.lineWidth = 1.3;
-    ctx.stroke();
     ctx.restore();
   }
 
