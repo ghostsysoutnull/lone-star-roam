@@ -19,49 +19,61 @@ const npcSub = (n) => (n.age && n.profession ? `Age ${n.age} · ${n.profession}`
 // name, city, look config, main lines (rotate per visit), fact, age, profession
 const NAMED = [
   ['Willie', 'Austin', { hat: 'stetson', hatC: 0x22201c, braids: true, shirt: 0x2a2a2a, prop: 'guitar' },
-    ['Welcome to Austin! Keep it weird, partner.', 'Wrote a song about that highway you came in on.', 'Best breakfast tacos are wherever you are at sunrise.', 'Stick around till sundown — the bridge breathes bats.'],
+    ['Welcome to Austin! Keep it weird, partner.', 'Wrote a song about that highway you came in on.', 'Best breakfast tacos are wherever you are at sunrise.', 'Stick around till sundown — the bridge breathes bats.',
+      'Sixth Street’s loud, Barton Springs is cold, and both are exactly right.', 'This guitar’s older than half the town. Sounds better than all of it.', 'They paved paradise and put up a food truck. Honestly? Pretty good tacos.', 'Everything’s a song if you hum it right, friend.'],
     'Austin is the live music capital of the world — 250+ venues.', 58, 'musician'],
   ['Rosa', 'Houston', { dress: 0x1f7a72, hair: 0x2a2018, bun: true },
-    ['Biggest city in Texas, and we still say howdy.', 'NASA’s just down the road — you can’t miss the rocket.', 'Try the kolaches. Trust me.'],
+    ['Biggest city in Texas, and we still say howdy.', 'NASA’s just down the road — you can’t miss the rocket.', 'Try the kolaches. Trust me.',
+      'Twelve-hour shift and I still love this town. That’s Houston.', 'The bayou’s slow and the traffic’s slower. Plan accordingly, mijo.', 'Half the world lives here, and you can eat all of it on one street.', 'Hurricane season we board up, then we throw a block party. Both matter.', 'You want culture? We got a rodeo AND an opera. Same weekend, sometimes.'],
     'Houston is home to the largest medical center on Earth.', 37, 'nurse'],
   ['Big Tex', 'Dallas', { scale: 2.6, hat: 'stetson', hatC: 0xe8e0d0, shirt: 0xaa2222, wave: true },
-    ['HOWDY, FOLKS! Welcome to Big D!', 'You look like you could use some state fair corny dogs.', 'Everything’s bigger here. Case in point.'],
+    ['HOWDY, FOLKS! Welcome to Big D!', 'You look like you could use some state fair corny dogs.', 'Everything’s bigger here. Case in point.',
+      'FOLKS, the fair runs twenty-four days and I stand for EVERY one of ’em.', 'I’ve said a million howdys and I meant every single one.', 'My boots are size seventy. STILL hand-tooled.', 'A corny dog and a cold lemonade — now THAT’S livin’, friend.'],
     'The frozen margarita machine was invented in Dallas in 1971.', 74, 'State Fair icon'],
   ['Elena', 'San Antonio', { dress: 0x6a3f8a, hair: 0x1a1410, flower: 0xe86a9a },
-    ['Remember the Alamo? It’s right downtown.', 'The river walk is prettier than any highway.', 'Mi casa es su casa, traveler.'],
+    ['Remember the Alamo? It’s right downtown.', 'The river walk is prettier than any highway.', 'Mi casa es su casa, traveler.',
+      'Get a raspa by the river and watch the barges go by. That’s a whole afternoon.', 'Fiesta lasts ten days. The confetti in my hair lasts all year.', 'The missions are older than the country, y aquí siguen.', 'Everyone falls in the river once. Locals just don’t tell.'],
     'San Antonio’s missions are a UNESCO World Heritage site.', 29, 'river walk guide'],
   ['Hank', 'Fort Worth', { hat: 'stetson', hatC: 0x7a5c38, vest: 0x5a4028, prop: 'lasso' },
-    ['Cowtown, they call it. Real cowboys drive cattle here twice a day.', 'That lasso ain’t for show. Well, mostly.', 'Fort Worth is where the West begins.'],
+    ['Cowtown, they call it. Real cowboys drive cattle here twice a day.', 'That lasso ain’t for show. Well, mostly.', 'Fort Worth is where the West begins.',
+      'Billy Bob’s has indoor bull riding. Indoor. Bull riding.', 'Dallas wears the suit. We wear the boots that paid for it.', 'Longhorns have the right of way here, and don’t you forget it.', 'A good rope, a good horse, and a bad idea — that’s how rodeo got invented.'],
     'The Stockyards run a longhorn cattle drive every single day.', 45, 'cattle drover'],
   ['Marisol', 'El Paso', { dress: 0xd8a832, hair: 0x201810 },
-    ['You made it all the way out west!', 'We’re closer to Los Angeles than to Houston out here.', 'Watch the star on the mountain light up tonight.'],
+    ['You made it all the way out west!', 'We’re closer to Los Angeles than to Houston out here.', 'Watch the star on the mountain light up tonight.',
+      'Two countries, three states, one sunset. Best corner of the map.', 'The Franklin Mountains keep this town in line. Somebody has to.', 'We make the best chile relleno in Texas. Fight me, Houston.', 'It’s a desert, sí, but it blooms if you know where to look.'],
     'El Paso sits in Mountain Time — the rest of Texas is Central.', 33, 'shop owner'],
   ['Dusty', 'Amarillo', { hat: 'stetson', hatC: 0x8a7050, shirt: 0xb09a70, kerchief: 0xaa4a2a },
-    ['Panhandle wind’ll knock your hat off.', 'Spray-paint a Cadillac while you’re here — everyone does.', 'Flat? Sure. But you can see tomorrow from here.'],
+    ['Panhandle wind’ll knock your hat off.', 'Spray-paint a Cadillac while you’re here — everyone does.', 'Flat? Sure. But you can see tomorrow from here.',
+      'The 72-ounce steak is free if you finish it. Nobody talks about the after.', 'Route 66 came through here when it meant something. Still does, to me.', 'More cattle than people out here, and the cattle gossip less.', 'A storm rolls in, you can watch it coming for two whole days.'],
     'Amarillo means "yellow" in Spanish, for the local soil.', 50, 'ranch hand'],
   ['Gully', 'Corpus Christi', { hat: 'bucket', hatC: 0x4a6a4a, shirt: 0x3a6a8a, prop: 'rod' },
-    ['Sparkling city by the sea!', 'Redfish are running today, I can feel it.', 'Watch for shrimp boats off Padre Island.'],
+    ['Sparkling city by the sea!', 'Redfish are running today, I can feel it.', 'Watch for shrimp boats off Padre Island.',
+      'The Lexington’s parked in the bay — a whole aircraft carrier, just sittin’ there.', 'Wind never quits here. Kitesurfers love it. My hat don’t.', 'Cast off the jetty at dawn and you’ll believe in something.', 'Salt air fixes most things. The rest, tacos.'],
     'Selena, the Queen of Tejano, called Corpus home.', 47, 'fishing guide'],
   ['Peggy Sue', 'Lubbock', { dress: 0x3a9a9a, hair: 0xd8b860, glasses: true },
-    ['Buddy Holly grew up right here.', 'That’ll be the day, sugar!', 'Stick around for the world’s flattest sunset.'],
+    ['Buddy Holly grew up right here.', 'That’ll be the day, sugar!', 'Stick around for the world’s flattest sunset.',
+      'The wind farm past the loop looks like the horizon doing a slow wave.', 'Prairie dog town has more drama than my whole radio show.', 'We invented the crop circle out here. It’s called a center pivot, sugar.', 'Every star you can name, you can see from my porch.'],
     'Lubbock is the world’s largest cottonseed processing region.', 26, 'radio DJ'],
   ['Chuy', 'Laredo', { hat: 'wide', hatC: 0xd8c8a0, shirt: 0xf0ead8 },
-    ['Bienvenido to the border!', 'I-35 starts right here and runs clear to Minnesota.', 'Two countries, one street. That’s Laredo.'],
+    ['Bienvenido to the border!', 'I-35 starts right here and runs clear to Minnesota.', 'Two countries, one street. That’s Laredo.',
+      'Trucks line up for miles at the bridge. Half of what America buys rolls past my window.', 'A hundred and five in the shade, and we call it a dry heat like that helps.', 'George Washington’s birthday? Biggest party of the year here. Since 1898.', 'On this street you’ll hear four languages before lunch.'],
     'Laredo has flown seven flags — one more than the rest of Texas.', 52, 'customs broker'],
   ['Quill', 'Marfa', { hat: 'beret', hatC: 0x1a1a1a, shirt: 0x1a1a1a, prop: 'brush' },
-    ['Artists, antelope, and lights nobody can explain.', 'The desert is the canvas. I just sign it.', 'Stick around till dark. You’ll see.'],
+    ['Artists, antelope, and lights nobody can explain.', 'The desert is the canvas. I just sign it.', 'Stick around till dark. You’ll see.',
+      'There’s a Prada store in the desert an hour out. It’s art. Don’t ask.', 'Judd came for the light. The light stayed. So did we.', 'I paint the horizon every day. It never repeats itself.', 'The quiet out here is so loud it keeps some folks up at night.'],
     'Marfa’s mystery lights have been reported since 1883.', 39, 'painter'],
   ['Cap’n Sal', 'Galveston', { hat: 'captain', hatC: 0xf0f0f0, coat: 0x24365a, beard: 0xd8d8d8 },
-    ['This island was the biggest city in Texas once, before the 1900 storm.', 'The Gulf gives and the Gulf takes, friend.', 'Steady as she goes, landlubber.'],
+    ['This island was the biggest city in Texas once, before the 1900 storm.', 'The Gulf gives and the Gulf takes, friend.', 'Steady as she goes, landlubber.',
+      'The seawall’s ten miles long, and I’ve walked every foot of it cursing the wind.', 'Jean Lafitte buried treasure here, they say. Sixty years I’ve said keep digging.', 'The pier lights come on at dusk — prettiest thing this side of a green flash.', 'A ship in port is safe, but that ain’t what ships are for.'],
     'The 1900 Galveston hurricane is still the deadliest US natural disaster.', 63, 'charter boat captain'],
 ];
 
 // context openers — checked in order at interact time
 const OPENERS = {
-  storm: ['Whoa there — this one’s a real frog-strangler!', 'Lightning like that, you’d best keep moving.'],
-  rain: ['Wet enough for ya?', 'Good day for ducks, not much else.'],
-  dust: ['Cover your eyes — West Texas is relocating today.', 'This dust’ll paint your truck for free.'],
-  night: ['You’re out late, partner.', 'Fine night for it, whatever it is you’re doing.'],
+  storm: ['Whoa there — this one’s a real frog-strangler!', 'Lightning like that, you’d best keep moving.', 'That anvil cloud means business — I’d go find a roof.', 'Count the seconds after the flash. Then don’t dawdle.'],
+  rain: ['Wet enough for ya?', 'Good day for ducks, not much else.', 'Smell that? Creosote and wet caliche. Best smell there is.', 'The land drinks first. We complain second.'],
+  dust: ['Cover your eyes — West Texas is relocating today.', 'This dust’ll paint your truck for free.', 'Keep your windows up till the sky turns back on.', 'That’s half of New Mexico blowing through. No charge.'],
+  night: ['You’re out late, partner.', 'Fine night for it, whatever it is you’re doing.', 'Stars put on a show out here once the sun clocks out.', 'Night driving’s for coyotes and truckers. Which are you?'],
 };
 const PROGRESS_LINES = [
   [(c) => c.species >= 8, 'Eight critters spotted? You’re a regular naturalist!'],
@@ -74,14 +86,21 @@ const PROGRESS_LINES = [
 // B2 — aviation-aware openers, gated on a live heli near the city (ctx.heli
 // from HeliSystem.candidates via getContext — only fires while it's airborne)
 const HELI_OPENERS = {
-  news: ['That news chopper’s been circling all morning. Somebody’s day got interesting.', 'News chopper overhead again. Wave — you might make the six o’clock.'],
-  medical: ['Med-flight went over a bit ago. Say a little prayer for whoever that’s for.', 'That’s the Lifeguard bird up there. Hope it’s just a training run.'],
-  coastguard: ['Coast Guard’s working the water today. Somebody’ll be glad to see that orange.', 'That orange chopper out there means the Gulf’s earning its keep.'],
-  army: ['Army birds out of Hood again. You feel that thump before you hear it.', 'Them Army helicopters rattle my windows every time over.'],
+  news: ['That news chopper’s been circling all morning. Somebody’s day got interesting.', 'News chopper overhead again. Wave — you might make the six o’clock.', 'When the news bird hovers, somebody’s front lawn is on TV.'],
+  medical: ['Med-flight went over a bit ago. Say a little prayer for whoever that’s for.', 'That’s the Lifeguard bird up there. Hope it’s just a training run.', 'That’s the fastest anybody moves in this county, right up there.'],
+  coastguard: ['Coast Guard’s working the water today. Somebody’ll be glad to see that orange.', 'That orange chopper out there means the Gulf’s earning its keep.', 'Sleep easy on this coast — that rotor noise is why.'],
+  army: ['Army birds out of Hood again. You feel that thump before you hear it.', 'Them Army helicopters rattle my windows every time over.', 'Fort Hood’s birds fly low enough to wave back. Don’t, though.'],
 };
 const JOB_LINES = [
   (to) => `Heard you’re hauling for ${to}. Don’t let it spoil.`,
   (to) => `Word travels — folks say you’ve got a load bound for ${to}.`,
+  (to) => `That crate bound for ${to}? Roads are long and the coffee’s cheap. Git.`,
+  (to) => `${to}, huh? Tell ’em hello from out here.`,
+];
+const FORECAST_LINES = [
+  (fc) => `Radio’s calling ${fc} later on. Plan around it.`,
+  (fc) => `They say ${fc}’s coming. Radio’s wrong half the time — but which half?`,
+  (fc) => `${fc} in the forecast. My knee already agrees.`,
 ];
 
 const TOWNSFOLK_LINES = [
@@ -95,13 +114,115 @@ const TOWNSFOLK_LINES = [
   'Old cemetery down the farm road glows some nights. Ain’t nobody mows it after dark.',
   'They say Enchanted Rock groans when it cools at night. The Tonkawa saw fires up top, too.',
   'My meemaw won’t drive past that old fort at Goliad after sundown. Won’t say why, neither.',
+  'Y’all lost, or just wandering? Both’s fine here.',
+  'Take it slow through town — the dog sleeps in the road.',
+  'Feed store’s got coffee if the diner line’s too long.',
+  'We wave at every truck here. You ain’t special. But howdy.',
+  'Church supper Sunday. Bring an appetite and a folding chair.',
+  'You picked a fine day to be somewhere.',
+  'This bench has heard forty years of my opinions.',
+  'Watch the caliche roads after a rain. Slicker’n owl grease.',
+  'Fireflies been thick down by the creek this week.',
+  'Need directions? Ask twice. The first answer’s always past the gas station that burned down.',
+  'It ain’t the heat, it’s the hundred straight days of it.',
+  'Somebody’s smoking brisket. Follow your nose — you can’t miss it.',
+  'That water tower’s been leaning since ’94. We like it that way.',
+  'High school got a new scoreboard this year. Whole town chipped in.',
+  'Sky’s been promising rain all week. All hat, no cattle.',
+  'Norther’s coming — you can smell it. Forty degrees by supper.',
+  'Come spring, this whole stretch turns bluebonnet blue.',
+  'Watch for hogs after dark. They don’t watch for you.',
+  'Creek’s up. Turn around, don’t drown — that ain’t a suggestion.',
+  'Hail took my windshield last spring. Left the mesquite alone, naturally.',
+  'Rained two inches Tuesday. Gauge says one, my boots say two.',
+  'The kolache place sells out by nine. You’ve been warned.',
+  'Gas station tamales here beat my cousin’s. Don’t tell her.',
+  'Brisket’s ready when it’s ready. Pitmaster don’t take questions.',
+  'Big Red and barbacoa on Sunday. That’s tradition, not a suggestion.',
+  'They say a lady in white walks the low-water crossing on full moons. My uncle honks, just to be polite.',
+  'That highway hums some nights. Old-timers say it’s singing back to the trains.',
+  'Weather balloon, they told us. Sure flew funny for a balloon.',
+  'Don’t count the crows on the courthouse. Meemaw says it’s bad luck to finish.',
+  'Courthouse clock runs four minutes fast. Town voted to leave it.',
+  'They filmed a movie here in ’79. Nobody’s been allowed to forget it.',
+  'Population sign says 1,200. The mayor counts the dogs.',
+  'Six-man football Friday night — loudest two hundred people in Texas.',
+  'The old drive-in still runs Fridays. Bring your own speakers now.',
+  'Everything worth knowing gets decided at the coffee shop by 7 a.m.',
+  'Can’t buy beer past midnight, but you can buy a saddle any hour. Priorities.',
+  'Main Street’s three blocks. Takes an hour if you know everybody.',
+  'My tomatoes won at the county fair. The secret’s spite.',
+  'Them vultures on the cell tower? Neighborhood watch.',
+  'Slow down and see something. That advice is free.',
+  'Half this town’s related to the other half. Choose your gossip careful.',
+  'Train still blows through at 2 a.m. You quit hearing it after a year. Visitors don’t.',
 ];
-const TOWNSFOLK_NAMES = ['Earl', 'Ruby', 'Cole', 'June', 'Wade', 'Dolly', 'Buck', 'Lupe', 'Roy', 'Faye', 'Cash', 'Ida', 'Slim', 'Pearl'];
-const TOWNSFOLK_PROFESSIONS = ['rancher', 'mechanic', 'shop owner', 'teacher', 'waitress', 'roughneck'];
+// first names ride the shared spawn stream (exactly one draw — position-safe);
+// surnames + professions come from the independent per-NPC stream (see spawn*)
+const TOWNSFOLK_FIRST = [
+  'Earl', 'Ruby', 'Cole', 'June', 'Wade', 'Dolly', 'Buck', 'Lupe', 'Roy', 'Faye', 'Cash', 'Ida', 'Slim', 'Pearl',
+  'Ada', 'Amos', 'Beau', 'Birdie', 'Boone', 'Bonnie', 'Calvin', 'Clara', 'Clay', 'Clint', 'Darla', 'Dale', 'Delia',
+  'Dixie', 'Doyle', 'Duane', 'Elmer', 'Estela', 'Flor', 'Floyd', 'Gus', 'Hattie', 'Hoyt', 'Imogene', 'Inés', 'J.D.',
+  'Jewel', 'Joaquín', 'Lela', 'Leon', 'Lonnie', 'Loretta', 'Mack', 'Mae', 'Marcelo', 'Mavis', 'Merle', 'Nadine',
+  'Nita', 'Odell', 'Opal', 'Orville', 'Otis', 'Paz', 'Quincy', 'Ramona', 'Reba', 'Rex', 'Rosalinda', 'Rufus',
+  'Sadie', 'Santos', 'Sissy', 'Sonny', 'Tavo', 'Tess', 'Travis', 'Vera', 'Virgil', 'Wanda', 'Wilma', 'Woody', 'Yolanda', 'Zeke',
+];
+const TOWNSFOLK_SURNAMES = [
+  'Hodges', 'Pruitt', 'Vasquez', 'Cantu', 'Whitley', 'Boggs', 'Treviño', 'McAllister', 'Stubbs', 'Ozuna', 'Pickens',
+  'LaRue', 'Guzmán', 'Tatum', 'Culpepper', 'Reyna', 'Dunlap', 'Sikes', 'Mendoza', 'Crabtree', 'Hollis', 'Zamora',
+  'Prescott', 'Gaines', 'Villarreal', 'Ledbetter', 'Cisneros', 'Rankin', 'Duffey', 'Salinas', 'Whitworth', 'Ybarra',
+  'Purdy', 'Kuykendall', 'Ochoa', 'Braddock', 'Elizondo', 'Montez', 'Slocum', 'Barrera', 'Hearn', 'Tidwell',
+];
+// disjoint on purpose — the npcs verify suite asserts big-city and small-town
+// professions never overlap (that's how it proves the split without pool access)
+const PROFESSIONS_TOWN = [
+  'rancher', 'mechanic', 'shop owner', 'teacher', 'waitress', 'roughneck', 'feed store clerk', 'brand inspector',
+  'farrier', 'water-well driller', 'county clerk', 'BBQ pitmaster', 'propane dealer', 'quilter', 'rodeo clown',
+  'school bus driver', 'pecan farmer', 'taxidermist', 'fence builder', 'windmill repairman', 'cotton gin operator',
+  'deputy sheriff', 'hairdresser', 'peach grower',
+];
+const PROFESSIONS_CITY = [
+  'barista', 'paramedic', 'museum docent', 'food truck owner', 'real estate agent', 'session musician', 'oil trader',
+  'ER nurse', 'line cook', 'rideshare driver', 'architect', 'TV weatherman', 'yoga instructor', 'bartender',
+  'bike courier', 'art dealer', 'window washer', 'sports radio host', 'tattoo artist', 'food critic',
+];
+// profession-flavored smalltalk — keys must match the pool strings exactly;
+// professions without an entry fall back to the generic pool
+const PROFESSION_LINES = {
+  'rancher': ['Calving season — I sleep in the truck more than the house.', 'Fence don’t care what day it is. It breaks when it breaks.', 'Cattle prices are up. Won’t last. Never does.'],
+  'mechanic': ['Whatever that rattle is, it ain’t gonna fix itself.', 'Your truck sounds healthy. Rare thing around here.', 'Parts truck comes Thursday. Everything in this town breaks Friday.'],
+  'shop owner': ['Sign says open when I’m here, closed when I’m fishing.', 'Tourists buy the bluebonnet postcards. Locals buy shells and duct tape.'],
+  'teacher': ['Twenty-two kids, and every one of ’em is somebody’s whole world.', 'Summer break is a myth. I repaint the classroom myself.'],
+  'waitress': ['Pie today is pecan. Pie tomorrow is also pecan. It’s a pecan town.', 'Coffee’s always fresh if you time it right. I’ll tell you when.', 'My regulars order by nodding. Took years to learn the nods.'],
+  'roughneck': ['Two weeks on, one off. The rig don’t know it’s Christmas.', 'You can hear the pumpjack from my porch. Sounds like a paycheck.'],
+  'feed store clerk': ['Spring means chicks in the tank by the register. Try leaving without one.', 'I can tell your acreage by your boot mud.'],
+  'farrier': ['Horses are honest. It’s the owners you gotta gentle.', 'Bad back, good hands, full book — that’s the trade.'],
+  'BBQ pitmaster': ['Lit the pit at three this morning. It’s a calling, not a job.', 'Post oak, salt, pepper, patience. Anything else is decoration.'],
+  'deputy sheriff': ['Quietest county in Texas, and I aim to keep it boring.', 'Mostly I unlock cars and escort funerals. Proud of both.'],
+  'school bus driver': ['Forty miles of dirt road every morning. I know every dog by name.', 'The kids think the bus can’t hear them. The bus hears everything.'],
+  'pecan farmer': ['Good year for pecans. The squirrels agree, unfortunately.', 'You don’t pick pecans. You negotiate with the tree.'],
+  'barista': ['Oat milk finally made it out here. Took a while. So did I.', 'Morning rush talks crude prices and cold brew in the same breath.'],
+  'paramedic': ['A slow shift is a good shift. Knock on wood.', 'I know every farm-to-market road by its worst curve.'],
+  'food truck owner': ['Brisket tacos at the brewery on Thursdays. That’s the whole business plan.', 'The truck’s AC died in June. We call it a sauna menu now.'],
+  'rideshare driver': ['Airport, rodeo, honky-tonk, repeat. I could drive it blindfolded.', 'Five stars if you don’t mention the check-engine light.'],
+  'sports radio host': ['Football season, my phone lines melt. Offseason, they melt different.', 'I’ve been taking calls about the same fumble for eleven years.'],
+  'ER nurse': ['Night shift teaches you the town’s secrets. Day shift teaches patience.', 'Wash your hands and wear your seatbelt. That’s the whole sermon.'],
+};
+// per-role profession variants; the variant picks first, then age draws inside
+// its band (so a 'retired airline captain' can't come out 25)
 const BYSTANDER_ROLE_INFO = {
-  spotter: { profession: 'plane spotter', ageLo: 16, ageHi: 72 },
-  relative: { profession: 'family member', ageLo: 25, ageHi: 75 },
-  pilot: { profession: 'off-duty pilot', ageLo: 25, ageHi: 58 },
+  spotter: [
+    { p: 'plane spotter', lo: 16, hi: 72 }, { p: 'aviation photographer', lo: 19, hi: 66 },
+    { p: 'retired air-traffic controller', lo: 57, hi: 78 }, { p: 'model-kit builder', lo: 16, hi: 70 },
+  ],
+  relative: [
+    { p: 'family member', lo: 25, hi: 75 }, { p: 'pilot’s spouse', lo: 26, hi: 68 },
+    { p: 'proud parent', lo: 42, hi: 78 }, { p: 'welcome-sign holder', lo: 16, hi: 70 },
+  ],
+  pilot: [
+    { p: 'off-duty pilot', lo: 25, hi: 58 }, { p: 'crop-duster pilot', lo: 24, hi: 61 },
+    { p: 'retired airline captain', lo: 58, hi: 79 }, { p: 'student pilot', lo: 17, hi: 44 }, { p: 'flight instructor', lo: 26, hi: 63 },
+  ],
 };
 
 // B1 — airport bystanders: figures waiting at tier-1/2 field gates, townsfolk
@@ -111,17 +232,33 @@ const BYSTANDER_ROLE_INFO = {
 // (6666 Ranch, Armstrong Ranch) stay empty, matching their own flavor text.
 const GATE_FIELDS = AIRPORTS.filter((a) => a.tier <= 2 || a.id === 'MRF' || a.id === 'TRL');
 const ROLE_SMALLTALK = {
-  spotter: ['Logged forty tails from this fence last month. Well. Fourteen.', 'You can tell the type by the engine note before you ever see it.', 'Best bench in Texas, right here by the fence.'],
-  relative: ['Airport coffee’s terrible everywhere. Comforting, really.', 'I always come out too early. Can’t help it.', 'They always walk out last. Every single time.'],
-  pilot: ['Day off. Can’t stay away from the field, though.', 'Twelve years in the left seat and I still watch every takeoff.', 'Ground’s fine. Sky’s better.'],
+  spotter: [
+    'Logged forty tails from this fence last month. Well. Fourteen.', 'You can tell the type by the engine note before you ever see it.', 'Best bench in Texas, right here by the fence.',
+    'Tail numbers are like license plates, except interesting.', 'I had this same spot at the old fence line, before they moved the gate.', 'Rain or shine. Mostly shine. This is Texas.',
+    'My logbook goes back nine years. My thermos goes back further.', 'One day something rare diverts in here. That’s the whole hobby — one day.',
+  ],
+  relative: [
+    'Airport coffee’s terrible everywhere. Comforting, really.', 'I always come out too early. Can’t help it.', 'They always walk out last. Every single time.',
+    'You can spot family at an airport fence a mile off. We all stand the same.', 'Brought the truck so there’s room for the bags. There’s never room for the bags.', 'One bar of signal out here, so I just watch the sky like the old days.',
+    'Last time I waited here it rained. They still talk about my sign running.', 'You’d think the waiting gets easier after all these years. It don’t.',
+  ],
+  pilot: [
+    'Day off. Can’t stay away from the field, though.', 'Twelve years in the left seat and I still watch every takeoff.', 'Ground’s fine. Sky’s better.',
+    'Everybody watches the landing. Pilots watch the wind sock.', 'Flew freight out of here for a spell. The coffee hasn’t improved.', 'You never really log out of the sky. You just file it away.',
+    'Crosswind days are free entertainment, fence-side.', 'The pattern here is friendly. The density altitude ain’t, come August.',
+  ],
 };
 const PILOT_WX = {
-  clear: 'Good day to be up there. Shame I’m down here.',
-  clouds: 'Ceiling’s workable. I’d file and go.',
-  rain: 'Soft ceiling today — instrument weather.',
-  storm: 'Nobody with sense is flying through that.',
-  dust: 'That brown-out would sand a windscreen clean off.',
+  clear: ['Good day to be up there. Shame I’m down here.', 'CAVU. That’s pilot for "wish I was working."', 'Not a cloud worth naming. Somebody’s logging hours today.'],
+  clouds: ['Ceiling’s workable. I’d file and go.', 'Scattered layer, decent gaps. VFR with manners.', 'Ceiling like that, you fly the plan, not the view.'],
+  rain: ['Soft ceiling today — instrument weather.', 'Good day to stay current on paperwork instead.', 'Wet runway, long rollout. Respect it.'],
+  storm: ['Nobody with sense is flying through that.', 'That cell would eat a Cessna for breakfast.', 'Tie-your-airplane-down weather, that is.'],
+  dust: ['That brown-out would sand a windscreen clean off.', 'Visibility’s measured in guesses right now.', 'I’ve seen that wall eat a whole horizon in ten minutes.'],
 };
+// verify-only surface — tools/checks/npcs.mjs imports the live module in-page
+// and asserts pool sizes/disjointness here instead of scraping source text
+export const POOLS = { NAMED, TOWNSFOLK_LINES, TOWNSFOLK_FIRST, TOWNSFOLK_SURNAMES, PROFESSIONS_TOWN, PROFESSIONS_CITY, PROFESSION_LINES, ROLE_SMALLTALK, BYSTANDER_ROLE_INFO, OPENERS, HELI_OPENERS, JOB_LINES, FORECAST_LINES, PILOT_WX };
+
 const WIND_NAMES = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
 const windName = (deg) => WIND_NAMES[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
 
@@ -221,9 +358,10 @@ export class NPCSystem {
       this.convo = this.bystanderConvo(n, ctx);
       n.visit++;
     } else if (n.townsfolk) {
+      const prof = PROFESSION_LINES[n.profession];
       this.convo = [
         ...(heliLine ? [heliLine] : []),
-        TOWNSFOLK_LINES[(Math.random() * TOWNSFOLK_LINES.length) | 0],
+        prof && Math.random() < 0.45 ? pick(prof) : pick(TOWNSFOLK_LINES),
       ];
     } else {
       const opener =
@@ -235,7 +373,7 @@ export class NPCSystem {
       const progress = PROGRESS_LINES.find(([test]) => test(ctx.counts) && Math.random() < 0.5);
       const pulls = []; // shared context, not per-character sets — voices untouched
       if (ctx.job && Math.random() < 0.5) pulls.push(pick(JOB_LINES)(ctx.job.to));
-      if (ctx.fc && Math.random() < 0.4) pulls.push(`Radio’s calling ${ctx.fc} later on. Plan around it.`);
+      if (ctx.fc && Math.random() < 0.4) pulls.push(pick(FORECAST_LINES)(ctx.fc));
       this.convo = [
         opener ?? n.lines[n.visit % n.lines.length],
         ...(opener ? [n.lines[n.visit % n.lines.length]] : []),
@@ -366,11 +504,13 @@ export class NPCSystem {
       g.rotation.y = rand() * Math.PI * 2;
       this.scene.add(g);
       // independent stream (keyed by index, not drawn from `rand`) so adding
-      // age/profession never shifts the shared stream's later look/position draws
+      // age/profession/surname never shifts the shared stream's later look/position draws
       const ar = seededRand('age:' + city.name + ':' + i);
+      const pool = bigCity ? PROFESSIONS_CITY : PROFESSIONS_TOWN;
+      const age = 20 + ((ar() * 55) | 0), profession = pool[(ar() * pool.length) | 0];
       folk.push({
-        g, name: TOWNSFOLK_NAMES[(rand() * TOWNSFOLK_NAMES.length) | 0],
-        age: 20 + ((ar() * 55) | 0), profession: TOWNSFOLK_PROFESSIONS[(ar() * TOWNSFOLK_PROFESSIONS.length) | 0],
+        g, name: TOWNSFOLK_FIRST[(rand() * TOWNSFOLK_FIRST.length) | 0] + ' ' + TOWNSFOLK_SURNAMES[(ar() * TOWNSFOLK_SURNAMES.length) | 0],
+        age, profession,
         townsfolk: true, bigCity, homeX: x, homeZ: z, walkT: rand() * 3, walking: false,
         dir: 0, wave: 0, phase: rand() * 6.28, baseRotY: g.rotation.y,
       });
@@ -394,13 +534,14 @@ export class NPCSystem {
       g.rotation.y = rand() * Math.PI * 2;
       this.scene.add(g);
       const role = roles.splice((rand() * roles.length) | 0, 1)[0];
-      const info = BYSTANDER_ROLE_INFO[role];
       // independent stream (keyed by index, not drawn from `rand`) so adding
-      // age never shifts the shared stream's later look/position draws
+      // variant/age/surname never shifts the shared stream's later look/position draws
       const ar = seededRand('age:' + a.id + ':' + i);
+      const variants = BYSTANDER_ROLE_INFO[role];
+      const v = variants[(ar() * variants.length) | 0];
       folk.push({
-        g, name: TOWNSFOLK_NAMES[(rand() * TOWNSFOLK_NAMES.length) | 0],
-        age: info.ageLo + ((ar() * (info.ageHi - info.ageLo)) | 0), profession: info.profession,
+        g, name: TOWNSFOLK_FIRST[(rand() * TOWNSFOLK_FIRST.length) | 0] + ' ' + TOWNSFOLK_SURNAMES[(ar() * TOWNSFOLK_SURNAMES.length) | 0],
+        age: v.lo + ((ar() * (v.hi - v.lo)) | 0), profession: v.p,
         bystander: true, bigCity, field: a, role,
         visit: 0, wave: 0, phase: rand() * 6.28, baseRotY: g.rotation.y,
       });
@@ -425,7 +566,7 @@ export class NPCSystem {
       const next = nextSlot(avn, ctx.day, (sl) => sl.from === a.id);
       if (next) lines.push(`Next one out is ${next.cs}, bound for ${idCity(next.dest)}.`);
     } else {
-      lines.push(`Wind’s out of the ${windName(windFrom(day))} today. ${PILOT_WX[ATMOS.weather] ?? PILOT_WX.clear}`);
+      lines.push(`Wind’s out of the ${windName(windFrom(day))} today. ${pick(PILOT_WX[ATMOS.weather] ?? PILOT_WX.clear)}`);
       if (ctx.fc) lines.push(`Radio says ${ctx.fc}’s coming. I’d believe it.`);
     }
     lines.push(pick(ROLE_SMALLTALK[n.role]));

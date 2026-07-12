@@ -350,6 +350,32 @@ ship.
   extras (Sheppard T-38 pattern, Marfa gliders, named GA/charter outfits —
   open call 5) need a fresh scope check before any further aviation work.
 
+- [x] ~~NPC expansion (waves 1–2)~~ — done 2026-07-12 (wave 1 structural
+  de339c1, wave 2 content same day). **Wave 1**: tier-3 bystanders at the
+  two public fields (Marfa Municipal, Terlingua Ranch; the private ranch
+  strips SSS/ARM stay empty per their own flavor text), night visibility
+  gated by the nearby city's real population (>400k stays out after dark —
+  threshold mirrored at cities.js:52 + twice in npcs.js), age/profession as
+  real fields surfaced in the dialog subtitle. **Wave 2**: townsfolk get
+  full names (76 first × 42 surnames), professions split into *disjoint*
+  small-town (24) / big-city (20) pools picked by the same >400k flag,
+  generic line pool 19→55, and ~18 professions carry 2–3 flavored lines
+  mixed in at 45% (`PROFESSION_LINES`); bystander roles carry 4–5
+  profession variants each with per-variant age bands (variant draws first,
+  age inside its band — no 25-year-old retired captains), role smalltalk
+  3→8; the 12 named characters grow to 7–8 rotating lines each, voices
+  intact; context pools bumped (weather/night openers 2→4, heli +1 each,
+  job 2→4, pilot-weather 1→3 per state, 3 forecast templates). Stream
+  safety: first name is the single position-safe draw on the shared spawn
+  stream; surname/profession/variant all ride the independent `age:`
+  stream. New `POOLS` export is the verify surface. New
+  `tools/checks/npcs.mjs` (6 checks): degenerate-pool guard via in-page
+  module import, spawn-signature baseline pinned *pre-expansion*
+  (positions/rotations/look colors byte-equal at El Paso/Waco/ACT),
+  observed variety across 30 cities (distinct names/professions,
+  pool-correct by city size), 40-chat flavored/generic mix, full
+  named-line rotation, bystander variant bands. No SHOT blocks.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

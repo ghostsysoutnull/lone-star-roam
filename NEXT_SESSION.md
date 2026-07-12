@@ -1,44 +1,20 @@
 # Lone Star Roam — next session kickoff
 
-## Session briefing
+No queued wave — NPC expansion shipped in full 2026-07-12 (wave 1 structural
+de339c1, wave 2 content the same day; details in ROADMAP.md). Pick the next
+effort from `BACKLOG.md` (queued work + pending playtests).
 
-*(Auto-greeting per CLAUDE.md — present this at session start, then wait
-for Bruno's go-ahead. No copy-paste needed; any first message triggers
-it.)*
-
-- **This session**: NPC expansion, **wave 2 of 2 — content authoring**:
-  much larger name pools, more profession variety, and more message/
-  dialogue variety across gate bystanders, city townsfolk, and the 12
-  named characters. Wave 1 (structural: tier-3 bystanders at the two
-  public fields, night visibility gated by the nearby city's real
-  population, age/profession as real fields wired into the dialog
-  subtitle) shipped 2026-07-12, commit de339c1.
-- **Recommended setup**: model **Fable 5**, effort **high** — this is
-  pool-writing/register-design work, the same shape as the aviation
-  chatter waves where Fable 5 was the right call over Sonnet 5's
-  table-plumbing sessions. Flag it if the running model differs.
-- **Budget**: content pools + checks asserting real variety (e.g. no
-  degenerate small pools, spot-check a few generated lines/professions
-  read naturally), no shots, grep-first (MODULES.md anchors). The
-  plumbing (fields, dialog subtitle, night-gate) is done — this session's
-  cost should be almost entirely the pools themselves.
-- **Then**: fold this NPC-expansion note into ROADMAP.md and delete this
-  briefing block once wave 2 ships.
-
-Gotchas carried over from wave 1 (read before touching `npcs.js`):
-- `spawnTownsfolk`/`spawnBystanders` draw look + position from one shared
-  seeded stream (`rand`) per city/field — any *new* draw added into that
-  loop shifts every later NPC's position/look (breaks the "same seed →
-  same world" guarantee players' spatial memory depends on). Wave 1 hit
-  this for age and fixed it by giving age its own independent stream
-  (`seededRand('age:' + city.name/a.id + ':' + i)`). Do the same for any
-  new per-NPC random content in wave 2 — never draw it from `rand`.
-- Night-gate threshold (pop > 400,000 = "big city") is mirrored in three
-  places: `cities.js:52`, and twice in `npcs.js` (`spawnTownsfolk`,
-  `spawnBystanders`) — not exported, keep them in sync if it ever changes.
-- Tier-3 bystanders: only Marfa Municipal (`MRF`) and Terlingua Ranch
-  (`TRL`) spawn folks — the two private ranch strips (`SSS`, `ARM`) stay
-  empty on purpose (their own flavor text calls them private).
+Gotchas for whoever touches `npcs.js` next:
+- `spawnTownsfolk`/`spawnBystanders`: the shared seeded stream (`rand`) owns
+  position/look and exactly ONE name draw per NPC — any new per-NPC random
+  content must ride the independent `seededRand('age:'…)` stream or it shifts
+  every later NPC's position (breaks players' spatial memory).
+- The npcs verify suite pins a pre-expansion spawn-signature baseline
+  (`tools/checks/npcs.mjs` `BASELINE`) — if it ever fails, positions drifted;
+  don't re-capture it to make the check pass without understanding why.
+- Night-gate threshold (pop > 400,000) is mirrored in `cities.js:52` and twice
+  in `npcs.js`; the same flag also picks the big-city vs small-town profession
+  pool (kept disjoint on purpose — a check asserts it).
 
 ---
 
@@ -62,5 +38,3 @@ Key facts:
   first (hard refresh — python http.server sends no cache headers).
 - **Ask before coding** — present an implementation plan and wait for
   the go-ahead.
-
-Non-aviation queued work + pending playtests are in `BACKLOG.md`.
