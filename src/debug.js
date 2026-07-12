@@ -8,7 +8,7 @@ import { EROCK } from './haunts.js';
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -57,6 +57,17 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       tp(blimp.pos.x + 20, blimp.pos.z, Math.PI / 2);
       hud.toast(`🎈 Blimp: ${blimp.state}`);
     },
+    nasa() {
+      const c = military.candidates.find((x) => x.kind === 'nasa');
+      tp(c.baseX + 30, c.baseZ, Math.PI / 2);
+      const ok = military.force('nasa', aviation);
+      hud.toast(ok ? '✈️ NASA T-38 pair inbound to Ellington' : '✈️ Sky already at the fixed-wing cap');
+    },
+    lowlevel() {
+      tp(-2600, 300, 0);
+      const ok = military.force('lowlevel', aviation);
+      hud.toast(ok ? '✈️ Low-level trainer pair, West Texas' : '✈️ Sky already at the fixed-wing cap');
+    },
     testRadio() {
       const tw = radio.nearestTowered(player.pos.x, player.pos.z);
       const un = radio.nearestUnicom(player.pos.x, player.pos.z);
@@ -78,7 +89,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       ['hauntCemetery', '👻 Haunt cemetery'], ['ghostFires', '🔥 Ghost fires'],
       ['saucer', '🛸 Saucer'], ['formation', '✨ Lubbock lights'], ['bats', '🦇 Bat show'],
       ['departure', '🛫 Departure'], ['arrival', '🛬 Arrival'], ['testRadio', '📻 Test radio'],
-      ['heli', '🚁 Heli'], ['blimp', '🎈 Blimp'],
+      ['heli', '🚁 Heli'], ['blimp', '🎈 Blimp'], ['nasa', '✈️ NASA T-38'], ['lowlevel', '✈️ Low-level pair'],
       ['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'], ['storm', '⛈ Storm'], ['dust', '🌪 Dust'],
     ];
     const el = document.createElement('div');

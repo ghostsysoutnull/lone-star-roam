@@ -742,11 +742,74 @@ export default async function aviation(t) {
   });
 
   await t.check('rotors advance through the real loop (wiring sentinel)', async () => {
-    const h0 = await t.ev('g.heli.simT'), b0 = await t.ev('g.blimp.simT');
+    const h0 = await t.ev('g.heli.simT'), b0 = await t.ev('g.blimp.simT'), m0 = await t.ev('g.military.simT');
     await t.wait(0.5); // real rAF ticks, not a stepper — this is the sentinel
-    const h1 = await t.ev('g.heli.simT'), b1 = await t.ev('g.blimp.simT');
+    const h1 = await t.ev('g.heli.simT'), b1 = await t.ev('g.blimp.simT'), m1 = await t.ev('g.military.simT');
     t.ok(h1 > h0 + 0.3, 'heli.simT frozen — HeliSystem.update not wired into the main loop');
     t.ok(b1 > b0 + 0.3, 'blimp.simT frozen — BlimpSystem.update not wired into the main loop');
+    t.ok(m1 > m0 + 0.3, 'military.simT frozen — MilitaryAirSystem.update not wired into the main loop');
+  });
+
+  // Military color (wave 5, partial): the two flavor pairs are aviation.js
+  // movers wearing rotors.js's candidate idiom — same rule applies (assert
+  // numbers over time, never pixels). The load-bearing invariant is the
+  // shared MAX_AIR fixed-wing budget: these pairs must never make the sky
+  // busier than the design stance allows.
+  await t.check('military pair shares the fixed-wing cap with scheduled traffic (never exceeds MAX_AIR)', async () => {
+    const r = await t.ev(`(() => {
+      g.military.despawnAll(); g.aviation.despawnAll();
+      const apt = g.AIRPORTS.find((a) => a.id === 'DFW');
+      g.aviation.px = apt.at[0]; g.aviation.pz = apt.at[1];
+      let n = 0;
+      while (g.aviation.force('arrival') && n < 8) n++;
+      const before = g.aviation.airborneCount();
+      const ok = g.military.force('nasa', g.aviation);
+      const total = g.aviation.airborneCount() + g.military.airborneCount();
+      return { before, ok, total };
+    })()`);
+    t.ok(r.before >= 4, `expected the aviation cap (4) to be fillable via forced arrivals, got ${r.before}`);
+    t.ok(!r.ok, 'military pair launched even though the fixed-wing sky was already full');
+    t.ok(r.total <= 4, `combined airborne fixed-wing exceeded MAX_AIR: ${r.total}`);
+    await t.ev('(g.aviation.despawnAll(), g.military.despawnAll())');
+  });
+
+  await t.check('NASA T-38 pair closes on Ellington and lands (arrival, not a stalk-and-loiter)', async () => {
+    const r = await t.ev(`(() => {
+      g.military.despawnAll(); g.aviation.despawnAll();
+      const ok = g.military.force('nasa', g.aviation);
+      if (!ok) return { err: 'force failed' };
+      const c = g.military.candidates.find((x) => x.kind === 'nasa');
+      const d0 = Math.hypot(c.x0 - c.baseX, c.z0 - c.baseZ);
+      for (let i = 0; i < 160; i++) g.military.update(0.05, c.baseX, c.baseZ, g.aviation); // 8s sim — spawn radius 280 / NASA_SPD 46 ≈ 6.1s to arrive
+      const d1 = Math.hypot(c.x - c.baseX, c.z - c.baseZ);
+      return { err: null, d0, d1, stillFlying: c.flying };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.d1 < r.d0 * 0.5, `NASA pair should have closed most of the distance to Ellington (${r.d0} → ${r.d1})`);
+    t.ok(!r.stillFlying, 'NASA pair never touched down — it should land and go quiet, not loiter');
+    await t.ev('g.military.despawnAll()');
+  });
+
+  await t.check('low-level trainer pair only rolls over the Trans-Pecos by day, never elsewhere or at night', async () => {
+    const rollOnce = (px, pz) => `(() => {
+      g.military.despawnAll(); g.aviation.despawnAll();
+      const orig = Math.random; Math.random = () => 0; // guarantee the odds roll fires
+      const low = g.military.candidates.find((x) => x.kind === 'lowlevel');
+      low.rollT = 0;
+      g.military.update(0.016, ${px}, ${pz}, g.aviation);
+      const flew = low.flying;
+      Math.random = orig;
+      return flew;
+    })()`;
+    await t.setDay();
+    const east = await t.ev(rollOnce(-1000, 300));    // east of the gate — should NOT fly
+    const westDay = await t.ev(rollOnce(-2600, 300));  // west, daytime — SHOULD fly
+    await t.setNight();
+    const westNight = await t.ev(rollOnce(-2600, 300)); // west, dark — should NOT fly
+    await t.ev('g.military.despawnAll()');
+    t.ok(!east, 'low-level pair rolled east of the Trans-Pecos gate (x < -2200)');
+    t.ok(westDay, 'low-level pair never rolled over the West Texas box by day');
+    t.ok(!westNight, 'low-level pair rolled at night');
   });
 
   if (process.env.SHOT) { // composition only — never the pass/fail signal

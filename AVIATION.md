@@ -181,14 +181,22 @@ named check in `tools/checks/aviation.mjs`, not just "the mechanism exists."
 
 ### Wave 5 — Charter & military color (candidates, pick à la carte)
 
+- **Military flavor** — ✅ shipped 2026-07-12 (partial): parked B-1 at Dyess
+  and Randolph's "Taj Mahal" tower as higher-poly landmark-grade meshes
+  (`gameplay.js`); NASA T-38 pair into Ellington and a rare fast low-level
+  trainer pair over West Texas as `src/military.js` `MilitaryAirSystem`
+  (rotors.js candidate idiom, shares `aviation.js`'s `MAX_AIR` fixed-wing
+  cap via `aviation.airborneCount()`). Details in ROADMAP.md. **Still open**:
+  T-38 pattern circuits at Sheppard — touch-and-gos are a closed traffic
+  pattern (takeoff→crosswind→downwind→base→final→touch-and-go→repeat), which
+  doesn't fit either the point-to-point `AviationSystem` schedule or the
+  simple orbit/transit movers used so far; it needs its own state machine,
+  not a copy of an existing idiom. No weapons, ever — holds for any future
+  military addition too.
 - **Charter jobs** (missions.js): ✈️ offers between airport pairs requiring a
   logged landing at both ends; separate offer type — the ground-haul ×1.5
   road bonus stays untouched; fast-travel lock reused. Gives the bankroll an
   air-side sink/source and the logbook a reason beyond completion.
-- **Military flavor**: T-38 pattern circuits at Sheppard (touch-and-gos are
-  great ambient), a parked B-1 at Dyess, NASA T-38 pair into Ellington,
-  Randolph's "Taj Mahal" tower as a landmark-grade mesh. Rare fast low-level
-  trainer pair over West Texas (UFO-roll idiom, daytime). No weapons, ever.
 - **Marfa gliders**: silent soaring circles over the strip on clear
   afternoons (thermal country; pairs with the lights lore).
 - **Crop duster**: dawn runs over Panhandle ag chunks from tier-3 strips

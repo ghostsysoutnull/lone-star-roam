@@ -29,25 +29,30 @@ Key facts:
 - **Ask before coding** — present the wave's implementation plan and wait
   for the go-ahead.
 
-Task: **Aviation wave 5 — Charter & military color** (full spec in
-`AVIATION.md`; waves 1–4 shipped 2026-07-11). This is an à-la-carte wave —
-pick from: charter jobs (missions.js, ✈️ offers between airport pairs
-requiring a logged landing at both ends — a separate offer type, ground-haul
-bonus untouched, fast-travel lock reused), military flavor (T-38 touch-and-gos
-at Sheppard, a parked B-1 at Dyess, NASA T-38 pair into Ellington, Randolph's
-tower as a landmark mesh, a rare fast low-level trainer pair over West Texas —
-UFO-roll idiom — no weapons ever), Marfa gliders (silent soaring circles on
+Task: **Aviation wave 5 — Charter & military color, continued** (full spec in
+`AVIATION.md`; waves 1–4 shipped 2026-07-11; military flavor's B-1/Randolph
+landmarks + NASA T-38/low-level trainer pairs shipped 2026-07-12 — see
+ROADMAP.md). Remaining à-la-carte candidates: **Sheppard T-38 touch-and-go
+pattern circuits** (the one piece that needs real new design — a closed
+traffic pattern doesn't fit the point-to-point `AviationSystem` schedule or
+the simple orbit/transit movers already built; budget it its own session),
+charter jobs (missions.js, ✈️ offers between airport pairs requiring a
+logged landing at both ends — a separate offer type, ground-haul bonus
+untouched, fast-travel lock reused), Marfa gliders (silent soaring circles on
 clear afternoons), crop duster dawn runs from tier-3 strips, and a 13th
 bespoke NPC (duster pilot, weather-wise dialog). Confirm scope with Bruno
 before picking which pieces ship this session — present the plan, wait for
-go-ahead. Notes from wave 4: `src/rotors.js` has `HeliSystem`/`BlimpSystem`
-(candidates array, `force(kind)`/`despawnAll` test hooks, global airborne cap
-idiom with per-kind `weight`); reuse the same pattern for any wave-5 mover
-rather than inventing a new one. `aviation.divert(m)` is public if new air
-traffic needs a forced diversion; `airports.js` `onRunway(a,x,z,rad)` is the
-pavement-corridor test for any new ground-contact placement; `radio.js` stays
-standalone — charter-job or military radio chatter should follow the same
-pattern, never break `aviation.update`'s signature.
+go-ahead. Notes: `src/rotors.js` has `HeliSystem`/`BlimpSystem` and
+`src/military.js` has `MilitaryAirSystem` (candidates array,
+`force(kind)`/`despawnAll` test hooks, global airborne cap idiom with
+per-kind `weight`); reuse the same pattern for any new mover rather than
+inventing one — military.js additionally shows how to share `aviation.js`'s
+`MAX_AIR` budget across systems via `aviation.airborneCount()`.
+`aviation.divert(m)` is public if new air traffic needs a forced diversion;
+`airports.js` `onRunway(a,x,z,rad)` is the pavement-corridor test for any new
+ground-contact placement; `radio.js` stays standalone — charter-job or
+Sheppard radio chatter should follow the same pattern, never break
+`aviation.update`'s signature.
 
 Session end (per wave): fold the shipped wave into ROADMAP.md, advance the
 Task block above to the next wave, run `node tools/verify.mjs`, then commit.

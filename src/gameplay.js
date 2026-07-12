@@ -37,6 +37,8 @@ export const LANDMARKS = [
   { name: 'World’s Largest Cowboy Boots', at: LL(29.6042, -98.4919), kind: 'boots', fact: '35-foot ostrich-skin boots guarding a San Antonio mall since 1979.' },
   { name: 'Terlingua Ghost Town', at: LL(29.3211, -103.6158), kind: 'terlingua', fact: 'A quicksilver boomtown gone quiet near Big Bend; its old cemetery still hosts a Día de los Muertos every fall.' },
   { name: 'Presidio La Bahía', at: LL(28.6470, -97.3844), kind: 'presidio', fact: 'Spanish fort at Goliad, 1749. After the massacre of Fannin’s men here in 1836, many say the garrison never mustered out.' },
+  { name: 'B-1 Gate Guardian, Dyess AFB', at: LL(32.4207, -99.8547), kind: 'b1', fact: 'Dyess is a B-1B Lancer base — the swing-wing bomber has called Abilene home since 1985.' },
+  { name: 'Randolph AFB Taj Mahal', at: LL(29.5292, -98.2783), kind: 'randolph', fact: 'Pilots have trained under this Spanish Colonial tower since 1931 — its water tower still doubles as base ops.' },
 ];
 export const LANDMARK_COUNT = LANDMARKS.length;
 
@@ -750,6 +752,66 @@ function mkLandmarkMesh(kind) {
       bell.position.set(1.5, 2.9, -1.65);
       box(0.06, 0.5, 0.06, 1.5, 3.7, -1.65, lime);            // cross
       box(0.28, 0.06, 0.06, 1.5, 3.8, -1.65, lime);
+      break;
+    }
+    case 'b1': {
+      // static display B-1B — unarmed gate guardian, higher-poly than the rest
+      // of the landmark set (this one's meant to be looked at up close)
+      const grey = new THREE.MeshLambertMaterial({ color: 0x53585c, flatShading: true });
+      const dark = new THREE.MeshLambertMaterial({ color: 0x2a2c2e, flatShading: true });
+      const glass = new THREE.MeshLambertMaterial({ color: 0x333a42 });
+      const fuse = add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.85, 8.6, 16).rotateZ(Math.PI / 2), grey));
+      fuse.position.set(0, 2.4, 0);
+      const nose = add(new THREE.Mesh(new THREE.ConeGeometry(0.55, 2.4, 16).rotateZ(Math.PI / 2), grey));
+      nose.position.set(-5.5, 2.4, 0);
+      const canopy = add(new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), glass));
+      canopy.position.set(-3.6, 2.85, 0);
+      canopy.scale.set(1.5, 0.7, 0.9);
+      for (const s of [-1, 1]) {                                   // swept wings (static ground sweep)
+        const root = add(new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.5, 1.3), dark));
+        root.position.set(0.6, 2.15, s * 1.1);
+        const wing = add(new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.14, 1.7), grey));
+        wing.position.set(1.6, 2.15, s * 2.1);
+        wing.rotation.y = s * 0.95;
+        for (const dz of [0.75, 1.55]) {                           // paired engine nacelles
+          const nac = add(new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.32, 1.8, 12).rotateZ(Math.PI / 2), dark));
+          nac.position.set(1.5, 1.5, s * dz);
+        }
+        const fin = add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.9, 0.14), grey));   // twin tail
+        fin.position.set(4.1, 3.4, s * 0.55);
+        fin.rotation.z = -0.12 * s;
+      }
+      for (const [x, z] of [[-3.2, 0], [1.5, -1.15], [1.5, 1.15]]) { // landing gear
+        const strut = add(new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2, 8), dark));
+        strut.position.set(x, 1.1, z);
+        const wheel = add(new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.14, 8, 14), dark));
+        wheel.position.set(x, 0.05, z);
+        wheel.rotation.x = Math.PI / 2;
+      }
+      break;
+    }
+    case 'randolph': {
+      // the "Taj Mahal" administration tower — ribbed cupola dome, higher
+      // segment counts than the rest of the landmark set
+      const cream = new THREE.MeshLambertMaterial({ color: 0xe8dcc0, flatShading: true });
+      const terracotta = new THREE.MeshLambertMaterial({ color: 0xb5643c, flatShading: true });
+      const gold = new THREE.MeshLambertMaterial({ color: 0xc9a227, emissive: 0x2a2000, emissiveIntensity: 0.08 });
+      box(4.2, 3.2, 4.2, 0, 1.6, 0, cream);
+      box(3.4, 3.0, 3.4, 0, 4.6, 0, cream);
+      box(2.6, 2.6, 2.6, 0, 7.4, 0, cream);
+      const windowMat = new THREE.MeshLambertMaterial({ color: 0x334455, emissive: 0xfff4d8, emissiveIntensity: 0.1 });
+      for (const a of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) {
+        const win = add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 1.3, 0.1), windowMat));
+        win.position.set(Math.sin(a) * 1.32, 7.6, Math.cos(a) * 1.32);
+        win.rotation.y = a;
+      }
+      const dome = add(new THREE.Mesh(new THREE.SphereGeometry(1.7, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), terracotta));
+      dome.position.y = 8.7;
+      const lantern = add(new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 1.4, 16), cream));
+      lantern.position.y = 10.4;
+      const spire = add(new THREE.Mesh(new THREE.ConeGeometry(0.16, 1.1, 10), gold));
+      spire.position.y = 11.6;
+      g.userData.nightMats = [windowMat, gold];
       break;
     }
   }

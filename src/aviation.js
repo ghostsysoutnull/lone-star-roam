@@ -26,7 +26,7 @@ const REDEYE_MAX = 2;                   // tier-1-only night slots, 0..2 seeded
 const NIGHT_U0 = 0.405, NIGHT_U1 = 0.845;
 const MAT_R = 380;                      // materialize flights within this range
 const AIR_FAR = 900, GROUND_FAR = 300;  // dematerialize distances — never in plain sight
-const MAX_AIR = 4;                      // hard cap on airborne fixed-wing near the player
+export const MAX_AIR = 4;               // hard cap on airborne fixed-wing near the player
 const POOL = 6;                         // instances per aircraft type
 const TAXI_SPD = 3, HOLD_S = 4, PARK_S = 25, FIX_D = 50;
 const SLOPE = 0.13;                     // climb/descent gradient (alt per unit forward)
@@ -285,6 +285,10 @@ export class AviationSystem {
   }
 
   despawnAll() { this.flights.length = 0; }
+
+  // shared with military.js so its two flavor pairs never push the sky past
+  // MAX_AIR total — mirrors HeliSystem.airborneCount()
+  airborneCount() { return this.flights.filter((m) => AIR.has(m.st.ph)).length; }
 
   // go-around: the flight climbs out live and recycles in the murk. Storm
   // weather triggers this above (update); wave-3 tower radio triggers it too,

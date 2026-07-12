@@ -126,6 +126,31 @@ ship.
   all four kinds forced at once, and a real-rAF sentinel for both systems'
   `simT`. Debug 🚁/🎈 actions.
 
+- [x] ~~Aviation wave 5 — Military color (partial)~~ — done 2026-07-12: two
+  static landmarks (`gameplay.js` `LANDMARKS`/`mkLandmarkMesh`) — a parked
+  B-1 gate guardian at Dyess AFB and Randolph AFB's "Taj Mahal" tower — built
+  noticeably higher-poly than the rest of the landmark set (12–20-segment
+  cylinders/spheres, twin tails/nacelles/landing gear on the B-1, a ribbed
+  cupola dome on the tower) since both invite a close look. New
+  `src/military.js` `MilitaryAirSystem` adds two rare fixed-wing flavor
+  pairs on the rotors.js candidate idiom: a NASA T-38 pair that rolls in
+  near Ellington Field and flies a straight inbound leg to a landing (not a
+  loiter — it goes quiet once down), and a fast low-level trainer pair that
+  only rolls over the Trans-Pecos (`x < -2200`, the same desert box
+  `animals.js` uses) on clear days. Both share `aviation.js`'s `MAX_AIR`
+  fixed-wing ceiling via a new `aviation.airborneCount()` (mirrors
+  `heli.airborneCount()`) — the pair's own `PAIR_W=2` weight is checked
+  against remaining headroom before either launches, so the sky-density
+  design stance holds even with a third fixed-wing source in play. No
+  weapons on anything. 4 new checks: cap-sharing at the MAX_AIR boundary,
+  the NASA pair's distance-over-time closure + touchdown, the low-level
+  pair's region+day gate (Math.random stubbed to force the roll, tested
+  east/west and day/night), and a real-rAF `simT` sentinel folded into the
+  existing rotors sentinel check. Debug ✈️ NASA/Low-level actions. Deferred:
+  Sheppard T-38 touch-and-go pattern circuits (needs its own closed-pattern
+  state machine, not a copy of an existing idiom — see `AVIATION.md`),
+  Marfa gliders, crop dusters, the 13th NPC.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin
