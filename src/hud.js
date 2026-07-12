@@ -13,6 +13,8 @@ function tagLabel(s) {
   return `${s.cs.toUpperCase()} · ${s.op ?? KIND_LABEL[s.kind] ?? ''}`;
 }
 
+const SHIELD_HOLD = 0.8; // seconds the road shield lingers through a nearestRoad dropout
+
 // Road shields: only the clean "PREFIX ###" refs get a shield (real Interstate/
 // US/state formats out of tools/build-data.mjs); messy municipal names like
 // "Southwest Loop 410" or unnumbered ones like "PGBT" fall through to the
@@ -85,6 +87,8 @@ export class HUD {
     this._shieldRaster = 0;
     this._shieldKey = null;
     this._shieldFloat = 0;
+    this._shieldHold = 0; // grace timer: keep the last shield up through brief nearestRoad dropouts
+    this._lastShieldRoad = null;
     this.shield.classList.toggle('centered', this.compass.style.display === 'none');
     // UI scale: CSS is rem-based (1rem = 10px at 100%), so one root font-size drives it all
     this.ui = Math.max(0.9, Math.min(2, parseFloat(localStorage.getItem('lonestar-ui-scale')) || 1));
@@ -266,7 +270,16 @@ export class HUD {
   // — re-rasterized only when the route ref or night-state changes; the
   // sway/float motion is a pure CSS transform on the wrap (animateShield).
   drawShield(road) {
-    const info = parseShield(road?.ref);
+    let info = parseShield(road?.ref);
+    // Persistence: nearestRoad(6) briefly flips to a cross-street/ramp near
+    // interchanges and in cities, which would strobe the shield in and out.
+    // When a numbered route is present, refresh the grace timer; when it drops
+    // out, keep drawing the last shield until the timer (ticked down in
+    // animateShield) expires. Shield→shield swaps stay instant — only
+    // shield→nothing is delayed — so the verify checks (which poll for the
+    // suppressed text ref) still pass.
+    if (info) { this._shieldHold = SHIELD_HOLD; this._lastShieldRoad = road; }
+    else if (this._shieldHold > 0 && this._lastShieldRoad) { road = this._lastShieldRoad; info = parseShield(road.ref); }
     this.shieldInfo = info;
     const night = ATMOS.night > 0.5;
     this.shieldNight = night;
@@ -470,6 +483,7 @@ export class HUD {
     const target = Math.max(-MAX_SWAY, Math.min(MAX_SWAY, (player.tilt || 0) * GAIN));
     const rate = Math.min(1, dt * 8);
     this.shieldSway += (target - this.shieldSway) * rate;
+    if (this._shieldHold > 0) this._shieldHold = Math.max(0, this._shieldHold - dt); // grace timer for shield persistence
     this._shieldFloat += dt;
     const w = (Math.PI * 2) / 3.4; // ~3.4 s base period — gentle, not frantic
     const idleYaw = Math.sin(this._shieldFloat * w) * 8;              // ±8° left-right rock (the visible axis)
