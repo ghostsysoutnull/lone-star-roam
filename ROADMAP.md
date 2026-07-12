@@ -570,6 +570,16 @@ ship.
   minimap/compass/dialog/travel panels sized in rem so they grow with their
   text. Compass tape crowds the top corners at 170%+ on 1080p — cap it if
   playtest says so.
+- [x] ~~Road shields~~ — done 2026-07-12: canvas-drawn Interstate/US/state-route
+  markers next to the compass (recenter into its spot when the compass is
+  off), parsed straight off the real highway `ref` data (`hud.js`
+  `parseShield`/`drawShield`). Messy municipal names ("Southwest Loop 410")
+  and unnumbered refs (PGBT) still fall back to the old text line; 3-char
+  refs (I 410/610/635, I 35W/35E/69E) shrink-to-fit via `measureText`.
+- [x] ~~HUD speed/mode overlap at high UI scale~~ — done 2026-07-12: the
+  bottom-right speed readout and mode line used raw px offsets under
+  rem-scaled text, so the gap between them didn't grow with UI scale (it was
+  already tight at 100%, overlapping by 140%+). Both now anchor in rem.
 - [ ] Mobile touch controls (virtual stick + buttons)
 
 ## Non-goals

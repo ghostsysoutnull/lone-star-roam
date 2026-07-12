@@ -15,12 +15,14 @@
   #hud-topleft { top: 12px; left: 14px; font-size: 1.4rem; line-height: 1.5; }
   #hud-topleft .title { font-weight: 700; font-size: 1.6rem; letter-spacing: .5px; }
   #hud-score { top: 12px; right: 14px; text-align: right; font-size: 1.4rem; line-height: 1.5; }
-  #hud-speed { bottom: 18px; right: 20px; font-size: 3rem; font-weight: 700; }
+  #hud-speed { bottom: 1.8rem; right: 2rem; font-size: 3rem; font-weight: 700; }
   #hud-speed small { font-size: 1.3rem; font-weight: 400; opacity: .8; }
   #hud-odo { font-size: 1.2rem; font-weight: 400; opacity: .65; text-align: right; }
-  #hud-mode { bottom: 58px; right: 22px; font-size: 1.3rem; opacity: .9; }
+  #hud-mode { bottom: 8.2rem; right: 2.2rem; font-size: 1.3rem; opacity: .9; }
   #compass { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: 34rem; height: 4rem;
     border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(10,14,20,.55); }
+  #road-shield { position: fixed; top: 10px; right: calc(50% + 17rem + 10px); width: 4.6rem; height: 4rem; }
+  #road-shield.centered { right: auto; left: 50%; transform: translateX(-50%); }
   #minimap { position: fixed; left: 14px; bottom: 14px; width: 19rem; height: 18rem;
     border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(10,14,20,.65); }
   #bigmap { position: fixed; inset: 0; display: none; background: rgba(6,9,14,.92); z-index: 10; }
@@ -103,6 +105,7 @@
 <div id="hud-mode" class="hud">🚙 DRIVE — V to change</div>
 <canvas id="minimap" width="380" height="360"></canvas>
 <canvas id="compass" width="680" height="80"></canvas>
+<canvas id="road-shield" width="92" height="80"></canvas>
 <div id="bigmap"><canvas id="bigmap-canvas"></canvas></div>
 <div id="dialog"><div class="npc-name"></div><div class="npc-sub"></div><div class="npc-text"></div><div class="hint">E — continue / close</div></div>
 <div id="interact-hint"></div>

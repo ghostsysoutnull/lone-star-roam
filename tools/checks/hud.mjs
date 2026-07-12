@@ -41,15 +41,16 @@ export default async function hud(t) {
     t.ok(r.missing.length === 0, `missing labels for: ${r.missing.join(', ')}`);
   });
 
-  await t.check('road ref shows when parked on the interstate', async () => {
+  await t.check('parking on the interstate shows a shield, not a duplicate text ref', async () => {
     await t.tp(austin.x, austin.z + 12);
     await t.ev(`(() => {
       const r = g.nearestRoad(g.player.pos.x, g.player.pos.z, 400, (ty) => ty === 'motorway');
       g.player.pos.set(r.x, 0, r.z);
     })()`);
-    await t.until(`g.hud.els.road.textContent.includes('🛣')`, 8000);
-    const road = await t.ev('g.hud.els.road.textContent');
-    t.ok(!road.includes('undefined') && road.length > 3, `bad road line: "${road}"`);
+    await t.until(`g.hud.shieldInfo?.shape === 'interstate'`, 8000);
+    const { info, txt } = await t.ev(`({ info: g.hud.shieldInfo, txt: g.hud.els.road.textContent })`);
+    t.ok(info.num === '35', `expected I-35 near Austin, parsed num "${info.num}"`);
+    t.ok(!txt.includes('🛣'), `text ref should be suppressed once the shield renders: "${txt}"`);
   });
 
   await t.check('speed readout tracks mph = |speed|·2.4', async () => {
@@ -81,11 +82,82 @@ export default async function hud(t) {
 
   await t.check('C toggles the compass and persists the preference', async () => {
     await t.key('KeyC');
-    const off = await t.ev(`({ disp: g.hud.compass.style.display, pref: localStorage['lonestar-compass'] })`);
+    const off = await t.ev(`({ disp: g.hud.compass.style.display, pref: localStorage['lonestar-compass'], centered: g.hud.shield.classList.contains('centered') })`);
     await t.key('KeyC');
-    const on = await t.ev(`({ disp: g.hud.compass.style.display, pref: localStorage['lonestar-compass'] })`);
+    const on = await t.ev(`({ disp: g.hud.compass.style.display, pref: localStorage['lonestar-compass'], centered: g.hud.shield.classList.contains('centered') })`);
     t.ok(off.disp === 'none' && off.pref === 'off', `off state: ${JSON.stringify(off)}`);
     t.ok(on.disp !== 'none' && on.pref === 'on', `on state: ${JSON.stringify(on)}`);
+    t.ok(off.centered === true && on.centered === false, `road-shield did not re-center with the compass: ${JSON.stringify({ off, on })}`);
+  });
+
+  await t.check('road shield renders for numbered routes without duplicating the text ref', async () => {
+    const spot = await t.ev(`(() => {
+      // a midpoint, not an endpoint — chained ways of a different ref often
+      // share endpoint coordinates, so pts[0] can tie-break to the wrong road
+      const mid = (h) => h.pts[Math.floor(h.pts.length / 2)];
+      const find = (re, wantStreet) => {
+        const h = g.GEO.highways.find((x) => re.test(x.ref) && (wantStreet ? x.type === 'street' : true));
+        return h && { ref: h.ref, pt: mid(h) };
+      };
+      return {
+        i: find(/^I ?\\d+[EW]?$/),
+        us: find(/^US ?\\d+$/),
+        sh: find(/^TX ?\\d+$/),
+        fm: find(/^FM ?\\d+$/),
+        street: find(/^(?!I |US |TX |FM |RM |BW )[A-Za-z].* /),
+      };
+    })()`);
+    for (const [key, shape] of [['i', 'interstate'], ['us', 'us'], ['sh', 'circle'], ['fm', 'circle']]) {
+      const s = spot[key];
+      t.ok(s, `no sample road found for ${key}`);
+      await t.tp(s.pt[0], s.pt[1]);
+      await t.until(`g.hud.shieldInfo?.shape === '${shape}'`, 8000);
+      const info = await t.ev('g.hud.shieldInfo');
+      t.ok(info.num && s.ref.includes(info.num), `${key}: parsed num "${info.num}" not in ref "${s.ref}"`);
+    }
+    const st = spot.street;
+    t.ok(st, 'no plain-street sample found');
+    await t.tp(st.pt[0], st.pt[1]);
+    await t.until(`g.hud.els.road.textContent.includes('🛣')`, 8000);
+    const { info, txt } = await t.ev(`({ info: g.hud.shieldInfo, txt: g.hud.els.road.textContent })`);
+    t.ok(info === null, `expected no shield on a plain street, got ${JSON.stringify(info)}`);
+    t.ok(txt.includes(st.ref), `plain street ref missing from text line: "${txt}"`);
+  });
+
+  await t.check('3-char interstate refs (loops, directional suffixes) shrink to fit the shield', async () => {
+    // the convenient "I 20"/"I 35" case fits at full size — these longer real
+    // Texas refs (San Antonio/Houston/Dallas loops, split I-35/I-69) are the
+    // natural-value case that actually exercises the shrink-to-fit path
+    const spots = await t.ev(`(() => {
+      const want = ['I 410', 'I 610', 'I 635', 'I 35W', 'I 35E', 'I 69E'];
+      return want.map((ref) => {
+        const h = g.GEO.highways.find((x) => x.ref === ref);
+        return h && { ref, pt: h.pts[Math.floor(h.pts.length / 2)] };
+      });
+    })()`);
+    for (const s of spots) {
+      t.ok(s, 'missing sample road for a 3-char interstate ref');
+      await t.tp(s.pt[0], s.pt[1]);
+      await t.until(`g.hud.shieldInfo?.shape === 'interstate'`, 8000);
+      const { info, fit } = await t.ev(`({ info: g.hud.shieldInfo, fit: g.hud.shieldFit })`);
+      t.ok(`${info.num}${info.tag ?? ''}` === s.ref.replace(/^I ?/, ''), `parsed "${info.num}${info.tag ?? ''}" from ref "${s.ref}"`);
+      t.ok(fit.width <= fit.max + 0.5, `"${s.ref}" label overflows the shield: ${fit.width.toFixed(1)}px > ${fit.max.toFixed(1)}px`);
+    }
+  });
+
+  await t.check('HUD speed readout never overlaps the mode line at any UI scale', async () => {
+    const rects = () => t.ev(`({
+      speed: document.getElementById('hud-speed').getBoundingClientRect().top,
+      mode: document.getElementById('hud-mode').getBoundingClientRect().bottom,
+    })`);
+    const base = await rects();
+    t.ok(base.speed >= base.mode, `overlap at 100%: speed.top ${base.speed.toFixed(0)} vs mode.bottom ${base.mode.toFixed(0)}`);
+    for (let i = 0; i < 10; i++) { // 10%-per-step up to the 200% clamp
+      await t.key('Equal');
+      const r = await rects();
+      t.ok(r.speed >= r.mode, `overlap at step ${i + 1}: speed.top ${r.speed.toFixed(0)} vs mode.bottom ${r.mode.toFixed(0)}`);
+    }
+    for (let i = 0; i < 10; i++) await t.key('Minus'); // restore baseline for later checks
   });
 
   await t.check('+/- steps the UI scale, resizes HUD text, persists', async () => {

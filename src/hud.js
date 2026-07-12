@@ -12,6 +12,24 @@ function tagLabel(s) {
   return `${s.cs.toUpperCase()} · ${s.op ?? KIND_LABEL[s.kind] ?? ''}`;
 }
 
+// Road shields: only the clean "PREFIX ###" refs get a shield (real Interstate/
+// US/state formats out of tools/build-data.mjs); messy municipal names like
+// "Southwest Loop 410" or unnumbered ones like "PGBT" fall through to the
+// plain-text road line untouched.
+function parseShield(ref) {
+  if (!ref) return null;
+  const s = ref.trim();
+  let m;
+  if ((m = /^I\s*(\d{1,3})([A-Z])?$/i.exec(s))) return { shape: 'interstate', num: m[1], tag: m[2]?.toUpperCase() ?? null };
+  if ((m = /^US\s*(\d{1,3})$/i.exec(s))) return { shape: 'us', num: m[1] };
+  if ((m = /^TX\s*(\d{1,3})\s+(Toll|Loop)$/i.exec(s))) return { shape: 'circle', num: m[1], label: m[2].toUpperCase() };
+  if ((m = /^TX\s*(\d{1,3})$/i.exec(s))) return { shape: 'circle', num: m[1], label: null };
+  if ((m = /^FM\s*(\d{1,4})$/i.exec(s))) return { shape: 'circle', num: m[1], label: 'FM' };
+  if ((m = /^RM\s*(\d{1,4})$/i.exec(s))) return { shape: 'circle', num: m[1], label: 'RM' };
+  if ((m = /^BW\s*(\d{1,3})$/i.exec(s))) return { shape: 'circle', num: m[1], label: 'LOOP' };
+  return null;
+}
+
 export class HUD {
   constructor() {
     this.mini = document.getElementById('minimap');
@@ -57,6 +75,9 @@ export class HUD {
     this.zoomIdx = 1;
     this.compass = document.getElementById('compass');
     if (localStorage.getItem('lonestar-compass') === 'off') this.compass.style.display = 'none';
+    this.shield = document.getElementById('road-shield');
+    this.shieldInfo = null;
+    this.shield.classList.toggle('centered', this.compass.style.display === 'none');
     // UI scale: CSS is rem-based (1rem = 10px at 100%), so one root font-size drives it all
     this.ui = Math.max(0.9, Math.min(2, parseFloat(localStorage.getItem('lonestar-ui-scale')) || 1));
     this.applyUiScale();
@@ -165,6 +186,7 @@ export class HUD {
   toggleCompass() {
     const off = this.compass.style.display !== 'none';
     this.compass.style.display = off ? 'none' : 'block';
+    this.shield.classList.toggle('centered', off);
     localStorage.setItem('lonestar-compass', off ? 'off' : 'on');
     return !off;
   }
@@ -229,6 +251,105 @@ export class HUD {
     ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.textAlign = 'left';
     ctx.fillText(`${Math.round(deg)}°`, 10, 30);
+  }
+
+  // official-looking Interstate/US/state-route markers, sized for legibility
+  // at HUD scale rather than strict MUTCD proportions
+  drawShield(road) {
+    const info = parseShield(road?.ref);
+    this.shieldInfo = info;
+    const ctx = this.shield.getContext('2d');
+    const W = this.shield.width, H = this.shield.height;
+    ctx.clearRect(0, 0, W, H);
+    if (!info) return;
+    const cx = W / 2, cy = H / 2 + 2;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    if (info.shape === 'interstate') this.drawInterstateShield(ctx, cx, cy, info);
+    else if (info.shape === 'us') this.drawUsShield(ctx, cx, cy, info);
+    else this.drawCircleShield(ctx, cx, cy, info);
+  }
+
+  drawInterstateShield(ctx, cx, cy, { num, tag }) {
+    const w = 66, h = 72, top = cy - h / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.32, top);
+    ctx.lineTo(cx + w * 0.32, top);
+    ctx.quadraticCurveTo(cx + w * 0.5, top + h * 0.06, cx + w * 0.5, top + h * 0.26);
+    ctx.lineTo(cx + w * 0.42, top + h * 0.52);
+    ctx.quadraticCurveTo(cx + w * 0.3, top + h * 0.8, cx, top + h);
+    ctx.quadraticCurveTo(cx - w * 0.3, top + h * 0.8, cx - w * 0.42, top + h * 0.52);
+    ctx.lineTo(cx - w * 0.5, top + h * 0.26);
+    ctx.quadraticCurveTo(cx - w * 0.5, top + h * 0.06, cx - w * 0.32, top);
+    ctx.closePath();
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = '#1c3f94';
+    ctx.fillRect(cx - w / 2, top, w, h * 0.24);
+    ctx.fillStyle = '#c8202e';
+    ctx.fillRect(cx - w / 2, top + h * 0.24, w, h * 0.09);
+    ctx.restore();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#0c1e50';
+    ctx.stroke();
+    ctx.fillStyle = '#1c3f94';
+    // 3-char refs (I 410/610/635, I 35W/35E/69E) need to shrink to fit the
+    // shield's narrowing lower half — don't just test the convenient 2-digit case
+    const label = num + (tag ?? '');
+    let size = 28;
+    ctx.font = `bold ${size}px system-ui`;
+    while (ctx.measureText(label).width > w * 0.62 && size > 14) {
+      size -= 2;
+      ctx.font = `bold ${size}px system-ui`;
+    }
+    this.shieldFit = { width: ctx.measureText(label).width, max: w * 0.62 };
+    ctx.fillText(label, cx, top + h * 0.62);
+  }
+
+  drawUsShield(ctx, cx, cy, { num }) {
+    const w = 62, h = 68, top = cy - h / 2;
+    const pts = [
+      [cx - w * 0.22, top], [cx + w * 0.22, top],
+      [cx + w * 0.5, top + h * 0.22], [cx + w * 0.5, top + h * 0.68],
+      [cx + w * 0.3, top + h], [cx - w * 0.3, top + h],
+      [cx - w * 0.5, top + h * 0.68], [cx - w * 0.5, top + h * 0.22],
+    ];
+    ctx.beginPath();
+    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.closePath();
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#111';
+    ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.font = 'bold 11px system-ui';
+    ctx.fillText('US', cx, top + h * 0.3);
+    ctx.font = 'bold 26px system-ui';
+    ctx.fillText(num, cx, top + h * 0.78);
+  }
+
+  drawCircleShield(ctx, cx, cy, { num, label }) {
+    const r = 30;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#111';
+    ctx.stroke();
+    ctx.fillStyle = '#111';
+    if (label) {
+      ctx.font = 'bold 11px system-ui';
+      ctx.fillText(label, cx, cy - 8);
+      ctx.font = `bold ${num.length > 3 ? 18 : 22}px system-ui`;
+      ctx.fillText(num, cx, cy + 16);
+    } else {
+      ctx.font = `bold ${num.length > 2 ? 22 : 28}px system-ui`;
+      ctx.fillText(num, cx, cy + 10);
+    }
   }
 
   toast(msg) {
@@ -312,8 +433,11 @@ export class HUD {
     const apt = fieldNear(player.pos.x, player.pos.z);
     this.els.location.textContent = (apt ? `🛫 ${apt.name} (${apt.id}) — ${apt.city}`
       : dist < 3 ? `📍 ${city.name}` : `📍 ${km} km ${dir} of ${city.name}`) + co;
-    // road when on one; water body when over one (both can show — bridges exist)
-    this.els.road.textContent = [road && `🛣 ${road.ref}`, water && `🌊 ${water}`].filter(Boolean).join('   ');
+    // road when on one; water body when over one (both can show — bridges exist).
+    // Numbered routes get a shield near the compass instead, so skip the redundant
+    // text ref there; unshielded roads (plain street names) still show as text.
+    this.drawShield(road);
+    this.els.road.textContent = [road && !this.shieldInfo && `🛣 ${road.ref}`, water && `🌊 ${water}`].filter(Boolean).join('   ');
     this.els.speed.innerHTML = player.mode === 'WALK' ? '🚶'
       : `${player.speedMph} <small>mph</small><div id="hud-odo">${Math.round(this.lastDist ?? 0).toLocaleString()} km</div>`;
     const icons = { DRIVE: '🚙', FLY: '✈️', WALK: '🚶' };

@@ -1,20 +1,17 @@
 # Lone Star Roam — next session kickoff
 
-No queued wave — NPC expansion shipped in full 2026-07-12 (wave 1 structural
-de339c1, wave 2 content the same day; details in ROADMAP.md). Pick the next
-effort from `BACKLOG.md` (queued work + pending playtests).
+No queued wave — road shields + the HUD speed/mode overlap fix shipped
+2026-07-12 (ad hoc, not a wave; details in ROADMAP.md). Pick the next effort
+from `BACKLOG.md` (queued work + pending playtests).
 
-Gotchas for whoever touches `npcs.js` next:
-- `spawnTownsfolk`/`spawnBystanders`: the shared seeded stream (`rand`) owns
-  position/look and exactly ONE name draw per NPC — any new per-NPC random
-  content must ride the independent `seededRand('age:'…)` stream or it shifts
-  every later NPC's position (breaks players' spatial memory).
-- The npcs verify suite pins a pre-expansion spawn-signature baseline
-  (`tools/checks/npcs.mjs` `BASELINE`) — if it ever fails, positions drifted;
-  don't re-capture it to make the check pass without understanding why.
-- Night-gate threshold (pop > 400,000) is mirrored in `cities.js:52` and twice
-  in `npcs.js`; the same flag also picks the big-city vs small-town profession
-  pool (kept disjoint on purpose — a check asserts it).
+Gotchas for whoever touches `hud.js` next:
+- Road shields only parse clean "PREFIX ###" refs (`parseShield`) — messy
+  municipal names like "Southwest Loop 410" intentionally fall through to
+  the plain text line; don't try to make the regex swallow those.
+- `#hud-speed`/`#hud-mode` offsets (index.html) are rem-based on purpose so
+  their gap scales with UI-scale text growth — if either block grows taller,
+  bump the other's `bottom` in rem too, and rerun the "never overlaps" hud
+  check before shipping.
 
 ---
 
