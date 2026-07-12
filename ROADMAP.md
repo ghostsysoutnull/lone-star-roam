@@ -78,6 +78,21 @@ ship.
   rejecting too-fast/too-high/off-pavement, landing-twice dedup, the physical
   go-around, and the real WebAudio synth path running error-free.
 
+- [x] ~~Tower radio: UNICOM at tier-2 fields~~ — done 2026-07-11, same day
+  as wave 3: a report that Waco and Laredo were silent surfaced that
+  by-design tier-1-only reception reads as broken at a non-hub field.
+  `src/radio.js` now has a second frequency: `UNICOM` (the 9 tier-2 fields),
+  120-unit range (vs. 250 for a tower), `awos()` (automated weather, a real
+  transmission) instead of `atis()` on tuning in, self-announce phrasing
+  ("Waco traffic, Lone Star N, departing runway 14, Waco traffic") instead
+  of controller clearances in AI ops narration, no player approach flow, no
+  logbook stamp (stays towered-only, `/7`). `receivable()` now returns
+  `{a, kind}`; the nearer field wins when both a tower and a UNICOM field
+  would be in range. The blocked-runway go-around now runs over all 20
+  fields (was 7) — a hazard regardless of tier. 3 new checks incl. one that
+  reproduces the exact report: an unforced flyby of Waco, no debug button,
+  no forced flight, must produce audio through the real loop.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

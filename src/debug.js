@@ -45,10 +45,16 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio }) {
       hud.toast(f ? `🛬 Lone Star ${f.sl.n} inbound from ${f.sl.from}` : '🛬 No field in range / sky full');
     },
     testRadio() {
-      const { a } = radio.nearestTowered(player.pos.x, player.pos.z);
-      if (!a) return hud.toast('📻 No towered field found');
-      radio.tx(a, `${a.city} Tower testing, one two three.`, 'test');
-      hud.toast(`📻 Test transmission — ${a.city} Tower`);
+      const tw = radio.nearestTowered(player.pos.x, player.pos.z);
+      const un = radio.nearestUnicom(player.pos.x, player.pos.z);
+      const useUnicom = un.a && (!tw.a || un.d < tw.d);
+      const a = useUnicom ? un.a : tw.a;
+      if (!a) return hud.toast('📻 No field found');
+      const text = useUnicom
+        ? `${a.city} traffic, testing, ${a.city} traffic.`
+        : `${a.city} Tower testing, one two three.`;
+      radio.tx(a, text, 'test');
+      hud.toast(`📻 Test transmission — ${a.city} ${useUnicom ? 'traffic' : 'Tower'}`);
     },
   };
   for (const w of ['clear', 'clouds', 'rain', 'storm', 'dust']) actions[w] = () => setWeather(w);

@@ -393,14 +393,73 @@ export default async function aviation(t) {
       g.player.pos.y = 0;
       const driveFarPerk = g.radio.receivable(g.player);
       g.player.perks.avionics = false;
-      return { driveClose: !!driveClose, flyClose: flyClose?.id ?? null, flyFar: !!flyFar,
-        flyFarPerk: flyFarPerk?.id ?? null, driveFarPerk: driveFarPerk?.id ?? null };
+      return { driveClose: !!driveClose, flyClose: flyClose?.a?.id ?? null, flyCloseKind: flyClose?.kind ?? null,
+        flyFar: !!flyFar, flyFarPerk: flyFarPerk?.a?.id ?? null, driveFarPerk: driveFarPerk?.a?.id ?? null };
     })()`);
     t.ok(!r.driveClose, 'receivable while driving close to a towered field, no perk');
-    t.ok(r.flyClose === 'AUS', `not receivable flying close to Austin (got ${r.flyClose})`);
+    t.ok(r.flyClose === 'AUS' && r.flyCloseKind === 'tower', `not receivable flying close to Austin (got ${r.flyClose}/${r.flyCloseKind})`);
     t.ok(!r.flyFar, 'receivable 200+ km from every towered field, no perk');
     t.ok(r.flyFarPerk, `perk didn't grant reception far away in FLY (got ${r.flyFarPerk})`);
     t.ok(r.driveFarPerk, `perk didn't grant reception far away while driving (got ${r.driveFarPerk})`);
+  });
+
+  await t.check('UNICOM: tier-2 fields give AWOS (not ATIS) on tuning in, shorter range, no player flow, no stamp', async () => {
+    const r = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'ACT'); // Waco Regional — tier 2
+      const day = Math.floor(g.sky.days);
+      g.gameplay.save.airports = [];
+      g.player.perks.avionics = false;
+      g.radio.tunedField = null; g.radio.flow = 'none'; g.radio.lastTx = null;
+      g.player.setMode('FLY');
+      g.player.pos.set(a.at[0] + 55, g.hAt(a.at[0] + 55, a.at[1] + 35) + 35, a.at[1] + 35); // ~65u, inside UNICOM range
+      const near = g.radio.receivable(g.player);
+      g.radio.update(0.05, g.player, g.aviation, g.sky); // AWOS fires here — a real transmission, not silence
+      const txAfterTune = g.radio.lastTx;
+      g.player.pos.set(a.at[0] + 145, 40, a.at[1] + 30); // ~148u — past the 120u UNICOM ring
+      const beyondUnicom = g.radio.receivable(g.player);
+      // fly a "clean landing" profile at Waco: no tower, so no flow/stamp should happen
+      const u = g.runwayInUse(a, day);
+      g.player.pos.set(u.tx, g.hAt(u.tx, u.tz) + 1, u.tz);
+      g.player.heading = -Math.atan2(u.dx, -u.dz);
+      g.player.vy = -3; g.player.speed = 25;
+      g.radio.update(0.05, g.player, g.aviation, g.sky);
+      return { nearKind: near?.kind ?? null, nearId: near?.a?.id ?? null,
+        txAfterTune, wind: g.windFrom(day), beyondUnicom: !!beyondUnicom, flowAfterLanding: g.radio.flow,
+        stamps: g.gameplay.save.airports.length };
+    })()`);
+    t.ok(r.nearKind === 'unicom' && r.nearId === 'ACT', `Waco should be UNICOM-receivable (got ${r.nearId}/${r.nearKind})`);
+    t.ok(r.txAfterTune?.kind === 'awos', `expected AWOS on tuning in, got ${r.txAfterTune?.kind}`);
+    t.ok(r.txAfterTune.wind === r.wind, `AWOS wind ${r.txAfterTune.wind} !== windFrom ${r.wind}`);
+    t.ok(!/Tower|cleared/i.test(r.txAfterTune.text), `AWOS used tower/controller phrasing: "${r.txAfterTune.text}"`);
+    t.ok(!r.txAfterTune.rwy, 'AWOS should not include a runway (no controller to assign one)');
+    t.ok(!r.beyondUnicom, 'still receivable past 120u — UNICOM range should be shorter than the tower ring');
+    t.ok(r.flowAfterLanding === 'none', `a UNICOM field ran the towered approach flow (flow=${r.flowAfterLanding})`);
+    t.ok(r.stamps === 0, `landing at a non-towered field stamped the logbook (${r.stamps})`);
+  });
+
+  await t.check('UNICOM self-announce phrasing on an AI departure at Waco (no controller clearance)', async () => {
+    await t.tp(-2767, 334, 'FLY', 40);
+    const r = await t.ev(`(() => {
+      g.aviation.despawnAll();
+      const a = g.AIRPORTS.find((x) => x.id === 'ACT');
+      g.radio.tunedField = null; g.radio.flow = 'none'; g.radio.lastTx = null;
+      g.radio.knownPh.clear();
+      g.player.setMode('FLY');
+      g.player.pos.set(a.at[0] + 40, g.hAt(a.at[0] + 40, a.at[1] + 25) + 30, a.at[1] + 25);
+      const f = g.aviation.force('departure', 'ACT');
+      if (!f) return { err: 'force returned null' };
+      const dt = 0.05;
+      for (let i = 0; i < 200 && f.st.ph !== 'roll'; i++) g.aviation.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+      g.radio.update(dt, g.player, g.aviation, g.sky);
+      const lastTx = g.radio.lastTx;
+      g.aviation.despawnAll();
+      return { err: null, ph: f.st.ph, lastTx };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.ph === 'roll', `flight not on roll when narrated (ph ${r.ph})`);
+    t.ok(r.lastTx?.kind === 'ops', `expected a self-announce, got ${r.lastTx?.kind}`);
+    t.ok(/Waco traffic/.test(r.lastTx?.text ?? ''), `not self-announce phrasing: "${r.lastTx?.text}"`);
+    t.ok(!/cleared/i.test(r.lastTx?.text ?? ''), `UNICOM shouldn't use controller phrasing: "${r.lastTx?.text}"`);
   });
 
   await t.check('tower radio ticks through the real loop (wiring sentinel)', async () => {
@@ -408,6 +467,17 @@ export default async function aviation(t) {
     await t.ev(`(g.radio.tunedField = null, g.player.perks.avionics = false)`);
     await t.tp(aus[0] + 60, aus[1] + 40, 'FLY', 40); // into AUS range — no manual radio.update() calls
     await t.until(`g.radio.tunedField === 'AUS'`, 8000); // only the real rAF loop can set this
+  });
+
+  await t.check('an unforced flyby of Waco produces real audio through the real loop (the reported bug)', async () => {
+    await t.tp(-2767, 334, 'FLY', 40); // clear of every field first
+    const act = await t.ev(`g.AIRPORTS.find((x) => x.id === 'ACT').at`);
+    await t.ev(`(g.radio.tunedField = null, g.radio.lastTx = null, g.hud.subtitleQ.length = 0, g.hud.subtitleBusy = false, clearTimeout(g.hud.subtitleTimer))`);
+    await t.tp(act[0] + 55, act[1] + 35, 'FLY', 40); // fly to Waco, no debug button, no forced flight
+    await t.until(`g.radio.tunedField === 'ACT'`, 8000); // real loop alone must tune in
+    await t.until(`g.radio.lastTx?.kind === 'awos'`, 8000); // and produce an actual transmission
+    const sub = await t.ev(`document.getElementById('radio-subtitle').textContent`);
+    t.ok(sub.length > 0, 'Waco flyby tuned in but the subtitle stayed empty — still silent to the player');
   });
 
   await t.check('UFO nearby chops in the one spooky template', async () => {
@@ -432,6 +502,10 @@ export default async function aviation(t) {
     await t.tp(-2767, 334, 'FLY', 40); // clear of every towered field first, so tunedField starts null
     const r = await t.ev(`(() => {
       g.radio.tunedField = null; g.radio.flow = 'none'; g.radio.lastTx = null;
+      // a prior check's subtitle may still be queued/showing — clear it so
+      // this check's DOM assertion reads only what THIS transmission wrote
+      g.hud.subtitleQ.length = 0; g.hud.subtitleBusy = false;
+      clearTimeout(g.hud.subtitleTimer);
       const a = g.AIRPORTS.find((x) => x.id === 'AUS');
       const day = Math.floor(g.sky.days);
       const x = a.at[0] + 61, z = a.at[1] + 39;

@@ -142,6 +142,22 @@ go-around is deliberately *not* gated on reception — it's a physical safety
 behavior — so wave 4 rotor/airship collision-adjacent behavior should follow
 the same pattern (check the physical world, gate only the narration).
 
+**Follow-up same day**: players reported silence at tier-2 fields (Waco,
+Laredo) — by design at ship time (only the 7 towered hubs had a frequency),
+but a dead spot players read as broken. Added `UNICOM` (the 9 tier-2
+fields, exported from radio.js): shorter range (120u vs. 250u), no
+controller — `awos()` (a real automated-weather transmission on tuning in;
+"monitoring" was considered and rejected, since that's something a pilot
+would key up and say, not something silence produces) instead of `atis()`,
+self-announce phrasing in `narrateOps` instead of clearances, and no player
+approach flow or stamp (the logbook stays towered-only). `receivable()` now
+returns `{a, kind: 'tower'|'unicom'}`, nearer wins when both would be in
+range. `checkBlock` runs over all 20 fields (was 7) — a blocked runway is a
+hazard regardless of tier. The regression to watch for: an *unforced* flyby
+of a tier-2 field must produce audio through the real loop with no debug
+button and no forced flight — that's the literal bug report, and it's now a
+named check in `tools/checks/aviation.mjs`, not just "the mechanism exists."
+
 ### Wave 4 — Rotors & airships
 
 - Helicopters (instanced, ≤2 airborne near player), placed by context not
