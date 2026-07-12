@@ -76,8 +76,9 @@ export class HUD {
     this.zoomIdx = 1;
     this.compass = document.getElementById('compass');
     if (localStorage.getItem('lonestar-compass') === 'off') this.compass.style.display = 'none';
-    this.shield = document.getElementById('road-shield-wrap'); // outer 3D card: position/centered/transform
-    this.shieldCanvas = document.getElementById('road-shield'); // inner canvas: 2D face raster
+    this.shield = document.getElementById('road-shield-wrap'); // outer: position/centered/perspective (static)
+    this.shieldCard = document.getElementById('road-shield-card'); // inner: JS-animated sway/float transform
+    this.shieldCanvas = document.getElementById('road-shield'); // innermost canvas: 2D face raster
     this.shieldInfo = null;
     this.shieldSway = 0;
     this.shieldNight = false;
@@ -342,7 +343,7 @@ export class HUD {
   }
 
   drawInterstateShield(ctx, cx, cy, { num, tag }, night) {
-    const w = 86, h = 94, top = cy - h / 2;
+    const w = 103, h = 113, top = cy - h / 2;
     const path = (ox = 0, oy = 0) => {
       const X = (v) => cx + v + ox, Y = (v) => top + v + oy;
       ctx.beginPath();
@@ -376,9 +377,9 @@ export class HUD {
     // 3-char refs (I 410/610/635, I 35W/35E/69E) need to shrink to fit the
     // shield's narrowing lower half — don't just test the convenient 2-digit case
     const label = num + (tag ?? '');
-    let size = 36;
+    let size = 44;
     ctx.font = `bold ${size}px system-ui`;
-    while (ctx.measureText(label).width > w * 0.62 && size > 18) {
+    while (ctx.measureText(label).width > w * 0.62 && size > 22) {
       size -= 3;
       ctx.font = `bold ${size}px system-ui`;
     }
@@ -388,7 +389,7 @@ export class HUD {
   }
 
   drawUsShield(ctx, cx, cy, { num }, night) {
-    const w = 81, h = 88, top = cy - h / 2;
+    const w = 97, h = 107, top = cy - h / 2;
     const path = (ox = 0, oy = 0) => {
       const pts = [
         [cx - w * 0.22, top], [cx + w * 0.22, top],
@@ -413,15 +414,15 @@ export class HUD {
     ctx.stroke();
     this.bevelStroke(ctx, path);
     ctx.fillStyle = '#111';
-    ctx.font = 'bold 14px system-ui';
+    ctx.font = 'bold 17px system-ui';
     ctx.fillText('US', cx, top + h * 0.3);
-    ctx.font = 'bold 34px system-ui';
+    ctx.font = 'bold 41px system-ui';
     ctx.fillText(num, cx, top + h * 0.78);
     if (night) this.nightWireframe(ctx, path, cx - w / 2, top, w, h);
   }
 
   drawCircleShield(ctx, cx, cy, { num, label }, night) {
-    const r = 39;
+    const r = 47;
     const path = (ox = 0, oy = 0) => {
       ctx.beginPath();
       ctx.arc(cx + ox, cy + oy, r, 0, Math.PI * 2);
@@ -440,21 +441,24 @@ export class HUD {
     this.bevelStroke(ctx, path);
     ctx.fillStyle = '#111';
     if (label) {
-      ctx.font = 'bold 14px system-ui';
-      ctx.fillText(label, cx, cy - 10);
-      ctx.font = `bold ${num.length > 3 ? 23 : 29}px system-ui`;
-      ctx.fillText(num, cx, cy + 20);
+      ctx.font = 'bold 17px system-ui';
+      ctx.fillText(label, cx, cy - 12);
+      ctx.font = `bold ${num.length > 3 ? 28 : 35}px system-ui`;
+      ctx.fillText(num, cx, cy + 24);
     } else {
-      ctx.font = `bold ${num.length > 2 ? 29 : 36}px system-ui`;
-      ctx.fillText(num, cx, cy + 13);
+      ctx.font = `bold ${num.length > 2 ? 35 : 43}px system-ui`;
+      ctx.fillText(num, cx, cy + 16);
     }
     if (night) this.nightWireframe(ctx, path, cx - r, cy - r, r * 2, r * 2);
   }
 
   // per-render-frame (not the ~12 Hz HUD tick): steer-driven sway + idle
-  // float on the wrap's CSS transform. GAIN turns DRIVE's tiny ±0.09 tilt
-  // into a readable ~±13° lean; the damped lerp keeps it arcade but smooth.
-  // Ungated by __skipRender in main.js so it ticks headless too.
+  // float on the INNER card's CSS transform — perspective lives on the OUTER
+  // #road-shield-wrap (a self-transformed element ignores its own
+  // perspective; it only foreshortens a transformed CHILD), so the rotation
+  // must land on shieldCard for the lean to actually be visible. GAIN turns
+  // DRIVE's tiny ±0.09 tilt into a readable ~±13° lean; the damped lerp
+  // keeps it arcade but smooth. Ungated by __skipRender so it ticks headless.
   animateShield(player, dt) {
     const GAIN = 150, MAX_SWAY = 40;
     const target = Math.max(-MAX_SWAY, Math.min(MAX_SWAY, (player.tilt || 0) * GAIN));
@@ -464,8 +468,7 @@ export class HUD {
     const period = 3.6, w = (Math.PI * 2) / period;
     const floatY = Math.sin(this._shieldFloat * w) * 1;
     const floatX = Math.sin(this._shieldFloat * w + Math.PI / 2) * 2;
-    const centered = this.shield.classList.contains('centered');
-    this.shield.style.transform = `${centered ? 'translateX(-50%) ' : ''}translateY(${floatY.toFixed(2)}px) rotateY(${this.shieldSway.toFixed(2)}deg) rotateX(${floatX.toFixed(2)}deg)`;
+    this.shieldCard.style.transform = `translateY(${floatY.toFixed(2)}px) rotateY(${this.shieldSway.toFixed(2)}deg) rotateX(${floatX.toFixed(2)}deg)`;
   }
 
   toast(msg) {

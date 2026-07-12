@@ -203,7 +203,7 @@ export default async function hud(t) {
   await t.check('enlarged 3D shield never overlaps the compass, at default and high UI scale', async () => {
     await parkOnInterstate();
     const rects = () => t.ev(`({
-      shield: document.getElementById('road-shield-wrap').getBoundingClientRect(),
+      shield: document.getElementById('road-shield-card').getBoundingClientRect(), // the rotating element, not the static outer wrap
       compass: document.getElementById('compass').getBoundingClientRect(),
     })`);
     const noOverlap = (a, b) => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
