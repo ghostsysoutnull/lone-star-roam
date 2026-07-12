@@ -66,11 +66,62 @@ const ROUTES = {
 
 const byId = Object.fromEntries(AIRPORTS.map((a) => [a.id, a]));
 
+// A6 — five loosely-homage carriers (the game's one sanctioned real-brand
+// wink: Sweetheart~Southwest/LUV/Love Field, Texan~American, Intercon~
+// Continental/United, Bravo~Braniff's rainbow fleet, Lone Star neutral).
+// hubs drives assignment weighting below; tint null means "roll one of
+// BRAVO_TINTS" (a varied fleet is the point, unlike the other four).
+export const AIRLINES = [
+  { key: 'sweetheart', name: 'Heart of Texas Air', callsign: 'SWEETHEART', hubs: ['DAL', 'HOU'], tint: 0xc23b3b, weight: 3 },
+  { key: 'texan', name: 'Texan Airways', callsign: 'TEXAN', hubs: ['DFW'], tint: 0x9aa8c2, weight: 3 },
+  { key: 'intercon', name: 'Intercontinental Airways', callsign: 'INTERCON', hubs: ['IAH'], tint: 0x2f4f78, weight: 3 },
+  { key: 'bravo', name: 'Bravo Air', callsign: 'BRAVO', hubs: [], tint: null, weight: 0.6 },
+  { key: 'lonestar', name: 'Lone Star', callsign: 'Lone Star', hubs: [], tint: 0x9a9a9a, weight: 2 },
+];
+const BRAVO_TINTS = [0xd83b7a, 0x3bb2d8, 0xe0a020, 0x5ad86a, 0xb03bd8];
+// decisive, not marginal — a slot departing a carrier's hub should land that
+// carrier the large majority of the time (an exact per-day assertion, not a
+// statistical one), so the boost dwarfs every other airline's base weight
+const HUB_BOOST = 12;
+
+function pickAirline(fromId, rand) {
+  const weights = AIRLINES.map((al) => al.weight * (al.hubs.includes(fromId) ? HUB_BOOST : 1));
+  const total = weights.reduce((s, w) => s + w, 0);
+  let x = rand() * total;
+  for (let i = 0; i < AIRLINES.length; i++) { x -= weights[i]; if (x <= 0) return AIRLINES[i]; }
+  return AIRLINES[AIRLINES.length - 1];
+}
+
+const TAIL_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+// FAA N-number shape: N + 2-3 digits + 2 letters — GA's callsign, no airline
+function mkTail(rand) {
+  const digits = 2 + (rand() < 0.5 ? 0 : 1);
+  let n = '';
+  for (let i = 0; i < digits; i++) n += Math.floor(rand() * 10);
+  return `N${n}${TAIL_LETTERS[Math.floor(rand() * 26)]}${TAIL_LETTERS[Math.floor(rand() * 26)]}`;
+}
+
+// A2+A6 identity: jets fly for a hub-weighted carrier (callsign + tail tint),
+// GA gets a tail number and no airline. Shared by mkSlot (seeded rand) and
+// force() (Math.random) so every forced flight — what the verify suite
+// actually exercises — carries the same fields as a scheduled one.
+function identityFor(type, fromId, n, rand) {
+  if (type !== 'jet') return { cs: mkTail(rand), airline: null, tint: null };
+  const al = pickAirline(fromId, rand);
+  return { cs: `${al.callsign} ${n}`, airline: al.key, tint: al.tint ?? BRAVO_TINTS[Math.floor(rand() * BRAVO_TINTS.length)] };
+}
+
 function mkSlot(a, day, k, u, dest, r) {
   const type = a.tier === 1 && byId[dest].tier === 1 ? 'jet' : 'ga';
-  return { key: `${a.id}:${day}:${k}`, from: a.id, dest, u, day, type,
-    n: 1 + Math.floor(r() * 98), // "Lone Star N" — wave-3 radio reads this
-    jit: 0.9 + r() * 0.2, band: r(), tint: TINTS[Math.floor(r() * TINTS.length)] };
+  const key = `${a.id}:${day}:${k}`;
+  const n = 1 + Math.floor(r() * 98);
+  const jit = 0.9 + r() * 0.2, band = r();
+  let tint = TINTS[Math.floor(r() * TINTS.length)];
+  // new streams, independent of r — existing avn: draw order/count untouched
+  const idRand = seededRand(`${type === 'jet' ? 'airline' : 'tail'}:${key}`);
+  const id = identityFor(type, a.id, n, idRand);
+  if (id.tint != null) tint = id.tint;
+  return { key, from: a.id, dest, u, day, type, n, jit, band, tint, cs: id.cs, airline: id.airline };
 }
 
 // one game day's departures for every field — pure and deterministic per
@@ -267,10 +318,12 @@ export class AviationSystem {
     const routes = ROUTES[apt.id];
     const [pid] = routes[(Math.random() * routes.length) | 0];
     const from = kind === 'arrival' ? pid : apt.id, dest = kind === 'arrival' ? apt.id : pid;
-    const sl = { key: 'F:' + this.seq++, from, dest, u: 0, day: this.day,
-      type: byId[from].tier === 1 && byId[dest].tier === 1 ? 'jet' : 'ga',
-      n: 1 + ((Math.random() * 98) | 0), jit: 0.9 + Math.random() * 0.2, band: Math.random(),
-      tint: TINTS[(Math.random() * TINTS.length) | 0] };
+    const type = byId[from].tier === 1 && byId[dest].tier === 1 ? 'jet' : 'ga';
+    const n = 1 + ((Math.random() * 98) | 0);
+    const id = identityFor(type, from, n, Math.random);
+    const sl = { key: 'F:' + this.seq++, from, dest, u: 0, day: this.day, type,
+      n, jit: 0.9 + Math.random() * 0.2, band: Math.random(),
+      tint: id.tint ?? TINTS[(Math.random() * TINTS.length) | 0], cs: id.cs, airline: id.airline };
     const fl = this.buildRaw(sl);
     let age = 0.001;
     if (kind === 'arrival') {

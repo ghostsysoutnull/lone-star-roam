@@ -889,6 +889,129 @@ export default async function aviation(t) {
     t.ok(!westNight, 'low-level pair rolled at night');
   });
 
+  // ---- aviation observability wave A, session 1: identity foundations ----
+  // A2 (callsigns) and A6 (airlines) are built together: jets fly for a
+  // hub-weighted carrier and inherit its callsign/tint, GA gets a tail
+  // number. force() shares aviation.js's identityFor() with the seeded
+  // schedule, so every forced flight — what these checks exercise — carries
+  // the same real cs/tint/airline fields a scheduled one would.
+
+  await t.check("A2: a forced departure narrates the slot's own callsign, not a hardcoded one", async () => {
+    await t.tp(aus[0] + 20, aus[1] + 16, 'WALK');
+    const r = await t.ev(`(() => {
+      g.player.perks.avionics = true; // WALK reception needs the perk (FLY-in-range is the other path)
+      g.radio.tunedField = null;
+      g.radio.update(0.05, g.player, g.aviation, g.sky); // tune in (consumes the ATIS transmission)
+      g.aviation.despawnAll();
+      g.radio.knownPh.clear();
+      const f = g.aviation.force('departure', 'AUS');
+      if (!f) return { err: 'force returned null' };
+      const dt = 0.05;
+      for (let i = 0; i < 3600 && f.st.ph !== 'roll'; i++) g.aviation.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+      g.radio.update(dt, g.player, g.aviation, g.sky); // already tuned — only narrateOps can fire here
+      const out = { err: null, cs: f.sl.cs, text: g.radio.lastTx?.text };
+      g.player.perks.avionics = false;
+      return out;
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.text?.includes(r.cs), `narration "${r.text}" doesn't contain the slot's own callsign "${r.cs}"`);
+    await t.ev('g.aviation.despawnAll()');
+  });
+
+  await t.check('A2: GA tail numbers match FAA N-number shape and are stable across a schedule rebuild', async () => {
+    const r = await t.ev(`(() => {
+      const day = 9;
+      const a1 = JSON.stringify(g.daySchedule(day)), a2 = JSON.stringify(g.daySchedule(day));
+      const sched = g.daySchedule(day);
+      const gaSlots = sched.flatMap((ap) => ap.slots.filter((s) => s.type === 'ga'));
+      const bad = gaSlots.filter((s) => !/^N\\d{2,3}[A-Z]{2}$/.test(s.cs)).map((s) => s.key + ':' + s.cs);
+      const noAirline = gaSlots.filter((s) => s.airline !== null).map((s) => s.key);
+      return { same: a1 === a2, n: gaSlots.length, bad, noAirline };
+    })()`);
+    t.ok(r.same, 'two daySchedule evals of the same day disagree (tail: stream not deterministic)');
+    t.ok(r.n > 0, 'no GA slots to check — assertion would be vacuous');
+    t.ok(r.bad.length === 0, `GA tail(s) not FAA-shaped: ${r.bad.slice(0, 5).join(', ')}`);
+    t.ok(r.noAirline.length === 0, `GA slot(s) carry an airline: ${r.noAirline.join(', ')}`);
+  });
+
+  await t.check('A6: airline assignment is deterministic and hub-weighted to an exact majority', async () => {
+    const r = await t.ev(`(() => {
+      const day = 9;
+      const s1 = g.daySchedule(day), s2 = g.daySchedule(day);
+      const same = JSON.stringify(s1) === JSON.stringify(s2);
+      const jetsOf = (id) => s1.find((ap) => ap.id === id).slots.filter((s) => s.type === 'jet');
+      const dal = jetsOf('DAL'), dfw = jetsOf('DFW');
+      const majority = (slots, key) => slots.filter((s) => s.airline === key).length > slots.length / 2;
+      return { same, dalN: dal.length, dfwN: dfw.length,
+        dalSweetheart: majority(dal, 'sweetheart'), dfwTexan: majority(dfw, 'texan') };
+    })()`);
+    t.ok(r.same, 'two daySchedule evals disagree (airline: stream not deterministic)');
+    t.ok(r.dalN > 0 && r.dfwN > 0, 'no jet slots at DAL/DFW to check — assertion would be vacuous');
+    t.ok(r.dalSweetheart, 'DAL jet slots are not majority SWEETHEART');
+    t.ok(r.dfwTexan, 'DFW jet slots are not majority TEXAN');
+  });
+
+  await t.check('A6: forced flights always carry a real carrier/tail callsign; jet tint matches its airline', async () => {
+    const r = await t.ev(`(() => {
+      g.aviation.despawnAll();
+      const bad = [], tintBad = [];
+      for (let i = 0; i < 20; i++) {
+        const f = g.aviation.force('departure', 'DAL');
+        if (!f) continue;
+        const s = f.sl;
+        if (s.type === 'jet') {
+          if (!/^(SWEETHEART|TEXAN|INTERCON|BRAVO|Lone Star) \\d+$/.test(s.cs)) bad.push(s.cs);
+          const al = g.AIRLINES.find((x) => x.key === s.airline);
+          if (!al) bad.push('no-airline:' + s.cs);
+          else if (al.tint != null && s.tint !== al.tint) tintBad.push(s.cs + ':' + s.tint);
+          else if (al.tint == null && s.tint == null) tintBad.push(s.cs + ':no-bravo-tint');
+        } else if (!/^N\\d{2,3}[A-Z]{2}$/.test(s.cs)) bad.push(s.cs);
+        g.aviation.despawnAll();
+      }
+      return { bad, tintBad };
+    })()`);
+    t.ok(r.bad.length === 0, `malformed callsign(s): ${r.bad.join(', ')}`);
+    t.ok(r.tintBad.length === 0, `tint didn't match the assigned airline: ${r.tintBad.join(', ')}`);
+  });
+
+  await t.check('A5: exactly one gate sign per tier-1/2 field, positioned at its gate, none at tier-3', async () => {
+    const r = await t.ev(`(() => {
+      const info = g.airports.signInfo;
+      const tier12 = g.AIRPORTS.filter((a) => a.tier <= 2).map((a) => a.id);
+      const tier3 = g.AIRPORTS.filter((a) => a.tier === 3).map((a) => a.id);
+      const ids = info.map((s) => s.id);
+      const missing = tier12.filter((id) => !ids.includes(id));
+      const dup = ids.length !== new Set(ids).size;
+      const wrongTier = ids.filter((id) => tier3.includes(id));
+      const farFromGate = info.filter((s) => {
+        const a = g.AIRPORTS.find((x) => x.id === s.id);
+        return Math.hypot(s.x - a.gate[0], s.z - a.gate[1]) > 3;
+      }).map((s) => s.id);
+      return { n: info.length, missing, dup, wrongTier, farFromGate };
+    })()`);
+    t.ok(r.n === 16, `expected 16 gate signs, got ${r.n}`);
+    t.ok(r.missing.length === 0, `missing signs for: ${r.missing.join(', ')}`);
+    t.ok(!r.dup, 'duplicate sign entries');
+    t.ok(r.wrongTier.length === 0, `tier-3 field got a sign: ${r.wrongTier.join(', ')}`);
+    t.ok(r.farFromGate.length === 0, `sign far from its field's gate: ${r.farFromGate.join(', ')}`);
+  });
+
+  await t.check('A5: gate sign mesh is the 9th global mesh, modestly emissive after dark', async () => {
+    await t.setDay(); // the preceding low-level-trainer check leaves the clock at night
+    await t.until('g.airports.signs.material.emissiveIntensity === 0', 8000);
+    const r0 = await t.ev(`({ inGroup: g.airports.group.children.includes(g.airports.signs),
+      childCount: g.airports.group.children.length, day: g.airports.signs.material.emissiveIntensity })`);
+    await t.setNight();
+    await t.until('g.airports.signs.material.emissiveIntensity > 0', 8000);
+    const night = await t.ev('g.airports.signs.material.emissiveIntensity');
+    await t.setDay();
+    await t.until('g.airports.signs.material.emissiveIntensity === 0', 8000);
+    t.ok(r0.inGroup, 'sign mesh not attached to the airport group');
+    t.ok(r0.childCount === 9, `expected 9 global airport meshes, got ${r0.childCount}`);
+    t.ok(r0.day === 0, `signs already emissive by day (${r0.day})`);
+    t.ok(night > 0 && night <= 1, `signs not emissive at night (${night})`);
+  });
+
   if (process.env.SHOT) { // composition only — never the pass/fail signal
     const dal = await t.ev(`g.AIRPORTS.find((a) => a.id === 'DAL').at`);
     // frame a real approach: 30u out on the 31L extended centerline, nose NW

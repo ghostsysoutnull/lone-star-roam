@@ -6,22 +6,25 @@
 for Bruno's go-ahead. No copy-paste needed; any first message triggers
 it.)*
 
-- **This session**: Aviation observability, **implementation session 1
-  of 3 — "identity foundations"**: A1 HUD airport line (`fieldNear`
-  pure query), A2 per-type callsigns (seeded `tail:` stream), A6
-  airline roster + hub-weighted assignment + tail tints, and A5's
-  static half (gate sign boards, big-map codes). Full spec:
-  `AVIATION_OBSERVABILITY_SPEC.md`; design all settled 2026-07-12,
-  three open calls remain but none block this session.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — this
-  session is deterministic table-plumbing; save Fable 5 for session
-  2's chatter engine. Flag it if the running model differs.
+- **This session**: Aviation observability, **implementation session 2
+  of 3 — "chatter + visuals"**: A3 the chatter engine (new `chatter.js`
+  — helis and planes, per-type voice registers, factual-by-construction
+  templates, ~25–45s budget, rare player-ref delight lines), A5's live
+  half (aircraft proximity tags in `hud.js`, sharing the chatter
+  scanner's source enumeration), and A4 medical pad stops (new
+  `padstop:` stream). Session 1 shipped 2026-07-12: A1 HUD airport
+  line, A2 callsigns, A6 airlines + hub-weighted assignment + tail
+  tints, A5's static half (gate signs, map codes) — see ROADMAP.md.
+  Full spec: `AVIATION_OBSERVABILITY_SPEC.md`.
+- **Recommended setup**: model **Fable 5**, effort **high** — this is
+  the session's real design work (voice registers, template pools,
+  budget/priority ordering), unlike session 1's table-plumbing. Flag
+  it if the running model differs.
 - **Budget**: code + checks, no shots, grep-first (MODULES.md
-  anchors). Possible single-shot exception: the gate signs, only if
-  Bruno asks for visual proof.
-- **Then**: sessions 2 (**Fable 5, high** — chatter engine + aircraft
-  tags + pad stops) and 3 (Wave B: airport NPCs + chatter enrichment,
-  model per session-1 experience). Update this block at each wave's
+  anchors). No known visual-proof exception this session (tags are
+  DOM text, not new geometry).
+- **Then**: session 3 (Wave B: airport NPCs + chatter enrichment,
+  model per session-2 experience). Update this block at each wave's
   session end; delete it when the spec fully ships.
 
 ---
@@ -52,73 +55,44 @@ Key facts:
 - **Ask before coding** — present the wave's implementation plan and wait
   for the go-ahead.
 
-Task: **Aviation wave 5 — Charter & military color, continued** (full spec in
-`AVIATION.md`; waves 1–4 shipped 2026-07-11; military flavor's B-1/Randolph
-landmarks + NASA T-38/low-level trainer pairs shipped 2026-07-12; **charter
-jobs shipped 2026-07-12** — missions.js `kind: 'charter'` offers between
-airport pairs, real-touchdown detection reusing radio.js's own landing test
-via new `airports.js` exports `TD_AGL`/`TD_SPD`, charter livery via
-`vehicle.js` `mkWings` `userData.mat`/`stockColor`, `missions.force(fromId,
-toId)` test hook + debug button — see ROADMAP.md, full spec in
-`CHARTER_JOBS_SPEC.md`; **helicopter detail pass + lofted-fuselage rebuild
-shipped 2026-07-12** — `rotors.js`'s `HeliSystem` split its one shared
-body/rotor geometry into four bespoke per-kind bodies + a real
-rotor-blade-count mechanic (army 4-blade cross vs 2 for the others), then
-the same day replaced each cabin's flat box with a lofted fuselage
-(`mkLoft()` chains tapered-cylinder frustums along Z, matched radii at
-seams, `openEnded` to avoid seam z-fighting) plus a two-panel wedge
-windscreen and a mast fairing, roughly doubling poly count again
-(132→284–368 tris); rotor mast height is now derived per kind from the
-body's real bounding box instead of a hand-tuned constant, and the 🚁 Heli
-debug action cycles kinds deterministically instead of picking randomly —
-see ROADMAP.md, full spec in `HELICOPTER_SPEC.md`).
-**Next up: Aviation observability wave A** (scope approved 2026-07-12,
-full spec in `AVIATION_OBSERVABILITY_SPEC.md` — spec only so far, present
-the wave plan and get a go-ahead before coding): airport name/code on the
-HUD location line (`fieldNear` pure query), per-type callsigns (seeded GA
-tails via new `tail:` stream, NASA voiced at Ellington), a **chatter
-engine** (new `chatter.js`: scanner frame, per-type voice registers for
-all 4 heli kinds + jets + GA, template pools filled from live context so
-lines are factual by construction, ~25–45 s budget with ops preempting
-casual, rare player-reference delight lines, callsign+route subtitle
-header, per-type synth voice — design settled with Bruno 2026-07-12), **visual identity** (aircraft
-proximity tags sharing the scanner's ~60-unit window, tier-1/2 gate sign
-boards via one canvas atlas, big-map airport codes drawn in `drawBig` —
-all three approved 2026-07-12), **fictional airlines** (5-carrier
-loose-homage roster — Sweetheart/Texan/Intercon/Bravo/Lone Star —
-hub-weighted seeded assignment via new `airline:` stream, per-airline
-tail tints, heli operator names StarCare Flight / KTX News 5; the game's
-sole real-brand exception, approved 2026-07-12), and medical-heli pad
-stops at the home city's field (new `padstop:` stream, cap accounting
-unchanged). Wave B (airport
-bystander NPCs + heli-aware/context-enriched townsfolk chatter) queued
-behind it in the same spec.
-Other à-la-carte candidates, both already scoped in with Bruno's
-go-ahead: **Sheppard T-38 touch-and-go pattern circuits** (the one piece
-that needs real new design — a closed traffic pattern doesn't fit the
-point-to-point `AviationSystem` schedule or the simple orbit/transit movers
-already built; budget it its own session), and **Marfa gliders** (silent
-soaring circles over the strip on clear afternoons). Still deferred/
-unscoped: crop duster dawn runs from tier-3 strips, a 13th bespoke NPC
-(duster pilot, weather-wise dialog) — confirm scope with Bruno before
-picking these up. Notes: `src/rotors.js` has `HeliSystem`/`BlimpSystem`
-(HeliSystem now keeps four kind-scoped `{body, rotor}` InstancedMesh pairs
-in `this.meshes`, per-kind blade count/diameter in `HELI_CONFIG`, rendered
-instance counts in `this.rotorCount`, mast heights derived per kind in
-`this.rotorY` — reuse this per-kind-mesh-pool pattern, and `mkLoft`/
-`mkWedge`/`mkMastFairing` for the lofted-fuselage technique, if any other
-mover ever needs real shape differentiation) and `src/military.js` has
-`MilitaryAirSystem` (candidates array, `force(kind)`/
-`despawnAll` test hooks, global airborne cap idiom with per-kind `weight`);
-reuse the same pattern for any new mover rather than inventing one —
-military.js additionally shows how to share `aviation.js`'s `MAX_AIR`
-budget across systems via `aviation.airborneCount()`. `aviation.divert(m)`
-is public if new air traffic needs a forced diversion; `airports.js`
-`onRunway(a,x,z,rad)` is the pavement-corridor test for any new
-ground-contact placement (now paired with exported `TD_AGL`/`TD_SPD` for
-"is this thing landed"); `radio.js` stays standalone — Sheppard radio
-chatter should follow the same pattern, never break `aviation.update`'s
-signature.
+Task: **Aviation observability wave A, session 2 of 3 — "chatter +
+visuals"** (full spec in `AVIATION_OBSERVABILITY_SPEC.md`; waves 1–5 of
+the original 5-wave aviation track, plus charter jobs and the helicopter
+detail/loft passes, all shipped 2026-07-11/12 — see ROADMAP.md). Session 1
+shipped 2026-07-12: A1 HUD airport line (`airports.js` `fieldNear`), A2
+per-type callsigns + A6 airlines (`aviation.js` `AIRLINES` table,
+hub-weighted `identityFor()` shared by `mkSlot` and `force()`, new
+`airline:`/`tail:` streams), A5's static half (gate sign boards — 9th
+global mesh, one canvas atlas — and big-map codes in `hud.js drawBig`).
+This session: **A3 the chatter engine** (new `chatter.js` — scanner frame,
+per-type voice registers for all 4 heli kinds + jets + GA, template pools
+filled from live context so lines are factual by construction, ~25–45s
+budget with ops preempting casual, rare player-reference delight lines,
+callsign+route subtitle header, per-type synth voice — design settled
+with Bruno 2026-07-12), **A5's live half** (aircraft proximity tags in
+`hud.js` sharing the chatter scanner's ~60-unit source enumeration — one
+enumeration, two consumers), and **A4 medical pad stops** (`rotors.js`/
+`airports.js` — new `padstop:${key}:${day}` stream, transit→descend→
+touchdown→dwell→lift at the home city's pad, cap accounting unchanged).
+Wave B (airport bystander NPCs + heli-aware/context-enriched townsfolk
+chatter) is session 3, queued behind this one in the same spec.
+
+Notes carried from wave 5 (still relevant if this session's movers need
+anything new): `src/rotors.js` has `HeliSystem`/`BlimpSystem` (four
+kind-scoped `{body, rotor}` InstancedMesh pairs in `this.meshes`, reuse
+this per-kind-mesh-pool pattern) and `src/military.js` has
+`MilitaryAirSystem` (candidates array, `force(kind)`/`despawnAll`, global
+airborne cap idiom with per-kind `weight` — its `nasa` candidate now
+carries `cs: 'NASA 9-0-1'`, ready for A3 to voice via the direct-range
+window, deferred from session 1 since Ellington isn't in `AIRPORTS`).
+`radio.js` stays standalone, never breaks `aviation.update`'s signature —
+A3 needs a new optional param or setter for `helis`, decided at
+implementation to match how `radio.js` already receives `aviation`.
+Other à-la-carte candidates already scoped in with Bruno, not part of this
+spec: Sheppard T-38 touch-and-go pattern circuits (own session — needs
+real new closed-pattern design), Marfa gliders. Still deferred/unscoped:
+crop duster dawn runs, a 13th bespoke NPC — confirm scope before picking
+these up.
 
 Session end (per wave): fold the shipped wave into ROADMAP.md, advance the
 Task block above to the next wave, run `node tools/verify.mjs`, then commit.

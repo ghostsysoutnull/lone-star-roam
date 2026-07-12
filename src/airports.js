@@ -115,17 +115,22 @@ for (const a of AIRPORTS) {
   }
 }
 
-// true when (x,z) is outside every airport footprint — placement systems call
-// this in their seeded loops, so it must stay pure and cheap
-export function airportClear(x, z) {
+// the airport whose footprint contains (x,z), else null — A1's HUD identity
+// line reads this; placement systems still want a boolean, so airportClear
+// delegates here rather than duplicating the footprint math
+export function fieldNear(x, z) {
   for (const a of AIRPORTS) {
     const ex = x - a.at[0], ez = z - a.at[1];
     if (ex * ex + ez * ez > a.maxR * a.maxR) continue;
     const u = ex * a.ax + ez * a.az, v = ex * -a.az + ez * a.ax;
-    if (u >= a.foot.u0 && u <= a.foot.u1 && v >= a.foot.v0 && v <= a.foot.v1) return false;
+    if (u >= a.foot.u0 && u <= a.foot.u1 && v >= a.foot.v0 && v <= a.foot.v1) return a;
   }
-  return true;
+  return null;
 }
+
+// true when (x,z) is outside every airport footprint — placement systems call
+// this in their seeded loops, so it must stay pure and cheap
+export function airportClear(x, z) { return !fieldNear(x, z); }
 
 // world-space footprint corner / interior-point helpers (verify + mesh builder)
 const fpPoint = (a, u, v) => [a.at[0] + a.ax * u - a.az * v, a.at[1] + a.az * u + a.ax * v];
@@ -197,6 +202,57 @@ function clearOfRunways(a, x, z, rad) {
 // jobs both read these so "landed" means the same physical thing everywhere.
 export const TD_AGL = 3, TD_SPD = 40;
 
+// A5 (static half) — gate sign boards: tier-1/2 fields (16) get a name+code
+// entrance placard. One shared canvas atlas + one merged UV'd quad mesh (a
+// 9th global mesh alongside pad/skirt/rwy/dirt/mark/bld/heads/sockMesh) reads
+// it in a single draw call instead of 16 separate label meshes — tier-3
+// ranch strips stay unsigned, a monument sign would be wrong on a dirt strip.
+const SIGN_FIELDS = AIRPORTS.filter((a) => a.tier <= 2);
+const SIGN_COLS = 4, SIGN_ROWS = Math.ceil(SIGN_FIELDS.length / SIGN_COLS);
+const CELL_W = 256, CELL_H = 160;
+
+function wrapText(ctx, text, cx, cy, maxW, lh) {
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (line && ctx.measureText(test).width > maxW) { lines.push(line); line = w; } else line = test;
+  }
+  lines.push(line);
+  const y0 = cy - ((lines.length - 1) * lh) / 2;
+  lines.forEach((l, i) => ctx.fillText(l, cx, y0 + i * lh));
+}
+
+function buildSignAtlas() {
+  const c = document.createElement('canvas');
+  c.width = SIGN_COLS * CELL_W; c.height = SIGN_ROWS * CELL_H;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#13201a';
+  ctx.fillRect(0, 0, c.width, c.height);
+  SIGN_FIELDS.forEach((a, i) => {
+    const cx = (i % SIGN_COLS) * CELL_W, cy = Math.floor(i / SIGN_COLS) * CELL_H;
+    ctx.strokeStyle = '#d8cf9c'; ctx.lineWidth = 4;
+    ctx.strokeRect(cx + 8, cy + 8, CELL_W - 16, CELL_H - 16);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#f0e8c8';
+    ctx.font = 'bold 28px system-ui, sans-serif';
+    wrapText(ctx, a.name, cx + CELL_W / 2, cy + CELL_H / 2 - 16, CELL_W - 40, 32);
+    ctx.fillStyle = '#ffd35c';
+    ctx.font = 'bold 44px system-ui, sans-serif';
+    ctx.fillText(a.id, cx + CELL_W / 2, cy + CELL_H - 26);
+  });
+  return new THREE.CanvasTexture(c);
+}
+
+// 4-corner quad (CCW from outside) with UVs into one atlas cell — mirrors
+// quad() above, adding normal/uv for a textured (not vertex-colored) mesh
+function quadUV(pos, nor, uv, a, b, c, d, n, u0, v0, u1, v1) {
+  pos.push(...a, ...b, ...c, ...a, ...c, ...d);
+  for (let i = 0; i < 6; i++) nor.push(...n);
+  uv.push(u0, v0, u1, v0, u1, v1, u0, v0, u1, v1, u0, v1);
+}
+
 export class AirportSystem {
   constructor(scene) {
     this.layout = airportLayout();
@@ -208,6 +264,9 @@ export class AirportSystem {
     const boxes = [];   // {x,z,y,rot,sx,sy,sz,color}
     this.beacons = [];  // {x,z,y,phase}
     this.socks = [];    // {x,z,y}
+    const signPos = [], signNor = [], signUv = [];
+    this.signInfo = [];  // {id,x,z} — data for the A5 check, not pixels
+    let signIdx = 0;
 
     for (let i = 0; i < AIRPORTS.length; i++) {
       const a = AIRPORTS[i], L = this.layout[i], y = L.padY;
@@ -269,6 +328,22 @@ export class AirportSystem {
           break;
         }
       }
+
+      // A5: gate sign board — a vertical panel standing right at the gate
+      // (already guaranteed clear of pavement), UV'd into this field's atlas
+      // cell. Width along the primary runway axis, facing the perpendicular.
+      if (a.tier <= 2) {
+        const [gx, gz] = a.gate, w = 3.6, h = 2.0, by = y + 0.05;
+        const hwx = a.ax * (w / 2), hwz = a.az * (w / 2);
+        const p0 = [gx - hwx, by, gz - hwz], p1 = [gx + hwx, by, gz + hwz];
+        const p2 = [p1[0], by + h, p1[2]], p3 = [p0[0], by + h, p0[2]];
+        const cx = signIdx % SIGN_COLS, cy = Math.floor(signIdx / SIGN_COLS);
+        signIdx++;
+        const u0 = cx / SIGN_COLS, u1 = (cx + 1) / SIGN_COLS;
+        const v1 = 1 - cy / SIGN_ROWS, v0 = 1 - (cy + 1) / SIGN_ROWS;
+        quadUV(signPos, signNor, signUv, p0, p1, p2, p3, [-a.az, 0, a.ax], u0, v0, u1, v1);
+        this.signInfo.push({ id: a.id, x: gx, z: gz });
+      }
     }
 
     const mesh = (tris, color) => {
@@ -300,6 +375,18 @@ export class AirportSystem {
       new THREE.MeshLambertMaterial({ color: 0xff7a2a, emissive: 0x2a1200, side: THREE.DoubleSide }), this.socks.length);
     this.sockMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.group.add(this.heads, this.sockMesh);
+
+    // 9th global mesh: every gate sign, one atlas, one draw call
+    const signGeo = new THREE.BufferGeometry();
+    signGeo.setAttribute('position', new THREE.Float32BufferAttribute(signPos, 3));
+    signGeo.setAttribute('normal', new THREE.Float32BufferAttribute(signNor, 3));
+    signGeo.setAttribute('uv', new THREE.Float32BufferAttribute(signUv, 2));
+    const signTex = buildSignAtlas();
+    this.signs = new THREE.Mesh(signGeo, new THREE.MeshLambertMaterial({
+      map: signTex, emissiveMap: signTex, emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide,
+    }));
+    this.group.add(this.signs);
+
     scene.add(this.group);
     this.update(0, 0);
   }
@@ -314,6 +401,7 @@ export class AirportSystem {
     const yaw = Math.atan2(Math.cos(toDeg), Math.sin(toDeg));
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), one = new THREE.Vector3(1, 1, 1);
     this.heads.visible = ATMOS.night > 0.25;
+    this.signs.material.emissiveIntensity = ATMOS.night > 0.25 ? 0.55 : 0; // modestly lit after dark, beacon's gate
     if (this.heads.visible) {
       this.beacons.forEach((b, k) => {
         m4.compose(new THREE.Vector3(b.x, b.y, b.z), q.setFromEuler(e.set(0, this.beaconAngle + b.phase, 0)), one);

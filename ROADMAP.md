@@ -232,6 +232,47 @@ ship.
   deterministically (was a random pick) so playtesting can hit every kind
   on demand, with a check covering the cycle order.
 
+- [x] ~~Aviation observability wave A, session 1 — identity foundations~~ —
+  done 2026-07-12: the aviation layer works but was illegible (generic
+  "Lone Star N" for everyone, no airport names on the HUD, no visible
+  identity anywhere). **A1** `airports.js` exports `fieldNear(x,z)` (pure
+  footprint query returning the field, not just a boolean — `airportClear`
+  now delegates to it); `hud.js`'s location line shows `🛫 Dallas Love
+  Field (DAL) — Dallas` inside a footprint instead of the city-distance
+  line. **A2+A6** (built together — callsign assembly depends on airline):
+  a new `AIRLINES` table in `aviation.js` (Heart of Texas Air/SWEETHEART,
+  Texan Airways/TEXAN, Intercontinental Airways/INTERCON, Bravo Air/BRAVO,
+  Lone Star — the game's one sanctioned real-brand wink) assigns jets a
+  hub-weighted carrier (new `airline:${slot key}` stream, `HUB_BOOST=12`
+  makes a carrier's own hub decisively — not just statistically —
+  majority) with a matching tail tint (Bravo rolls a bright tint from a
+  small seeded palette); GA gets a seeded FAA-shaped tail number (new
+  `tail:${slot key}` stream, `/^N\d{2,3}[A-Z]{2}$/`) and no airline. Both
+  live in a shared `identityFor()` called by `mkSlot` (seeded) *and*
+  `force()` (Math.random) so every forced flight — what the whole verify
+  suite actually exercises — carries the same real fields a scheduled one
+  would. `radio.js narrateOps` speaks `m.sl.cs` at all five sites (tower
+  takeoff/land/divert + both UNICOM self-announces) instead of a
+  hardcoded "Lone Star". NASA's T-38 pair gets `cs: 'NASA 9-0-1'` as data
+  only — voicing it on radio needs session 2's chatter-engine direct-range
+  window, since Ellington isn't in the `AIRPORTS` table. **A5 (static
+  half)**: tier-1/2 fields (16) get a gate sign board — one shared canvas
+  atlas (name + code per cell) baked into one merged UV'd quad mesh (a 9th
+  global mesh alongside the existing 8), standing at each field's `gate`,
+  modestly emissive after dark via `material.emissiveIntensity` on the
+  same `ATMOS.night` gate as the beacons; tier-3 ranch strips stay
+  unsigned. Big-map airport codes draw next to the ✈ glyphs in `drawBig`
+  at draw time (not baked into the shared minimap layer) from a plain
+  `hud.airportLabels()` data method. 9 new checks across `aviation.mjs`/
+  `hud.mjs`: HUD footprint-in/out, GA tail shape + determinism, exact
+  hub-majority + tint-matches-airline + GA-carries-no-airline, forced-
+  flight callsign structure, gate-sign count/position/tier exclusion,
+  sign-mesh night-gating, map-label completeness. No SHOT blocks — all
+  strings/positions/state, per the spec's verify plan. Full spec in
+  `AVIATION_OBSERVABILITY_SPEC.md`. Session 2 (chatter engine, aircraft
+  tags, medical pad stops) and session 3 (Wave B: airport NPCs + chatter
+  enrichment) still queued.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

@@ -121,16 +121,16 @@ export class TowerRadio {
       this.knownPh.set(m.sl.key, ph);
       if (kind === 'tower') {
         if (m.sl.from === field.id && ph === 'roll')
-          this.tx(field, `Lone Star ${m.sl.n}, cleared for takeoff, runway ${rwy}.`, 'ops');
+          this.tx(field, `${m.sl.cs}, cleared for takeoff, runway ${rwy}.`, 'ops');
         else if (m.sl.dest === field.id && ph === 'final')
-          this.tx(field, `Lone Star ${m.sl.n}, cleared to land, runway ${rwy}.`, 'ops');
+          this.tx(field, `${m.sl.cs}, cleared to land, runway ${rwy}.`, 'ops');
         else if (m.sl.dest === field.id && ph === 'divert')
-          this.tx(field, `Lone Star ${m.sl.n}, traffic holding on the runway, go around.`, 'divert');
+          this.tx(field, `${m.sl.cs}, traffic holding on the runway, go around.`, 'divert');
       } else {
         if (m.sl.from === field.id && ph === 'roll')
-          this.tx(field, `${field.city} traffic, Lone Star ${m.sl.n}, departing runway ${rwy}, ${field.city} traffic.`, 'ops');
+          this.tx(field, `${field.city} traffic, ${m.sl.cs}, departing runway ${rwy}, ${field.city} traffic.`, 'ops');
         else if (m.sl.dest === field.id && ph === 'final')
-          this.tx(field, `${field.city} traffic, Lone Star ${m.sl.n}, on final runway ${rwy}, ${field.city} traffic.`, 'ops');
+          this.tx(field, `${field.city} traffic, ${m.sl.cs}, on final runway ${rwy}, ${field.city} traffic.`, 'ops');
       }
     }
     for (const k of [...this.knownPh.keys()]) if (!live.has(k)) this.knownPh.delete(k);

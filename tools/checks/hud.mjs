@@ -13,6 +13,34 @@ export default async function hud(t) {
     t.ok(loc.includes('Travis Co.'), `county missing: "${loc}"`);
   });
 
+  await t.check('A1: HUD shows airport name/code inside its footprint, city line just outside it', async () => {
+    const dal = await t.ev(`(() => {
+      const L = g.airports.layout.find((x) => x.id === 'DAL');
+      const r = L.rws[0]; // far runway end, off the anchor
+      const [A, , C] = L.corners, cx = (A[0] + C[0]) / 2, cz = (A[1] + C[1]) / 2;
+      return { end: [r.x1, r.z1], outside: [A[0] + (A[0] - cx) * 0.4, A[1] + (A[1] - cz) * 0.4] };
+    })()`);
+    await t.tp(dal.end[0], dal.end[1], 'WALK');
+    await t.until(`g.hud.els.location.textContent.includes('Love Field (DAL)')`, 8000);
+    const inside = await t.ev('g.hud.els.location.textContent');
+    t.ok(inside.startsWith('🛫'), `airport line missing the tower glyph: "${inside}"`);
+    await t.tp(dal.outside[0], dal.outside[1], 'WALK');
+    await t.until(`!g.hud.els.location.textContent.includes('Love Field')`, 8000);
+    const outside = await t.ev('g.hud.els.location.textContent');
+    t.ok(!outside.includes('🛫') && outside.includes('📍'), `still airport-styled just outside the footprint: "${outside}"`);
+  });
+
+  await t.check('A5: big-map airport code labels are real per-field data (all 20 fields)', async () => {
+    const r = await t.ev(`(() => {
+      const labels = g.hud.airportLabels();
+      const ids = new Set(labels.map((l) => l.id));
+      const missing = g.AIRPORTS.filter((a) => !ids.has(a.id)).map((a) => a.id);
+      return { n: labels.length, missing };
+    })()`);
+    t.ok(r.n === 20, `expected 20 airport labels, got ${r.n}`);
+    t.ok(r.missing.length === 0, `missing labels for: ${r.missing.join(', ')}`);
+  });
+
   await t.check('road ref shows when parked on the interstate', async () => {
     await t.tp(austin.x, austin.z + 12);
     await t.ev(`(() => {

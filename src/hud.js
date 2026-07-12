@@ -1,6 +1,6 @@
 // HUD: minimap + fullscreen map (border/highways pre-rendered once), text readouts, toasts, dialog.
 import { GEO, nearestCity } from './geo.js';
-import { AIRPORTS } from './airports.js';
+import { AIRPORTS, fieldNear } from './airports.js';
 
 export class HUD {
   constructor() {
@@ -252,14 +252,17 @@ export class HUD {
   update(player, counts, road, water, clock, weatherIcon, stats, skyLine, county, forecast) {
     this.lastDist = stats?.dist ?? this.lastDist;
     this.els.sky.textContent = skyLine || '';
-    // location line: nearest city + real distance
+    // location line: airport name/code when inside its footprint (A1), else
+    // nearest city + real distance
     const { city, dist } = nearestCity(player.pos.x, player.pos.z);
     const km = (dist * 0.1).toFixed(dist < 100 ? 1 : 0);
     const dx = player.pos.x - city.x, dz = player.pos.z - city.z;
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     const dir = dirs[Math.round(((Math.atan2(dx, -dz) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8];
     const co = county ? ` · ${county} Co.` : '';
-    this.els.location.textContent = (dist < 3 ? `📍 ${city.name}` : `📍 ${km} km ${dir} of ${city.name}`) + co;
+    const apt = fieldNear(player.pos.x, player.pos.z);
+    this.els.location.textContent = (apt ? `🛫 ${apt.name} (${apt.id}) — ${apt.city}`
+      : dist < 3 ? `📍 ${city.name}` : `📍 ${km} km ${dir} of ${city.name}`) + co;
     // road when on one; water body when over one (both can show — bridges exist)
     this.els.road.textContent = [road && `🛣 ${road.ref}`, water && `🌊 ${water}`].filter(Boolean).join('   ');
     this.els.speed.innerHTML = player.mode === 'WALK' ? '🚶'
@@ -318,10 +321,22 @@ export class HUD {
       const [tx, tz] = this.mapT(this.mission.target[0], this.mission.target[1]);
       this.diamond(ctx, tx * sx, tz * sy, 9);
     }
+    // A5: airport codes next to the baked ✈ glyphs — drawn here (occasional
+    // full-map redraws), not on the always-live minimap layer
+    ctx.font = '12px system-ui'; ctx.fillStyle = '#8fc4f0'; ctx.textAlign = 'center';
+    for (const l of this.airportLabels()) {
+      const [lx, lz] = this.mapT(l.x, l.z);
+      ctx.fillText(l.id, lx * sx, lz * sy + 15);
+    }
     ctx.fillStyle = '#ffd35c';
     ctx.strokeStyle = '#000';
     ctx.beginPath(); ctx.arc(px * sx, pz * sy, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }
+
+  // A5: plain data the big map's code labels are drawn from — not baked into
+  // the shared offscreen layer, so the minimap (which does use that layer)
+  // stays uncluttered; only the occasional full-map draw pays for these
+  airportLabels() { return AIRPORTS.map((a) => ({ id: a.id, x: a.at[0], z: a.at[1] })); }
 
   diamond(ctx, x, y, r) {
     ctx.fillStyle = this.mission?.late ? '#ff7a66' : '#ffd35c';

@@ -61,7 +61,9 @@ const UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
 export class MilitaryAirSystem {
   constructor(scene) {
     this.candidates = [
-      { kind: 'nasa', baseX: ELLINGTON[0], baseZ: ELLINGTON[1], tint: 0xf2f0ea,
+      // cs: A2 identity data only this session — voicing it on radio needs
+      // A3's direct-range window (Ellington has no tower/AIRPORTS entry)
+      { kind: 'nasa', baseX: ELLINGTON[0], baseZ: ELLINGTON[1], tint: 0xf2f0ea, cs: 'NASA 9-0-1',
         runT: 60 + Math.random() * 60, flying: false, active: false, t: 0, x: 0, y: 0, z: 0, heading: 0 },
       { kind: 'lowlevel', tint: 0x8a8f96,
         rollT: 90 + Math.random() * 90, flying: false, active: false, t: 0, x: 0, y: 0, z: 0, heading: 0 },
