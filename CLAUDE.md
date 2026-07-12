@@ -12,6 +12,29 @@ See `ROADMAP.md` for planned work and known limitations before proposing feature
 
 On the first message of a new session — before any other work — read `NEXT_SESSION.md`. If it contains a `## Session briefing` block, greet Bruno with it: the planned wave, the **recommended model + effort** (compare against the model actually running and flag any mismatch — he must set these manually via `/model` and `/effort`), and the wave budget. Then wait for his explicit go-ahead; after it, present the implementation plan before coding as usual. At each wave's session end, rewrite the briefing block for the next wave. When an effort has no queued waves, delete the block — the greeting disappears with it until the next spec writes a new one.
 
+## Multi-wave protocol (starting a new track)
+
+For any effort too big for one session (precedents: `AVIATION.md`, `HELICOPTER_SPEC.md`, `CHARTER_JOBS_SPEC.md`, the NPC expansion):
+
+1. **Spec session**: write `<NAME>_SPEC.md` — goals, the wave split, and open calls resolved *before* any wave codes. Each wave = one session's deliverable: the code + its verify checks.
+2. **Per wave, recommend model + effort**: Fable 5 for content/register/pool-writing waves, Sonnet 5 for structural/table-plumbing waves; effort usually high. Also state the wave's token budget (e.g. "code + checks, no shots, grep-first").
+3. **Write the first `## Session briefing` block** into `NEXT_SESSION.md` (template below). Each wave's session end rewrites it for the next wave; the *last* wave deletes it and folds the whole track into one `ROADMAP.md` entry. The spec file stays as history.
+4. **Per-wave session cycle**: greeting from the briefing → Bruno's go-ahead → implementation plan → his approval → code + checks → full `node tools/verify.mjs` → commit → step 3's rewrite.
+
+Briefing-block template:
+
+```markdown
+## Session briefing
+- **This session**: <track>, wave N of M — <one-line scope>. Wave N−1
+  (<scope>) shipped <date>, commit <hash>.
+- **Recommended setup**: model **X**, effort **Y** — <one-line why,
+  by wave shape>. Flag it if the running model differs.
+- **Budget**: <deliverables + token rules for this wave>.
+- **Then**: <what the wave-end rewrite or deletion should do>.
+
+Gotchas carried over: <only what the next wave must know>
+```
+
 ## Commands
 
 ```bash
