@@ -1,8 +1,32 @@
 # Lone Star Roam — next session kickoff
 
-Copy-paste this prompt to start the next session:
+## Session briefing
+
+*(Auto-greeting per CLAUDE.md — present this at session start, then wait
+for Bruno's go-ahead. No copy-paste needed; any first message triggers
+it.)*
+
+- **This session**: Aviation observability, **implementation session 1
+  of 3 — "identity foundations"**: A1 HUD airport line (`fieldNear`
+  pure query), A2 per-type callsigns (seeded `tail:` stream), A6
+  airline roster + hub-weighted assignment + tail tints, and A5's
+  static half (gate sign boards, big-map codes). Full spec:
+  `AVIATION_OBSERVABILITY_SPEC.md`; design all settled 2026-07-12,
+  three open calls remain but none block this session.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — this
+  session is deterministic table-plumbing; save Fable 5 for session
+  2's chatter engine. Flag it if the running model differs.
+- **Budget**: code + checks, no shots, grep-first (MODULES.md
+  anchors). Possible single-shot exception: the gate signs, only if
+  Bruno asks for visual proof.
+- **Then**: sessions 2 (**Fable 5, high** — chatter engine + aircraft
+  tags + pad stops) and 3 (Wave B: airport NPCs + chatter enrichment,
+  model per session-1 experience). Update this block at each wave's
+  session end; delete it when the spec fully ships.
 
 ---
+
+Background context for the session:
 
 We're continuing work on **Lone Star Roam** (`~/claude-area/devel/tx`), the
 Three.js free-roam Texas game, on the **aviation priority track**. Before

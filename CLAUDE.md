@@ -8,6 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 See `ROADMAP.md` for planned work and known limitations before proposing features. `AVIATION.md` is the active priority track (airports/air traffic/tower radio, 5 waves) — it runs ahead of ROADMAP.md candidates.
 
+## Session briefing (greeting)
+
+On the first message of a new session — before any other work — read `NEXT_SESSION.md`. If it contains a `## Session briefing` block, greet Bruno with it: the planned wave, the **recommended model + effort** (compare against the model actually running and flag any mismatch — he must set these manually via `/model` and `/effort`), and the wave budget. Then wait for his explicit go-ahead; after it, present the implementation plan before coding as usual. At each wave's session end, rewrite the briefing block for the next wave. When an effort has no queued waves, delete the block — the greeting disappears with it until the next spec writes a new one.
+
 ## Commands
 
 ```bash
