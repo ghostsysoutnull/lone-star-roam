@@ -69,7 +69,23 @@ async function boot() {
   const radio = new TowerRadio();
   radio.onRadio = (text, meta) => { audio.radio(text, { ufo: ATMOS.ufo, voice: chatterVoices[meta?.voice] }); hud.subtitle(text, meta?.header); };
   radio.onStamp = (id, name) => gameplay.logAirport(id, name);
-  const npcs = new NPCSystem(scene, () => ({ night: ATMOS.night, weather: ATMOS.weather, counts: gameplay.counts() }));
+  // B2: nearest airborne heli for NPC context — heli/missions/sky are consts
+  // below in this scope; the arrows only run at interact time, well after boot
+  const nearestHeli = () => {
+    let best = null;
+    for (const c of heli.candidates) {
+      if (!c.flying) continue;
+      const d = Math.hypot(c.x - player.pos.x, c.z - player.pos.z);
+      if (!best || d < best.d) best = { kind: c.kind, d };
+    }
+    return best;
+  };
+  const npcs = new NPCSystem(scene, () => ({
+    night: ATMOS.night, weather: ATMOS.weather, counts: gameplay.counts(),
+    day: sky.days, heli: nearestHeli(), job: missions.job,
+    fc: player.perks.radio && sky.forecast ? sky.forecastName() : null,
+  }));
+  npcs.aviation = aviation; // B1 bystander schedule/flight queries (property pattern)
   const missions = new MissionSystem(scene, gameplay, player, (m) => hud.toast(m), (k) => audio.chime(k));
   const dog = new DogSystem(scene, player);
   dog.onBark = () => audio.bark();

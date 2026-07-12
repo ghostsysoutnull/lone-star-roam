@@ -200,6 +200,14 @@ export function runwayInUse(a, day) {
     dx: r.dx * s, dz: r.dz * s };                           // takeoff/landing world direction
 }
 
+// spoken runway number for a runwayInUse() result — ATIS and gate spotters
+// must name the same runway from the same source
+export const rwyLabel = (u) => {
+  let n = Math.round((((u.hdg % 360) + 360) % 360) / 10);
+  if (n === 0) n = 36;
+  return String(n).padStart(2, '0');
+};
+
 // true when (x,z) sits within `rad` of any of this airport's runway corridors
 // (pavement + safety margin) — wave-3 tower radio uses this to detect a
 // blocked runway (the player parked on it triggers an AI go-around)

@@ -56,7 +56,12 @@ export default async function hud(t) {
     await t.until(`g.hud.els.speed.textContent.includes('0')`, 8000); // parked
     await t.hold('KeyW');
     await t.simStep(1.5); // instantly at the road cap; W stays held so it sits there
-    await t.until(`parseInt(g.hud.els.speed.textContent) > 0`, 8000); // let a 12 Hz tick land
+    // wait for DOM and live speed to cohere, not just first-nonzero — the
+    // first climbing tick can show "1 mph" a whole hudTick before this read
+    await t.until(`(() => {
+      const shown = parseInt(g.hud.els.speed.textContent.match(/\\d+/)?.[0] ?? '-1', 10);
+      return shown > 0 && Math.abs(shown - Math.abs(g.player.speed) * 2.4) < 25;
+    })()`, 8000);
     const { txt, spd } = await t.ev(`({ txt: g.hud.els.speed.textContent, spd: g.player.speed })`);
     await t.release();
     const shown = parseInt(txt.match(/\d+/)?.[0] ?? '-1', 10);

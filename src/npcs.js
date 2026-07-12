@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { GEO, seededRand, nearestRoad, hAt } from './geo.js';
 import { cityRadius } from './cities.js';
 import { ATMOS } from './sky.js';
+import { AIRPORTS, runwayInUse, rwyLabel, windFrom } from './airports.js';
 
 const TALK_R = 6, FACE_R = 10;
 
@@ -60,6 +61,20 @@ const PROGRESS_LINES = [
   [(c) => c.cities >= 50, 'Fifty towns and counting — you’ve seen more of Texas than most Texans.'],
   [(c) => c.landmarks >= 10, 'Heard you’ve been collecting landmarks. The big hydrant too?'],
   [(c) => c.roses >= 50, 'Yellow roses in your truck bed? Somebody’s sweet on Texas.'],
+  [(c) => c.airports >= 10, 'Ten airfields stamped? You’ve got avgas in your veins, friend.'],
+];
+
+// B2 — aviation-aware openers, gated on a live heli near the city (ctx.heli
+// from HeliSystem.candidates via getContext — only fires while it's airborne)
+const HELI_OPENERS = {
+  news: ['That news chopper’s been circling all morning. Somebody’s day got interesting.', 'News chopper overhead again. Wave — you might make the six o’clock.'],
+  medical: ['Med-flight went over a bit ago. Say a little prayer for whoever that’s for.', 'That’s the Lifeguard bird up there. Hope it’s just a training run.'],
+  coastguard: ['Coast Guard’s working the water today. Somebody’ll be glad to see that orange.', 'That orange chopper out there means the Gulf’s earning its keep.'],
+  army: ['Army birds out of Hood again. You feel that thump before you hear it.', 'Them Army helicopters rattle my windows every time over.'],
+};
+const JOB_LINES = [
+  (to) => `Heard you’re hauling for ${to}. Don’t let it spoil.`,
+  (to) => `Word travels — folks say you’ve got a load bound for ${to}.`,
 ];
 
 const TOWNSFOLK_LINES = [
@@ -75,6 +90,36 @@ const TOWNSFOLK_LINES = [
   'My meemaw won’t drive past that old fort at Goliad after sundown. Won’t say why, neither.',
 ];
 const TOWNSFOLK_NAMES = ['Earl', 'Ruby', 'Cole', 'June', 'Wade', 'Dolly', 'Buck', 'Lupe', 'Roy', 'Faye', 'Cash', 'Ida', 'Slim', 'Pearl'];
+
+// B1 — airport bystanders: figures waiting at tier-1/2 field gates, townsfolk
+// builds, dialog assembled at interact time from live aviation state
+const GATE_FIELDS = AIRPORTS.filter((a) => a.tier <= 2);
+const ROLE_SMALLTALK = {
+  spotter: ['Logged forty tails from this fence last month. Well. Fourteen.', 'You can tell the type by the engine note before you ever see it.', 'Best bench in Texas, right here by the fence.'],
+  relative: ['Airport coffee’s terrible everywhere. Comforting, really.', 'I always come out too early. Can’t help it.', 'They always walk out last. Every single time.'],
+  pilot: ['Day off. Can’t stay away from the field, though.', 'Twelve years in the left seat and I still watch every takeoff.', 'Ground’s fine. Sky’s better.'],
+};
+const PILOT_WX = {
+  clear: 'Good day to be up there. Shame I’m down here.',
+  clouds: 'Ceiling’s workable. I’d file and go.',
+  rain: 'Soft ceiling today — instrument weather.',
+  storm: 'Nobody with sense is flying through that.',
+  dust: 'That brown-out would sand a windscreen clean off.',
+};
+const WIND_NAMES = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
+const windName = (deg) => WIND_NAMES[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+
+// next remaining departure slot today matching `test`, across every field
+function nextSlot(avn, days, test) {
+  if (!avn || days == null) return null;
+  const day = Math.floor(days);
+  let best = null;
+  for (const ap of avn.schedule(day)) for (const sl of ap.slots) {
+    if (!test(sl) || day + sl.u <= days) continue;
+    if (!best || sl.u < best.u) best = sl;
+  }
+  return best;
+}
 
 export class NPCSystem {
   constructor(scene, getContext) {
@@ -106,6 +151,11 @@ export class NPCSystem {
 
     // townsfolk — spawned per city by proximity
     this.townByCity = new Map();
+
+    // airport bystanders — spawned per field by proximity; aviation is
+    // assigned by main.js (property pattern, like radio.helis)
+    this.byField = new Map();
+    this.aviation = null;
   }
 
   // a horn blast nearby: folks jump and wave
@@ -123,6 +173,7 @@ export class NPCSystem {
   all() {
     let list = this.named;
     for (const folk of this.townByCity.values()) list = list.concat(folk);
+    for (const folk of this.byField.values()) list = list.concat(folk);
     return list;
   }
 
@@ -149,18 +200,30 @@ export class NPCSystem {
     this.dialogStep = 0;
     n.wave = 1; // greet
     const ctx = this.getContext();
-    if (n.townsfolk) {
-      this.convo = [TOWNSFOLK_LINES[(Math.random() * TOWNSFOLK_LINES.length) | 0]];
+    const heliLine = ctx.heli && ctx.heli.d < 150 ? pick(HELI_OPENERS[ctx.heli.kind] ?? ['Busy sky today.']) : null;
+    if (n.bystander) {
+      this.convo = this.bystanderConvo(n, ctx);
+      n.visit++;
+    } else if (n.townsfolk) {
+      this.convo = [
+        ...(heliLine ? [heliLine] : []),
+        TOWNSFOLK_LINES[(Math.random() * TOWNSFOLK_LINES.length) | 0],
+      ];
     } else {
       const opener =
         (ATMOS.weather === 'storm' && pick(OPENERS.storm)) ||
         (ATMOS.weather === 'rain' && pick(OPENERS.rain)) ||
         (ATMOS.weather === 'dust' && pick(OPENERS.dust)) ||
+        heliLine ||
         (ctx.night > 0.6 && pick(OPENERS.night)) || null;
       const progress = PROGRESS_LINES.find(([test]) => test(ctx.counts) && Math.random() < 0.5);
+      const pulls = []; // shared context, not per-character sets — voices untouched
+      if (ctx.job && Math.random() < 0.5) pulls.push(pick(JOB_LINES)(ctx.job.to));
+      if (ctx.fc && Math.random() < 0.4) pulls.push(`Radio’s calling ${ctx.fc} later on. Plan around it.`);
       this.convo = [
         opener ?? n.lines[n.visit % n.lines.length],
         ...(opener ? [n.lines[n.visit % n.lines.length]] : []),
+        ...pulls,
         ...(progress ? [progress[1]] : []),
         '📌 ' + n.fact,
       ];
@@ -189,11 +252,25 @@ export class NPCSystem {
       }
     }
 
+    // bystanders spawn/despawn by airport-gate proximity (same hysteresis)
+    for (const a of GATE_FIELDS) {
+      const d = Math.hypot(a.gate[0] - pos.x, a.gate[1] - pos.z);
+      const has = this.byField.has(a.id);
+      if (d < 500 && !has) this.spawnBystanders(a);
+      else if (d > 650 && has) {
+        for (const f of this.byField.get(a.id)) {
+          this.scene.remove(f.g);
+          f.g.traverse((o) => o.geometry?.dispose());
+        }
+        this.byField.delete(a.id);
+      }
+    }
+
     let hint = null;
     for (const n of this.all()) {
       const g = n.g;
-      // townsfolk head home after dark
-      if (n.townsfolk) g.visible = !night;
+      // townsfolk and gate bystanders head home after dark
+      if (n.townsfolk || n.bystander) g.visible = !night;
       if (!g.visible) continue;
 
       const dx = pos.x - g.position.x, dz = pos.z - g.position.z;
@@ -276,6 +353,53 @@ export class NPCSystem {
       });
     }
     this.townByCity.set(city.name, folk);
+  }
+
+  spawnBystanders(a) {
+    const rand = seededRand('gatefolk:' + a.id);
+    const n = a.tier === 1 ? 3 : 2;
+    const roles = ['spotter', 'relative', 'pilot'];
+    const [gx, gz] = a.gate;
+    const folk = [];
+    for (let i = 0; i < n; i++) {
+      const g = mkCharacter(randomLook(rand), rand);
+      const ang = rand() * Math.PI * 2, r = 1.4 + rand() * 2.2;
+      const x = gx + Math.cos(ang) * r, z = gz + Math.sin(ang) * r;
+      g.position.set(x, hAt(x, z), z);
+      g.rotation.y = rand() * Math.PI * 2;
+      this.scene.add(g);
+      folk.push({
+        g, name: TOWNSFOLK_NAMES[(rand() * TOWNSFOLK_NAMES.length) | 0],
+        bystander: true, field: a, role: roles.splice((rand() * roles.length) | 0, 1)[0],
+        visit: 0, wave: 0, phase: rand() * 6.28, baseRotY: g.rotation.y,
+      });
+    }
+    this.byField.set(a.id, folk);
+  }
+
+  // role dialog from live aviation state — a factual claim (origin city,
+  // runway, next departure) only when the schedule actually backs it
+  bystanderConvo(n, ctx) {
+    const a = n.field, day = Math.floor(ctx.day ?? 0), avn = this.aviation;
+    const idCity = (id) => AIRPORTS.find((x) => x.id === id)?.city ?? id;
+    const lines = [];
+    if (n.role === 'relative') {
+      const live = avn?.flights.find((m) => m.sl.dest === a.id && m.st.ph !== 'done');
+      const next = live ? null : nextSlot(avn, ctx.day, (sl) => sl.dest === a.id);
+      if (live) lines.push(`That’s them now, coming in from ${idCity(live.sl.from)} — I’d know that speck anywhere.`);
+      else if (next) lines.push(`Waiting on family — they’re coming in from ${idCity(next.from)}.`);
+      else lines.push('Came out to meet somebody, but the board’s gone quiet for the day.');
+    } else if (n.role === 'spotter') {
+      lines.push(`They’re running runway ${rwyLabel(runwayInUse(a, day))} today. Wind says so.`);
+      const next = nextSlot(avn, ctx.day, (sl) => sl.from === a.id);
+      if (next) lines.push(`Next one out is ${next.cs}, bound for ${idCity(next.dest)}.`);
+    } else {
+      lines.push(`Wind’s out of the ${windName(windFrom(day))} today. ${PILOT_WX[ATMOS.weather] ?? PILOT_WX.clear}`);
+      if (ctx.fc) lines.push(`Radio says ${ctx.fc}’s coming. I’d believe it.`);
+    }
+    lines.push(pick(ROLE_SMALLTALK[n.role]));
+    lines.push('📌 ' + a.fact);
+    return lines;
   }
 }
 

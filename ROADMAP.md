@@ -315,6 +315,41 @@ ship.
   heli tag DOM lifecycle through the real loop, forced-jet scanner
   identity. No SHOT blocks. Session 3 (Wave B) queued.
 
+- [x] ~~Aviation observability wave B — people~~ — done 2026-07-12; the
+  observability spec is fully shipped and folded in (spec file deleted).
+  **B1** airport bystanders: tier-1/2 fields (16) get 2–3 townsfolk-build
+  figures (new `gatefolk:<id>` stream) scattered a few units around the
+  field's `gate`, spawn <500 / despawn >650 like townsfolk, hidden after
+  dark on the same `night > 0.6` gate (open call 1 settled: v1 hides them,
+  no night-shift variant). Three roles — spotter / waiting relative /
+  off-duty pilot — with dialog assembled at interact time from live
+  aviation state, factual by construction: the relative names a live
+  inbound's origin city (`aviation.flights`, dest == field) or the next
+  scheduled arrival today (`nextSlot` scan over `aviation.schedule(day)`),
+  and says a quiet-board line when neither exists; the spotter names the
+  active runway via `runwayInUse` + the next departure's callsign and
+  destination; the pilot talks `windFrom(day)` wind + weather/forecast.
+  Field `fact` is every role's 📌 closer. `rwyLabel` moved from radio.js
+  into airports.js (exported beside `runwayInUse`) so ATIS and the spotter
+  name runways from one source. `npcs.aviation` assigned by main.js
+  (property pattern, like `radio.helis`); npcs.js imports airports.js only
+  (no cycle — airports imports geo/sky). **B2** aviation-aware NPC context:
+  `getContext` grows `heli` (nearest *airborne* kind + distance from
+  `HeliSystem.candidates`, read directly — not via radio), `day`, `job`
+  (active mission), and `fc` (forecast name, radio perk only). Townsfolk
+  and the 12 named characters gain per-kind heli openers (news/medical/
+  coastguard/army), gated `d < 150` and deterministic while the heli is
+  up; named characters also gain shared context pulls — active-job line,
+  forecast line, and an airports-progress milestone — slotted into the
+  existing opener/progress assembly, voices untouched. 3 new aviation.mjs
+  checks: gate spawn/roles/despawn + night hide; relative-names-origin +
+  quiet-board-no-claim (clock pinned past the day's last inbound slot) +
+  spotter-runway against an independent oracle, all interacted at natural
+  parked distances; heli opener present for townsfolk *and* named while
+  airborne nearby, gone after despawn. No SHOT blocks. À-la-carte aviation
+  extras (Sheppard T-38 pattern, Marfa gliders, named GA/charter outfits —
+  open call 5) need a fresh scope check before any further aviation work.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

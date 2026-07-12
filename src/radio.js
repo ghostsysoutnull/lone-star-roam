@@ -23,7 +23,7 @@
 // go-around at ANY field with traffic
 // (physical safety, not a radio behavior) regardless of tower or tier.
 import { hAt, nearestCity, nearestRoad, seededRand } from './geo.js';
-import { AIRPORTS, runwayInUse, windFrom, onRunway, TD_AGL, TD_SPD } from './airports.js';
+import { AIRPORTS, runwayInUse, rwyLabel, windFrom, onRunway, TD_AGL, TD_SPD } from './airports.js';
 import { ATMOS } from './sky.js';
 import { chatterLine, HELI_ID } from './chatter.js';
 
@@ -57,11 +57,6 @@ const ROLL_OK = {
   military: ['enroute'],
 };
 
-const rwyLabel = (u) => {
-  let n = Math.round((((u.hdg % 360) + 360) % 360) / 10);
-  if (n === 0) n = 36;
-  return String(n).padStart(2, '0');
-};
 const windKt = () => Math.round(3 + Math.max(0, ATMOS.wind - 1) * 11);
 
 export class TowerRadio {

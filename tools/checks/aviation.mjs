@@ -1312,6 +1312,143 @@ export default async function aviation(t) {
     t.ok(true, 'scanner carried the jet with its real identity');
   });
 
+  // --- Wave B — people: gate bystanders (B1) + aviation-aware NPC context (B2)
+
+  await t.check('B1: bystanders spawn at the gate with distinct roles, despawn far, hide at night', async () => {
+    await t.setDay();
+    await t.setWeather('clear');
+    const r = await t.ev(`(() => {
+      g.radio.chatterT = 999; // quiet radio (standing gotcha)
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      g.player.setMode('WALK');
+      g.player.pos.set(a.gate[0] + 4, 0, a.gate[1]);
+      g.npcs.update(0.05, g.player.pos);
+      const folk = g.npcs.byField.get('AUS') ?? [];
+      const dists = folk.map((f) => Math.hypot(f.g.position.x - a.gate[0], f.g.position.z - a.gate[1]));
+      const roles = folk.map((f) => f.role).sort().join();
+      const tier2 = g.AIRPORTS.filter((x) => x.tier === 2).length;
+      g.player.pos.set(a.gate[0] + 700, 0, a.gate[1]);
+      g.npcs.update(0.05, g.player.pos);
+      const gone = !g.npcs.byField.has('AUS');
+      g.player.pos.set(a.gate[0] + 4, 0, a.gate[1]);
+      g.npcs.update(0.05, g.player.pos);
+      return { n: folk.length, dists, roles, gone, tier2 };
+    })()`);
+    t.ok(r.n === 3, `${r.n} bystanders at AUS (want 3 at tier 1)`);
+    t.ok(r.dists.every((d) => d > 0.5 && d < 5), `gate scatter ${r.dists.map((d) => d.toFixed(1)).join(',')}`);
+    t.ok(r.roles === 'pilot,relative,spotter', `roles ${r.roles}`);
+    t.ok(r.gone, 'bystanders did not despawn at 700 units');
+    await t.setNight();
+    const hidden = await t.ev(`(() => {
+      g.npcs.update(0.05, g.player.pos);
+      return (g.npcs.byField.get('AUS') ?? []).every((f) => !f.g.visible);
+    })()`);
+    t.ok(hidden, 'bystanders still visible after dark');
+    await t.setDay();
+  });
+
+  await t.check('B1: relative names a live arrival’s origin; quiet board → no aviation claim; spotter names the in-use runway', async () => {
+    const r = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      g.player.setMode('WALK');
+      g.player.pos.set(a.gate[0] + 4, 0, a.gate[1]);
+      g.npcs.update(0.05, g.player.pos);
+      const folk = g.npcs.byField.get('AUS');
+      if (!folk) return { err: 'no bystanders spawned' };
+      // park at a conversational distance (TALK_R edge, natural values), on
+      // the side away from the other two so npcNear picks the one we want
+      const talk = (f) => {
+        const others = folk.filter((o) => o !== f);
+        let vx = 0, vz = 0;
+        for (const o of others) { vx += f.g.position.x - o.g.position.x; vz += f.g.position.z - o.g.position.z; }
+        const L = Math.hypot(vx, vz) || 1;
+        for (const d of [4.5, 3.5, 2.0]) {
+          g.player.pos.set(f.g.position.x + (vx / L) * d, 0, f.g.position.z + (vz / L) * d);
+          if (g.npcs.npcNear(g.player.pos) === f) {
+            g.npcs.activeNPC = null;
+            g.npcs.interact(g.player.pos);
+            const convo = g.npcs.convo.slice();
+            g.npcs.activeNPC = null;
+            return convo;
+          }
+        }
+        return null;
+      };
+      const rel = folk.find((f) => f.role === 'relative');
+      const spot = folk.find((f) => f.role === 'spotter');
+
+      g.aviation.despawnAll();
+      const m = g.aviation.force('arrival', 'AUS');
+      if (!m) return { err: 'force arrival failed' };
+      const originCity = g.AIRPORTS.find((x) => x.id === m.sl.from).city;
+      const liveConvo = talk(rel);
+
+      // empty sky, clock pinned past today's last inbound slot → the relative
+      // must not claim an arrival that isn't coming
+      g.aviation.despawnAll();
+      const day = Math.floor(g.sky.days);
+      let lastU = 0;
+      for (const ap of g.aviation.schedule(day))
+        for (const sl of ap.slots) if (sl.dest === 'AUS') lastU = Math.max(lastU, sl.u);
+      const saveDays = g.sky.days;
+      g.sky.days = day + lastU + (1 - lastU) * 0.5;
+      const quietConvo = talk(rel);
+      g.sky.days = saveDays;
+
+      const spotConvo = talk(spot);
+      const u = g.runwayInUse(a, day);
+      let rn = Math.round((((u.hdg % 360) + 360) % 360) / 10); // independent oracle
+      if (rn === 0) rn = 36;
+      return { originCity, liveConvo, quietConvo, spotConvo, rwy: String(rn).padStart(2, '0'), fact: a.fact };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.liveConvo?.[0]?.includes(r.originCity), `live arrival line missing origin "${r.originCity}": ${r.liveConvo?.[0]}`);
+    t.ok(r.quietConvo && !r.quietConvo[0].includes('coming in from'), `quiet board still claims an arrival: ${r.quietConvo?.[0]}`);
+    t.ok(r.spotConvo?.[0]?.includes('runway ' + r.rwy), `spotter line missing runway ${r.rwy}: ${r.spotConvo?.[0]}`);
+    t.ok(r.liveConvo?.[r.liveConvo.length - 1]?.includes(r.fact), 'field fact missing as the closer');
+  });
+
+  await t.check('B2: heli openers fire only while a heli is airborne nearby (townsfolk + named)', async () => {
+    await t.setDay();
+    await t.setWeather('clear');
+    const r = await t.ev(`(() => {
+      const c = g.GEO.cities.find((x) => x.name === 'Austin');
+      g.player.setMode('WALK');
+      g.player.pos.set(c.x, 0, c.z);
+      g.npcs.update(0.05, g.player.pos);
+      const talk = (n) => {
+        g.player.pos.set(n.g.position.x + 2.5, 0, n.g.position.z);
+        if (g.npcs.npcNear(g.player.pos) !== n) return null;
+        g.npcs.activeNPC = null;
+        g.npcs.interact(g.player.pos);
+        const convo = g.npcs.convo.slice();
+        g.npcs.activeNPC = null;
+        return convo;
+      };
+      const folkList = g.npcs.townByCity.get('Austin') ?? [];
+      let folk = null; // nearest townsfolk the stand-beside trick works on
+      for (const f of folkList) if (talk(f)) { folk = f; break; }
+      const willie = g.npcs.named.find((n) => n.name === 'Willie');
+      if (!folk || !willie) return { err: 'no talkable townsfolk/Willie in Austin' };
+
+      g.heli.despawnAll();
+      if (!g.heli.force('news')) return { err: 'heli force failed' };
+      const cand = g.heli.candidates.find((x) => x.kind === 'news' && x.flying);
+      cand.x = g.player.pos.x + 60; cand.z = g.player.pos.z; // inside the 150 u gate
+      const folkWith = talk(folk);
+      cand.x = g.player.pos.x + 60; cand.z = g.player.pos.z; // talk() moved the player
+      const namedWith = talk(willie);
+
+      g.heli.despawnAll();
+      const folkWithout = talk(folk);
+      return { folkWith, namedWith, folkWithout };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(/chopper/i.test(r.folkWith?.[0] ?? ''), `townsfolk missing heli line: ${r.folkWith?.[0]}`);
+    t.ok(/chopper/i.test(r.namedWith?.[0] ?? ''), `named character missing heli opener: ${r.namedWith?.[0]}`);
+    t.ok(!/chopper/i.test((r.folkWithout ?? []).join(' ')), `heli line survived the despawn: ${r.folkWithout?.[0]}`);
+  });
+
   if (process.env.SHOT) { // composition only — never the pass/fail signal
     const dal = await t.ev(`g.AIRPORTS.find((a) => a.id === 'DAL').at`);
     // frame a real approach: 30u out on the 31L extended centerline, nose NW
