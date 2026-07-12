@@ -41,33 +41,75 @@ legibility, plus one flourish (medical pad stops, below).
   `tail:${slot key}` — existing seed strings untouched, and the same
   day always yields the same tail.
 - `radio.js` `narrateOps` speaks `m.sl.cs` instead of hardcoding
-  "Lone Star" — one substitution, phraseology otherwise unchanged.
+  "Lone Star" — one substitution, tower phraseology otherwise
+  unchanged (the tower stays clipped and professional; casual talk
+  lives in A3's chatter engine, on other "frequencies").
 - Military gets voiced at the field it touches: NASA arrival into
   Ellington as `NASA 9-0-1`; the low-level pair is out in the
   Trans-Pecos far from any towered field and stays silent (realistic —
   they're not talking to anyone the player can hear).
 
-### A3. Heli radio presence (`radio.js`, `rotors.js`)
+### A3. Chatter engine — helis *and* planes (`chatter.js` new,
+`radio.js`, `hud.js`, `audio.js`)
 
-- Kind-distinct callsigns: medical `Lifeguard 3`, news `Chopper 5`,
-  coast guard `Rescue 6-0`, army `Hood 2-1, flight of two` (generic-
-  but-flavored, not real operator brands — open call 2).
-- Helis transmit on **state edges only** (lift / on-station / return /
-  touchdown), reusing the `knownPh` dedup idiom — no periodic spam.
-  Example lines: "Lifeguard 3, lifting, en route to the scene",
-  "Chopper 5 is over downtown, orbiting", "Rescue 6-0, commencing
-  search pattern", "Hood 2-1 flight, western corridor, low level".
-- Receivable via the existing `receivable` rules (tuned to a nearby
-  field, or anywhere with the avionics perk) **plus** a direct-range
-  window: an airborne heli within ~60 units of an airborne/avionics
-  player is hearable regardless of field tuning — they're line-of-sight
-  VHF, and it's the only way the coast guard (nowhere near a towered
-  field) ever gets heard.
-- Same `tx`/`lastTx` structured shape (`kind: 'heli'`, callsign, phase)
-  so checks stay string-free where possible. `radio.js` keeps its
-  standalone pattern; `aviation.update`'s signature is untouched —
-  radio reads `helis` via a new optional param or a setter, decided at
-  implementation to match how it already receives `aviation`.
+Design settled with Bruno 2026-07-12 (label format, cadence, player
+refs, per-type voice — see settled calls at the bottom). The realism
+frame: the player's radio is a *scanner*. Tower/UNICOM keeps strict
+phraseology (A2); casual talk is what you overhear on the other
+channels — medical↔hospital dispatch, news↔station producer, army
+inter-flight, coast guard crew, airline enroute ride reports, folksy
+GA on CTAF. That frame licenses varied/natural/fun without ever making
+the tower unprofessional.
+
+- **Engine**: new `chatter.js` — pure line-pool tables keyed by
+  (source type × event) with placeholders filled from live context at
+  transmit time: `{dest}`/`{origin}` from the real schedule slot,
+  `{city}` from `nearestCity`, weather from `ATMOS`/`sky.forecast`,
+  `{rwy}` from `runwayInUse`, time of day. Lines are **factual by
+  construction** — a template only fires when its context is live.
+  Seeded picks (new `chatter:` stream) for determinism. No scene deps;
+  `radio.js` stays the sole transmitter and consumes it.
+- **Kind-distinct callsigns**: medical `Lifeguard 3`, news `Chopper
+  5`, coast guard `Rescue 6-0`, army `Hood 2-1, flight of two`
+  (generic-but-flavored, not real operator brands — open call 2).
+- **Voice registers per type**: Lifeguard↔dispatch (lifting, ETA to
+  scene/pad, fuel; tasteful — never patient details); Chopper 5↔
+  station (what's actually below: real interstate, city, incoming
+  weather, "thirty seconds to the top of the hour"); Rescue 6-0
+  (search legs, gulf weather, dry shrimp-boat banter); Hood flight
+  (terse lead/wingman two-ship — "Two." — occasional deadpan);
+  Lone Star jets (enroute position + destination, ride reports,
+  handoffs); GA tails (folksiest — student pilots, full-stop calls,
+  the café at the field). Humor rationed to ~1-in-4 lines.
+- **Transmit triggers**: state edges (lift / on-station / return /
+  touchdown / roll / final — `knownPh` dedup idiom) *plus* seeded
+  mid-phase enroute rolls, all behind a **global chatter budget**:
+  minimum gap ~25–45 s between lines (moderate cadence), priority
+  ordering (tower ops and safety calls always preempt casual), and
+  only the nearest 1–2 sources ever talk.
+- **Player references, rare**: delight lines gated on *real* player
+  behavior near the source — Chopper 5 mentioning "some pickup
+  hauling down I-10" only when the player is actually speeding on a
+  motorway within its view. Seeded + hard-throttled (at most ~one per
+  session-hour), never hostile.
+- **Reception**: existing `receivable` rules (tuned field or avionics
+  perk) plus a ~60-unit direct-range window to any airborne source —
+  line-of-sight VHF, and the only way the coast guard (nowhere near a
+  towered field) ever gets heard.
+- **HUD label** (`hud.js`): subtitle gains a header line above the
+  quote — `📻 LONE STAR 23 · AUS → LBB` / `📻 LIFEGUARD 3 · Houston`
+  (route arrow when a schedule slot applies, operating city for
+  helis). Rem-based sizing per the UI-scale rule.
+- **Audio** (`audio.js`): every line still runs the radio synth;
+  `radio(text, opts)` gains per-type voice character (pitch/rate —
+  dispatch calm, news quick, army clipped) so types are audibly
+  distinct, not just textually.
+- Same `tx`/`lastTx` structured shape, extended: `{kind, cs, route,
+  phase, casual: bool, voice}` — checks stay string-light. `radio.js`
+  keeps its standalone pattern; `aviation.update`'s signature is
+  untouched — radio reads `helis` via a new optional param or setter,
+  decided at implementation to match how it already receives
+  `aviation`.
 
 ### A4. Medical pad stops (`rotors.js`, `airports.js`)
 
@@ -119,7 +161,7 @@ legibility, plus one flourish (medical pad stops, below).
 ## What doesn't change
 
 - No existing `seededRand` seed strings; new streams only (`tail:`,
-  `padstop:`).
+  `padstop:`, `chatter:`).
 - `radio.js` standalone; `aviation.update` signature; sky.js owns all
   lights; heli cap/weight logic; save format (no new keys — airport
   stamps already exist).
@@ -143,7 +185,14 @@ mid-transit helis, not conveniently on-station).
 - **A3**: `force('medical')` + step → structured `lastTx` with
   `kind:'heli'` and "Lifeguard"; a second step in the same phase emits
   no duplicate (edge dedup); coast guard heard via the direct-range
-  window with no field tuned.
+  window with no field tuned. Chatter engine: template fill is factual
+  (a jet's enroute line contains its slot's *actual* destination
+  city); determinism (same day + same event → same line); budget (two
+  eligible sources, assert ≥ min-gap between their `tx` timestamps);
+  priority (a tower ops call and a casual line eligible in the same
+  window → ops wins); player-ref gating (the speeding line fires only
+  above the speed threshold on a motorway near the news heli, never
+  below it); per-type `voice` present on `lastTx`.
 - **A4**: seeded day where the pad-stop rolls true → `t.step` the heli
   until AGL < `TD_AGL` *and* distance-to-pad < pad radius, held for
   the dwell, then AGL rising again — position-over-time, not a
@@ -158,6 +207,17 @@ mid-transit helis, not conveniently on-station).
   player/traffic/flares/sky; A4's pad stop gets its edge asserted
   through `t.step` on the heli system, with the existing heli `simT`
   sentinel confirming main.js wiring.
+
+## Settled calls — 2026-07-12 (chatter design, with Bruno)
+
+1. **Label format**: callsign + route header line above the quoted
+   text (`📻 LONE STAR 23 · AUS → LBB`), operating city for helis.
+2. **Cadence**: moderate — a line every ~25–45 s when sources are
+   nearby; tower ops always preempt.
+3. **Player references**: yes, rarely — gated on real player
+   behavior, seeded + hard-throttled, never hostile.
+4. **Audio**: per-type synth voice character (pitch/rate), every line
+   voiced.
 
 ## Open calls
 

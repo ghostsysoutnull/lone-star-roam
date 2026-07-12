@@ -52,10 +52,14 @@ see ROADMAP.md, full spec in `HELICOPTER_SPEC.md`).
 full spec in `AVIATION_OBSERVABILITY_SPEC.md` — spec only so far, present
 the wave plan and get a go-ahead before coding): airport name/code on the
 HUD location line (`fieldNear` pure query), per-type callsigns (seeded GA
-tails via new `tail:` stream, NASA voiced at Ellington), heli radio
-presence on state edges (Lifeguard/Chopper/Rescue/Hood + ~60-unit
-direct-range window), and medical-heli pad stops at the home city's field
-(new `padstop:` stream, cap accounting unchanged). Wave B (airport
+tails via new `tail:` stream, NASA voiced at Ellington), a **chatter
+engine** (new `chatter.js`: scanner frame, per-type voice registers for
+all 4 heli kinds + jets + GA, template pools filled from live context so
+lines are factual by construction, ~25–45 s budget with ops preempting
+casual, rare player-reference delight lines, callsign+route subtitle
+header, per-type synth voice — design settled with Bruno 2026-07-12), and
+medical-heli pad stops at the home city's field (new `padstop:` stream,
+cap accounting unchanged). Wave B (airport
 bystander NPCs + heli-aware/context-enriched townsfolk chatter) queued
 behind it in the same spec.
 Other à-la-carte candidates, both already scoped in with Bruno's
