@@ -773,6 +773,18 @@ export default async function aviation(t) {
     t.ok(n === 4, `expected 4 distinct body geometries, got ${n} (kinds still sharing one shared mesh)`);
   });
 
+  await t.check('rotor mast height clears the tallest point of each kind\'s own body', async () => {
+    // a fixed mast height was previously shared across all four bodies, so once each
+    // kind got its own (taller/shorter) geometry the rotor started sitting inside the
+    // fuselage instead of on top of it for some kinds — assert real numbers, not a shot
+    const r = await t.ev(`(() => {
+      const ks = ['medical', 'news', 'coastguard', 'army'];
+      return ks.map((k) => ({ k, rotorY: g.heli.config[k].rotorY, bodyTop: g.heli.meshes[k].body.geometry.boundingBox.max.y }));
+    })()`);
+    for (const { k, rotorY, bodyTop } of r)
+      t.ok(rotorY > bodyTop, `${k} rotor mast (${rotorY}) doesn't clear its body top (${bodyTop})`);
+  });
+
   await t.check('army rotor is a real 4-blade outlier, other kinds stay at 2 (per aircraft)', async () => {
     const r = await t.ev(`(() => {
       g.heli.despawnAll();

@@ -35,11 +35,16 @@ const UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
 // InstancedMesh instance (so "how many rotor instances rendered" is a real,
 // countable proxy for blade count — see rotorCount below).
 const KINDS = ['medical', 'news', 'coastguard', 'army'];
+// rotorY is the mast height (world Y = candidate.y + rotorY) — must clear
+// the tallest point of that kind's own body geometry (fin/nose/canopy),
+// with a little headroom so the disc visibly floats above the fuselage
+// instead of skewering it. Kept as real per-kind data, not one shared
+// constant, since the four bodies are no longer the same height.
 const HELI_CONFIG = {
-  medical: { blades: 2, rotorR: 1.7 },   // standard diameter
-  news: { blades: 2, rotorR: 1.4 },      // lightest airframe, smallest disc
-  coastguard: { blades: 2, rotorR: 1.9 }, // medium diameter
-  army: { blades: 4, rotorR: 2.3 },      // 4-blade cross, largest — the at-a-distance tell
+  medical: { blades: 2, rotorR: 1.7, rotorY: 1.35 },    // standard diameter
+  news: { blades: 2, rotorR: 1.4, rotorY: 1.2 },        // lightest airframe, smallest disc
+  coastguard: { blades: 2, rotorR: 1.9, rotorY: 1.5 },  // medium diameter, bigger cabin
+  army: { blades: 4, rotorR: 2.3, rotorY: 1.5 },        // 4-blade cross, largest — the at-a-distance tell
 };
 const BODY_POOL = { medical: 4, news: 4, coastguard: 1, army: 2 };
 const ROTOR_POOL = Object.fromEntries(KINDS.map((k) => [k, BODY_POOL[k] * HELI_CONFIG[k].blades]));
@@ -181,10 +186,13 @@ export class HeliSystem {
     this.simT = 0; // accumulates in the real loop — wiring sentinel
     this.meshes = {};
     this.rotorCount = {};
+    this.config = HELI_CONFIG; // exposed read-only for verify (rotorY-clears-body checks)
     for (const kind of KINDS) {
       const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
       const rotorMat = new THREE.MeshBasicMaterial({ vertexColors: true });
-      const body = new THREE.InstancedMesh(BODY_GEO[kind](), mat, BODY_POOL[kind]);
+      const bodyGeo = BODY_GEO[kind]();
+      bodyGeo.computeBoundingBox(); // so the rotor mast height can be verified to actually clear the fuselage/fin/canopy
+      const body = new THREE.InstancedMesh(bodyGeo, mat, BODY_POOL[kind]);
       const rotor = new THREE.InstancedMesh(mkHeliRotorBlade(HELI_CONFIG[kind].rotorR), rotorMat, ROTOR_POOL[kind]);
       body.frustumCulled = false;
       rotor.frustumCulled = false;
@@ -290,7 +298,7 @@ export class HeliSystem {
     }
     for (const kind of KINDS) {
       const { body, rotor } = this.meshes[kind];
-      const list = lists[kind], blades = HELI_CONFIG[kind].blades, tint = TINT[kind];
+      const cfg = HELI_CONFIG[kind], list = lists[kind], blades = cfg.blades, tint = TINT[kind];
       let bi = 0, ri = 0;
       for (; bi < list.length && bi < BODY_POOL[kind]; bi++) {
         const it = list[bi];
@@ -299,7 +307,7 @@ export class HeliSystem {
         body.setColorAt(bi, this.col.set(tint));
         for (let b = 0; b < blades && ri < ROTOR_POOL[kind]; b++, ri++) {
           const bladeAng = this.t * 22 + (2 * Math.PI * b) / blades;
-          this.m4.compose(new THREE.Vector3(it.x, it.y + 0.42, it.z), this.q.setFromAxisAngle(UP, bladeAng), ONE);
+          this.m4.compose(new THREE.Vector3(it.x, it.y + cfg.rotorY, it.z), this.q.setFromAxisAngle(UP, bladeAng), ONE);
           rotor.setMatrixAt(ri, this.m4);
         }
       }
