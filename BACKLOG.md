@@ -9,9 +9,12 @@ the next item from here back into it.
 - **Split `aviation.mjs` into wave-shards** (~30 s → ~20 s): export
   `shards = [{name, run}]` (wrap each wave's checks in an in-place arrow fn,
   re-declare `const aus` per shard) + a back-compat serial `default`; teach the
-  runner to schedule a sharded suite as N queue units. Breaks the 24.5 s
-  aviation pole. Re-run 15× co-scheduled stress after (chatter checks land in
-  higher concurrency). Design settled; only diminishing-returns held it back.
+  runner to schedule a sharded suite as N queue units. Breaks the aviation
+  pole. Re-run 15× co-scheduled stress after (chatter checks land in higher
+  concurrency). Design settled; **evaluated and skipped 2026-07-12 on ROI** —
+  measured full run ~24 s (aviation pole 17.4 s, next pole lights 12.0 s), so
+  sharding recovers only ~8–10 s/run vs a ~30-min session (~300-run payback).
+  Revisit only if aviation grows substantially or concurrency flakes appear.
 - **lights `until(trains>0, 45000)`**: drive/force a train to a known spot
   instead of waiting on the real spawn, so lights can't become the pole.
 
