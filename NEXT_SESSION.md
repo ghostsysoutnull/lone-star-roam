@@ -48,7 +48,17 @@ windscreen and a mast fairing, roughly doubling poly count again
 body's real bounding box instead of a hand-tuned constant, and the 🚁 Heli
 debug action cycles kinds deterministically instead of picking randomly —
 see ROADMAP.md, full spec in `HELICOPTER_SPEC.md`).
-Remaining à-la-carte candidates, both already scoped in with Bruno's
+**Next up: Aviation observability wave A** (scope approved 2026-07-12,
+full spec in `AVIATION_OBSERVABILITY_SPEC.md` — spec only so far, present
+the wave plan and get a go-ahead before coding): airport name/code on the
+HUD location line (`fieldNear` pure query), per-type callsigns (seeded GA
+tails via new `tail:` stream, NASA voiced at Ellington), heli radio
+presence on state edges (Lifeguard/Chopper/Rescue/Hood + ~60-unit
+direct-range window), and medical-heli pad stops at the home city's field
+(new `padstop:` stream, cap accounting unchanged). Wave B (airport
+bystander NPCs + heli-aware/context-enriched townsfolk chatter) queued
+behind it in the same spec.
+Other à-la-carte candidates, both already scoped in with Bruno's
 go-ahead: **Sheppard T-38 touch-and-go pattern circuits** (the one piece
 that needs real new design — a closed traffic pattern doesn't fit the
 point-to-point `AviationSystem` schedule or the simple orbit/transit movers
