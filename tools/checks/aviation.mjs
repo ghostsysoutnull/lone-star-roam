@@ -655,6 +655,100 @@ export default async function aviation(t) {
     t.ok((await t.ev('!!g.radio.lastTx')).valueOf(), 'test-radio action produced no transmission');
   });
 
+  // ---- wave 4: rotors & airships ----
+  // Helicopters and the blimp follow the chapelAt/aviation lesson: pure math
+  // first, meshes second. The checks below read live numbers off
+  // g.heli.candidates / g.blimp — never pixels or audio waveforms — per the
+  // charging-deer lesson. rotors.js's own real-rAF sentinels (heli.simT,
+  // blimp.simT) close out the wave; everything else uses g.heli.update()
+  // directly (a stepper, like g.aviation.update() elsewhere in this suite).
+
+  await t.check('news heli orbits its downtown center at a steady radius, sampled over time', async () => {
+    await t.setDay();
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      if (!g.heli.force('news')) return { err: 'force failed' };
+      const c = g.heli.candidates.find((x) => x.kind === 'news' && x.flying);
+      const dt = 0.05, radii = [], pts = [];
+      // watching from nearby (baseX+50) — realistic "player is in this city" case
+      for (let i = 0; i < 2000; i++) {
+        g.heli.update(dt, c.baseX + 50, c.baseZ + 50);
+        if (i % 40 === 0) { radii.push(Math.hypot(c.x - c.baseX, c.z - c.baseZ)); pts.push([c.x, c.z]); }
+      }
+      return { err: null, radii, moved: Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.radii.length > 10, `only ${r.radii.length} samples`);
+    const bad = r.radii.filter((x) => Math.abs(x - 40) > 2);
+    t.ok(bad.length === 0, `orbit radius drifted off 40u: ${r.radii.map((x) => x.toFixed(1)).join(',')}`);
+    t.ok(r.moved > 1, 'orbit position frozen — news heli never actually circled');
+    await t.ev('g.heli.despawnAll()');
+  });
+
+  await t.check('a continuous rotorcraft (coast guard) frees its cap slot once the player drives away', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      if (!g.heli.force('coastguard')) return { err: 'force failed' };
+      const c = g.heli.candidates.find((x) => x.kind === 'coastguard');
+      const dt = 0.05;
+      for (let i = 0; i < 20; i++) g.heli.update(dt, c.baseX, c.baseZ); // a few ticks nearby: stays airborne
+      const nearCount = g.heli.airborneCount();
+      for (let i = 0; i < 40; i++) g.heli.update(dt, c.baseX + 5000, c.baseZ + 5000); // player drives far inland
+      const farCount = g.heli.airborneCount();
+      return { err: null, nearCount, farCount };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.nearCount === 1, `coast guard should hold its slot while watched (got ${r.nearCount})`);
+    t.ok(r.farCount === 0, `coast guard slot never freed after the player left (still ${r.farCount})`);
+  });
+
+  await t.check('blimp position is a pure deterministic function of the day', async () => {
+    const r = await t.ev(`(() => {
+      const a = g.blimp.positionAt(11, 1.3), b = g.blimp.positionAt(11, 1.3), c = g.blimp.positionAt(12, 1.3);
+      return { same: a.x === b.x && a.z === b.z, diff: a.x !== c.x || a.z !== c.z };
+    })()`);
+    t.ok(r.same, 'two evals of the same day+angle disagree');
+    t.ok(r.diff, 'a different day gave an identical position');
+  });
+
+  await t.check('rotor audio gain fades with distance to the nearest airborne heli, silent with none in range', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      if (!g.heli.force('medical')) return { err: 'force failed' };
+      const c = g.heli.candidates.find((x) => x.kind === 'medical' && x.flying);
+      g.heli.update(0.05, c.baseX, c.baseZ);
+      const near = g.heli.nearestAirborneDist(c.x, c.z), far = g.heli.nearestAirborneDist(c.x + 1000, c.z);
+      g.audio.heli(near); const gNear = g.audio.heliTarget;
+      g.audio.heli(far); const gFar = g.audio.heliTarget;
+      g.audio.heli(Infinity); const gNone = g.audio.heliTarget;
+      return { err: null, gNear, gFar, gNone };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.gNear > r.gFar, `gain didn't fall off with distance (near ${r.gNear}, far ${r.gFar})`);
+    t.ok(r.gNone === 0, `no heli in range should be silent, got ${r.gNone}`);
+    t.ok(r.gNear > 0, `near gain should be audible, got ${r.gNear}`);
+    await t.ev('g.heli.despawnAll()');
+  });
+
+  await t.check('airborne rotorcraft cap holds at 2 across all four kinds', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      const got = ['medical', 'news', 'coastguard', 'army'].map((k) => g.heli.force(k));
+      return { got, count: g.heli.airborneCount() };
+    })()`);
+    t.ok(r.count === 2, `airborne count ${r.count}, expected the cap of 2`);
+    t.ok(r.got.filter(Boolean).length <= 2, `forced ${r.got.filter(Boolean).length} kinds airborne at once`);
+    await t.ev('g.heli.despawnAll()');
+  });
+
+  await t.check('rotors advance through the real loop (wiring sentinel)', async () => {
+    const h0 = await t.ev('g.heli.simT'), b0 = await t.ev('g.blimp.simT');
+    await t.wait(0.5); // real rAF ticks, not a stepper — this is the sentinel
+    const h1 = await t.ev('g.heli.simT'), b1 = await t.ev('g.blimp.simT');
+    t.ok(h1 > h0 + 0.3, 'heli.simT frozen — HeliSystem.update not wired into the main loop');
+    t.ok(b1 > b0 + 0.3, 'blimp.simT frozen — BlimpSystem.update not wired into the main loop');
+  });
+
   if (process.env.SHOT) { // composition only — never the pass/fail signal
     const dal = await t.ev(`g.AIRPORTS.find((a) => a.id === 'DAL').at`);
     // frame a real approach: 30u out on the 31L extended centerline, nose NW

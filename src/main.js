@@ -23,6 +23,7 @@ import { DogSystem } from './dog.js';
 import { AirportSystem, AIRPORTS, airportClear, airportLayout, windFrom, runwayInUse } from './airports.js';
 import { AviationSystem, daySchedule } from './aviation.js';
 import { TowerRadio } from './radio.js';
+import { HeliSystem, BlimpSystem } from './rotors.js';
 import { applyGear } from './shop.js';
 import { HUD } from './hud.js';
 
@@ -74,6 +75,8 @@ async function boot() {
   const travel = new TravelMenu(player, gameplay, sky, npcs, missions, dog, (m) => hud.toast(m), (k) => audio.chime(k));
   const trains = new TrainSystem(scene);
   const maritime = new MaritimeSystem(scene);
+  const heli = new HeliSystem(scene, maritime);
+  const blimp = new BlimpSystem(scene);
   trains.onHorn = () => audio.trainHorn();
   traffic.onHonk = (type) => audio.honk(type);
   animals.onSound = (kind) => audio[kind]?.();
@@ -88,7 +91,7 @@ async function boot() {
   player.onStep = () => audio.step();
   const flares = new FlareSystem(scene, player);
   flares.onSound = (kind) => audio.flare(kind);
-  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio }); // panel only with ?debug=1; actions drive the verify suite
+  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp }); // panel only with ?debug=1; actions drive the verify suite
   player.flares = flares; // hud reads the rack count off the player
 
   // Spawn on I-35 just south of Austin
@@ -147,7 +150,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, airports, aviation, radio, AIRPORTS, airportClear, airportLayout, windFrom, runwayInUse, daySchedule, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, airports, aviation, radio, heli, blimp, maritime, audio, AIRPORTS, airportClear, airportLayout, windFrom, runwayInUse, daySchedule, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -164,6 +167,9 @@ async function boot() {
     traffic.setNight(ATMOS.night);
     trains.update(dt, player.pos.x, player.pos.z);
     maritime.update(dt, clock.elapsedTime);
+    heli.update(dt, player.pos.x, player.pos.z);
+    blimp.update(dt, sky.days);
+    audio.heli(heli.nearestAirborneDist(player.pos.x, player.pos.z));
     ufo.update(dt, player.pos.x, player.pos.z, player.pos.y);
     haunts.update(dt, player.pos.x, player.pos.z, sky.t, sky.days);
     flares.update(dt);

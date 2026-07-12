@@ -8,7 +8,7 @@ import { EROCK } from './haunts.js';
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -44,6 +44,19 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio }) {
       const f = aviation.force('arrival');
       hud.toast(f ? `🛬 Lone Star ${f.sl.n} inbound from ${f.sl.from}` : '🛬 No field in range / sky full');
     },
+    heli() {
+      const kinds = ['medical', 'news', 'coastguard', 'army'];
+      const k = kinds[Math.floor(Math.random() * kinds.length)];
+      const ok = heli.force(k);
+      if (!ok) return hud.toast('🚁 Sky already at the rotorcraft cap');
+      const c = heli.candidates.find((x) => x.kind === k && x.flying);
+      tp(c.baseX + 20, c.baseZ, Math.PI / 2);
+      hud.toast(`🚁 ${k} run`);
+    },
+    blimp() {
+      tp(blimp.pos.x + 20, blimp.pos.z, Math.PI / 2);
+      hud.toast(`🎈 Blimp: ${blimp.state}`);
+    },
     testRadio() {
       const tw = radio.nearestTowered(player.pos.x, player.pos.z);
       const un = radio.nearestUnicom(player.pos.x, player.pos.z);
@@ -65,6 +78,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio }) {
       ['hauntCemetery', '👻 Haunt cemetery'], ['ghostFires', '🔥 Ghost fires'],
       ['saucer', '🛸 Saucer'], ['formation', '✨ Lubbock lights'], ['bats', '🦇 Bat show'],
       ['departure', '🛫 Departure'], ['arrival', '🛬 Arrival'], ['testRadio', '📻 Test radio'],
+      ['heli', '🚁 Heli'], ['blimp', '🎈 Blimp'],
       ['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'], ['storm', '⛈ Storm'], ['dust', '🌪 Dust'],
     ];
     const el = document.createElement('div');

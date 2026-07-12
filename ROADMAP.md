@@ -93,6 +93,39 @@ ship.
   reproduces the exact report: an unforced flyby of Waco, no debug button,
   no forced flight, must produce audio through the real loop.
 
+- [x] ~~Aviation wave 4 — Rotors & airships~~ — done 2026-07-11: `src/rotors.js`
+  `HeliSystem` + `BlimpSystem`. Helicopters are placed by real-world context,
+  not a species table: medical (helipad near each big-four downtown edge,
+  occasional out-and-back run), news (continuous slow orbit at 40u/55 altitude
+  over Houston/San Antonio/Dallas/Austin — the real top-4 by population —
+  day-gated), Coast Guard (patrols the maritime `LANE`, occasionally hovers
+  near a ship), Army (a pair near Fort Cavazos/Killeen, occasional joint
+  patrol). All four share one instanced body+rotor mesh pair (livery via the
+  aviation pastel-wash tint trick) and a single global cap of 2 airborne
+  (parked/grounded instances render but don't spend the budget — the aviation
+  `AIR`-set idiom); the Army pair is gated as one two-instance unit (`weight:
+  2`) so it can never coexist with anything else at the ceiling. Rotor audio:
+  a new `audio.js` ambient channel (noise through a 130 Hz bandpass, chopped
+  by a 12 Hz LFO) gain-faded by distance to the nearest airborne heli,
+  exposed as a plain `heliTarget` field so tests don't have to read the
+  ramping AudioParam. One blimp, a charm piece not a fleet: the literal
+  AT&T Stadium/Astrodome/downtown-Austin triangle measures ~8900 units at the
+  spec's ~4 u/s (a 37-minute lap vs. a 12-minute game day), so it instead
+  rolls a `seededRand('blimp:…:day')` per-day anchor and loiters a small
+  circle near it (`positionAt(day, u)` is a pure query, independent of live
+  ATMOS — the determinism hook for tests), mooring at Waco Regional (roughly
+  equidistant from all three) after dark or in storm/dust and flying back out
+  once conditions clear. LONE STAR side panel scrolls via a canvas-texture
+  emissive map gated on `ATMOS.night` (no new scene light). Continuous kinds
+  (news/coastguard) get an `AIR_FAR`-style far despawn (aviation.js idiom) so
+  a slot activated near the player doesn't stay spent forever once they drive
+  away — the local hop kinds (medical/army) don't need it, but share the same
+  guard. 6 new checks: news-orbit radius held over time, a freed cap slot
+  after the player leaves, blimp day-determinism, rotor gain vs. distance
+  (incl. silence with none in range), the airborne cap holding at 2 across
+  all four kinds forced at once, and a real-rAF sentinel for both systems'
+  `simT`. Debug 🚁/🎈 actions.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

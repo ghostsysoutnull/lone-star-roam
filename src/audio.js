@@ -68,6 +68,20 @@ export class AudioSystem {
     this.rainGain = chan();
     noiseSrc('highpass', 1900, 0.4).connect(this.rainGain);
 
+    // --- rotor thump: noise chopped at blade frequency, gain fades by distance ---
+    this.heliGain = chan();
+    this.heliTarget = 0; // last commanded gain target (verify reads this, not the ramping AudioParam)
+    const heliChop = ctx.createGain();
+    heliChop.gain.value = 1;
+    noiseSrc('bandpass', 130, 1.1).connect(heliChop).connect(this.heliGain);
+    const heliLfo = ctx.createOscillator();
+    heliLfo.type = 'square';
+    heliLfo.frequency.value = 12;
+    const heliDepth = ctx.createGain();
+    heliDepth.gain.value = 0.85;
+    heliLfo.connect(heliDepth).connect(heliChop.gain);
+    heliLfo.start();
+
     // --- crickets: pulsed high tone at night ---
     this.cricketGain = chan();
     const cricket = ctx.createOscillator();
@@ -144,6 +158,14 @@ export class AudioSystem {
     set(this.windGain.gain, Math.min(0.14, windSpd * 0.1 + (atmos.wind - 1) * 0.02), 0.3);
     set(this.rainGain.gain, (atmos.rain || 0) * 0.05, 0.5);
     set(this.cricketGain.gain, atmos.night * (1 - Math.min(1, atmos.rain || 0)) * 0.012, 0.5);
+  }
+
+  // rotorcraft ambience: nearest-airborne-heli distance -> gain, faded like
+  // bell(d). Called every frame from main.js with rotors.nearestAirborneDist().
+  heli(dist = Infinity) {
+    this.heliTarget = Math.max(0, 0.05 * (1 - dist / 140));
+    if (!this.ctx || this.muted) return;
+    this.heliGain.gain.setTargetAtTime(this.heliTarget, this.ctx.currentTime, 0.25);
   }
 
   // one-shot helpers ---------------------------------------------------------
