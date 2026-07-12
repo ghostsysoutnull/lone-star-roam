@@ -365,7 +365,12 @@ function mkBlimpMesh() {
   gondola.position.set(0, -1.7, 0.4);
   g.add(gondola);
   const tex = mkSignTexture();
-  const signMat = new THREE.MeshLambertMaterial({ color: 0x202020, map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0 });
+  // day legibility: the panel's diffuse color IS the text color where the
+  // texture is white (background stays black regardless, since it multiplies
+  // to zero there) — a dark base color here reads as dim gray-on-black by
+  // day no matter how bright the sun is. Bright base + the same emissiveMap
+  // at night keeps the scrolling glow on top.
+  const signMat = new THREE.MeshLambertMaterial({ color: 0xf2f0ea, map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0 });
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 0.9), signMat);
   sign.position.set(1.62, 0, 0);
   sign.rotation.y = Math.PI / 2;
