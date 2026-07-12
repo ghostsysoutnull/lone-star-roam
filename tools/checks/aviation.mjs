@@ -521,8 +521,11 @@ export default async function aviation(t) {
     t.ok(r.lastTx.wind === r.wind, `ATIS wind ${r.lastTx.wind} !== windFrom ${r.wind}`);
     t.ok(r.lastTx.rwy === r.rwy, `ATIS runway ${r.lastTx.rwy} !== runway-in-use ${r.rwy}`);
     t.ok(r.lastTx.text.includes(String(r.wind)), 'ATIS text missing the wind number');
-    const sub = await t.ev(`document.getElementById('radio-subtitle').textContent`);
+    const sub = await t.ev(`document.getElementById('radio-text').textContent`);
     t.ok(sub.length > 0 && sub === r.lastTx.text, `subtitle text "${sub}" doesn't match the last transmission`);
+    const hdr = await t.ev(`({ text: document.getElementById('radio-header').textContent,
+      shown: document.getElementById('radio-header').style.display })`);
+    t.ok(hdr.shown === 'block' && /TOWER/.test(hdr.text), `ATIS header missing/wrong: "${hdr.text}" (${hdr.shown})`);
   });
 
   await t.check('off-axis approach: misaligned holds at "contact," aligns to "cleared," single stamp on touchdown', async () => {
@@ -1010,6 +1013,303 @@ export default async function aviation(t) {
     t.ok(r0.childCount === 9, `expected 9 global airport meshes, got ${r0.childCount}`);
     t.ok(r0.day === 0, `signs already emissive by day (${r0.day})`);
     t.ok(night > 0 && night <= 1, `signs not emissive at night (${night})`);
+  });
+
+  // ---- wave A session 2: chatter engine + pad stops + proximity tags ----
+  // A3/A4/A5 assert numbers and structured lastTx, per the standing rule:
+  // template fills are checked against the REAL slot/context, pad stops are
+  // position-over-time through the stepper, tags through the real rAF loop
+  // (this session's wiring sentinel alongside the existing flyby check).
+
+  await t.check('A3: chatterLine is deterministic, fully filled, and context-gated', async () => {
+    const r = await t.ev(`(() => {
+      const ctx = { cs: 'TEXAN 12', dest: 'Lubbock', origin: 'Dallas', airline: 'texan',
+        wx: 'clear skies', city: 'Abilene', field: 'Dallas Love Field', fc: 'a thunderstorm', tod: 'afternoon' };
+      const a = g.chatterLine('jet', 'enroute', ctx, 'jet:enroute:5:TEXAN 12');
+      const b = g.chatterLine('jet', 'enroute', ctx, 'jet:enroute:5:TEXAN 12');
+      const unfilled = [];
+      let destSeen = 0;
+      for (const kind of ['medical', 'news', 'coastguard', 'army', 'jet', 'ga', 'military'])
+        for (const ev of ['lift', 'enroute', 'padDown', 'padLift', 'touchdown', 'hover', 'playerRef'])
+          for (let s = 0; s < 12; s++) {
+            const l = g.chatterLine(kind, ev, ctx, kind + ':' + ev + ':' + s);
+            if (l && /[{}]/.test(l.text)) unfilled.push(kind + ':' + ev);
+            if (l && l.text.includes('Lubbock')) destSeen++;
+          }
+      let gated = true; // no dest in ctx → no jet line may reference a destination
+      for (let s = 0; s < 20; s++) {
+        const l = g.chatterLine('jet', 'enroute', { cs: 'LONE STAR 4' }, 'g:' + s);
+        if (l && /direct|into |out of|bound/.test(l.text)) gated = false;
+      }
+      return { same: !!a && !!b && a.text === b.text && a.voice === b.voice, voice: a?.voice,
+        unfilled, destSeen, gated };
+    })()`);
+    t.ok(r.same, 'same seed+ctx gave different lines');
+    t.ok(r.voice === 'jet', `jet line carries voice "${r.voice}"`);
+    t.ok(r.unfilled.length === 0, `unfilled tokens in: ${r.unfilled.join(', ')}`);
+    t.ok(r.destSeen > 0, 'no line ever used the real destination city');
+    t.ok(r.gated, 'a jet line referenced a destination with none in context');
+  });
+
+  await t.check('A3: medical lift edge chatters once (structured tx, voice, budget holds after)', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll(); g.aviation.despawnAll();
+      const c = g.heli.candidates.find((x) => x.kind === 'medical');
+      g.player.setMode('DRIVE');
+      g.player.pos.set(c.baseX + 3, 0, c.baseZ + 3);
+      g.radio.tunedField = null; g.radio.lastTx = null; g.radio.srcPh.clear();
+      const dt = 0.1;
+      const step = () => { g.heli.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+        g.radio.update(dt, g.player, g.aviation, g.sky); };
+      step(); // baseline: the parked heli enters the scanner at ph 'idle'
+      const baseline = g.radio.sources.some((s) => s.kind === 'medical');
+      g.radio.chatterT = 0;
+      if (!g.heli.force('medical')) return { err: 'force failed' };
+      c.pad = null; // plain out-and-back — a seeded pad stop would add its own "lifting off" line
+      let liftTx = null;
+      for (let i = 0; i < 30 && !liftTx; i++) { step(); if (g.radio.lastTx?.kind === 'chatter') liftTx = g.radio.lastTx; }
+      const at0 = liftTx?.at ?? -1;
+      for (let i = 0; i < 100; i++) step(); // 10 s < the 25 s min gap
+      const gapHeld = g.radio.lastTx?.at === at0;
+      // dedup: hold the budget open through the rest of the sortie — the lift
+      // pool may never re-fire while enroute rolls repeat freely
+      let liftLines = liftTx && /lifting |is up at |off the pad/.test(liftTx.text) ? 1 : 0;
+      for (let i = 0; i < 120; i++) {
+        g.radio.chatterT = 0; step();
+        const tx = g.radio.lastTx;
+        if (tx?.kind === 'chatter' && tx.at !== at0 && /lifting |is up at |off the pad/.test(tx.text)) liftLines++;
+      }
+      g.heli.despawnAll(); g.hud.subtitleQ.length = 0;
+      return { err: null, baseline, liftTx, gapHeld, liftLines };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.baseline, 'parked medical heli never entered the scanner');
+    t.ok(r.liftTx?.kind === 'chatter' && r.liftTx?.src === 'medical', `lift tx: ${JSON.stringify(r.liftTx)}`);
+    t.ok(/Lifeguard 3/.test(r.liftTx?.text ?? ''), `no callsign in "${r.liftTx?.text}"`);
+    t.ok(r.liftTx?.voice === 'dispatch' && r.liftTx?.casual === true, `voice/casual wrong: ${r.liftTx?.voice}/${r.liftTx?.casual}`);
+    t.ok(/^📻 LIFEGUARD 3/.test(r.liftTx?.header ?? ''), `header "${r.liftTx?.header}"`);
+    t.ok(r.gapHeld, 'a second casual line fired inside the min gap');
+    t.ok(r.liftLines === 1, `lift edge narrated ${r.liftLines}× (dedup failed)`);
+  });
+
+  await t.check('A3: casual lines respect the 25 s min gap with two live sources', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      const med = g.heli.candidates.find((x) => x.kind === 'medical');
+      g.player.setMode('DRIVE');
+      g.player.pos.set(med.baseX, 0, med.baseZ);
+      g.radio.tunedField = null; g.radio.lastTx = null; g.radio.srcPh.clear();
+      g.radio.chatterT = 0;
+      g.heli.force('medical'); g.heli.force('news'); // same metro — both in the window
+      const dt = 0.1, ats = [];
+      for (let i = 0; i < 700; i++) {
+        g.heli.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+        g.radio.update(dt, g.player, g.aviation, g.sky);
+        const tx = g.radio.lastTx;
+        if (tx?.kind === 'chatter' && tx.at !== ats[ats.length - 1]) ats.push(tx.at);
+      }
+      g.heli.despawnAll(); g.hud.subtitleQ.length = 0;
+      let minGap = Infinity;
+      for (let i = 1; i < ats.length; i++) minGap = Math.min(minGap, ats[i] - ats[i - 1]);
+      return { n: ats.length, minGap };
+    })()`);
+    t.ok(r.n >= 2, `only ${r.n} casual lines in 70 s with two sources`);
+    t.ok(r.minGap >= 24.9, `casual lines only ${r.minGap.toFixed(1)} s apart`);
+  });
+
+  await t.check('A3: a tower ops call preempts casual chatter for the hold window', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      const c = g.heli.candidates.find((x) => x.kind === 'news');
+      g.player.setMode('DRIVE');
+      g.player.pos.set(c.baseX, 0, c.baseZ);
+      g.radio.srcPh.clear();
+      g.heli.force('news');
+      const dt = 0.1;
+      g.heli.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+      g.radio.chatterT = 0;
+      g.radio.tx(g.AIRPORTS[0], 'test ops call', 'ops'); // ops always bump the hold
+      const holdAfterOps = g.radio.chatterT;
+      const opsAt = g.radio.lastTx.at;
+      for (let i = 0; i < 30; i++) { // 3 s — inside the hold: casual must stay quiet
+        g.heli.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+        g.radio.update(dt, g.player, g.aviation, g.sky);
+      }
+      const heldQuiet = g.radio.lastTx.at === opsAt;
+      for (let i = 0; i < 60; i++) { // 6 more s — past the hold: the news heli may talk
+        g.heli.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+        g.radio.update(dt, g.player, g.aviation, g.sky);
+      }
+      const spoke = g.radio.lastTx.kind === 'chatter';
+      g.heli.despawnAll(); g.hud.subtitleQ.length = 0;
+      return { holdAfterOps, heldQuiet, spoke };
+    })()`);
+    t.ok(r.holdAfterOps >= 5.9, `ops tx only pushed chatter out ${r.holdAfterOps} s`);
+    t.ok(r.heldQuiet, 'casual chatter fired inside the ops hold');
+    t.ok(r.spoke, 'no casual line after the hold expired');
+  });
+
+  await t.check('A3: coast guard heard through the direct-range window, no field tuned', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      const c = g.heli.candidates.find((x) => x.kind === 'coastguard');
+      if (!g.heli.force('coastguard')) return { err: 'force failed' };
+      // start the patrol at mid-lane: the candidate's in-range anchor is
+      // laneAt(len/2), and the lane runs the whole coast — a player parked at
+      // the lane START would put the pair beyond AIR_FAR of the anchor
+      c.s = g.maritime.len / 2;
+      const dt = 0.1;
+      g.heli.update(dt, c.baseX, c.baseZ, g.sky.days); // place it on the lane
+      g.player.setMode('DRIVE');
+      g.player.perks.avionics = false;
+      g.player.pos.set(c.x + 5, 0, c.z + 5);
+      g.radio.tunedField = null; g.radio.lastTx = null; g.radio.srcPh.clear();
+      g.radio.chatterT = 0;
+      let tx = null;
+      for (let i = 0; i < 40 && !tx; i++) {
+        g.heli.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+        g.radio.update(dt, g.player, g.aviation, g.sky);
+        if (g.radio.lastTx?.kind === 'chatter') tx = g.radio.lastTx;
+      }
+      const tuned = g.radio.tunedField;
+      g.heli.despawnAll(); g.hud.subtitleQ.length = 0;
+      return { err: null, tx, tuned };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.tx?.src === 'coastguard' && /Rescue 6-0/.test(r.tx?.text ?? ''), `got ${JSON.stringify(r.tx)}`);
+    t.ok(r.tuned === null, `a field was tuned (${r.tuned}) — direct range wasn't the path`);
+  });
+
+  await t.check('A3: player-ref line gated on real speeding near the news heli, hard-throttled', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      const c = g.heli.candidates.find((x) => x.kind === 'news');
+      const road = g.nearestRoad(c.baseX, c.baseZ, 35, (ty) => ty === 'motorway');
+      if (!road) return { err: 'no motorway near the news downtown — pick another metro' };
+      if (!g.heli.force('news')) return { err: 'force failed' };
+      const dt = 0.1;
+      g.player.setMode('DRIVE');
+      g.player.pos.set(road.x, 0, road.z);
+      // wait for the orbit to swing the heli inside the window
+      for (let i = 0; i < 500 && Math.hypot(c.x - road.x, c.z - road.z) > 50; i++)
+        g.heli.update(dt, road.x, road.z, g.sky.days);
+      if (Math.hypot(c.x - road.x, c.z - road.z) > 50) return { err: 'orbit never came inside the window' };
+      g.radio.tunedField = null; g.radio.srcPh.clear();
+      const refRx = /pickup|truck flying low/;
+      let below = false;
+      g.player.speed = 10; g.radio.playerRefT = 0;
+      for (let i = 0; i < 20; i++) {
+        g.radio.chatterT = 0;
+        g.heli.update(dt, road.x, road.z, g.sky.days);
+        g.radio.update(dt, g.player, g.aviation, g.sky);
+        if (refRx.test(g.radio.lastTx?.text ?? '')) below = true;
+      }
+      let above = false;
+      g.player.speed = 40;
+      for (let i = 0; i < 40 && !above; i++) {
+        g.radio.chatterT = 0;
+        g.heli.update(dt, road.x, road.z, g.sky.days);
+        g.radio.update(dt, g.player, g.aviation, g.sky);
+        if (refRx.test(g.radio.lastTx?.text ?? '')) above = true;
+      }
+      const throttled = g.radio.playerRefT > 3000;
+      g.heli.despawnAll(); g.hud.subtitleQ.length = 0; g.player.speed = 0; g.radio.playerRefT = 240;
+      return { err: null, below, above, throttled };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(!r.below, 'player-ref line fired below the speed threshold');
+    t.ok(r.above, 'player-ref line never fired while genuinely speeding on the motorway');
+    t.ok(r.throttled, 'delight line aired but the hourly throttle was not armed');
+  });
+
+  await t.check('A4: pad-stop sortie touches down on the real pad, dwells, lifts — cap held throughout', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      const c = g.heli.candidates.find((x) => x.kind === 'medical');
+      if (!g.heli.force('medical', { pad: true })) return { err: 'force failed' };
+      if (!c.pad) return { err: 'forced pad stop rolled no pad' };
+      const p = c.pad, pp = g.padAt(c.fieldId);
+      const padPure = pp && Math.abs(pp.x - p.x) < 1e-9 && Math.abs(pp.z - p.z) < 1e-9;
+      const dt = 0.1;
+      let touched = false, dwellT = 0, rose = false, armyBlocked = null, countOnPad = 0;
+      for (let i = 0; i < 3000 && c.flying; i++) {
+        g.heli.update(dt, c.baseX + 5, c.baseZ + 5, g.sky.days);
+        if (c.ph === 'pad') {
+          dwellT += dt;
+          const agl = c.y - g.hAt(c.x, c.z), dp = Math.hypot(c.x - p.x, c.z - p.z);
+          if (agl < 3 && dp < 2) touched = true; // TD_AGL, on the spot
+          if (armyBlocked === null) { armyBlocked = !g.heli.force('army'); countOnPad = g.heli.airborneCount(); }
+        }
+        if (c.ph === 'lift' && c.y - g.hAt(c.x, c.z) > 4) rose = true;
+      }
+      const done = !c.flying && c.pad === null;
+      g.heli.despawnAll();
+      return { err: null, padPure, touched, dwellT, rose, armyBlocked, countOnPad, done };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.padPure, 'the sortie pad differs from a fresh padAt() eval');
+    t.ok(r.touched, 'never both low (<3 AGL) and on the pad spot');
+    t.ok(r.dwellT >= 18, `dwell only ${r.dwellT?.toFixed(1)} s (rolled 20–40)`);
+    t.ok(r.rose, 'never climbed back out after the dwell');
+    t.ok(r.armyBlocked === true, 'army pair forced airborne past the cap during the pad stop');
+    t.ok(r.countOnPad >= 1, 'the stopped heli stopped counting against the cap mid-sortie');
+    t.ok(r.done, 'sortie never completed/cleared its pad');
+  });
+
+  await t.check('A4: pad-stop roll is the seeded padstop: stream (deterministic)', async () => {
+    const r = await t.ev(`(() => {
+      const c = g.heli.candidates.find((x) => x.kind === 'medical');
+      const day = 7, save = { s: c.sortieN, f: c.flying, p: c.pad, t: c.flightT, d: g.heli.day };
+      const exp = g.seededRand('padstop:' + c.city + ':' + day + ':' + (c.sortieN + 1))() < 0.4; // PAD_ODDS
+      g.heli.day = day;
+      g.heli.startSortie(c);
+      const got = !!c.pad;
+      c.sortieN = save.s; c.flying = save.f; c.pad = save.p; c.flightT = save.t; g.heli.day = save.d;
+      return { exp, got, city: c.city, fieldId: c.fieldId };
+    })()`);
+    t.ok(r.fieldId, `medical candidate for ${r.city} has no home field`);
+    t.ok(r.exp === r.got, `padstop roll ${r.got} but the stream says ${r.exp}`);
+  });
+
+  await t.check('A5: heli tag appears in the window through the real loop, gone beyond it', async () => {
+    await t.ev(`(() => {
+      g.heli.despawnAll();
+      const c = g.heli.candidates.find((x) => x.kind === 'news'); // continuous — no sortie clock to race
+      g.player.setMode('DRIVE');
+      g.player.pos.set(c.baseX + 10, 0, c.baseZ + 10);
+      g.heli.force('news');
+    })()`);
+    // the orbit has to swing the heli in FRONT of the chase camera — up to
+    // most of a 40 s lap in the worst case, so the wait is generous
+    await t.until(`[...document.querySelectorAll('#air-tags .tag')]
+      .some((e) => e.style.display !== 'none' && /CHOPPER 5 · KTX News 5/.test(e.textContent))`, 30000);
+    await t.ev(`g.player.pos.set(-2767, 0, 334)`); // empty I-10 west — no sources
+    await t.until(`[...document.querySelectorAll('#air-tags .tag')].every((e) => e.style.display === 'none')`, 8000);
+    await t.ev(`(g.heli.despawnAll(), g.hud.subtitleQ.length = 0)`);
+    t.ok(true, 'tag lifecycle followed the window');
+  });
+
+  await t.check('A5: a forced jet arrival enters the tag source list with its real callsign and route', async () => {
+    // the tags render radio.sources verbatim (DOM pipeline sentineled by the
+    // heli tag check above) — assert the shared enumeration's data here, at a
+    // natural spot: parked at the anchor while the jet crosses on final
+    const f = await t.ev(`(() => {
+      g.aviation.despawnAll();
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      g.player.setMode('DRIVE');
+      g.player.pos.set(a.anchor[0], 0, a.anchor[1]);
+      let m = null;
+      for (let k = 0; k < 12 && (!m || m.sl.type !== 'jet'); k++) { // want an airliner, not a GA tail
+        g.aviation.despawnAll();
+        m = g.aviation.force('arrival', 'AUS');
+      }
+      return m && m.sl.type === 'jet' ? { cs: m.sl.cs, from: m.sl.from } : null;
+    })()`);
+    t.ok(f, 'no jet arrival in 12 forces');
+    await t.until(`g.radio.sources.some((s) => s.kind === 'jet' && s.air
+      && s.cs === ${JSON.stringify(f?.cs)} && s.route === '${f?.from} → AUS')`, 45000);
+    await t.ev(`(g.aviation.despawnAll(), g.hud.subtitleQ.length = 0)`);
+    t.ok(true, 'scanner carried the jet with its real identity');
   });
 
   if (process.env.SHOT) { // composition only — never the pass/fail signal

@@ -135,19 +135,40 @@ export function airportClear(x, z) { return !fieldNear(x, z); }
 // world-space footprint corner / interior-point helpers (verify + mesh builder)
 const fpPoint = (a, u, v) => [a.at[0] + a.ax * u - a.az * v, a.at[1] + a.az * u + a.ax * v];
 
+// footprint-max elevation scan for one site — the pad surface height. Pure
+// given the table + hAt; shared by airportLayout and padAt so a heli touching
+// down and the mesh builder can never disagree about where the ground is.
+function padYOf(a) {
+  const { u0, u1, v0, v1 } = a.foot;
+  let maxH = -1e9;
+  const su = Math.max(1.5, (u1 - u0) / 28), sv = Math.max(1.5, (v1 - v0) / 28);
+  for (let u = u0; u <= u1; u += su)
+    for (let v = v0; v <= v1; v += sv) {
+      const [x, z] = fpPoint(a, u, v);
+      maxH = Math.max(maxH, hAt(x, z));
+    }
+  return maxH + 0.06;
+}
+
+// helipad spot at a field — apron beside the parked-jet anchor, clear of
+// runways (A4 medical pad stops land here). Pure; single-site padY scan.
+export function padAt(id) {
+  const a = AIRPORTS.find((f) => f.id === id);
+  if (!a) return null;
+  let px = a.anchor[0], pz = a.anchor[1];
+  for (const du of [6, -6, 10, -10]) {
+    const x = a.anchor[0] + a.ax * du, z = a.anchor[1] + a.az * du;
+    if (clearOfRunways(a, x, z, 2.5)) { px = x; pz = z; break; }
+  }
+  return { x: px, z: pz, y: padYOf(a) };
+}
+
 // full site layout with elevation — pure given the table + hAt, recomputed on
 // call (the determinism check evaluates it twice and compares)
 export function airportLayout() {
   return AIRPORTS.map((a) => {
+    const padY = padYOf(a);
     const { u0, u1, v0, v1 } = a.foot;
-    let maxH = -1e9;
-    const su = Math.max(1.5, (u1 - u0) / 28), sv = Math.max(1.5, (v1 - v0) / 28);
-    for (let u = u0; u <= u1; u += su)
-      for (let v = v0; v <= v1; v += sv) {
-        const [x, z] = fpPoint(a, u, v);
-        maxH = Math.max(maxH, hAt(x, z));
-      }
-    const padY = maxH + 0.06;
     const corners = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]].map(([u, v]) => fpPoint(a, u, v));
     return {
       id: a.id, tier: a.tier, padY, corners,

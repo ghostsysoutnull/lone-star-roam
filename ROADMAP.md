@@ -273,6 +273,48 @@ ship.
   tags, medical pad stops) and session 3 (Wave B: airport NPCs + chatter
   enrichment) still queued.
 
+- [x] ~~Aviation observability wave A, session 2 — chatter + visuals~~ —
+  done 2026-07-12. **A3** new `chatter.js`: the player's radio is a
+  *scanner* — tower keeps strict phraseology, casual talk is what you
+  overhear on the other channels (medical↔dispatch, news↔station, coast
+  guard crew, terse army two-ship, airline enroute with per-carrier
+  registers, folksy GA, NASA into Ellington). Pure line-pool tables keyed
+  kind×event; a template is eligible only when every `{token}` it uses is
+  live in ctx — factual by construction; seeded picks (new `chatter:`
+  stream) make same-day+event lines deterministic; humor rationed ~1-in-4.
+  `radio.js` stays the sole transmitter: a new `scan()` enumerates airborne
+  sources within a 60u direct-range window (line-of-sight VHF — how the
+  coast guard gets heard with no field tuned) into `radio.sources`, ONE
+  list consumed by both chatter and the A5 tags. Heli/military phase edges
+  (`EDGE_EV`, knownPh idiom) + seeded mid-phase enroute rolls (`ROLL_OK`
+  phases only), all behind a global budget: 25–45 s seeded min-gap, ops
+  transmissions bump the hold (always preempt casual). Player-ref delight
+  line: news chopper only, gated on genuinely speeding (>34) on a motorway
+  in its window, armed only when it actually airs, then throttled ~1/hour.
+  `lastTx` extended `{at, src, cs, route, phase, casual, voice, header}`;
+  every subtitle now carries a `📻 CALLSIGN · route/city` header line
+  (`hud.js` `#radio-header`), and `audio.radio` takes `opts.voice` {p,r}
+  pitch/rate so dispatch/news/army are audibly distinct. **A4** medical
+  pad stops: `airports.js` exports pure `padAt(id)` (apron spot beside the
+  anchor, clear of runways, single-site `padYOf` shared with
+  `airportLayout`); medical sorties roll a new `padstop:${city}:${day}:${sortie}`
+  stream (odds 0.4) and when it hits fly transit→descend→touchdown→dwell
+  20–40 s→lift→return to the home city's nearest tier-1 field (central
+  Dallas medical lands at Love Field, not DFW) — all inside the sortie's
+  existing cap slot; heli candidates now expose `ph` for the chatter
+  edges, and `HeliSystem.update` takes an optional `days` 4th param.
+  **A5 (live half)** aircraft proximity tags: `hud.updateTags(radio.sources,
+  camera)` at the 12 Hz hudTick projects pooled DOM labels over airborne
+  sources, fading with distance (`LIFEGUARD 3 · StarCare Flight`,
+  `SWEETHEART 41 · DAL → HOU`, `N42TX`, `NASA 9-0-1`), rem-sized. 10 new
+  aviation.mjs checks: chatterLine determinism/fill/context-gating, lift-
+  edge structured tx + dedup + budget hold, two-source min-gap over 70 s,
+  ops-preempts-casual, coast-guard direct-range untuned, player-ref
+  speed gating both sides + throttle, pad-stop position-over-time (AGL +
+  on-spot + dwell + climb-out) with cap held, padstop-stream determinism,
+  heli tag DOM lifecycle through the real loop, forced-jet scanner
+  identity. No SHOT blocks. Session 3 (Wave B) queued.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

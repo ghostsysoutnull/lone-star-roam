@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { GEO, hAt, seededRand } from './geo.js';
 import { ATMOS } from './sky.js';
 import { merge, tinted } from './traffic.js';
+import { AIRPORTS, padAt } from './airports.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 
@@ -24,6 +25,10 @@ const BIG_FOUR = ['Houston', 'San Antonio', 'Dallas', 'Austin'];
 const KILLEEN = LL(31.1379, -97.7048); // Fort Cavazos
 const NEWS_R = 40, NEWS_ALT = 55, NEWS_OMEGA = (2 * Math.PI) / 40; // one lap ~40s; NEWS_ALT is AGL over the downtown center
 const CG_ALT = 30, CG_SPD = 5; // CG_ALT is AGL over the current lane point
+// A4 medical pad stops: some sorties divert to the home city's airport pad —
+// transit → descend → touchdown → dwell → lift → return, all inside the
+// sortie's existing cap slot. Rolled seeded per day+sortie (padstop: stream).
+const MED_SPD = 4.4, PAD_DESC_T = 5, PAD_ODDS = 0.4;
 const TINT = { medical: 0xd8203a, news: 0x2a5ea8, coastguard: 0xd88a1a, army: 0x4a5a30 };
 const UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
 
@@ -197,23 +202,65 @@ function mkHeliRotorBlade(radius) {
 
 function advanceMedical(c, dt) {
   if (!c.flying) {
-    c.x = c.baseX; c.z = c.baseZ; c.y = hAt(c.baseX, c.baseZ) + 0.05; c.heading = 0;
+    c.x = c.baseX; c.z = c.baseZ; c.y = hAt(c.baseX, c.baseZ) + 0.05; c.heading = 0; c.ph = 'idle';
     return;
   }
   c.flightT += dt;
+  if (c.pad) return advancePadSortie(c);
   const DUR = 18, f = Math.min(1, c.flightT / DUR), out = f < 0.5 ? f * 2 : (1 - f) * 2;
   c.x = c.baseX + Math.cos(c.bearing) * 40 * out;
   c.z = c.baseZ + Math.sin(c.bearing) * 40 * out;
   c.y = hAt(c.baseX, c.baseZ) + 4 + 14 * Math.sin(Math.PI * Math.min(1, f * 1.2));
   c.heading = c.bearing + (f < 0.5 ? 0 : Math.PI);
+  c.ph = f < 0.5 ? 'out' : 'return';
   if (f >= 1) { c.flying = false; c.flightT = 0; }
+}
+
+// A pad-stop sortie is a closed-form leg timeline over flightT (same style as
+// the plain out-and-back): transit to the pad at cruise AGL, descend on the
+// spot, sit through the dwell, lift, transit home. Descend start altitude
+// reuses the transit formula at f=1 so the legs join without a snap.
+function advancePadSortie(c) {
+  const p = c.pad;
+  const dx = p.x - c.baseX, dz = p.z - c.baseZ, dist = Math.hypot(dx, dz);
+  const tOut = Math.max(4, dist / MED_SPD);
+  const t1 = tOut, t2 = t1 + PAD_DESC_T, t3 = t2 + p.dwell, t4 = t3 + PAD_DESC_T, t5 = t4 + tOut;
+  const cruiseY = (x, z, tIn) => hAt(x, z) + 4 + 8 * Math.min(1, tIn / 4);
+  const t = c.flightT, hdgOut = Math.atan2(-dx / dist, -dz / dist);
+  if (t < t1) {
+    const f = t / t1;
+    c.x = c.baseX + dx * f; c.z = c.baseZ + dz * f;
+    c.y = cruiseY(c.x, c.z, Math.min(t, t1 - t + 4)); // climb out; hold cruise into the field
+    c.heading = hdgOut; c.ph = 'out';
+  } else if (t < t2) {
+    const f = (t - t1) / PAD_DESC_T;
+    c.x = p.x; c.z = p.z;
+    c.y = cruiseY(p.x, p.z, 4) + (p.y + 0.05 - cruiseY(p.x, p.z, 4)) * f;
+    c.heading = hdgOut; c.ph = 'descend';
+  } else if (t < t3) {
+    c.x = p.x; c.z = p.z; c.y = p.y + 0.05; c.heading = hdgOut; c.ph = 'pad';
+  } else if (t < t4) {
+    const f = (t - t3) / PAD_DESC_T;
+    c.x = p.x; c.z = p.z;
+    c.y = p.y + 0.05 + (cruiseY(p.x, p.z, 4) - p.y - 0.05) * f;
+    c.heading = hdgOut + Math.PI; c.ph = 'lift';
+  } else if (t < t5) {
+    const f = (t - t4) / tOut;
+    c.x = p.x - dx * f; c.z = p.z - dz * f;
+    c.y = cruiseY(c.x, c.z, Math.min(t - t4 + 4, t5 - t));
+    c.heading = hdgOut + Math.PI; c.ph = 'return';
+  } else {
+    c.flying = false; c.flightT = 0; c.pad = null;
+    c.x = c.baseX; c.z = c.baseZ; c.y = hAt(c.baseX, c.baseZ) + 0.05; c.ph = 'idle';
+  }
 }
 
 function advanceArmy(c, dt) {
   if (!c.flying) {
-    c.x = c.baseX; c.z = c.baseZ; c.y = hAt(c.baseX, c.baseZ) + 0.05; c.heading = 0;
+    c.x = c.baseX; c.z = c.baseZ; c.y = hAt(c.baseX, c.baseZ) + 0.05; c.heading = 0; c.ph = 'idle';
     return;
   }
+  c.ph = 'circuit';
   c.flightT += dt;
   const DUR = 25, f = Math.min(1, c.flightT / DUR), ang = c.flightT * 0.3, R = 25;
   c.x = c.baseX + Math.cos(ang) * R;
@@ -224,6 +271,7 @@ function advanceArmy(c, dt) {
 }
 
 function advanceNews(c, dt) {
+  c.ph = 'orbit';
   c.angle += dt * NEWS_OMEGA;
   c.x = c.baseX + Math.cos(c.angle) * NEWS_R;
   c.z = c.baseZ + Math.sin(c.angle) * NEWS_R;
@@ -232,7 +280,8 @@ function advanceNews(c, dt) {
 }
 
 function advanceCoastGuard(c, dt, maritime) {
-  if (c.hoverT > 0) { c.hoverT -= dt; return; }
+  if (c.hoverT > 0) { c.hoverT -= dt; c.ph = 'hover'; return; }
+  c.ph = 'patrol';
   c.s += dt * CG_SPD;
   const [lx, lz, dx, dz] = maritime.laneAt(c.s);
   c.x = lx; c.z = lz; c.y = hAt(lx, lz) + CG_ALT; c.heading = Math.atan2(-dx, -dz);
@@ -245,6 +294,7 @@ export class HeliSystem {
   constructor(scene, maritime) {
     this.maritime = maritime;
     this.candidates = mkCandidates(maritime);
+    this.day = 0; // game day, from update(…, days) — seeds the padstop: rolls
     this.t = 0;
     this.simT = 0; // accumulates in the real loop — wiring sentinel
     this.meshes = {};
@@ -272,7 +322,9 @@ export class HeliSystem {
 
   // debug/test hook: force a parked candidate of `kind` airborne right now,
   // respecting the cap — mirrors aviation.force(). Returns success.
-  force(kind) {
+  // opts.pad forces a medical pad-stop sortie regardless of the seeded roll
+  // (the roll itself has its own determinism check).
+  force(kind, opts = {}) {
     const c = this.candidates.find((x) => x.kind === kind && !x.flying);
     if (!c) return false;
     const w = c.weight ?? 1;
@@ -280,7 +332,18 @@ export class HeliSystem {
     for (const o of this.candidates) if (o.flying) used += o.weight ?? 1;
     if (used + w > CAP) return false;
     c.flying = true; c.flightT = 0; c.active = true;
+    if (c.kind === 'medical') this.startSortie(c, opts.pad === true);
     return true;
+  }
+
+  // sortie kickoff for medical: roll the seeded pad-stop stream for this
+  // day+sortie; a win swaps the plain out-and-back for a pad-stop timeline
+  startSortie(c, forcePad = false) {
+    c.sortieN++;
+    c.pad = null;
+    if (!c.fieldId) return;
+    const r = seededRand(`padstop:${c.city}:${this.day}:${c.sortieN}`);
+    if ((r() < PAD_ODDS || forcePad) && (c.pad = padAt(c.fieldId))) c.pad.dwell = 20 + r() * 20;
   }
 
   despawnAll() { for (const c of this.candidates) { c.flying = false; c.active = false; } }
@@ -293,9 +356,10 @@ export class HeliSystem {
     return best;
   }
 
-  update(dt, px, pz) {
+  update(dt, px, pz, days = 0) {
     this.t += dt;
     this.simT += dt;
+    this.day = Math.floor(days);
 
     // a flight keeps updating past MAT_R so a local hop completes instead of
     // freezing mid-air, but continuous kinds (news/coastguard) have no
@@ -340,7 +404,10 @@ export class HeliSystem {
         if (c.runT <= 0) {
           c.runT = c.kind === 'medical' ? 45 + Math.random() * 60 : 40 + Math.random() * 50;
           const odds = c.kind === 'medical' ? 0.35 : 0.4;
-          if (Math.random() < odds && used + weight <= CAP) { c.flying = true; c.flightT = 0; used += weight; }
+          if (Math.random() < odds && used + weight <= CAP) {
+            c.flying = true; c.flightT = 0; used += weight;
+            if (c.kind === 'medical') this.startSortie(c);
+          }
         }
       }
       if (c.kind === 'medical') advanceMedical(c, dt); else advanceArmy(c, dt);
@@ -392,17 +459,22 @@ function mkCandidates(maritime) {
     if (!city) continue;
     const r1 = seededRand('heli:medical:' + name);
     const a1 = r1() * Math.PI * 2, R1 = 14 + r1() * 6;
-    cands.push({ kind: 'medical', baseX: city.x + Math.cos(a1) * R1, baseZ: city.z + Math.sin(a1) * R1,
-      bearing: r1() * Math.PI * 2, tint: TINT.medical,
+    const baseX = city.x + Math.cos(a1) * R1, baseZ = city.z + Math.sin(a1) * R1;
+    // home field for pad stops: the city's nearest tier-1 field to the base
+    // (central Dallas medical flies to Love Field, not DFW)
+    const fieldId = AIRPORTS.filter((a) => a.tier === 1 && a.city === name)
+      .reduce((b, a) => (!b || Math.hypot(a.at[0] - baseX, a.at[1] - baseZ) < Math.hypot(b.at[0] - baseX, b.at[1] - baseZ) ? a : b), null)?.id ?? null;
+    cands.push({ kind: 'medical', city: name, fieldId, baseX, baseZ,
+      bearing: r1() * Math.PI * 2, tint: TINT.medical, ph: 'idle', pad: null, sortieN: 0,
       runT: 20 + Math.random() * 40, flying: false, flightT: 0, active: false, x: 0, y: 0, z: 0, heading: 0 });
     const r2 = seededRand('heli:news:' + name);
-    cands.push({ kind: 'news', baseX: city.x, baseZ: city.z, tint: TINT.news,
+    cands.push({ kind: 'news', city: name, baseX: city.x, baseZ: city.z, tint: TINT.news, ph: 'idle',
       angle: r2() * Math.PI * 2, flying: false, active: false, x: 0, y: 0, z: 0, heading: 0 });
   }
   const [cgx, cgz] = maritime.laneAt(maritime.len / 2); // mid-lane anchor, purely for the materialize distance check
-  cands.push({ kind: 'coastguard', baseX: cgx, baseZ: cgz, tint: TINT.coastguard,
+  cands.push({ kind: 'coastguard', baseX: cgx, baseZ: cgz, tint: TINT.coastguard, ph: 'idle',
     s: 0, hoverT: 0, flying: false, active: false, x: 0, y: 0, z: 0, heading: 0 });
-  cands.push({ kind: 'army', weight: 2, baseX: KILLEEN[0], baseZ: KILLEEN[1], tint: TINT.army,
+  cands.push({ kind: 'army', weight: 2, city: 'Killeen', baseX: KILLEEN[0], baseZ: KILLEEN[1], tint: TINT.army, ph: 'idle',
     runT: 20 + Math.random() * 30, flying: false, flightT: 0, active: false, x: 0, y: 0, z: 0, heading: 0 });
   return cands;
 }

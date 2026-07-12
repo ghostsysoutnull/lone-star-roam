@@ -20,9 +20,10 @@ import { MaritimeSystem } from './maritime.js';
 import { UFOSystem } from './ufo.js';
 import { FlareSystem } from './flares.js';
 import { DogSystem } from './dog.js';
-import { AirportSystem, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse } from './airports.js';
+import { AirportSystem, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt } from './airports.js';
 import { AviationSystem, daySchedule, AIRLINES } from './aviation.js';
 import { TowerRadio } from './radio.js';
+import { VOICES as chatterVoices, chatterLine, HELI_ID } from './chatter.js';
 import { HeliSystem, BlimpSystem } from './rotors.js';
 import { MilitaryAirSystem } from './military.js';
 import { applyGear } from './shop.js';
@@ -66,7 +67,7 @@ async function boot() {
   gameplay.onToast = (m) => hud.toast(m);
   const audio = new AudioSystem();
   const radio = new TowerRadio();
-  radio.onRadio = (text) => { audio.radio(text, { ufo: ATMOS.ufo }); hud.subtitle(text); };
+  radio.onRadio = (text, meta) => { audio.radio(text, { ufo: ATMOS.ufo, voice: chatterVoices[meta?.voice] }); hud.subtitle(text, meta?.header); };
   radio.onStamp = (id, name) => gameplay.logAirport(id, name);
   const npcs = new NPCSystem(scene, () => ({ night: ATMOS.night, weather: ATMOS.weather, counts: gameplay.counts() }));
   const missions = new MissionSystem(scene, gameplay, player, (m) => hud.toast(m), (k) => audio.chime(k));
@@ -79,6 +80,7 @@ async function boot() {
   const heli = new HeliSystem(scene, maritime);
   const blimp = new BlimpSystem(scene);
   const military = new MilitaryAirSystem(scene);
+  radio.helis = heli; radio.militaryAir = military; // A3 scanner sources (property pattern, like onRadio)
   trains.onHorn = () => audio.trainHorn();
   traffic.onHonk = (type) => audio.honk(type);
   animals.onSound = (kind) => audio[kind]?.();
@@ -152,7 +154,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, daySchedule, AIRLINES, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -169,7 +171,7 @@ async function boot() {
     traffic.setNight(ATMOS.night);
     trains.update(dt, player.pos.x, player.pos.z);
     maritime.update(dt, clock.elapsedTime);
-    heli.update(dt, player.pos.x, player.pos.z);
+    heli.update(dt, player.pos.x, player.pos.z, sky.days);
     blimp.update(dt, sky.days);
     military.update(dt, player.pos.x, player.pos.z, aviation);
     audio.heli(heli.nearestAirborneDist(player.pos.x, player.pos.z));
@@ -204,6 +206,7 @@ async function boot() {
         lastForecast = sky.forecast;
       }
       hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading), county, player.perks.radio ? sky.forecastLine() : null);
+      hud.updateTags(radio.sources, camera); // A5: aircraft tags share the scanner's enumeration
       hudTick = 0;
     }
     // headless verify sets __skipRender: every system above still ticks at full

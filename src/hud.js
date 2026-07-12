@@ -1,6 +1,16 @@
 // HUD: minimap + fullscreen map (border/highways pre-rendered once), text readouts, toasts, dialog.
+import { Vector3 } from 'three';
 import { GEO, nearestCity } from './geo.js';
 import { AIRPORTS, fieldNear } from './airports.js';
+
+// A5 tag text: airline jets show their route, GA/military just the callsign,
+// helis their operator brand (or service when unbranded — government kinds)
+const KIND_LABEL = { medical: 'Medical', news: 'News', coastguard: 'Coast Guard', army: 'Army' };
+function tagLabel(s) {
+  if (s.kind === 'jet') return `${s.cs.toUpperCase()} · ${s.route}`;
+  if (s.kind === 'ga' || s.kind === 'military') return s.cs.toUpperCase();
+  return `${s.cs.toUpperCase()} · ${s.op ?? KIND_LABEL[s.kind] ?? ''}`;
+}
 
 export class HUD {
   constructor() {
@@ -27,9 +37,21 @@ export class HUD {
       interact: document.getElementById('interact-hint'),
       help: document.getElementById('help'),
       subtitle: document.getElementById('radio-subtitle'),
+      subtitleHeader: document.getElementById('radio-header'),
+      subtitleText: document.getElementById('radio-text'),
     };
     this.subtitleQ = [];
     this.subtitleBusy = false;
+    // A5 tag pool: a handful of reusable labels is plenty — the scanner window
+    // rarely holds more airborne sources than that
+    const tagBox = document.getElementById('air-tags');
+    this.tagPool = Array.from({ length: 6 }, () => {
+      const el = document.createElement('div');
+      el.className = 'tag';
+      tagBox.appendChild(el);
+      return el;
+    });
+    this.tagV = new Vector3();
     this.mapLayer = this.renderMapLayer(1400, 1320);
     this.zoomLevels = [1.4, 2.4, 4.5];
     this.zoomIdx = 1;
@@ -224,23 +246,47 @@ export class HUD {
   }
 
   // tower radio: one line at a time, ~5 s each, queued (never overlapped —
-  // a busy tower shouldn't stomp its own subtitle mid-sentence)
-  subtitle(text) {
-    this.subtitleQ.push(text);
+  // a busy tower shouldn't stomp its own subtitle mid-sentence). A3: an
+  // optional header identifies the transmitter above the quote
+  // (📻 LONE STAR 23 · AUS → LBB)
+  subtitle(text, header = null) {
+    this.subtitleQ.push({ text, header });
     if (!this.subtitleBusy) this.pumpSubtitle();
   }
 
   pumpSubtitle() {
-    const text = this.subtitleQ.shift();
-    if (text == null) { this.subtitleBusy = false; return; }
+    const item = this.subtitleQ.shift();
+    if (item == null) { this.subtitleBusy = false; return; }
     this.subtitleBusy = true;
-    this.els.subtitle.textContent = text;
+    this.els.subtitleText.textContent = item.text;
+    this.els.subtitleHeader.textContent = item.header ?? '';
+    this.els.subtitleHeader.style.display = item.header ? 'block' : 'none';
     this.els.subtitle.style.opacity = 1;
     clearTimeout(this.subtitleTimer);
     this.subtitleTimer = setTimeout(() => {
       this.els.subtitle.style.opacity = 0;
       setTimeout(() => this.pumpSubtitle(), 350);
     }, 5000);
+  }
+
+  // A5 aircraft proximity tags: pooled DOM labels over any airborne source in
+  // the scanner's window (radio.sources — one enumeration, two consumers),
+  // world→screen projected at the HUD's 12 Hz, fading with distance
+  updateTags(sources, camera) {
+    const pool = this.tagPool;
+    let i = 0;
+    for (const s of sources ?? []) {
+      if (!s.air || i >= pool.length) continue;
+      this.tagV.set(s.x, s.y + 2.5, s.z).project(camera);
+      if (this.tagV.z > 1 || this.tagV.z < -1) continue; // behind the camera
+      const el = pool[i++];
+      el.textContent = tagLabel(s);
+      el.style.left = `${(this.tagV.x * 0.5 + 0.5) * innerWidth}px`;
+      el.style.top = `${(-this.tagV.y * 0.5 + 0.5) * innerHeight}px`;
+      el.style.opacity = Math.max(0.25, 1 - s.d / 60).toFixed(2);
+      el.style.display = 'block';
+    }
+    for (; i < pool.length; i++) pool[i].style.display = 'none';
   }
 
   interactHint(label) {

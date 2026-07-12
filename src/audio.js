@@ -207,21 +207,24 @@ export class AudioSystem {
   // clearance reads longer than "radar contact." Ducks the engine under the
   // transmission (radioDuck, not engineGain — that's rewritten every frame).
   // opts.ufo (0..~1, ATMOS.ufo) chops the gain with random dropouts — the
-  // Levelland effect reaching the avionics.
+  // Levelland effect reaching the avionics. opts.voice {p, r} (chatter.js
+  // VOICES) retunes pitch and syllable rate so a calm dispatcher, a quick
+  // news pilot and a clipped two-ship are audibly distinct voices.
   radio(text, opts = {}) {
     if (!this.ctx || this.muted) return;
     const ctx = this.ctx;
-    const dur = Math.min(4.2, Math.max(0.9, text.length * 0.045));
+    const vp = opts.voice?.p ?? 1, vr = opts.voice?.r ?? 1;
+    const dur = Math.min(4.2, Math.max(0.9, text.length * 0.045)) / vr;
     const t0 = ctx.currentTime + 0.02;
 
     this.note(1800, 0, 0.02, 0.05, 'square'); // squelch open
 
     const o = ctx.createOscillator();
     o.type = 'sawtooth';
-    o.frequency.setValueAtTime(120, t0);
+    o.frequency.setValueAtTime(120 * vp, t0);
     const f = ctx.createBiquadFilter();
     f.type = 'bandpass';
-    f.frequency.setValueAtTime(900, t0);
+    f.frequency.setValueAtTime(900 * vp, t0);
     f.Q.value = 3.2;
     const wob = ctx.createOscillator(); // wobbling center frequency
     wob.frequency.value = 5.3;
@@ -230,7 +233,7 @@ export class AudioSystem {
     wob.connect(wobAmt).connect(f.frequency);
     const syl = ctx.createOscillator(); // ~4 Hz syllable AM
     syl.type = 'square';
-    syl.frequency.value = 3.6 + Math.random() * 0.8;
+    syl.frequency.value = (3.6 + Math.random() * 0.8) * vr;
     const sylAmt = ctx.createGain();
     sylAmt.gain.value = 0.05;
 
