@@ -335,6 +335,31 @@ export class HUD {
     ctx.fill();
   }
 
+  // Interstate identity in the dark theme: the top-third banner as a deep navy
+  // band + dark red stripe, softly backlit at their seams (a blue and a red
+  // glow line), so the shield still reads as an Interstate without leaving the
+  // dark palette. Clipped to the shield path; amber outline/number drawn after.
+  nightBanner(ctx, path, x, y, w, h) {
+    const bandH = h * 0.24, stripeH = h * 0.09, seam = y + bandH, stripeEnd = seam + stripeH;
+    ctx.save();
+    path();
+    ctx.clip();
+    const bg = ctx.createLinearGradient(0, y, 0, seam);
+    bg.addColorStop(0, '#0d1a36');
+    bg.addColorStop(1, '#1b3768');
+    ctx.fillStyle = bg;
+    ctx.fillRect(x, y, w, bandH);
+    ctx.fillStyle = '#511320';
+    ctx.fillRect(x, seam, w, stripeH);
+    ctx.lineWidth = 1.6;
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = '#5a86e0'; ctx.shadowColor = '#5a86e0'; ctx.shadowBlur = 6; // blue glow at the band/stripe seam
+    ctx.beginPath(); ctx.moveTo(x, seam); ctx.lineTo(x + w, seam); ctx.stroke();
+    ctx.strokeStyle = '#e8465a'; ctx.shadowColor = '#e8465a'; // red glow under the stripe
+    ctx.beginPath(); ctx.moveTo(x, stripeEnd); ctx.lineTo(x + w, stripeEnd); ctx.stroke();
+    ctx.restore();
+  }
+
   specularStreak(ctx, x, y, w, h) {
     const g = ctx.createLinearGradient(x, y, x + w * 0.6, y + h * 0.6);
     g.addColorStop(0, 'rgba(255,255,255,0)');
@@ -394,6 +419,7 @@ export class HUD {
     this.chromeExtrude(ctx, path);
     if (night) {
       this.nightFace(ctx, path, cx - w / 2, top, w, h);
+      this.nightBanner(ctx, path, cx - w / 2, top, w, h); // deep navy band + dark red stripe, backlit seams
     } else {
       this.chromeFace(ctx, path, cx - w / 2, top, w, h);
       ctx.save();
