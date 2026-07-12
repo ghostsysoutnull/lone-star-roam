@@ -65,7 +65,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     },
     lowlevel() {
       tp(-2600, 300, 0);
-      const ok = military.force('lowlevel', aviation);
+      const ok = military.force('lowlevel', aviation, -2600, 300); // explicit — see military.js force() comment
       hud.toast(ok ? '✈️ Low-level trainer pair, West Texas' : '✈️ Sky already at the fixed-wing cap');
     },
     testRadio() {

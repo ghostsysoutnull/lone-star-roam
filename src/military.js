@@ -80,8 +80,12 @@ export class MilitaryAirSystem {
   }
 
   // debug/test hook: force a parked pair airborne now, respecting the shared
-  // fixed-wing cap — mirrors heli.force()/aviation.force()
-  force(kind, aviation) {
+  // fixed-wing cap — mirrors heli.force()/aviation.force(). px/pz default to
+  // the last update() position but take an explicit override: a debug
+  // teleport calls force() in the same tick as tp(), before the next real
+  // update() refreshes this.px/this.pz, so a stale fallback would roll the
+  // low-level pass around the player's pre-teleport spot instead of the new one.
+  force(kind, aviation, px = this.px, pz = this.pz) {
     const c = this.candidates.find((x) => x.kind === kind && !x.flying);
     if (!c) return false;
     if (this.candidates.some((x) => x.flying)) return false; // one pair at a time
@@ -91,7 +95,7 @@ export class MilitaryAirSystem {
       const a = Math.random() * Math.PI * 2;
       c.x0 = ELLINGTON[0] + Math.cos(a) * 280; c.z0 = ELLINGTON[1] + Math.sin(a) * 280;
     } else {
-      this.rollLowlevel(c, this.px ?? WEST_TEXAS_X - 100, this.pz ?? 300);
+      this.rollLowlevel(c, px ?? WEST_TEXAS_X - 100, pz ?? 300);
     }
     return true;
   }

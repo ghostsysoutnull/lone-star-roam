@@ -28,6 +28,35 @@ export default async function debug(t) {
     t.ok(await t.ev('g.ufo.saucer.visible'), 'saucer not visible');
   });
 
+  await t.check('nasa debug action teleports near Ellington and launches the pair through the real loop', async () => {
+    await t.ev('(g.military.despawnAll(), g.aviation.despawnAll(), g.debug.actions.nasa())');
+    await t.until(`g.military.candidates.find((x) => x.kind === 'nasa').flying`, 5000);
+    const d = await t.ev(`(() => {
+      const c = g.military.candidates.find((x) => x.kind === 'nasa');
+      return Math.hypot(g.player.pos.x - c.baseX, g.player.pos.z - c.baseZ);
+    })()`);
+    t.ok(d < 60, `player wasn't teleported near Ellington (dist ${d})`);
+    await t.ev('g.military.despawnAll()');
+  });
+
+  await t.check('lowlevel debug action rolls the flyby around the new teleport spot, not a stale pre-teleport one', async () => {
+    // start the player far east so a stale g.military.px/pz (only refreshed
+    // inside update()) would roll the pass around the wrong place entirely —
+    // a same-position check wouldn't have caught that class of bug
+    await t.ev('(g.military.despawnAll(), g.aviation.despawnAll(), g.player.pos.set(2000, 0, 2000))');
+    await t.wait(0.2); // let a real frame latch military.px/pz to the far-east spot
+    const r = await t.ev(`(() => {
+      g.debug.actions.lowlevel();
+      const c = g.military.candidates.find((x) => x.kind === 'lowlevel');
+      const mx = (c.x0 + c.x1) / 2, mz = (c.z0 + c.z1) / 2;
+      return { flying: c.flying, px: g.player.pos.x, dist: Math.hypot(mx - g.player.pos.x, mz - g.player.pos.z) };
+    })()`);
+    t.ok(r.flying, 'lowlevel debug action did not launch the pair');
+    t.ok(r.px < -2200, `player wasn't teleported into the Trans-Pecos (x=${r.px})`);
+    t.ok(r.dist < 40, `flyby rolled ${r.dist} units from the teleport spot — looks stale`);
+    await t.ev('g.military.despawnAll()');
+  });
+
   await t.check('weather actions pin the sky', async () => {
     await t.ev('g.debug.actions.storm()');
     await t.until(`g.ATMOS.weather === 'storm'`, 10000);
