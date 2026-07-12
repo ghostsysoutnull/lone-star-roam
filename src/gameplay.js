@@ -53,6 +53,7 @@ export class Gameplay {
     this.save.job ??= null;    // active delivery, serialized by missions.js
     this.save.gear ??= {};     // shop purchase levels by item id (shop.js)
     this.save.legends ??= [];  // haunts witnessed (haunts.js LEGENDS keys)
+    this.save.airports ??= []; // logbook: towered fields actually landed at (radio.js)
     this.saveTimer = 0;
     this.countyNow = null;
     this.countyToastT = 0;
@@ -69,7 +70,7 @@ export class Gameplay {
       cities: this.save.cities.length, landmarks: this.save.landmarks.length,
       roses: this.save.roses.length, species: this.save.species.length,
       counties: this.save.counties.length, bank: this.save.bank,
-      legends: this.save.legends.length,
+      legends: this.save.legends.length, airports: this.save.airports.length,
     };
   }
 
@@ -108,6 +109,15 @@ export class Gameplay {
     this.persist();
     this.onToast?.(`👻 ${label} (${this.save.legends.length}/${total})${fact ? ` — ${fact}` : ''}`);
     this.onCollect?.('legend');
+  }
+
+  // logbook stamp — landing-only (radio.js), the 10th collectible
+  logAirport(id, name) {
+    if (this.save.airports.includes(id)) return;
+    this.save.airports.push(id);
+    this.persist();
+    this.onToast?.(`✈️ ${name} — logbook stamped (${this.save.airports.length}/7)`);
+    this.onCollect?.('stamp');
   }
 
   persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); }

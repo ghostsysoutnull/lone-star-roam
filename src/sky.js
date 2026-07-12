@@ -407,6 +407,9 @@ export class SkySystem {
     return WEATHER[this.target].icon;
   }
 
+  // current weather in words — ATIS reads this, never re-derives it
+  weatherName() { return WEATHER[this.target].name; }
+
   // What's up there right now: moon + phase, visible planets, the constellation you're facing
   skyReport(heading) {
     if (!this.celestial) return '';

@@ -286,6 +286,16 @@ export class AviationSystem {
 
   despawnAll() { this.flights.length = 0; }
 
+  // go-around: the flight climbs out live and recycles in the murk. Storm
+  // weather triggers this above (update); wave-3 tower radio triggers it too,
+  // when the player is parked on the runway a flight is inbound to.
+  divert(m) {
+    const st = m.st;
+    const s = Math.max(st.speed, m.fl.T.cruise * 0.8);
+    m.divert = { x: st.x, z: st.z, y: st.y, vx: st.hx * s, vz: st.hz * s, hx: st.hx, hz: st.hz };
+    this.spent.add(m.sl.key);
+  }
+
   update(dt, px, pz, days) {
     this.simT += dt;
     this.px = px; this.pz = pz;
@@ -313,9 +323,7 @@ export class AviationSystem {
       if (stop && held) continue; // ground stop: age freezes, delay accumulates
       if (stop && (st.ph === 'descend' || st.ph === 'final')
         && Math.hypot(st.x - byId[m.sl.dest].at[0], st.z - byId[m.sl.dest].at[1]) < 320) {
-        const s = Math.max(st.speed, m.fl.T.cruise * 0.8);
-        m.divert = { x: st.x, z: st.z, y: st.y, vx: st.hx * s, vz: st.hz * s, hx: st.hx, hz: st.hz };
-        this.spent.add(m.sl.key);
+        this.divert(m);
         continue;
       }
       m.age += dt * (st.ph === 'taxi' || st.ph === 'taxiin' ? slow : 1);

@@ -36,7 +36,7 @@ export default async function shop(t) {
       return { n: btns.length - swatches.length, sw: swatches.length, disabled: btns.every((b) => b.disabled),
                lvl: g.gameplay.save.gear.engine ?? 0, bank: g.gameplay.save.bank };
     })()`);
-    t.ok(r.n === 5, `${r.n} shop items rendered, expected 5`);
+    t.ok(r.n === 6, `${r.n} shop items rendered, expected 6`);
     t.ok(r.sw === 7, `${r.sw} paint swatches rendered, expected 7`);
     t.ok(r.disabled, 'an unaffordable item was clickable');
     t.ok(r.lvl === 0 && r.bank === 0, `broke purchase went through (lvl ${r.lvl}, bank ${r.bank})`);

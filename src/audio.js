@@ -26,7 +26,11 @@ export class AudioSystem {
     // prop AM stage: an LFO chops the engine tone at blade frequency in FLY mode
     this.propMod = ctx.createGain();
     this.propMod.gain.value = 1;
-    this.engineFilter.connect(this.propMod).connect(this.engineGain);
+    // radio duck: a separate multiplier so a transmission can dip the engine
+    // without fighting the per-frame engineGain automation in update()
+    this.radioDuck = ctx.createGain();
+    this.radioDuck.gain.value = 1;
+    this.engineFilter.connect(this.propMod).connect(this.radioDuck).connect(this.engineGain);
     this.propLfo = ctx.createOscillator();
     this.propLfo.type = 'sine';
     this.propLfo.frequency.value = 18;
@@ -170,8 +174,73 @@ export class AudioSystem {
       cash: [[880, 0, 0.1, 0.08], [1109, 0.08, 0.1, 0.08], [1319, 0.16, 0.12, 0.09], [1760, 0.24, 0.45, 0.1]],
       buy: [[659, 0, 0.1, 0.07], [880, 0.09, 0.12, 0.08], [1319, 0.18, 0.35, 0.09]],
       legend: [[392, 0, 0.55, 0.06], [466, 0.18, 0.55, 0.06], [587, 0.36, 1.0, 0.07]], // minor rise — something's out there
+      stamp: [[660, 0, 0.12, 0.07], [880, 0.09, 0.14, 0.08], [1320, 0.18, 0.4, 0.09]], // logbook stamped
     };
     for (const [f, w, d, g] of SONGS[kind] || []) this.note(f, w, d, g ?? 0.1, 'triangle');
+  }
+
+  // tower radio: squelch click → syllabic gibberish burst (no TTS, no words —
+  // sawtooth through a wobbling bandpass, chopped at ~4 Hz to read as speech
+  // cadence) → closing squelch. Duration follows text length so a longer
+  // clearance reads longer than "radar contact." Ducks the engine under the
+  // transmission (radioDuck, not engineGain — that's rewritten every frame).
+  // opts.ufo (0..~1, ATMOS.ufo) chops the gain with random dropouts — the
+  // Levelland effect reaching the avionics.
+  radio(text, opts = {}) {
+    if (!this.ctx || this.muted) return;
+    const ctx = this.ctx;
+    const dur = Math.min(4.2, Math.max(0.9, text.length * 0.045));
+    const t0 = ctx.currentTime + 0.02;
+
+    this.note(1800, 0, 0.02, 0.05, 'square'); // squelch open
+
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(120, t0);
+    const f = ctx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.setValueAtTime(900, t0);
+    f.Q.value = 3.2;
+    const wob = ctx.createOscillator(); // wobbling center frequency
+    wob.frequency.value = 5.3;
+    const wobAmt = ctx.createGain();
+    wobAmt.gain.value = 220;
+    wob.connect(wobAmt).connect(f.frequency);
+    const syl = ctx.createOscillator(); // ~4 Hz syllable AM
+    syl.type = 'square';
+    syl.frequency.value = 3.6 + Math.random() * 0.8;
+    const sylAmt = ctx.createGain();
+    sylAmt.gain.value = 0.05;
+
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.05, t0 + 0.04);
+    g.gain.setValueAtTime(0.05, t0 + dur - 0.06);
+    g.gain.linearRampToValueAtTime(0, t0 + dur);
+    syl.connect(sylAmt).connect(g.gain);
+
+    const ufo = opts.ufo || 0;
+    if (ufo > 0) {
+      const drops = 1 + Math.floor(ufo * 4);
+      for (let i = 0; i < drops; i++) {
+        const dt2 = t0 + 0.1 + Math.random() * Math.max(0.1, dur - 0.3);
+        g.gain.setTargetAtTime(0.005, dt2, 0.015);
+        g.gain.setTargetAtTime(0.05, dt2 + 0.08, 0.02);
+      }
+    }
+
+    o.connect(f).connect(g).connect(this.sfx);
+    o.start(t0); wob.start(t0); syl.start(t0);
+    o.stop(t0 + dur + 0.05); wob.stop(t0 + dur + 0.05); syl.stop(t0 + dur + 0.05);
+
+    this.note(1500, dur + 0.03, 0.02, 0.045, 'square'); // squelch close
+
+    const d = this.radioDuck.gain;
+    d.cancelScheduledValues(t0);
+    d.setValueAtTime(1, t0);
+    d.linearRampToValueAtTime(0.35, t0 + 0.05);
+    d.setValueAtTime(0.35, t0 + dur - 0.08);
+    d.linearRampToValueAtTime(1, t0 + dur);
   }
 
   // footstep: soft thump + spur jingle every other stride

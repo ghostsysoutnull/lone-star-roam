@@ -8,7 +8,7 @@ import { EROCK } from './haunts.js';
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -44,6 +44,12 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation }) {
       const f = aviation.force('arrival');
       hud.toast(f ? `🛬 Lone Star ${f.sl.n} inbound from ${f.sl.from}` : '🛬 No field in range / sky full');
     },
+    testRadio() {
+      const { a } = radio.nearestTowered(player.pos.x, player.pos.z);
+      if (!a) return hud.toast('📻 No towered field found');
+      radio.tx(a, `${a.city} Tower testing, one two three.`, 'test');
+      hud.toast(`📻 Test transmission — ${a.city} Tower`);
+    },
   };
   for (const w of ['clear', 'clouds', 'rain', 'storm', 'dust']) actions[w] = () => setWeather(w);
 
@@ -52,7 +58,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation }) {
       ['day', '🌞 Day'], ['night', '🌙 Night'], ['midnight', '🕛 Midnight'],
       ['hauntCemetery', '👻 Haunt cemetery'], ['ghostFires', '🔥 Ghost fires'],
       ['saucer', '🛸 Saucer'], ['formation', '✨ Lubbock lights'], ['bats', '🦇 Bat show'],
-      ['departure', '🛫 Departure'], ['arrival', '🛬 Arrival'],
+      ['departure', '🛫 Departure'], ['arrival', '🛬 Arrival'], ['testRadio', '📻 Test radio'],
       ['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'], ['storm', '⛈ Storm'], ['dust', '🌪 Dust'],
     ];
     const el = document.createElement('div');

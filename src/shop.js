@@ -24,6 +24,9 @@ export const SHOP = [
   { id: 'radio', icon: '📻', name: 'Weather radio', prices: [400],
     tiers: ['hear the weather coming before it hits'],
     done: 'Crackling on the dash' },
+  { id: 'avionics', icon: '🎙️', name: 'Aviation band radio', prices: [500],
+    tiers: ['dial into any towered field, any mode, any distance'],
+    done: 'Scanning the tower frequencies' },
 ];
 
 // paint shop: a fresh coat any time, index 0 is the factory blue (vehicle.js)
@@ -71,6 +74,7 @@ export function applyGear(save, player, dog) {
     rainDrag: TIRE_RAIN[lvl('tires')],
     lightI: LIGHT_I[lvl('lights')],
     radio: lvl('radio') > 0,
+    avionics: lvl('avionics') > 0,
   };
   player.truck.userData.bodyMat.color.setHex(PAINTS[save.gear?.paint ?? 0].hex);
   dog?.setOwned(lvl('dog') > 0);

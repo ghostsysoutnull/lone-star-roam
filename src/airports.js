@@ -174,15 +174,22 @@ export function runwayInUse(a, day) {
     dx: r.dx * s, dz: r.dz * s };                           // takeoff/landing world direction
 }
 
-// a point is clear of every runway corridor by `rad` (keeps our own terminal
-// and hangars off the pavement, crossing-runway fields included)
-function clearOfRunways(a, x, z, rad) {
+// true when (x,z) sits within `rad` of any of this airport's runway corridors
+// (pavement + safety margin) — wave-3 tower radio uses this to detect a
+// blocked runway (the player parked on it triggers an AI go-around)
+export function onRunway(a, x, z, rad = 1.5) {
   for (const r of a.rws) {
     const ex = x - r.cx, ez = z - r.cz;
     const u = ex * r.dx + ez * r.dz, v = ex * -r.dz + ez * r.dx;
-    if (Math.abs(v) < r.w / 2 + rad && Math.abs(u) < r.hl + rad) return false;
+    if (Math.abs(v) < r.w / 2 + rad && Math.abs(u) < r.hl + rad) return true;
   }
-  return true;
+  return false;
+}
+
+// a point is clear of every runway corridor by `rad` (keeps our own terminal
+// and hangars off the pavement, crossing-runway fields included)
+function clearOfRunways(a, x, z, rad) {
+  return !onRunway(a, x, z, rad);
 }
 
 export class AirportSystem {

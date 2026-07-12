@@ -117,40 +117,30 @@ Shipped as specced (details folded into ROADMAP.md). Notes for later waves:
   "traffic holding on the runway" go-around should reuse the same divert
   machinery, triggered by the player parked on the pavement instead.
 
-### Wave 3 — Tower radio (the flagship)
+### Wave 3 — Tower radio (the flagship) — ✅ shipped 2026-07-11
 
-- audio.js `radio(text, opts)`: keyed squelch click → syllabic gibberish
-  burst sized to text length (sawtooth ~120 Hz through a wobbling ~900 Hz
-  bandpass, ~4 Hz syllable AM — the prop-AM/rattle idioms) → closing squelch.
-  Constant volume while receivable (radios don't distance-fade); ducks under
-  the engine. No TTS — it can't route through WebAudio and breaks the
-  aesthetic.
-- HUD subtitle line (rem-based, own element, ~5 s fade, one-line queue):
-  `📻 Love Tower: Lone Star 1, wind 340 at 8, runway 31, cleared to land.`
-- Receivable when: player is in FLY (you're in the plane — the ask) within
-  ~250 units of a towered field, **or** anywhere/any mode with the shop's
-  **aviation band radio** (~$500, weather-radio precedent → `perks.avionics`).
-- Content, all event-driven off real sim state:
-  - ATIS on entering tower range: wind (runway-in-use math), sky/weather
-    from live `ATMOS`, forecast from `sky.forecast` (radio-perk synergy).
-  - AI ops narrated as they happen: taxi, takeoff clearance, landing
-    clearance, go-around on a blocked runway (player parked on it — traffic
-    honk precedent, in phraseology: "traffic holding on the runway...").
-  - Player flow: "radar contact" entering the ring; aligned within ±20° of
-    the runway, descending, inside the approach cone → cleared to land;
-    touchdown below AGL 3 at < 40 speed on the pad → "welcome to {city}" +
-    **logbook stamp**.
-  - UFO crossover: `ATMOS.ufo > 0` chops the radio gain (Levelland reaches
-    the avionics) and fires the one spooky template ("unidentified traffic…
-    say intentions").
-- **Logbook = 10th collectible**: `save.airports` (additive key only), ✈️
-  row in the score panel, new `stamp` chime, counts in `gameplay.counts()`.
-  Landing-only on purpose — it's FLY's progression loop; drive-up visits get
-  the sign and the chatter, not the stamp.
-- Verify at natural values: approach flown at an ugly offset angle and a real
-  parked-short distance; stamp appended exactly once; not receivable in
-  DRIVE without the perk; receivable in FLY near the field; subtitle DOM
-  text present; ATIS wind matches the seeded runway-in-use.
+Shipped as specced (details folded into ROADMAP.md). Notes for later waves:
+`src/radio.js` is standalone (not inside `AviationSystem`) — it reads
+`aviation.flights`/`airports`/the player and is driven from main.js as
+`radio.update(dt, player, aviation, sky)`. `TOWERED`/`TOWERED_COUNT` (the 7
+tier-1 hubs, exported from radio.js) is the definition of "has a tower" —
+reuse it rather than checking `tier === 1` inline. `AviationSystem.divert(m)`
+is now public (factored out of the storm go-around) — wave 4 rotor traffic
+or wave 5 charter jobs needing a forced diversion should call it, not
+reimplement the climb-out math. `airports.js` exports `onRunway(a,x,z,rad)`
+(pavement-corridor test, `clearOfRunways` is now its negation) — the wave-4
+helicopter helipad/hover logic and any future "is this point on pavement"
+check should reuse it. The logbook (`save.airports`) is towered-fields-only
+(`/7`, not `/20`) — landing at a towerless strip gets the sign and scenery,
+not a stamp; wave 5's charter jobs / duster-pilot NPC are the strips' moment.
+Radio reception and the player's own approach-narration flow are two
+different gates: ATIS/ops narration follow `receivable()` (FLY-in-range or
+the `perks.avionics` shop item, unlimited range); the "radar contact →
+cleared → touchdown" flow additionally requires FLY mode regardless of the
+perk (you can't land a plane you aren't flying). The blocked-runway
+go-around is deliberately *not* gated on reception — it's a physical safety
+behavior — so wave 4 rotor/airship collision-adjacent behavior should follow
+the same pattern (check the physical world, gate only the narration).
 
 ### Wave 4 — Rotors & airships
 

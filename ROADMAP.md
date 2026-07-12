@@ -43,6 +43,41 @@ ship.
   on-runway touchdown, ground stop + go-around, watched-park persistence,
   airborne cap, real-rAF plane-moves sentinel).
 
+- [x] ~~Aviation wave 3 — Tower radio~~ — done 2026-07-11: `src/radio.js`
+  `TowerRadio`, a standalone narration layer (not folded into
+  `AviationSystem` — keeps aviation.js's `update(dt, px, pz, days)` signature
+  and construction order intact, avoids an import cycle) that reads live
+  `aviation.flights` phase edges, `airports.js` runway-in-use/wind, and the
+  player, and turns them into transmissions. `audio.js` `radio(text, opts)`:
+  sawtooth-through-wobbling-bandpass gibberish burst (~4 Hz syllable AM)
+  between squelch clicks, sized to text length, no TTS; a new `radioDuck`
+  gain node (separate from the per-frame `engineGain` automation) ducks the
+  engine under a transmission; `opts.ufo` chops the gain with random dropouts
+  (the Levelland effect reaching the avionics). HUD subtitle (`hud.subtitle`,
+  rem-based, ~5 s fade, one-line queue). Receivable in FLY within 250 units
+  of a towered (tier-1) field, or anywhere/any mode with the new shop item
+  (`perks.avionics`, $500). ATIS fires on tuning in, reading `windFrom`/
+  `runwayInUse` (never re-derived) + live `ATMOS`/`sky.forecast`; AI ops
+  narrated off `flights[i].st.ph` phase edges (roll → cleared for takeoff,
+  final → cleared to land, divert → go-around); player's own flow (FLY-only,
+  independent of the perk) — radar contact → cleared to land (±20° aligned,
+  descending, inside the approach cone) → touchdown (AGL < 3, speed < 40, on
+  the pavement) → "welcome to {city}" + logbook stamp. A blocked-runway
+  go-around is a physical check run every frame for all 7 towered fields
+  regardless of radio reception (real safety behavior doesn't need a
+  listener) and reuses wave 2's go-around machinery via a new
+  `aviation.divert(m)` (factored out of the storm-diversion branch).
+  Logbook = 10th collectible (`save.airports`, additive, dedup by field id,
+  ✈️ row `/7`, new `stamp` chime). Debug `📻 Test radio` action. 9 new
+  checks: reception gating (FLY/DRIVE/perk), a real-rAF wiring sentinel (only
+  the main loop can tune a field in — every other check drives `radio.update`
+  manually, so this is the one that would have caught a dropped wire), the
+  UFO spooky template, ATIS content vs. seeded wind/runway + subtitle DOM
+  text, an off-axis approach that stays at "contact" while misaligned and
+  reaches "cleared"/a single stamp once corrected, the touchdown gate
+  rejecting too-fast/too-high/off-pavement, landing-twice dedup, the physical
+  go-around, and the real WebAudio synth path running error-free.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

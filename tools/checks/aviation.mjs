@@ -366,6 +366,221 @@ export default async function aviation(t) {
     await t.ev('g.aviation.despawnAll()');
   });
 
+  // ---- wave 3: tower radio ----
+  // radio.js is a pure narration layer (no import of aviation.js — it reads
+  // the live aviation/airports/sky state passed into update()). Reception,
+  // ATIS content and the player's own approach/landing flow are asserted at
+  // ugly values (off-axis heading, real touchdown thresholds), matching the
+  // charging-deer lesson from wave 2. A blocked-runway go-around is asserted
+  // as a physical event (aviation.divert firing) independent of whether
+  // anyone is tuned in — real safety behavior doesn't need a listener.
+
+  await t.check('reception: FLY within range, not DRIVE without the perk, anywhere with it', async () => {
+    const r = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      g.player.perks.avionics = false;
+      g.player.setMode('DRIVE');
+      g.player.pos.set(a.at[0] + 42, 0, a.at[1] + 57);
+      const driveClose = g.radio.receivable(g.player);
+      g.player.setMode('FLY');
+      g.player.pos.y = g.hAt(g.player.pos.x, g.player.pos.z) + 35;
+      const flyClose = g.radio.receivable(g.player);
+      g.player.pos.set(-2767, 40, 334); // the empty I-10 west stretch — clear of every field
+      const flyFar = g.radio.receivable(g.player);
+      g.player.perks.avionics = true;
+      const flyFarPerk = g.radio.receivable(g.player);
+      g.player.setMode('DRIVE');
+      g.player.pos.y = 0;
+      const driveFarPerk = g.radio.receivable(g.player);
+      g.player.perks.avionics = false;
+      return { driveClose: !!driveClose, flyClose: flyClose?.id ?? null, flyFar: !!flyFar,
+        flyFarPerk: flyFarPerk?.id ?? null, driveFarPerk: driveFarPerk?.id ?? null };
+    })()`);
+    t.ok(!r.driveClose, 'receivable while driving close to a towered field, no perk');
+    t.ok(r.flyClose === 'AUS', `not receivable flying close to Austin (got ${r.flyClose})`);
+    t.ok(!r.flyFar, 'receivable 200+ km from every towered field, no perk');
+    t.ok(r.flyFarPerk, `perk didn't grant reception far away in FLY (got ${r.flyFarPerk})`);
+    t.ok(r.driveFarPerk, `perk didn't grant reception far away while driving (got ${r.driveFarPerk})`);
+  });
+
+  await t.check('tower radio ticks through the real loop (wiring sentinel)', async () => {
+    await t.tp(-2767, 334, 'FLY', 40); // clear of every towered field first
+    await t.ev(`(g.radio.tunedField = null, g.player.perks.avionics = false)`);
+    await t.tp(aus[0] + 60, aus[1] + 40, 'FLY', 40); // into AUS range — no manual radio.update() calls
+    await t.until(`g.radio.tunedField === 'AUS'`, 8000); // only the real rAF loop can set this
+  });
+
+  await t.check('UFO nearby chops in the one spooky template', async () => {
+    const r = await t.ev(`(() => {
+      g.player.setMode('DRIVE'); // avoid the same-frame ATIS/contact overwrite the FLY flow has
+      g.player.perks.avionics = true;
+      g.radio.tunedField = null; g.radio.ufoWas = false;
+      g.player.pos.set(-2767, 0, 334);
+      g.radio.update(0.05, g.player, g.aviation, g.sky); // tunes in (ATIS)
+      const prevUfo = g.ATMOS.ufo;
+      g.ATMOS.ufo = 0.8;
+      g.radio.update(0.05, g.player, g.aviation, g.sky);
+      const kind = g.radio.lastTx?.kind;
+      g.ATMOS.ufo = prevUfo;
+      g.player.perks.avionics = false;
+      return kind;
+    })()`);
+    t.ok(r === 'ufo', `UFO nearby didn't produce the spooky template (got ${r})`);
+  });
+
+  await t.check('ATIS on entering range matches windFrom/runwayInUse; subtitle shows the text', async () => {
+    await t.tp(-2767, 334, 'FLY', 40); // clear of every towered field first, so tunedField starts null
+    const r = await t.ev(`(() => {
+      g.radio.tunedField = null; g.radio.flow = 'none'; g.radio.lastTx = null;
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      const day = Math.floor(g.sky.days);
+      const x = a.at[0] + 61, z = a.at[1] + 39;
+      g.player.perks.avionics = false;
+      g.player.setMode('FLY');
+      g.player.pos.set(x, g.hAt(x, z) + 37, z);
+      g.radio.update(0.05, g.player, g.aviation, g.sky);
+      let n = Math.round((((g.runwayInUse(a, day).hdg % 360) + 360) % 360) / 10); if (n === 0) n = 36;
+      return { lastTx: g.radio.lastTx, wind: g.windFrom(day), rwy: String(n).padStart(2, '0') };
+    })()`);
+    t.ok(r.lastTx?.kind === 'atis', `first tx on entering range should be ATIS, got ${r.lastTx?.kind}`);
+    t.ok(r.lastTx.field === 'AUS', `ATIS tuned to the wrong field (${r.lastTx.field})`);
+    t.ok(r.lastTx.wind === r.wind, `ATIS wind ${r.lastTx.wind} !== windFrom ${r.wind}`);
+    t.ok(r.lastTx.rwy === r.rwy, `ATIS runway ${r.lastTx.rwy} !== runway-in-use ${r.rwy}`);
+    t.ok(r.lastTx.text.includes(String(r.wind)), 'ATIS text missing the wind number');
+    const sub = await t.ev(`document.getElementById('radio-subtitle').textContent`);
+    t.ok(sub.length > 0 && sub === r.lastTx.text, `subtitle text "${sub}" doesn't match the last transmission`);
+  });
+
+  await t.check('off-axis approach: misaligned holds at "contact," aligns to "cleared," single stamp on touchdown', async () => {
+    await t.tp(aus[0] + 800, aus[1] + 800, 'FLY', 40); // clear of the ring before scripting the approach
+    const r = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      const day = Math.floor(g.sky.days);
+      const u = g.runwayInUse(a, day);
+      g.gameplay.save.airports = [];
+      g.player.perks.avionics = false;
+      g.radio.tunedField = null; g.radio.flow = 'none'; g.radio.lastTx = null;
+      g.player.setMode('FLY');
+      const targetH = -Math.atan2(u.dx, -u.dz); // compass hdg -> player.heading convention
+      const dt = 0.05, steps = 460;
+      let flowAtEarly = null, clearedAt = null;
+      for (let i = 0; i < steps; i++) {
+        const t2 = i / (steps - 1);
+        const D = 200 * (1 - Math.min(1, t2 / 0.85));
+        const alignT = Math.max(0, (t2 - 0.28) / 0.5); // stays 33° off until 28% in, then eases straight
+        const off = (33 * Math.PI / 180) * (1 - Math.min(1, alignT));
+        const L = 26 * (1 - Math.min(1, alignT));
+        const x = u.tx - D * u.dx - L * u.dz, z = u.tz - D * u.dz + L * u.dx;
+        const agl = Math.max(0, 70 * (1 - Math.min(1, t2 / 0.9)));
+        g.player.pos.set(x, g.hAt(x, z) + agl, z);
+        g.player.heading = targetH + off;
+        g.player.vy = -3;
+        g.player.speed = 45 - 20 * Math.min(1, t2);
+        g.radio.update(dt, g.player, g.aviation, g.sky);
+        if (i === Math.floor(steps * 0.15)) flowAtEarly = g.radio.flow;
+        if (clearedAt == null && g.radio.lastTx?.kind === 'cleared') clearedAt = i;
+      }
+      return { flowAtEarly, clearedAt, finalFlow: g.radio.flow,
+        stampCount: g.gameplay.save.airports.length, lastTx: g.radio.lastTx };
+    })()`);
+    t.ok(r.flowAtEarly === 'contact', `still-misaligned leg should read 'contact', got ${r.flowAtEarly}`);
+    t.ok(r.clearedAt != null, 'never reached "cleared to land" after aligning');
+    t.ok(r.finalFlow === 'landed', `flow never reached landed (${r.finalFlow})`);
+    t.ok(r.stampCount === 1, `logbook stamped ${r.stampCount} times, expected exactly 1`);
+    t.ok(r.lastTx?.kind === 'landed', `last transmission wasn't the landing welcome (${r.lastTx?.kind})`);
+  });
+
+  await t.check('touchdown gate rejects too-fast, too-high, and off-pavement (no stamp)', async () => {
+    const r = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      const day = Math.floor(g.sky.days);
+      const u = g.runwayInUse(a, day);
+      g.player.setMode('FLY');
+      const h = -Math.atan2(u.dx, -u.dz);
+      const attempt = (x, z, agl, speed) => {
+        g.gameplay.save.airports = [];
+        g.radio.flow = 'none';
+        g.player.pos.set(x, g.hAt(x, z) + agl, z);
+        g.player.heading = h;
+        g.player.vy = -3;
+        g.player.speed = speed;
+        g.radio.update(0.05, g.player, g.aviation, g.sky);
+        return g.gameplay.save.airports.length;
+      };
+      const tooFast = attempt(u.tx, u.tz, 1, 62);
+      const tooHigh = attempt(u.tx, u.tz, 21, 25);
+      const offPavement = attempt(u.tx - u.dz * 40, u.tz + u.dx * 40, 1, 25);
+      const clean = attempt(u.tx, u.tz, 1, 25);
+      return { tooFast, tooHigh, offPavement, clean };
+    })()`);
+    t.ok(r.tooFast === 0, 'stamped despite touchdown speed 62 > 40');
+    t.ok(r.tooHigh === 0, 'stamped despite touchdown AGL 21 > 3');
+    t.ok(r.offPavement === 0, 'stamped despite landing 40u off the runway pavement');
+    t.ok(r.clean === 1, 'clean touchdown never stamped');
+  });
+
+  await t.check('the logbook dedupes: landing twice at the same field stamps once', async () => {
+    const r = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      const day = Math.floor(g.sky.days);
+      const u = g.runwayInUse(a, day);
+      g.gameplay.save.airports = [];
+      g.player.setMode('FLY');
+      g.player.heading = -Math.atan2(u.dx, -u.dz);
+      const land = () => {
+        g.radio.flow = 'none';
+        g.player.pos.set(u.tx, g.hAt(u.tx, u.tz) + 1, u.tz);
+        g.player.vy = -3; g.player.speed = 25;
+        g.radio.update(0.05, g.player, g.aviation, g.sky);
+      };
+      land();
+      const after1 = g.gameplay.save.airports.length;
+      land();
+      const after2 = g.gameplay.save.airports.length;
+      return { after1, after2 };
+    })()`);
+    t.ok(r.after1 === 1, `first landing didn't stamp (${r.after1})`);
+    t.ok(r.after2 === 1, `second landing at the same field double-stamped (${r.after2})`);
+  });
+
+  await t.check('a player parked on the active runway forces an inbound flight to go around', async () => {
+    await t.tp(aus[0] + 20, aus[1] + 16, 'WALK');
+    const r = await t.ev(`(() => {
+      g.aviation.despawnAll();
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      const day = Math.floor(g.sky.days);
+      const u = g.runwayInUse(a, day);
+      const f = g.aviation.force('arrival', 'AUS');
+      if (!f) return { err: 'force returned null' };
+      const dt = 0.05;
+      for (let i = 0; i < 4800 && f.st.ph !== 'final'; i++)
+        g.aviation.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+      const phBefore = f.st.ph;
+      // WALK the player onto the runway centerline — no radio, no perk: the
+      // go-around must still fire (physical, not a listening-in behavior)
+      g.player.setMode('WALK');
+      g.player.pos.set(u.tx, g.hAt(u.tx, u.tz), u.tz);
+      g.player.speed = 0;
+      for (let i = 0; i < 30 && !f.divert; i++) {
+        g.aviation.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
+        g.radio.update(dt, g.player, g.aviation, g.sky);
+      }
+      return { err: null, phBefore, diverted: !!f.divert };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.phBefore === 'final', `flight not on final when the runway was blocked (ph ${r.phBefore})`);
+    t.ok(r.diverted, 'blocked runway never triggered a go-around');
+    await t.ev('g.aviation.despawnAll()');
+  });
+
+  await t.check('the real audio synth runs without error (debug test-radio action)', async () => {
+    await t.key('KeyX'); // any keydown boots the lazy AudioContext — unbound code, no side effect
+    await t.tp(aus[0] + 30, aus[1] + 20, 'FLY', 40);
+    await t.ev(`g.debug.actions.testRadio()`);
+    await t.wait(0.3); // let the scheduled WebAudio graph actually build
+    t.ok((await t.ev('!!g.radio.lastTx')).valueOf(), 'test-radio action produced no transmission');
+  });
+
   if (process.env.SHOT) { // composition only — never the pass/fail signal
     const dal = await t.ev(`g.AIRPORTS.find((a) => a.id === 'DAL').at`);
     // frame a real approach: 30u out on the 31L extended centerline, nose NW

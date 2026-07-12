@@ -19,13 +19,17 @@ export class HUD {
       critters: document.getElementById('score-critters'),
       legends: document.getElementById('score-legends'),
       counties: document.getElementById('score-counties'),
+      airports: document.getElementById('score-airports'),
       bank: document.getElementById('score-bank'),
       job: document.getElementById('hud-job'),
       toast: document.getElementById('toast'),
       dialog: document.getElementById('dialog'),
       interact: document.getElementById('interact-hint'),
       help: document.getElementById('help'),
+      subtitle: document.getElementById('radio-subtitle'),
     };
+    this.subtitleQ = [];
+    this.subtitleBusy = false;
     this.mapLayer = this.renderMapLayer(1400, 1320);
     this.zoomLevels = [1.4, 2.4, 4.5];
     this.zoomIdx = 1;
@@ -219,6 +223,26 @@ export class HUD {
     this.els.dialog.style.display = 'block';
   }
 
+  // tower radio: one line at a time, ~5 s each, queued (never overlapped —
+  // a busy tower shouldn't stomp its own subtitle mid-sentence)
+  subtitle(text) {
+    this.subtitleQ.push(text);
+    if (!this.subtitleBusy) this.pumpSubtitle();
+  }
+
+  pumpSubtitle() {
+    const text = this.subtitleQ.shift();
+    if (text == null) { this.subtitleBusy = false; return; }
+    this.subtitleBusy = true;
+    this.els.subtitle.textContent = text;
+    this.els.subtitle.style.opacity = 1;
+    clearTimeout(this.subtitleTimer);
+    this.subtitleTimer = setTimeout(() => {
+      this.els.subtitle.style.opacity = 0;
+      setTimeout(() => this.pumpSubtitle(), 350);
+    }, 5000);
+  }
+
   interactHint(label) {
     if (!label) { this.els.interact.style.display = 'none'; return; }
     this.els.interact.textContent = `E — ${label}`;
@@ -248,6 +272,7 @@ export class HUD {
     this.els.critters.textContent = counts.species;
     this.els.legends.textContent = counts.legends ?? 0;
     this.els.counties.textContent = counts.counties;
+    this.els.airports.textContent = counts.airports ?? 0;
     this.els.bank.textContent = (counts.bank ?? 0).toLocaleString();
     // active delivery line (set by main from missions.hudInfo)
     this.els.job.textContent = this.mission?.text ?? '';
