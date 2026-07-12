@@ -4,6 +4,17 @@ Everything here is on hold until the `AVIATION.md` waves ship (decided
 2026-07-11). NEXT_SESSION.md stays aviation-only; when the track ends, pull
 the next item from here back into it.
 
+## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
+
+- **Split `aviation.mjs` into wave-shards** (~30 s → ~20 s): export
+  `shards = [{name, run}]` (wrap each wave's checks in an in-place arrow fn,
+  re-declare `const aus` per shard) + a back-compat serial `default`; teach the
+  runner to schedule a sharded suite as N queue units. Breaks the 24.5 s
+  aviation pole. Re-run 15× co-scheduled stress after (chatter checks land in
+  higher concurrency). Design settled; only diminishing-returns held it back.
+- **lights `until(trains>0, 45000)`**: drive/force a train to a known spot
+  instead of waiting on the real spawn, so lights can't become the pole.
+
 ## Next in line (in order)
 
 1. **Haunted Texas wave 2 — the apparitions** (planned & approved 2026-07-11;

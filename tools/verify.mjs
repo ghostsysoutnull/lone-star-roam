@@ -1,7 +1,9 @@
-// Headless verification harness — boots the game once, runs named check suites.
+// Headless verification harness — runs named check suites across a pool of
+// parallel browser workers (each suite gets a fresh game in its own context).
 //
-//   node tools/verify.mjs [-v] [suite…]   # no args = every suite in tools/checks/
+//   node tools/verify.mjs [-v] [-j N] [suite…]   # no args = every suite
 //   node tools/verify.mjs drive missions
+//   node tools/verify.mjs -j8                     # force 8-wide (default: cores/2, RAM-capped)
 //
 // One-time setup (deps live OUTSIDE the repo, shared across sessions):
 //   mkdir -p ~/.cache/lonestar-verify && cd ~/.cache/lonestar-verify && npm i playwright-core
@@ -54,22 +56,28 @@ function serve() {
 }
 
 // --- check runner ---
+// Counters + detail lines live per suite-run (a "sink") so suites can run
+// concurrently in separate browser workers without racing on shared totals.
+// Lines are buffered into the sink and flushed in canonical suite order after
+// the pool drains, so the compact one-line-per-suite output contract holds
+// regardless of the order suites actually finish in.
 const VERBOSE = process.argv.includes('-v');
-let passed = 0, failed = 0;
-async function check(name, fn) {
-  const t0 = Date.now();
-  const dur = () => { const s = (Date.now() - t0) / 1000; return s >= 1 ? ` (${s.toFixed(1)}s)` : ''; };
-  try {
-    await fn();
-    passed++;
-    if (VERBOSE) console.log(`PASS ${name}${dur()}`);
-  } catch (e) {
-    failed++;
-    console.log(`FAIL ${name} — ${String(e.message || e).split('\n')[0]}${dur()}`);
-  }
+function mkCheck(sink) {
+  return async function check(name, fn) {
+    const t0 = Date.now();
+    const dur = () => { const s = (Date.now() - t0) / 1000; return s >= 1 ? ` (${s.toFixed(1)}s)` : ''; };
+    try {
+      await fn();
+      sink.passed++;
+      if (VERBOSE) sink.lines.push(`PASS ${name}${dur()}`);
+    } catch (e) {
+      sink.failed++;
+      sink.lines.push(`FAIL ${name} — ${String(e.message || e).split('\n')[0]}${dur()}`);
+    }
+  };
 }
 
-function mkT(page) {
+function mkT(page, check) {
   // evaluate an expression string with `g` = window.__game
   const ev = (expr) => page.evaluate(`(() => { const g = window.__game; return (${expr}); })()`);
   const t = {
@@ -212,40 +220,96 @@ function mkT(page) {
 }
 
 // --- main ---
-const wanted = process.argv.slice(2).filter((a) => a !== '-v');
+// CLI: [-v] [-j N] [suite…].  -j sets worker concurrency (each worker is its
+// OWN chromium instance — separate renderer process, so a suite's synchronous
+// in-page loops actually run on their own core; pages sharing one browser can
+// land in one renderer and serialise, defeating that).
+const raw = process.argv.slice(2).filter((a) => a !== '-v');
+let jFlag = 0;
+const wanted = [];
+for (let i = 0; i < raw.length; i++) {
+  const a = raw[i];
+  if (a === '-j') { jFlag = parseInt(raw[++i], 10) || 0; continue; }
+  if (a.startsWith('-j')) { jFlag = parseInt(a.slice(2), 10) || 0; continue; }
+  wanted.push(a);
+}
 const suiteDir = join(ROOT, 'tools/checks');
 const all = (await readdir(suiteDir)).filter((f) => f.endsWith('.mjs')).map((f) => f.replace('.mjs', ''));
 const suites = wanted.length ? wanted : all;
 const unknown = suites.filter((s) => !all.includes(s));
 if (unknown.length) { console.error(`unknown suite(s): ${unknown.join(', ')} — have: ${all.join(', ')}`); process.exit(2); }
 
+// Approx per-suite seconds — a SCHEDULING HINT only (longest-processing-time
+// packing so the heavy suites start first); wrong values just cost a little
+// packing efficiency, never correctness. Update loosely as suites grow.
+const WEIGHTS = { aviation: 22, lights: 13, haunts: 7, missions: 6, wildlife: 5, hud: 3, shop: 3, traffic: 2, drive: 2, npcs: 1, debug: 1 };
+// Default concurrency is capped by BOTH cores and free RAM. RAM is the real
+// ceiling: each worker's fresh-context game boot peaks ~0.8 GB under SwiftShader,
+// and overcommitting thrashes — which on this box turned j=8/10 SLOWER than j=6
+// and flaky. ~cores/2 lands at the measured knee (~30 s, stable) on 12 cores.
+const memCap = Math.floor(os.freemem() / (0.8 * 2 ** 30));
+const DEFAULT_J = Math.min(suites.length, Math.max(2, Math.min(Math.floor(os.cpus().length / 2), memCap)));
+const C = Math.max(1, Math.min(suites.length, jFlag > 0 ? jFlag : DEFAULT_J));
+
 const srv = await serve();
-const browser = await chromium.launch({
-  executablePath: findChromium(),
-  args: ['--no-sandbox', '--enable-unsafe-swiftshader'],
-});
-// small viewport: SwiftShader fill rate directly limits sim fps
-const page = await browser.newPage({ viewport: { width: 640, height: 360 } });
-page.on('pageerror', (e) => console.log(`     pageerror: ${String(e).split('\n')[0]}`));
+const port = srv.address().port;
+const queue = suites.slice().sort((a, b) => (WEIGHTS[b] ?? 5) - (WEIGHTS[a] ?? 5));
+const results = new Map();
+
+// Each suite gets a FRESH browser context (clean localStorage) + a fresh game
+// boot. This is mandatory, not wasteful: suites mutate shared game state and
+// don't reset it — shop's applyGear() boosts player.perks, lights/aviation
+// leave weather/night set — so a warm-reused game leaks that into the next
+// suite (the serial runner only got away with it via fixed alphabetical
+// order). The Chromium PROCESS stays warm per worker (launched once); only the
+// per-suite game boot (~2.5 s) is re-paid, which the pool overlaps across cores.
+async function runSuite(browser, name) {
+  const sink = { name, passed: 0, failed: 0, lines: [], ms: 0 };
+  results.set(name, sink);
+  const ctx = await browser.newContext({ viewport: { width: 640, height: 360 } }); // small viewport: SwiftShader fill rate limits sim fps
+  try {
+    const page = await ctx.newPage();
+    page.on('pageerror', (e) => sink.lines.push(`     pageerror: ${String(e).split('\n')[0]}`));
+    await page.goto(`http://127.0.0.1:${port}/`);
+    await page.waitForFunction('window.__game && document.getElementById("loading").style.display === "none"', null, { timeout: 60000 });
+    // skip the ~300 ms SwiftShader draw: the loop still runs every system update
+    // at full rAF speed, sim time tracks wall time, and evaluates return fast
+    await page.evaluate('window.__skipRender = 1');
+    await page.waitForTimeout(500); // first frames: chunks spawn, ATMOS settles
+    const s0 = Date.now();
+    await (await import(join(suiteDir, name + '.mjs'))).default(mkT(page, mkCheck(sink)));
+    sink.ms = Date.now() - s0;
+    process.stderr.write(`  ✓ ${name} (${(sink.ms / 1000).toFixed(1)}s)\n`); // live progress → stderr, off the stdout report
+  } finally {
+    await ctx.close();
+  }
+}
+
+async function worker() {
+  let browser;
+  try {
+    browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+    while (queue.length) await runSuite(browser, queue.shift());
+  } finally {
+    if (browser) await browser.close();
+  }
+}
 
 try {
-  await page.goto(`http://127.0.0.1:${srv.address().port}/`);
-  await page.waitForFunction('window.__game && document.getElementById("loading").style.display === "none"', null, { timeout: 60000 });
-  // skip the ~300 ms SwiftShader draw: the loop still runs every system update
-  // at full rAF speed, sim time tracks wall time, and evaluates return fast
-  await page.evaluate('window.__skipRender = 1');
-  await page.waitForTimeout(500); // first frames: chunks spawn, ATMOS settles
-  const t = mkT(page);
-  for (const s of suites) {
-    if (VERBOSE) console.log(`— ${s}`);
-    const p0 = passed, f0 = failed, s0 = Date.now();
-    await (await import(join(suiteDir, s + '.mjs'))).default(t);
-    const fails = failed - f0;
-    console.log(`${s}: ${passed - p0} passed${fails ? `, ${fails} FAILED` : ''}, ${((Date.now() - s0) / 1000).toFixed(1)}s`);
-  }
+  await Promise.all(Array.from({ length: C }, () => worker()));
 } finally {
-  await browser.close();
   srv.close();
 }
-console.log(`${passed} passed, ${failed} failed (${suites.join(', ')})`);
+
+// flush in canonical suite order, same compact contract as the serial runner
+let passed = 0, failed = 0;
+for (const s of suites) {
+  const r = results.get(s);
+  if (!r) continue;
+  passed += r.passed; failed += r.failed;
+  if (VERBOSE) console.log(`— ${s}`);
+  for (const line of r.lines) console.log(line);
+  console.log(`${s}: ${r.passed} passed${r.failed ? `, ${r.failed} FAILED` : ''}, ${(r.ms / 1000).toFixed(1)}s`);
+}
+console.log(`${passed} passed, ${failed} failed (${suites.join(', ')})  [j=${C}]`);
 process.exit(failed ? 1 : 0);

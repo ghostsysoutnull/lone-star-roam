@@ -1545,19 +1545,28 @@ export default async function aviation(t) {
       g.heli.despawnAll();
       if (!g.heli.force('news')) return { err: 'heli force failed' };
       const cand = g.heli.candidates.find((x) => x.kind === 'news' && x.flying);
-      cand.x = g.player.pos.x + 60; cand.z = g.player.pos.z; // inside the 150 u gate
-      const folkWith = talk(folk);
-      cand.x = g.player.pos.x + 60; cand.z = g.player.pos.z; // talk() moved the player
-      const namedWith = talk(willie);
+      // anchor the heli 60u from the SPECIFIC npc we're about to talk to (talk()
+      // then stands the player right beside them) so the <150u gate is met
+      // deterministically — not relative to whoever the previous talk() left the
+      // player next to, which made Willie's opener depend on where the ambient
+      // (randomly drifting) townsfolk happened to be.
+      const nearHeli = (n) => { cand.x = n.g.position.x + 60; cand.z = n.g.position.z; return talk(n); };
+      const folkWith = nearHeli(folk);
+      const namedWith = nearHeli(willie);
 
       g.heli.despawnAll();
       const folkWithout = talk(folk);
       return { folkWith, namedWith, folkWithout };
     })()`);
     t.ok(!r.err, r.err);
-    t.ok(/chopper/i.test(r.folkWith?.[0] ?? ''), `townsfolk missing heli line: ${r.folkWith?.[0]}`);
-    t.ok(/chopper/i.test(r.namedWith?.[0] ?? ''), `named character missing heli opener: ${r.namedWith?.[0]}`);
-    t.ok(!/chopper/i.test((r.folkWithout ?? []).join(' ')), `heli line survived the despawn: ${r.folkWithout?.[0]}`);
+    // assert the opener is one of the ACTUAL news heli openers, not a coincidental
+    // substring: the pool has three variants and only two say "chopper" ("...news
+    // bird hovers..." is the third), so /chopper/i false-failed ~1/3 of runs at
+    // random (pick() picks one of the three). Membership is wording-independent.
+    const newsOpeners = await t.ev(`(async () => (await import('/src/npcs.js')).POOLS.HELI_OPENERS.news)()`);
+    t.ok(newsOpeners.includes(r.folkWith?.[0]), `townsfolk missing heli opener: ${r.folkWith?.[0]}`);
+    t.ok(newsOpeners.includes(r.namedWith?.[0]), `named character missing heli opener: ${r.namedWith?.[0]}`);
+    t.ok(!newsOpeners.includes(r.folkWithout?.[0]), `heli opener survived the despawn: ${r.folkWithout?.[0]}`);
   });
 
   if (process.env.SHOT) { // composition only — never the pass/fail signal
