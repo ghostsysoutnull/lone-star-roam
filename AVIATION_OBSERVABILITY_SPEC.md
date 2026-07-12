@@ -152,6 +152,54 @@ player meets the aviation layer: in the sky, on the ground, on the map.
   *not* baked into the shared offscreen layer, so the minimap stays
   uncluttered.
 
+### A6. Airlines & operators (`aviation.js`, `chatter.js`) — added
+2026-07-12
+
+The game's one sanctioned exception to "real places, no real brands":
+fictional carriers *loosely homaging* the real Texas airlines (settled
+call 6). Five-carrier roster in an `AIRLINES` table (name, callsign
+word, hubs, tail tint, weight):
+
+- **Heart of Texas Air** — callsign SWEETHEART, hubs DAL + HOU, warm
+  red tail (→ Southwest: LUV, hearts, Love Field).
+- **Texan Airways** — callsign TEXAN, hub DFW, silver/blue (→
+  American).
+- **Intercontinental Airways** — callsign INTERCON, hub IAH (→
+  Continental/United; the airport already carries the name).
+- **Bravo Air** — callsign BRAVO, rare (low weight), *varied* bright
+  tail tints per aircraft (→ Braniff and its rainbow fleet).
+- **Lone Star** — the state flag carrier, neutral livery; existing
+  radio lines and checks survive unchanged, it just becomes one of
+  five instead of all of them.
+
+Mechanics:
+- **Assignment** at `daySchedule` time, seeded (new `airline:` stream)
+  and **hub-weighted**: a carrier's weight is boosted on slots
+  touching its hub, so Sweetheart dominates Love Field and Texan
+  dominates DFW — factual-by-construction mirroring of real Texas
+  aviation. GA slots get no airline (tails only).
+- **Callsigns** become `<CALLSIGN WORD> <n>` (`SWEETHEART 41`),
+  flowing automatically into A2's tower phraseology, A3's chatter, and
+  A5's tags — one assignment, every channel.
+- **Livery**: per-airline tail tint on the jet `InstancedMesh` via the
+  existing per-instance-tint-on-white-bodywork idiom (traffic.js
+  precedent). Bravo rolls a seeded bright tint per aircraft.
+- **Chatter personality**: one register note per carrier in the A3
+  pools — Sweetheart folksy ("y'all have a good one"), Texan
+  corporate-crisp, Intercon long-haul-tired, Bravo a little
+  flamboyant ("the orange one"), Lone Star neutral.
+- **Heli operators — names, not callsigns**: medical flies for
+  **StarCare Flight** (→ CareFlite/STAR Flight), the news chopper
+  belongs to station **KTX News 5** (so "Chopper 5" means something).
+  Radio callsigns stay Lifeguard/Chopper — that's how it really works
+  (operator brand ≠ radio callsign). Coast guard and army stay
+  government, unbranded, correctly. Operator names surface in chatter
+  lines, A5 tags (`LIFEGUARD 3 · StarCare Flight`), and Wave B NPC
+  dialog.
+- **Deferred**: named GA/charter outfits (Hill Country Charter etc.)
+  in chatter and charter jobs — Bruno scoped to airlines + heli
+  operators for now; see open calls.
+
 ## Wave B — people
 
 ### B1. Airport bystanders (`npcs.js`, `airports.js`)
@@ -188,7 +236,7 @@ player meets the aviation layer: in the sky, on the ground, on the map.
 ## What doesn't change
 
 - No existing `seededRand` seed strings; new streams only (`tail:`,
-  `padstop:`, `chatter:`).
+  `padstop:`, `chatter:`, `airline:`).
 - `radio.js` standalone; `aviation.update` signature; sky.js owns all
   lights; heli cap/weight logic; save format (no new keys — airport
   stamps already exist).
@@ -231,6 +279,12 @@ mid-transit helis, not conveniently on-station).
   exactly one sign per tier-1/2 field (count = 16), each within a few
   units of its field's `gate`, none at tier-3. Map codes: assert the
   label list `drawBig` consumes (data, not pixels).
+- **A6**: determinism (same day → same carrier per slot); hub
+  weighting (over one seeded day's schedule, the majority of DAL
+  slots are SWEETHEART and DFW slots TEXAN — the schedule is
+  deterministic, so this is an exact assertion, not statistical);
+  `lastTx`/tag carry the carrier callsign; per-airline instance tint
+  applied (color numbers, not pixels); GA slots carry no airline.
 - **B1**: force an arrival into a field, interact with the waiting
   bystander → dialog mentions the flight's origin city; empty sky →
   no aviation line; bystanders hidden at `ATMOS.night > 0.6`.
@@ -254,18 +308,25 @@ mid-transit helis, not conveniently on-station).
 5. **Visual identity — all three** (2026-07-12): aircraft proximity
    tags, tier-1/2 gate signs, big-map airport codes (A5). Supersedes
    open call 3.
+6. **Airlines** (2026-07-12): loose-homage naming (recognizable winks
+   at the real carriers, the game's sole real-brand exception), scope
+   = airlines + heli operator names; GA/charter outfit names deferred
+   (open call 5). Also settles open call 2 (callsign flavor) in the
+   same spirit.
 
 ## Open calls
 
 1. **Airport NPCs at night** — proposal: hidden like townsfolk (v1);
    a single night-shift character at tier-1 hubs is a cheap follow-up
    if the fields feel dead after dark.
-2. **Callsign flavor** — proposal: generic-but-flavored (Lifeguard /
-   Chopper 5 / Rescue 6-0 / Hood 2-1), not real operator brands; the
-   game uses real *places* freely but has no precedent for real
-   company brands.
+2. ~~**Callsign flavor**~~ — settled by call 6: loose-homage carriers
+   for jets; helis keep FAA-style callsigns (Lifeguard/Chopper) with
+   operator *names* (StarCare Flight, KTX News 5) as flavor.
 3. ~~**GA tails beyond the radio**~~ — superseded by settled call 5:
    proximity tags (A5) show tails visually, no look-at picker needed.
 4. **Pad stops for other kinds** — proposal: medical only; news
    refueling stops are plausible but add nothing observably new once
    medical demonstrates the mechanic.
+5. **Named GA/charter outfits** (deferred from A6) — Hill Country
+   Charter / Big Bend Air style names in GA chatter, charter jobs,
+   and NPC dialog; scoped out 2026-07-12, revisit after Wave B.

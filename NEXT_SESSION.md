@@ -60,8 +60,13 @@ casual, rare player-reference delight lines, callsign+route subtitle
 header, per-type synth voice — design settled with Bruno 2026-07-12), **visual identity** (aircraft
 proximity tags sharing the scanner's ~60-unit window, tier-1/2 gate sign
 boards via one canvas atlas, big-map airport codes drawn in `drawBig` —
-all three approved 2026-07-12), and medical-heli pad stops at the home
-city's field (new `padstop:` stream, cap accounting unchanged). Wave B (airport
+all three approved 2026-07-12), **fictional airlines** (5-carrier
+loose-homage roster — Sweetheart/Texan/Intercon/Bravo/Lone Star —
+hub-weighted seeded assignment via new `airline:` stream, per-airline
+tail tints, heli operator names StarCare Flight / KTX News 5; the game's
+sole real-brand exception, approved 2026-07-12), and medical-heli pad
+stops at the home city's field (new `padstop:` stream, cap accounting
+unchanged). Wave B (airport
 bystander NPCs + heli-aware/context-enriched townsfolk chatter) queued
 behind it in the same spec.
 Other à-la-carte candidates, both already scoped in with Bruno's
