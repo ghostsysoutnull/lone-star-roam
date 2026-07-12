@@ -241,6 +241,9 @@ export class HUD {
   dialog(d) {
     if (!d) { this.els.dialog.style.display = 'none'; return; }
     this.els.dialog.querySelector('.npc-name').textContent = d.name;
+    const sub = this.els.dialog.querySelector('.npc-sub');
+    sub.textContent = d.sub || '';
+    sub.style.display = d.sub ? 'block' : 'none';
     this.els.dialog.querySelector('.npc-text').textContent = d.text;
     this.els.dialog.style.display = 'block';
   }

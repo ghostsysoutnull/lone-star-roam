@@ -1314,7 +1314,7 @@ export default async function aviation(t) {
 
   // --- Wave B — people: gate bystanders (B1) + aviation-aware NPC context (B2)
 
-  await t.check('B1: bystanders spawn at the gate with distinct roles, despawn far, hide at night', async () => {
+  await t.check('B1: bystanders spawn at the gate with distinct roles, despawn far, hide at night (small city)', async () => {
     await t.setDay();
     await t.setWeather('clear');
     const r = await t.ev(`(() => {
@@ -1326,25 +1326,136 @@ export default async function aviation(t) {
       const folk = g.npcs.byField.get('AUS') ?? [];
       const dists = folk.map((f) => Math.hypot(f.g.position.x - a.gate[0], f.g.position.z - a.gate[1]));
       const roles = folk.map((f) => f.role).sort().join();
+      const ages = folk.map((f) => f.age);
+      const professions = folk.map((f) => f.profession);
       const tier2 = g.AIRPORTS.filter((x) => x.tier === 2).length;
       g.player.pos.set(a.gate[0] + 700, 0, a.gate[1]);
       g.npcs.update(0.05, g.player.pos);
       const gone = !g.npcs.byField.has('AUS');
       g.player.pos.set(a.gate[0] + 4, 0, a.gate[1]);
       g.npcs.update(0.05, g.player.pos);
-      return { n: folk.length, dists, roles, gone, tier2 };
+      return { n: folk.length, dists, roles, ages, professions, gone, tier2 };
     })()`);
     t.ok(r.n === 3, `${r.n} bystanders at AUS (want 3 at tier 1)`);
     t.ok(r.dists.every((d) => d > 0.5 && d < 5), `gate scatter ${r.dists.map((d) => d.toFixed(1)).join(',')}`);
     t.ok(r.roles === 'pilot,relative,spotter', `roles ${r.roles}`);
+    t.ok(r.ages.every((a) => Number.isInteger(a) && a > 0), `ages ${r.ages.join(',')}`);
+    t.ok(r.professions.every((p) => typeof p === 'string' && p.length > 0), `professions ${r.professions.join(',')}`);
     t.ok(r.gone, 'bystanders did not despawn at 700 units');
     await t.setNight();
-    const hidden = await t.ev(`(() => {
+    // AUS sits in Austin (pop > 400k) — big-city bystanders now stay out after dark
+    const austinVisible = await t.ev(`(() => {
       g.npcs.update(0.05, g.player.pos);
-      return (g.npcs.byField.get('AUS') ?? []).every((f) => !f.g.visible);
+      return (g.npcs.byField.get('AUS') ?? []).every((f) => f.g.visible);
     })()`);
-    t.ok(hidden, 'bystanders still visible after dark');
+    t.ok(austinVisible, 'big-city (Austin) bystanders hid after dark');
+    // ACT sits in Waco (pop well under 400k) — small-city bystanders still hide
+    const wacoHidden = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'ACT');
+      g.player.pos.set(a.gate[0] + 4, 0, a.gate[1]);
+      g.npcs.update(0.05, g.player.pos);
+      return (g.npcs.byField.get('ACT') ?? []).every((f) => !f.g.visible);
+    })()`);
+    t.ok(wacoHidden, 'small-city (Waco) bystanders still visible after dark');
     await t.setDay();
+  });
+
+  await t.check('B1: tier-3 bystanders at public fields only (private ranch strips stay empty)', async () => {
+    await t.setDay();
+    const r = await t.ev(`(() => {
+      g.player.setMode('WALK');
+      const results = {};
+      for (const id of ['MRF', 'TRL', 'SSS', 'ARM']) {
+        const a = g.AIRPORTS.find((x) => x.id === id);
+        g.player.pos.set(a.gate[0] + 4, 0, a.gate[1]);
+        g.npcs.update(0.05, g.player.pos);
+        results[id] = (g.npcs.byField.get(id) ?? []).length;
+        g.player.pos.set(a.gate[0] + 700, 0, a.gate[1]);
+        g.npcs.update(0.05, g.player.pos);
+      }
+      return results;
+    })()`);
+    t.ok(r.MRF === 2, `Marfa Municipal (public tier-3): ${r.MRF} bystanders (want 2)`);
+    t.ok(r.TRL === 2, `Terlingua Ranch (public tier-3): ${r.TRL} bystanders (want 2)`);
+    t.ok(r.SSS === 0, `6666 Ranch Airstrip (private): ${r.SSS} bystanders (want 0)`);
+    t.ok(r.ARM === 0, `Armstrong Ranch Airstrip (private): ${r.ARM} bystanders (want 0)`);
+  });
+
+  await t.check('B1: dialog carries an age/profession subtitle for bystanders and named characters', async () => {
+    const r = await t.ev(`(() => {
+      g.player.setMode('WALK');
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      g.player.pos.set(a.gate[0] + 4, 0, a.gate[1]);
+      g.npcs.update(0.05, g.player.pos);
+      const bystander = (g.npcs.byField.get('AUS') ?? [])[0];
+      let bystanderSub = null;
+      g.npcs.onDialog = (d) => { bystanderSub = d?.sub; };
+      g.npcs.activeNPC = null;
+      g.player.pos.set(bystander.g.position.x + 2.5, 0, bystander.g.position.z);
+      if (g.npcs.npcNear(g.player.pos) === bystander) g.npcs.interact(g.player.pos);
+      g.npcs.activeNPC = null;
+
+      const named = g.npcs.named.find((n) => n.name === 'Willie');
+      let namedSub = null;
+      g.npcs.onDialog = (d) => { namedSub = d?.sub; };
+      g.player.pos.set(named.g.position.x + 2.5, 0, named.g.position.z);
+      if (g.npcs.npcNear(g.player.pos) === named) g.npcs.interact(g.player.pos);
+      g.npcs.activeNPC = null;
+
+      return { bystanderSub, namedSub, bystanderAge: bystander.age, bystanderProfession: bystander.profession };
+    })()`);
+    t.ok(r.bystanderSub === `Age ${r.bystanderAge} · ${r.bystanderProfession}`, `bystander sub "${r.bystanderSub}"`);
+    t.ok(r.namedSub === 'Age 58 · musician', `Willie sub "${r.namedSub}"`);
+  });
+
+  await t.check('player and bystanders stand on the pad plateau, not sunk to raw terrain (reported bug)', async () => {
+    // pick the field where the gate sits furthest below the pad's max-terrain
+    // plateau — restricted to gates that actually land inside the footprint
+    // (some tier-3 strips' gates sit off the pavement on raw terrain, where
+    // no substitution is expected) — else the test is vacuous
+    const pick = await t.ev(`(() => {
+      let worst = null, worstGap = -1;
+      for (const L of g.airports.layout) {
+        const a = g.AIRPORTS.find((x) => x.id === L.id);
+        const groundY = g.groundYAt(a.gate[0], a.gate[1]);
+        if (groundY == null) continue;
+        const gap = L.padY - g.hAt(a.gate[0], a.gate[1]);
+        if (gap > worstGap) { worstGap = gap; worst = { id: a.id, gate: a.gate, at: a.at, padY: L.padY, groundY }; }
+      }
+      return { ...worst, gap: worstGap };
+    })()`);
+    t.ok(pick.gap > 0.1, `worst-case field ${pick.id} gate sits flush with raw terrain (gap ${pick.gap.toFixed(2)}) — test is vacuous`);
+    t.ok(Math.abs(pick.padY - pick.groundY) < 0.01,
+      `${pick.id}: groundYAt(gate)=${pick.groundY} doesn't match padY=${pick.padY}`);
+    await t.tp(pick.gate[0] + 4, pick.gate[1], 'WALK');
+    const r = await t.ev(`(() => {
+      g.npcs.update(0.05, g.player.pos);
+      const folk = g.npcs.byField.get('${pick.id}') ?? [];
+      return { playerY: g.player.pos.y, folkY: folk.map((f) => f.g.position.y) };
+    })()`);
+    t.ok(Math.abs(r.playerY - pick.padY) < 0.1, `${pick.id}: player.pos.y ${r.playerY.toFixed(2)} !== padY ${pick.padY.toFixed(2)} (sunk into the pad)`);
+    t.ok(r.folkY.length > 0, `${pick.id}: no bystanders spawned to check`);
+    for (const y of r.folkY)
+      t.ok(Math.abs(y - pick.padY) < 0.1, `${pick.id}: bystander y ${y.toFixed(2)} !== padY ${pick.padY.toFixed(2)} (sunk into the pad)`);
+
+    // Lacy follows in WALK — same plateau substitution, bypassing the shop
+    // purchase flow since only ground placement is under test here. Face the
+    // player toward the field center first so her trail point (behind the
+    // heading) drifts into the apron, not off a tight margin edge.
+    const dogY = await t.ev(`(() => {
+      g.dog.setOwned(true);
+      g.dog.g.position.set(g.player.pos.x, g.player.pos.y, g.player.pos.z);
+      const ux = ${pick.at[0]} - g.player.pos.x, uz = ${pick.at[1]} - g.player.pos.z;
+      g.player.heading = Math.atan2(ux, uz);
+      for (let i = 0; i < 60; i++) g.dog.update(0.05);
+      const r = { y: g.dog.g.position.y, x: g.dog.g.position.x, z: g.dog.g.position.z,
+        ground: g.groundYAt(g.dog.g.position.x, g.dog.g.position.z) };
+      g.dog.setOwned(false);
+      return r;
+    })()`);
+    t.ok(dogY.ground != null, `${pick.id}: dog drifted off the pad in 3 frames — pick a field with a deeper apron margin`);
+    t.ok(Math.abs(dogY.y - pick.padY) < 0.1,
+      `${pick.id}: dog y ${dogY.y.toFixed(2)} !== padY ${pick.padY.toFixed(2)} at (${dogY.x.toFixed(1)},${dogY.z.toFixed(1)}) (sunk into the pad)`);
   });
 
   await t.check('B1: relative names a live arrival’s origin; quiet board → no aviation claim; spotter names the in-use runway', async () => {

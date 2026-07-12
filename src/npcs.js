@@ -5,48 +5,55 @@ import * as THREE from 'three';
 import { GEO, seededRand, nearestRoad, hAt } from './geo.js';
 import { cityRadius } from './cities.js';
 import { ATMOS } from './sky.js';
-import { AIRPORTS, runwayInUse, rwyLabel, windFrom } from './airports.js';
+import { AIRPORTS, runwayInUse, rwyLabel, windFrom, groundYAt } from './airports.js';
+
+// ground height for NPC placement: airport pad plateau when inside a
+// footprint (bystanders spawn at the terminal gate), else raw terrain
+const gY = (x, z) => groundYAt(x, z) ?? hAt(x, z);
 
 const TALK_R = 6, FACE_R = 10;
 
-// name, city, look config, main lines (rotate per visit), fact
+// dialog subtitle for NPCs carrying age/profession (bystanders, townsfolk, named)
+const npcSub = (n) => (n.age && n.profession ? `Age ${n.age} · ${n.profession}` : null);
+
+// name, city, look config, main lines (rotate per visit), fact, age, profession
 const NAMED = [
   ['Willie', 'Austin', { hat: 'stetson', hatC: 0x22201c, braids: true, shirt: 0x2a2a2a, prop: 'guitar' },
     ['Welcome to Austin! Keep it weird, partner.', 'Wrote a song about that highway you came in on.', 'Best breakfast tacos are wherever you are at sunrise.', 'Stick around till sundown — the bridge breathes bats.'],
-    'Austin is the live music capital of the world — 250+ venues.'],
+    'Austin is the live music capital of the world — 250+ venues.', 58, 'musician'],
   ['Rosa', 'Houston', { dress: 0x1f7a72, hair: 0x2a2018, bun: true },
     ['Biggest city in Texas, and we still say howdy.', 'NASA’s just down the road — you can’t miss the rocket.', 'Try the kolaches. Trust me.'],
-    'Houston is home to the largest medical center on Earth.'],
+    'Houston is home to the largest medical center on Earth.', 37, 'nurse'],
   ['Big Tex', 'Dallas', { scale: 2.6, hat: 'stetson', hatC: 0xe8e0d0, shirt: 0xaa2222, wave: true },
     ['HOWDY, FOLKS! Welcome to Big D!', 'You look like you could use some state fair corny dogs.', 'Everything’s bigger here. Case in point.'],
-    'The frozen margarita machine was invented in Dallas in 1971.'],
+    'The frozen margarita machine was invented in Dallas in 1971.', 74, 'State Fair icon'],
   ['Elena', 'San Antonio', { dress: 0x6a3f8a, hair: 0x1a1410, flower: 0xe86a9a },
     ['Remember the Alamo? It’s right downtown.', 'The river walk is prettier than any highway.', 'Mi casa es su casa, traveler.'],
-    'San Antonio’s missions are a UNESCO World Heritage site.'],
+    'San Antonio’s missions are a UNESCO World Heritage site.', 29, 'river walk guide'],
   ['Hank', 'Fort Worth', { hat: 'stetson', hatC: 0x7a5c38, vest: 0x5a4028, prop: 'lasso' },
     ['Cowtown, they call it. Real cowboys drive cattle here twice a day.', 'That lasso ain’t for show. Well, mostly.', 'Fort Worth is where the West begins.'],
-    'The Stockyards run a longhorn cattle drive every single day.'],
+    'The Stockyards run a longhorn cattle drive every single day.', 45, 'cattle drover'],
   ['Marisol', 'El Paso', { dress: 0xd8a832, hair: 0x201810 },
     ['You made it all the way out west!', 'We’re closer to Los Angeles than to Houston out here.', 'Watch the star on the mountain light up tonight.'],
-    'El Paso sits in Mountain Time — the rest of Texas is Central.'],
+    'El Paso sits in Mountain Time — the rest of Texas is Central.', 33, 'shop owner'],
   ['Dusty', 'Amarillo', { hat: 'stetson', hatC: 0x8a7050, shirt: 0xb09a70, kerchief: 0xaa4a2a },
     ['Panhandle wind’ll knock your hat off.', 'Spray-paint a Cadillac while you’re here — everyone does.', 'Flat? Sure. But you can see tomorrow from here.'],
-    'Amarillo means "yellow" in Spanish, for the local soil.'],
+    'Amarillo means "yellow" in Spanish, for the local soil.', 50, 'ranch hand'],
   ['Gully', 'Corpus Christi', { hat: 'bucket', hatC: 0x4a6a4a, shirt: 0x3a6a8a, prop: 'rod' },
     ['Sparkling city by the sea!', 'Redfish are running today, I can feel it.', 'Watch for shrimp boats off Padre Island.'],
-    'Selena, the Queen of Tejano, called Corpus home.'],
+    'Selena, the Queen of Tejano, called Corpus home.', 47, 'fishing guide'],
   ['Peggy Sue', 'Lubbock', { dress: 0x3a9a9a, hair: 0xd8b860, glasses: true },
     ['Buddy Holly grew up right here.', 'That’ll be the day, sugar!', 'Stick around for the world’s flattest sunset.'],
-    'Lubbock is the world’s largest cottonseed processing region.'],
+    'Lubbock is the world’s largest cottonseed processing region.', 26, 'radio DJ'],
   ['Chuy', 'Laredo', { hat: 'wide', hatC: 0xd8c8a0, shirt: 0xf0ead8 },
     ['Bienvenido to the border!', 'I-35 starts right here and runs clear to Minnesota.', 'Two countries, one street. That’s Laredo.'],
-    'Laredo has flown seven flags — one more than the rest of Texas.'],
+    'Laredo has flown seven flags — one more than the rest of Texas.', 52, 'customs broker'],
   ['Quill', 'Marfa', { hat: 'beret', hatC: 0x1a1a1a, shirt: 0x1a1a1a, prop: 'brush' },
     ['Artists, antelope, and lights nobody can explain.', 'The desert is the canvas. I just sign it.', 'Stick around till dark. You’ll see.'],
-    'Marfa’s mystery lights have been reported since 1883.'],
+    'Marfa’s mystery lights have been reported since 1883.', 39, 'painter'],
   ['Cap’n Sal', 'Galveston', { hat: 'captain', hatC: 0xf0f0f0, coat: 0x24365a, beard: 0xd8d8d8 },
     ['This island was the biggest city in Texas once, before the 1900 storm.', 'The Gulf gives and the Gulf takes, friend.', 'Steady as she goes, landlubber.'],
-    'The 1900 Galveston hurricane is still the deadliest US natural disaster.'],
+    'The 1900 Galveston hurricane is still the deadliest US natural disaster.', 63, 'charter boat captain'],
 ];
 
 // context openers — checked in order at interact time
@@ -90,10 +97,19 @@ const TOWNSFOLK_LINES = [
   'My meemaw won’t drive past that old fort at Goliad after sundown. Won’t say why, neither.',
 ];
 const TOWNSFOLK_NAMES = ['Earl', 'Ruby', 'Cole', 'June', 'Wade', 'Dolly', 'Buck', 'Lupe', 'Roy', 'Faye', 'Cash', 'Ida', 'Slim', 'Pearl'];
+const TOWNSFOLK_PROFESSIONS = ['rancher', 'mechanic', 'shop owner', 'teacher', 'waitress', 'roughneck'];
+const BYSTANDER_ROLE_INFO = {
+  spotter: { profession: 'plane spotter', ageLo: 16, ageHi: 72 },
+  relative: { profession: 'family member', ageLo: 25, ageHi: 75 },
+  pilot: { profession: 'off-duty pilot', ageLo: 25, ageHi: 58 },
+};
 
 // B1 — airport bystanders: figures waiting at tier-1/2 field gates, townsfolk
 // builds, dialog assembled at interact time from live aviation state
-const GATE_FIELDS = AIRPORTS.filter((a) => a.tier <= 2);
+// tier-3 fields get bystanders too where they're public (Marfa Municipal,
+// Terlingua Ranch's ghost-town strip) — the two private ranch strips
+// (6666 Ranch, Armstrong Ranch) stay empty, matching their own flavor text.
+const GATE_FIELDS = AIRPORTS.filter((a) => a.tier <= 2 || a.id === 'MRF' || a.id === 'TRL');
 const ROLE_SMALLTALK = {
   spotter: ['Logged forty tails from this fence last month. Well. Fourteen.', 'You can tell the type by the engine note before you ever see it.', 'Best bench in Texas, right here by the fence.'],
   relative: ['Airport coffee’s terrible everywhere. Comforting, really.', 'I always come out too early. Can’t help it.', 'They always walk out last. Every single time.'],
@@ -134,7 +150,7 @@ export class NPCSystem {
 
     // named 12 — always present
     this.named = [];
-    for (const [name, cityName, look, lines, fact] of NAMED) {
+    for (const [name, cityName, look, lines, fact, age, profession] of NAMED) {
       const c = GEO.cities.find((c) => c.name === cityName);
       if (!c) continue;
       const rand = seededRand('npc:' + name);
@@ -142,11 +158,11 @@ export class NPCSystem {
       const R = cityRadius(c.pop);
       const a = rand() * Math.PI * 2;
       const [px, pz] = roadShoulder(c.x + Math.cos(a) * R * 0.45, c.z + Math.sin(a) * R * 0.45, R);
-      g.position.set(px, hAt(px, pz), pz);
+      g.position.set(px, gY(px, pz), pz);
       g.rotation.y = rand() * Math.PI * 2;
       addMarker(g, look.scale || 1);
       scene.add(g);
-      this.named.push({ g, name, lines, fact, visit: 0, baseRotY: g.rotation.y, wave: 0, townsfolk: false });
+      this.named.push({ g, name, lines, fact, age, profession, visit: 0, baseRotY: g.rotation.y, wave: 0, townsfolk: false });
     }
 
     // townsfolk — spawned per city by proximity
@@ -191,7 +207,7 @@ export class NPCSystem {
     if (this.activeNPC) { // advance / close
       this.dialogStep++;
       if (this.dialogStep >= this.convo.length) { this.activeNPC = null; this.onDialog?.(null); }
-      else this.onDialog?.({ name: this.activeNPC.name, text: this.convo[this.dialogStep] });
+      else this.onDialog?.({ name: this.activeNPC.name, sub: npcSub(this.activeNPC), text: this.convo[this.dialogStep] });
       return true;
     }
     const n = this.npcNear(pos);
@@ -230,7 +246,7 @@ export class NPCSystem {
       n.visit++;
     }
     this.onTalk?.();
-    this.onDialog?.({ name: n.name, text: this.convo[0] });
+    this.onDialog?.({ name: n.name, sub: npcSub(n), text: this.convo[0] });
     return true;
   }
 
@@ -270,7 +286,7 @@ export class NPCSystem {
     for (const n of this.all()) {
       const g = n.g;
       // townsfolk and gate bystanders head home after dark
-      if (n.townsfolk || n.bystander) g.visible = !night;
+      if (n.townsfolk || n.bystander) g.visible = n.bigCity || !night;
       if (!g.visible) continue;
 
       const dx = pos.x - g.position.x, dz = pos.z - g.position.z;
@@ -290,7 +306,7 @@ export class NPCSystem {
           const nz = g.position.z - Math.cos(n.dir) * 1.1 * dt;
           if (Math.hypot(nx - n.homeX, nz - n.homeZ) < 14 && !nearestRoad(nx, nz, 1.5)) {
             g.position.x = nx; g.position.z = nz;
-            g.position.y = hAt(nx, nz);
+            g.position.y = gY(nx, nz);
             g.rotation.y = n.dir;
           } else n.dir += Math.PI / 2;
         }
@@ -324,7 +340,7 @@ export class NPCSystem {
       // startled hop (horn) — a quick jump, then settle back onto the terrain
       if (n.hop > 0) {
         n.hop -= dt;
-        const gy = hAt(g.position.x, g.position.z);
+        const gy = gY(g.position.x, g.position.z);
         g.position.y = gy + (n.hop > 0 ? Math.abs(Math.sin(n.hop * 15)) * 0.3 : 0);
       }
 
@@ -338,17 +354,24 @@ export class NPCSystem {
     const rand = seededRand('folk:' + city.name);
     const n = city.pop > 400000 ? 5 : city.pop > 80000 ? 3 : 2;
     const R = cityRadius(city.pop);
+    // same 400,000 "big city" threshold as cities.js:52 — mirrored here
+    // (not exported there); keep the two in sync if it ever changes.
+    const bigCity = city.pop > 400000;
     const folk = [];
     for (let i = 0; i < n; i++) {
       const g = mkCharacter(randomLook(rand), rand);
       const a = rand() * Math.PI * 2, r = R * (0.2 + rand() * 0.5);
       const [x, z] = roadShoulder(city.x + Math.cos(a) * r, city.z + Math.sin(a) * r, R);
-      g.position.set(x, hAt(x, z), z);
+      g.position.set(x, gY(x, z), z);
       g.rotation.y = rand() * Math.PI * 2;
       this.scene.add(g);
+      // independent stream (keyed by index, not drawn from `rand`) so adding
+      // age/profession never shifts the shared stream's later look/position draws
+      const ar = seededRand('age:' + city.name + ':' + i);
       folk.push({
         g, name: TOWNSFOLK_NAMES[(rand() * TOWNSFOLK_NAMES.length) | 0],
-        townsfolk: true, homeX: x, homeZ: z, walkT: rand() * 3, walking: false,
+        age: 20 + ((ar() * 55) | 0), profession: TOWNSFOLK_PROFESSIONS[(ar() * TOWNSFOLK_PROFESSIONS.length) | 0],
+        townsfolk: true, bigCity, homeX: x, homeZ: z, walkT: rand() * 3, walking: false,
         dir: 0, wave: 0, phase: rand() * 6.28, baseRotY: g.rotation.y,
       });
     }
@@ -360,17 +383,25 @@ export class NPCSystem {
     const n = a.tier === 1 ? 3 : 2;
     const roles = ['spotter', 'relative', 'pilot'];
     const [gx, gz] = a.gate;
+    // same 400,000 "big city" threshold as cities.js:52 — mirrored here
+    const bigCity = (GEO.cities.find((c) => c.name === a.city)?.pop ?? 0) > 400000;
     const folk = [];
     for (let i = 0; i < n; i++) {
       const g = mkCharacter(randomLook(rand), rand);
       const ang = rand() * Math.PI * 2, r = 1.4 + rand() * 2.2;
       const x = gx + Math.cos(ang) * r, z = gz + Math.sin(ang) * r;
-      g.position.set(x, hAt(x, z), z);
+      g.position.set(x, gY(x, z), z);
       g.rotation.y = rand() * Math.PI * 2;
       this.scene.add(g);
+      const role = roles.splice((rand() * roles.length) | 0, 1)[0];
+      const info = BYSTANDER_ROLE_INFO[role];
+      // independent stream (keyed by index, not drawn from `rand`) so adding
+      // age never shifts the shared stream's later look/position draws
+      const ar = seededRand('age:' + a.id + ':' + i);
       folk.push({
         g, name: TOWNSFOLK_NAMES[(rand() * TOWNSFOLK_NAMES.length) | 0],
-        bystander: true, field: a, role: roles.splice((rand() * roles.length) | 0, 1)[0],
+        age: info.ageLo + ((ar() * (info.ageHi - info.ageLo)) | 0), profession: info.profession,
+        bystander: true, bigCity, field: a, role,
         visit: 0, wave: 0, phase: rand() * 6.28, baseRotY: g.rotation.y,
       });
     }

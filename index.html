@@ -29,6 +29,7 @@
     background: rgba(12,16,24,.92); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 10px;
     padding: 14px 18px; font-size: 1.5rem; line-height: 1.45; display: none; z-index: 9; }
   #dialog .npc-name { font-weight: 700; color: #ffd35c; margin-bottom: 4px; }
+  #dialog .npc-sub { font-size: 1.2rem; opacity: .65; margin-bottom: 6px; }
   #dialog .hint { margin-top: 8px; font-size: 1.2rem; opacity: .6; }
   #toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: rgba(20,26,36,.92);
     color: #ffd35c; padding: 10px 22px; border-radius: 24px; font-size: 1.5rem; font-weight: 600;
@@ -103,7 +104,7 @@
 <canvas id="minimap" width="380" height="360"></canvas>
 <canvas id="compass" width="680" height="80"></canvas>
 <div id="bigmap"><canvas id="bigmap-canvas"></canvas></div>
-<div id="dialog"><div class="npc-name"></div><div class="npc-text"></div><div class="hint">E — continue / close</div></div>
+<div id="dialog"><div class="npc-name"></div><div class="npc-sub"></div><div class="npc-text"></div><div class="hint">E — continue / close</div></div>
 <div id="interact-hint"></div>
 <div id="toast"></div>
 <div id="radio-subtitle"><div id="radio-header"></div><span id="radio-text"></span></div>
