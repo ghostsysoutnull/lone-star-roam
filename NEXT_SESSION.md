@@ -37,26 +37,35 @@ airport pairs, real-touchdown detection reusing radio.js's own landing test
 via new `airports.js` exports `TD_AGL`/`TD_SPD`, charter livery via
 `vehicle.js` `mkWings` `userData.mat`/`stockColor`, `missions.force(fromId,
 toId)` test hook + debug button — see ROADMAP.md, full spec in
-`CHARTER_JOBS_SPEC.md`). Remaining à-la-carte candidates, both already
-scoped in with Bruno's go-ahead: **Sheppard T-38 touch-and-go pattern
-circuits** (the one piece that needs real new design — a closed traffic
-pattern doesn't fit the point-to-point `AviationSystem` schedule or the
-simple orbit/transit movers already built; budget it its own session), and
-**Marfa gliders** (silent soaring circles over the strip on clear
-afternoons). Still deferred/unscoped: crop duster dawn runs from tier-3
-strips, a 13th bespoke NPC (duster pilot, weather-wise dialog) — confirm
-scope with Bruno before picking these up. Notes: `src/rotors.js` has
-`HeliSystem`/`BlimpSystem` and `src/military.js` has `MilitaryAirSystem`
-(candidates array, `force(kind)`/`despawnAll` test hooks, global airborne
-cap idiom with per-kind `weight`); reuse the same pattern for any new mover
-rather than inventing one — military.js additionally shows how to share
-`aviation.js`'s `MAX_AIR` budget across systems via
-`aviation.airborneCount()`. `aviation.divert(m)` is public if new air
-traffic needs a forced diversion; `airports.js` `onRunway(a,x,z,rad)` is the
-pavement-corridor test for any new ground-contact placement (now paired with
-exported `TD_AGL`/`TD_SPD` for "is this thing landed"); `radio.js` stays
-standalone — Sheppard radio chatter should follow the same pattern, never
-break `aviation.update`'s signature.
+`CHARTER_JOBS_SPEC.md`; **helicopter detail pass shipped 2026-07-12** —
+`rotors.js`'s `HeliSystem` split its one shared body/rotor geometry into
+four bespoke per-kind bodies + a real rotor-blade-count mechanic (army
+4-blade cross vs 2 for the others), fixing a latent `POOL=6` truncation bug
+as a side effect — see ROADMAP.md, full spec in `HELICOPTER_SPEC.md`).
+Remaining à-la-carte candidates, both already scoped in with Bruno's
+go-ahead: **Sheppard T-38 touch-and-go pattern circuits** (the one piece
+that needs real new design — a closed traffic pattern doesn't fit the
+point-to-point `AviationSystem` schedule or the simple orbit/transit movers
+already built; budget it its own session), and **Marfa gliders** (silent
+soaring circles over the strip on clear afternoons). Still deferred/
+unscoped: crop duster dawn runs from tier-3 strips, a 13th bespoke NPC
+(duster pilot, weather-wise dialog) — confirm scope with Bruno before
+picking these up. Notes: `src/rotors.js` has `HeliSystem`/`BlimpSystem`
+(HeliSystem now keeps four kind-scoped `{body, rotor}` InstancedMesh pairs
+in `this.meshes`, per-kind blade count/diameter in `HELI_CONFIG`, rendered
+instance counts in `this.rotorCount` — reuse this per-kind-mesh-pool
+pattern if any other mover ever needs real shape differentiation) and
+`src/military.js` has `MilitaryAirSystem` (candidates array, `force(kind)`/
+`despawnAll` test hooks, global airborne cap idiom with per-kind `weight`);
+reuse the same pattern for any new mover rather than inventing one —
+military.js additionally shows how to share `aviation.js`'s `MAX_AIR`
+budget across systems via `aviation.airborneCount()`. `aviation.divert(m)`
+is public if new air traffic needs a forced diversion; `airports.js`
+`onRunway(a,x,z,rad)` is the pavement-corridor test for any new
+ground-contact placement (now paired with exported `TD_AGL`/`TD_SPD` for
+"is this thing landed"); `radio.js` stays standalone — Sheppard radio
+chatter should follow the same pattern, never break `aviation.update`'s
+signature.
 
 Session end (per wave): fold the shipped wave into ROADMAP.md, advance the
 Task block above to the next wave, run `node tools/verify.mjs`, then commit.

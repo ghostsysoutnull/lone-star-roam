@@ -18,7 +18,6 @@ const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180)
 const CAP = 2;              // hard cap on airborne rotorcraft near the player (AVIATION.md)
 const MAT_R = 450;          // materialize distance
 const AIR_FAR = 900;        // far despawn for an in-progress flight (aviation.js idiom) — frees the cap slot
-const POOL = 6;
 // real top-4 Texas metros by population (Houston/San Antonio/Dallas/Austin;
 // Fort Worth is 5th and not close enough to edge out Austin)
 const BIG_FOUR = ['Houston', 'San Antonio', 'Dallas', 'Austin'];
@@ -28,20 +27,105 @@ const CG_ALT = 30, CG_SPD = 5; // CG_ALT is AGL over the current lane point
 const TINT = { medical: 0xd8203a, news: 0x2a5ea8, coastguard: 0xd88a1a, army: 0x4a5a30 };
 const UP = new THREE.Vector3(0, 1, 0), ONE = new THREE.Vector3(1, 1, 1);
 
-const W = 0xf2f0ea, GLASS = 0x8fa8bc, DARK = 0x2a2a30;
-function mkHeliBody() {
+// Per-kind detail pass (HELICOPTER_SPEC.md): each kind gets its own body
+// geometry + rotor blade count/diameter instead of one shared chassis +
+// tint. BODY_POOL matches mkCandidates()'s natural per-kind instance count
+// (army renders 2 body instances per 1 weight-2 candidate — see render()).
+// ROTOR_POOL is body count × blade count since each blade is now its own
+// InstancedMesh instance (so "how many rotor instances rendered" is a real,
+// countable proxy for blade count — see rotorCount below).
+const KINDS = ['medical', 'news', 'coastguard', 'army'];
+const HELI_CONFIG = {
+  medical: { blades: 2, rotorR: 1.7 },   // standard diameter
+  news: { blades: 2, rotorR: 1.4 },      // lightest airframe, smallest disc
+  coastguard: { blades: 2, rotorR: 1.9 }, // medium diameter
+  army: { blades: 4, rotorR: 2.3 },      // 4-blade cross, largest — the at-a-distance tell
+};
+const BODY_POOL = { medical: 4, news: 4, coastguard: 1, army: 2 };
+const ROTOR_POOL = Object.fromEntries(KINDS.map((k) => [k, BODY_POOL[k] * HELI_CONFIG[k].blades]));
+
+const W = 0xf2f0ea, GLASS = 0x8fa8bc, DARK = 0x2a2a30, RED = 0xcc2222;
+
+function mkMedicalBody() {
+  // Airbus H135 / Bell 407 ref: tapered nose cone, red-cross panel, short hoist arm.
   return merge([
-    tinted(new THREE.BoxGeometry(0.95, 0.85, 1.7).translate(0, 0.7, 0.15), W),
+    tinted(new THREE.BoxGeometry(0.95, 0.85, 1.6).translate(0, 0.7, 0.1), W),
+    tinted(new THREE.ConeGeometry(0.48, 0.9, 8).rotateX(Math.PI / 2).translate(0, 0.72, -0.95), W),
     tinted(new THREE.BoxGeometry(0.7, 0.55, 0.6).translate(0, 0.85, -0.55), GLASS),
-    tinted(new THREE.CylinderGeometry(0.16, 0.1, 2.1, 6).rotateX(Math.PI / 2).translate(0, 0.6, 1.55), W),
+    tinted(new THREE.CylinderGeometry(0.16, 0.1, 2.1, 8).rotateX(Math.PI / 2).translate(0, 0.6, 1.55), W),
     tinted(new THREE.BoxGeometry(0.05, 0.5, 0.42).translate(0, 0.95, 2.55), 0xffffff), // fin — full tint (livery)
     tinted(new THREE.BoxGeometry(0.04, 0.04, 0.42).translate(0.24, 0.8, 2.5), DARK),   // tail rotor
-    tinted(new THREE.CylinderGeometry(0.05, 0.06, 0.55, 6).translate(-0.32, 0.18, 0.5), DARK),
-    tinted(new THREE.CylinderGeometry(0.05, 0.06, 0.55, 6).translate(0.32, 0.18, 0.5), DARK),
+    tinted(new THREE.CylinderGeometry(0.05, 0.06, 0.55, 8).translate(-0.32, 0.18, 0.5), DARK),
+    tinted(new THREE.CylinderGeometry(0.05, 0.06, 0.55, 8).translate(0.32, 0.18, 0.5), DARK),
     tinted(new THREE.BoxGeometry(0.75, 0.05, 0.1).translate(0, 0.14, 0.5), DARK),
+    tinted(new THREE.BoxGeometry(0.5, 0.28, 0.02).translate(0.48, 0.7, 0.15), RED),   // cross panel, bar 1
+    tinted(new THREE.BoxGeometry(0.16, 0.5, 0.02).translate(0.48, 0.7, 0.15), RED),   // cross panel, bar 2
+    tinted(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6).rotateZ(Math.PI / 2).translate(0, 1.15, -0.2), DARK), // hoist arm
   ]);
 }
-const mkHeliRotor = () => tinted(new THREE.BoxGeometry(3.4, 0.03, 0.14), 0x303030);
+
+function mkNewsBody() {
+  // Smallest/lightest of the four; nose camera ball is the signature tell.
+  return merge([
+    tinted(new THREE.BoxGeometry(0.8, 0.7, 1.5).translate(0, 0.65, 0.1), W),
+    tinted(new THREE.BoxGeometry(0.6, 0.5, 0.55).translate(0, 0.8, -0.5), GLASS),
+    tinted(new THREE.CylinderGeometry(0.14, 0.09, 1.9, 8).rotateX(Math.PI / 2).translate(0, 0.55, 1.4), W),
+    tinted(new THREE.BoxGeometry(0.04, 0.32, 0.3).translate(0, 0.85, 2.3), 0xffffff), // simplified fin
+    tinted(new THREE.BoxGeometry(0.03, 0.03, 0.3).translate(0.2, 0.72, 2.28), DARK),  // tail rotor
+    tinted(new THREE.CylinderGeometry(0.045, 0.055, 0.5, 8).translate(-0.28, 0.16, 0.45), DARK),
+    tinted(new THREE.CylinderGeometry(0.045, 0.055, 0.5, 8).translate(0.28, 0.16, 0.45), DARK),
+    tinted(new THREE.BoxGeometry(0.65, 0.05, 0.1).translate(0, 0.12, 0.45), DARK),
+    tinted(new THREE.SphereGeometry(0.13, 8, 6).translate(0, 0.55, -1.15), DARK),      // camera ball
+    tinted(new THREE.CylinderGeometry(0.03, 0.03, 0.25, 6).translate(0, 0.68, -1.05), DARK), // camera mount
+  ]);
+}
+
+function mkCoastGuardBody() {
+  // MH-65 Dolphin ref: bigger cabin, hemisphere nose, rescue hoist boom + basket.
+  return merge([
+    tinted(new THREE.BoxGeometry(1.1, 0.95, 1.85).translate(0, 0.75, 0.15), W),
+    tinted(new THREE.SphereGeometry(0.55, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2).rotateX(-Math.PI / 2).translate(0, 0.75, -0.9), W), // hemisphere nose
+    tinted(new THREE.BoxGeometry(0.85, 0.62, 0.7).translate(0, 0.92, -0.4), GLASS),
+    tinted(new THREE.CylinderGeometry(0.18, 0.11, 2.3, 8).rotateX(Math.PI / 2).translate(0, 0.65, 1.7), W),
+    tinted(new THREE.BoxGeometry(0.05, 0.55, 0.46).translate(0, 1.0, 2.8), 0xffffff), // fin
+    tinted(new THREE.BoxGeometry(0.04, 0.04, 0.46).translate(0.26, 0.85, 2.75), DARK), // tail rotor
+    tinted(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 8).translate(-0.36, 0.2, 0.55), DARK),
+    tinted(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 8).translate(0.36, 0.2, 0.55), DARK),
+    tinted(new THREE.BoxGeometry(0.85, 0.05, 0.1).translate(0, 0.15, 0.55), DARK),
+    tinted(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 6).rotateZ(Math.PI / 2).translate(0.65, 0.85, 0.2), DARK), // hoist boom
+    tinted(new THREE.BoxGeometry(0.18, 0.22, 0.18).translate(0.9, 0.55, 0.2), DARK),   // hoist basket
+  ]);
+}
+
+function mkArmyBody() {
+  // UH-60 ref: boxiest/largest cabin, stub-wing fuel tanks, portholes (no glass canopy), tail wheel.
+  return merge([
+    tinted(new THREE.BoxGeometry(1.15, 0.95, 1.9).translate(0, 0.72, 0.1), W),
+    tinted(new THREE.CylinderGeometry(0.1, 0.1, 0.35, 8).rotateZ(Math.PI / 2).translate(-0.45, 0.9, -0.45), DARK), // porthole L
+    tinted(new THREE.CylinderGeometry(0.1, 0.1, 0.35, 8).rotateZ(Math.PI / 2).translate(0.45, 0.9, -0.45), DARK),  // porthole R
+    tinted(new THREE.CylinderGeometry(0.2, 0.13, 2.2, 8).rotateX(Math.PI / 2).translate(0, 0.62, 1.65), W),
+    tinted(new THREE.BoxGeometry(0.06, 0.6, 0.5).translate(0, 1.0, 2.7), 0xffffff), // fin
+    tinted(new THREE.BoxGeometry(0.05, 0.05, 0.5).translate(0.28, 0.85, 2.65), DARK), // tail rotor
+    tinted(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 8).translate(-0.38, 0.2, 0.5), DARK),
+    tinted(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 8).translate(0.38, 0.2, 0.5), DARK),
+    tinted(new THREE.BoxGeometry(0.9, 0.05, 0.1).translate(0, 0.15, 0.5), DARK),
+    tinted(new THREE.BoxGeometry(0.1, 0.35, 0.35).translate(-0.7, 0.55, 0), DARK),   // wing stub L
+    tinted(new THREE.BoxGeometry(0.32, 0.28, 0.7).translate(-0.85, 0.5, 0), DARK),   // fuel tank L
+    tinted(new THREE.BoxGeometry(0.1, 0.35, 0.35).translate(0.7, 0.55, 0), DARK),    // wing stub R
+    tinted(new THREE.BoxGeometry(0.32, 0.28, 0.7).translate(0.85, 0.5, 0), DARK),    // fuel tank R
+    tinted(new THREE.CylinderGeometry(0.08, 0.08, 0.12, 8).rotateZ(Math.PI / 2).translate(0, 0.1, 2.9), DARK), // tail wheel
+  ]);
+}
+
+const BODY_GEO = { medical: mkMedicalBody, news: mkNewsBody, coastguard: mkCoastGuardBody, army: mkArmyBody };
+
+// A single hub-to-tip blade, shared per kind at that kind's rotorR. Rendered
+// as `blades` separate instances spaced evenly around the hub — so "how many
+// rotor instances are live" is a real per-kind count (army 4, others 2), not
+// baked into one merged disc.
+function mkHeliRotorBlade(radius) {
+  return tinted(new THREE.BoxGeometry(radius, 0.03, 0.14).translate(radius / 2, 0, 0), 0x303030);
+}
 
 function advanceMedical(c, dt) {
   if (!c.flying) {
@@ -95,13 +179,19 @@ export class HeliSystem {
     this.candidates = mkCandidates(maritime);
     this.t = 0;
     this.simT = 0; // accumulates in the real loop — wiring sentinel
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    const rotorMat = new THREE.MeshBasicMaterial({ vertexColors: true });
-    this.body = new THREE.InstancedMesh(mkHeliBody(), mat, POOL);
-    this.rotor = new THREE.InstancedMesh(mkHeliRotor(), rotorMat, POOL);
-    this.body.frustumCulled = false;
-    this.rotor.frustumCulled = false;
-    scene.add(this.body, this.rotor);
+    this.meshes = {};
+    this.rotorCount = {};
+    for (const kind of KINDS) {
+      const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+      const rotorMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+      const body = new THREE.InstancedMesh(BODY_GEO[kind](), mat, BODY_POOL[kind]);
+      const rotor = new THREE.InstancedMesh(mkHeliRotorBlade(HELI_CONFIG[kind].rotorR), rotorMat, ROTOR_POOL[kind]);
+      body.frustumCulled = false;
+      rotor.frustumCulled = false;
+      scene.add(body, rotor);
+      this.meshes[kind] = { body, rotor };
+      this.rotorCount[kind] = 0;
+    }
     this.m4 = new THREE.Matrix4();
     this.zero = new THREE.Matrix4().makeScale(0, 0, 0);
     this.q = new THREE.Quaternion();
@@ -189,28 +279,37 @@ export class HeliSystem {
   }
 
   render() {
-    const list = [];
+    const lists = { medical: [], news: [], coastguard: [], army: [] };
     for (const c of this.candidates) {
       if (!c.active) continue;
       if (c.kind === 'army') {
         const perp = c.heading + Math.PI / 2, ox = Math.cos(perp) * 8, oz = Math.sin(perp) * 8;
-        list.push({ x: c.x - ox, y: c.y, z: c.z - oz, heading: c.heading, tint: c.tint });
-        list.push({ x: c.x + ox, y: c.y, z: c.z + oz, heading: c.heading, tint: c.tint });
-      } else list.push({ x: c.x, y: c.y, z: c.z, heading: c.heading, tint: c.tint });
+        lists.army.push({ x: c.x - ox, y: c.y, z: c.z - oz, heading: c.heading });
+        lists.army.push({ x: c.x + ox, y: c.y, z: c.z + oz, heading: c.heading });
+      } else lists[c.kind].push({ x: c.x, y: c.y, z: c.z, heading: c.heading });
     }
-    let i = 0;
-    for (; i < list.length && i < POOL; i++) {
-      const it = list[i];
-      this.m4.compose(new THREE.Vector3(it.x, it.y, it.z), this.q.setFromAxisAngle(UP, it.heading), ONE);
-      this.body.setMatrixAt(i, this.m4);
-      this.body.setColorAt(i, this.col.set(it.tint));
-      this.m4.compose(new THREE.Vector3(it.x, it.y + 0.42, it.z), this.q.setFromAxisAngle(UP, this.t * 22), ONE);
-      this.rotor.setMatrixAt(i, this.m4);
+    for (const kind of KINDS) {
+      const { body, rotor } = this.meshes[kind];
+      const list = lists[kind], blades = HELI_CONFIG[kind].blades, tint = TINT[kind];
+      let bi = 0, ri = 0;
+      for (; bi < list.length && bi < BODY_POOL[kind]; bi++) {
+        const it = list[bi];
+        this.m4.compose(new THREE.Vector3(it.x, it.y, it.z), this.q.setFromAxisAngle(UP, it.heading), ONE);
+        body.setMatrixAt(bi, this.m4);
+        body.setColorAt(bi, this.col.set(tint));
+        for (let b = 0; b < blades && ri < ROTOR_POOL[kind]; b++, ri++) {
+          const bladeAng = this.t * 22 + (2 * Math.PI * b) / blades;
+          this.m4.compose(new THREE.Vector3(it.x, it.y + 0.42, it.z), this.q.setFromAxisAngle(UP, bladeAng), ONE);
+          rotor.setMatrixAt(ri, this.m4);
+        }
+      }
+      this.rotorCount[kind] = ri;
+      for (; bi < BODY_POOL[kind]; bi++) body.setMatrixAt(bi, this.zero);
+      for (; ri < ROTOR_POOL[kind]; ri++) rotor.setMatrixAt(ri, this.zero);
+      body.instanceMatrix.needsUpdate = true;
+      rotor.instanceMatrix.needsUpdate = true;
+      if (body.instanceColor) body.instanceColor.needsUpdate = true;
     }
-    for (; i < POOL; i++) { this.body.setMatrixAt(i, this.zero); this.rotor.setMatrixAt(i, this.zero); }
-    this.body.instanceMatrix.needsUpdate = true;
-    this.rotor.instanceMatrix.needsUpdate = true;
-    if (this.body.instanceColor) this.body.instanceColor.needsUpdate = true;
   }
 }
 

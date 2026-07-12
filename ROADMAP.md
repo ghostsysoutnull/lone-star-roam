@@ -180,6 +180,30 @@ ship.
   `CHARTER_JOBS_SPEC.md`. Still open from wave 5: Sheppard T-38 touch-and-go
   pattern circuits, Marfa gliders, crop dusters, the 13th NPC.
 
+- [x] ~~Helicopter detail pass~~ — done 2026-07-12: `src/rotors.js`'s
+  `HeliSystem` split its one shared body + one shared rotor geometry (tint
+  was the only per-kind signal) into four real bespoke bodies —
+  `mkMedicalBody`/`mkNewsBody`/`mkCoastGuardBody`/`mkArmyBody` — each with
+  1-2 signature tells (medical: tapered nose + red-cross panel + hoist arm;
+  news: nose camera ball + simplified fin; coast guard: hemisphere nose +
+  rescue hoist boom/basket + bigger cabin; army: stub-wing fuel tanks +
+  portholes instead of a glass canopy + tail wheel), ~3× the old 132-tri
+  baseline. Rotor blade count became a real per-kind mechanic:
+  `mkHeliRotorBlade(radius)` is one hub-to-tip blade instanced `blades`
+  times per aircraft (2 for medical/news/coastguard, 4 for army in a cross —
+  the single biggest at-a-distance tell). `HeliSystem` now keeps four
+  kind-scoped `{body, rotor}` InstancedMesh pairs (`this.meshes`, pool sized
+  to each kind's real candidate count) instead of one shared pair truncated
+  at `POOL=6` — fixes a latent bug where all four kinds simultaneously
+  active (11 instances) would silently drop some. Cap/weight/force/
+  despawnAll/airborneCount logic untouched (rendering-layer change only).
+  4 new checks: per-kind triangle count > the old shared baseline, four
+  distinct geometry objects, army rendering 8 rotor-blade instances (2
+  aircraft × 4 blades) vs 2 for other kinds, plus one gated `SHOT` gut-check
+  (all four kinds forced airborne one at a time) per `HELICOPTER_SPEC.md`'s
+  sanctioned exception to the no-screenshots-by-default rule. Full spec in
+  `HELICOPTER_SPEC.md`.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

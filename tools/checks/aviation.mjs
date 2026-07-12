@@ -750,6 +750,71 @@ export default async function aviation(t) {
     t.ok(m1 > m0 + 0.3, 'military.simT frozen — MilitaryAirSystem.update not wired into the main loop');
   });
 
+  // Rotor detail pass: per-kind body geometry (was one shared 132-tri body
+  // for all four kinds) and per-kind blade counts (army = 4-blade cross, the
+  // other three keep 2 blades). Same numbers-over-pixels rule as the rest of
+  // this suite — poly counts and rotorCount, not a screenshot, are the
+  // pass/fail signal; the one SHOT below is HELICOPTER_SPEC.md's sanctioned
+  // exception for a genuine shape-differentiation gut check.
+  await t.check('helicopter body poly count increased per kind (real geometry, not shared)', async () => {
+    const counts = await t.ev(`(() => {
+      const ks = ['medical', 'news', 'coastguard', 'army'];
+      return ks.map((k) => g.heli.meshes[k].body.geometry.index.count / 3); // merge() always emits an indexed geometry — triangle count is index.count/3, not position.count/3
+    })()`);
+    for (const [i, k] of ['medical', 'news', 'coastguard', 'army'].entries())
+      t.ok(counts[i] > 132, `${k} body still at/below the old shared 132-tri geometry (${counts[i]})`);
+  });
+
+  await t.check('all four helicopter kinds have distinct body geometries', async () => {
+    const n = await t.ev(`(() => {
+      const ks = ['medical', 'news', 'coastguard', 'army'];
+      return new Set(ks.map((k) => g.heli.meshes[k].body.geometry)).size;
+    })()`);
+    t.ok(n === 4, `expected 4 distinct body geometries, got ${n} (kinds still sharing one shared mesh)`);
+  });
+
+  await t.check('army rotor is a real 4-blade outlier, other kinds stay at 2 (per aircraft)', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll();
+      if (!g.heli.force('army')) return { err: 'force army failed' };
+      const army = g.heli.candidates.find((x) => x.kind === 'army' && x.flying);
+      g.heli.update(0.05, army.baseX, army.baseZ);
+      const armyCount = g.heli.rotorCount.army;
+      g.heli.despawnAll();
+      if (!g.heli.force('medical')) return { err: 'force medical failed' };
+      const med = g.heli.candidates.find((x) => x.kind === 'medical' && x.flying);
+      g.heli.update(0.05, med.baseX, med.baseZ);
+      const medCount = g.heli.rotorCount.medical;
+      return { err: null, armyCount, medCount };
+    })()`);
+    t.ok(!r.err, r.err);
+    // the army candidate renders as a 2-aircraft pair (see rotors.js header comment on the weight-2 gate),
+    // so its rotor total is 2 aircraft × 4 blades = 8 — still double medical's 1 aircraft × 2 blades, the
+    // real per-kind differentiation the spec asks for.
+    t.ok(r.armyCount === 8, `army rotor should render 8 blade instances (2 aircraft × 4 blades), got ${r.armyCount}`);
+    t.ok(r.medCount === 2, `medical rotor should render 2 blades, got ${r.medCount}`);
+    await t.ev('g.heli.despawnAll()');
+  });
+
+  if (process.env.SHOT) { // composition only — never the pass/fail signal; sanctioned by HELICOPTER_SPEC.md
+    for (const k of ['medical', 'news', 'coastguard', 'army']) {
+      const pos = await t.ev(`(() => {
+        g.heli.despawnAll();
+        if (!g.heli.force('${k}')) return null;
+        const c = g.heli.candidates.find((x) => x.kind === '${k}' && x.flying);
+        for (let i = 0; i < 60; i++) g.heli.update(0.05, c.baseX + 50, c.baseZ + 50);
+        return { x: c.x, z: c.z, y: c.y ?? (g.hAt(c.x, c.z) + 30) };
+      })()`);
+      if (pos) {
+        await t.tp(pos.x + 20, pos.z + 20, 'FLY', 15);
+        await t.ev(`g.player.heading = Math.atan2(-(${pos.x} - g.player.pos.x), -(${pos.z} - g.player.pos.z))`);
+        await t.wait(0.3);
+        await t.shot(`heli-${k}`);
+      }
+    }
+    await t.ev('g.heli.despawnAll()');
+  }
+
   // Military color (wave 5, partial): the two flavor pairs are aviation.js
   // movers wearing rotors.js's candidate idiom — same rule applies (assert
   // numbers over time, never pixels). The load-bearing invariant is the
