@@ -14,6 +14,8 @@ function tagLabel(s) {
 }
 
 const SHIELD_HOLD = 0.8; // seconds the road shield lingers through a nearestRoad dropout
+const AMBER = '#ffb020';     // night shield: glowing outline / lattice
+const AMBER_LIT = '#ffd27a'; // night shield: brighter core for the glyphs
 
 // Road shields: only the clean "PREFIX ###" refs get a shield (real Interstate/
 // US/state formats out of tools/build-data.mjs); messy municipal names like
@@ -302,8 +304,8 @@ export class HUD {
 
   // chrome-card helpers shared by the three shield shapes: an offset dark
   // copy of the path for faked extruded thickness, a metallic gradient face,
-  // a clipped diagonal specular streak, a light bevel stroke, and (night) an
-  // amber wireframe lattice traced over the same path
+  // a clipped diagonal specular streak, a light bevel stroke, and (night) a
+  // dark warm face + amber wireframe lattice traced over the same path
   chromeExtrude(ctx, path) {
     path(3, 4);
     ctx.fillStyle = '#0a0d16';
@@ -317,6 +319,18 @@ export class HUD {
     g.addColorStop(0.45, '#c7ccd6');
     g.addColorStop(0.55, '#eef1f6');
     g.addColorStop(1, '#a7adb9');
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+
+  // night "dark mode": a near-black warm (amber-tinted) face — the glow comes
+  // from the amber outline/lattice/glyphs and the CSS bloom on the wrap
+  nightFace(ctx, path, x, y, w, h) {
+    path();
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, '#2a1f12');
+    g.addColorStop(0.5, '#160f08');
+    g.addColorStop(1, '#0a0603');
     ctx.fillStyle = g;
     ctx.fill();
   }
@@ -342,16 +356,30 @@ export class HUD {
     ctx.save();
     path();
     ctx.clip();
-    ctx.strokeStyle = '#ffb020';
-    ctx.globalAlpha = 0.85;
+    ctx.strokeStyle = AMBER;
+    ctx.shadowColor = AMBER;
+    ctx.shadowBlur = 7;      // glowing amber edge (inner bloom; CSS adds the outer)
+    ctx.globalAlpha = 0.95;
     path();
-    ctx.lineWidth = 2.2;
+    ctx.lineWidth = 2.8;
     ctx.stroke();
+    ctx.globalAlpha = 0.45;  // fainter interior lattice
+    ctx.shadowBlur = 3;
     ctx.beginPath();
     ctx.moveTo(x, y); ctx.lineTo(x + w, y + h);
     ctx.moveTo(x + w, y); ctx.lineTo(x, y + h);
-    ctx.lineWidth = 1.4;
+    ctx.lineWidth = 1.3;
     ctx.stroke();
+    ctx.restore();
+  }
+
+  // glowing amber glyphs for the night face (reset shadow after)
+  amberText(ctx, text, x, y) {
+    ctx.save();
+    ctx.fillStyle = AMBER_LIT;
+    ctx.shadowColor = AMBER;
+    ctx.shadowBlur = 8;
+    ctx.fillText(text, x, y);
     ctx.restore();
   }
 
@@ -371,22 +399,25 @@ export class HUD {
       ctx.closePath();
     };
     this.chromeExtrude(ctx, path);
-    this.chromeFace(ctx, path, cx - w / 2, top, w, h);
-    ctx.save();
-    path();
-    ctx.clip();
-    ctx.fillStyle = '#1c3f94';
-    ctx.fillRect(cx - w / 2, top, w, h * 0.24);
-    ctx.fillStyle = '#c8202e';
-    ctx.fillRect(cx - w / 2, top + h * 0.24, w, h * 0.09);
-    this.specularStreak(ctx, cx - w / 2, top, w, h);
-    ctx.restore();
-    path();
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = '#0c1e50';
-    ctx.stroke();
-    this.bevelStroke(ctx, path);
-    ctx.fillStyle = '#1c3f94';
+    if (night) {
+      this.nightFace(ctx, path, cx - w / 2, top, w, h);
+    } else {
+      this.chromeFace(ctx, path, cx - w / 2, top, w, h);
+      ctx.save();
+      path();
+      ctx.clip();
+      ctx.fillStyle = '#1c3f94';
+      ctx.fillRect(cx - w / 2, top, w, h * 0.24);
+      ctx.fillStyle = '#c8202e';
+      ctx.fillRect(cx - w / 2, top + h * 0.24, w, h * 0.09);
+      this.specularStreak(ctx, cx - w / 2, top, w, h);
+      ctx.restore();
+      path();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#0c1e50';
+      ctx.stroke();
+      this.bevelStroke(ctx, path);
+    }
     // 3-char refs (I 410/610/635, I 35W/35E/69E) need to shrink to fit the
     // shield's narrowing lower half — don't just test the convenient 2-digit case
     const label = num + (tag ?? '');
@@ -397,7 +428,8 @@ export class HUD {
       ctx.font = `bold ${size}px system-ui`;
     }
     this.shieldFit = { width: ctx.measureText(label).width, max: w * 0.62 };
-    ctx.fillText(label, cx, top + h * 0.62);
+    if (night) { this.amberText(ctx, label, cx, top + h * 0.62); }
+    else { ctx.fillStyle = '#1c3f94'; ctx.fillText(label, cx, top + h * 0.62); }
     if (night) this.nightWireframe(ctx, path, cx - w / 2, top, w, h);
   }
 
@@ -415,22 +447,27 @@ export class HUD {
       ctx.closePath();
     };
     this.chromeExtrude(ctx, path);
-    this.chromeFace(ctx, path, cx - w / 2, top, w, h);
-    ctx.save();
-    path();
-    ctx.clip();
-    this.specularStreak(ctx, cx - w / 2, top, w, h);
-    ctx.restore();
-    path();
-    ctx.lineWidth = 3.5;
-    ctx.strokeStyle = '#111';
-    ctx.stroke();
-    this.bevelStroke(ctx, path);
-    ctx.fillStyle = '#111';
+    if (night) {
+      this.nightFace(ctx, path, cx - w / 2, top, w, h);
+    } else {
+      this.chromeFace(ctx, path, cx - w / 2, top, w, h);
+      ctx.save();
+      path();
+      ctx.clip();
+      this.specularStreak(ctx, cx - w / 2, top, w, h);
+      ctx.restore();
+      path();
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#111';
+      ctx.stroke();
+      this.bevelStroke(ctx, path);
+    }
     ctx.font = 'bold 17px system-ui';
-    ctx.fillText('US', cx, top + h * 0.3);
+    if (night) this.amberText(ctx, 'US', cx, top + h * 0.3);
+    else { ctx.fillStyle = '#111'; ctx.fillText('US', cx, top + h * 0.3); }
     ctx.font = 'bold 41px system-ui';
-    ctx.fillText(num, cx, top + h * 0.78);
+    if (night) this.amberText(ctx, num, cx, top + h * 0.78);
+    else { ctx.fillStyle = '#111'; ctx.fillText(num, cx, top + h * 0.78); }
     if (night) this.nightWireframe(ctx, path, cx - w / 2, top, w, h);
   }
 
@@ -441,26 +478,30 @@ export class HUD {
       ctx.arc(cx + ox, cy + oy, r, 0, Math.PI * 2);
     };
     this.chromeExtrude(ctx, path);
-    this.chromeFace(ctx, path, cx - r, cy - r, r * 2, r * 2);
-    ctx.save();
-    path();
-    ctx.clip();
-    this.specularStreak(ctx, cx - r, cy - r, r * 2, r * 2);
-    ctx.restore();
-    path();
-    ctx.lineWidth = 3.5;
-    ctx.strokeStyle = '#111';
-    ctx.stroke();
-    this.bevelStroke(ctx, path);
-    ctx.fillStyle = '#111';
+    if (night) {
+      this.nightFace(ctx, path, cx - r, cy - r, r * 2, r * 2);
+    } else {
+      this.chromeFace(ctx, path, cx - r, cy - r, r * 2, r * 2);
+      ctx.save();
+      path();
+      ctx.clip();
+      this.specularStreak(ctx, cx - r, cy - r, r * 2, r * 2);
+      ctx.restore();
+      path();
+      ctx.lineWidth = 3.5;
+      ctx.strokeStyle = '#111';
+      ctx.stroke();
+      this.bevelStroke(ctx, path);
+    }
+    const txt = (t, x, y) => (night ? this.amberText(ctx, t, x, y) : (ctx.fillStyle = '#111', ctx.fillText(t, x, y)));
     if (label) {
       ctx.font = 'bold 17px system-ui';
-      ctx.fillText(label, cx, cy - 12);
+      txt(label, cx, cy - 12);
       ctx.font = `bold ${num.length > 3 ? 28 : 35}px system-ui`;
-      ctx.fillText(num, cx, cy + 24);
+      txt(num, cx, cy + 24);
     } else {
       ctx.font = `bold ${num.length > 2 ? 35 : 43}px system-ui`;
-      ctx.fillText(num, cx, cy + 16);
+      txt(num, cx, cy + 16);
     }
     if (night) this.nightWireframe(ctx, path, cx - r, cy - r, r * 2, r * 2);
   }
