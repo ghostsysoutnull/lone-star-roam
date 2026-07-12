@@ -19,7 +19,14 @@ For any effort too big for one session (precedents: `AVIATION.md`, `HELICOPTER_S
 1. **Spec session**: write `<NAME>_SPEC.md` — goals, the wave split, and open calls resolved *before* any wave codes. Each wave = one session's deliverable: the code + its verify checks.
 2. **Per wave, recommend model + effort**: Fable 5 for content/register/pool-writing waves, Sonnet 5 for structural/table-plumbing waves; effort usually high. Also state the wave's token budget (e.g. "code + checks, no shots, grep-first").
 3. **Write the first `## Session briefing` block** into `NEXT_SESSION.md` (template below). Each wave's session end rewrites it for the next wave; the *last* wave deletes it and folds the whole track into one `ROADMAP.md` entry. The spec file stays as history.
-4. **Per-wave session cycle**: greeting from the briefing → Bruno's go-ahead → implementation plan → his approval → code + checks → full `node tools/verify.mjs` → commit → step 3's rewrite.
+4. **Per-wave session cycle**: greeting from the briefing → Bruno's go-ahead → implementation plan → his approval → code + checks → full `node tools/verify.mjs` → **wave-end performance report** → commit → step 3's rewrite.
+5. **Wave-end performance report** (in-chat, before the commit): a compact ledger, not prose —
+   - **Promised vs delivered**: briefed scope/budget vs what actually shipped.
+   - **Time**: session wall-clock and where it went (code / checks / verify / detours).
+   - **Verify economics**: targeted runs, full runs, flakes hit — and whether each flake was reasoned through or brute-force rerun.
+   - **Budget adherence** (observable proxies, not token counts): screenshots taken, whole-file reads vs greps, reruns.
+   - **Detours**: each one, its cost, and whether the cost was surfaced *before* it was taken.
+   - **Honest ROI verdict**: was the wave worth its actual cost — stated plainly; mislabeled value (e.g. "optimization" that was really a reliability fix) called out.
 
 Briefing-block template:
 
