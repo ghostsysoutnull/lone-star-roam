@@ -580,6 +580,17 @@ ship.
   bottom-right speed readout and mode line used raw px offsets under
   rem-scaled text, so the gap between them didn't grow with UI scale (it was
   already tight at 100%, overlapping by 140%+). Both now anchor in rem.
+- [x] ~~3D chrome road shields~~ — done 2026-07-12: the flat-canvas route
+  shields (shipped earlier the same day) got a CSS-3D "chrome card" upgrade
+  per `ROAD_SHIELDS_3D_SPEC.md` — metallic gradient face, beveled edge,
+  clipped specular streak, and a faked extruded thickness edge, ~30% bigger.
+  A `#road-shield-wrap` perspective container drives a steer-gained
+  (`player.tilt × 150`, damped) left/right sway plus an always-on idle
+  float, both pure CSS transforms updated every render frame
+  (`hud.animateShield`) — the canvas face itself re-rasters only when the
+  route ref or night-state changes (`_shieldRaster` cache key). At night the
+  face traces an amber wireframe lattice with a CSS bloom/pulse, gated on
+  `ATMOS.night`. `parseShield`'s grammar is unchanged.
 - [ ] Mobile touch controls (virtual stick + buttons)
 
 ## Non-goals

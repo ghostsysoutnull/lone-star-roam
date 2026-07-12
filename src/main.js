@@ -202,6 +202,7 @@ async function boot() {
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed);
     missions.update(dt, player.pos, player.mode, player.pos.y - hAt(player.pos.x, player.pos.z));
+    hud.animateShield(player, dt); // per-frame sway/float — headless too, not gated by __skipRender
     const npcName = npcs.update(dt, player.pos);
     const lmNear = npcName ? null : gameplay.landmarkNear(player.pos, 28);
     hud.interactHint(npcName ? `talk to ${npcName}` : lmNear && lmNear.name !== plaqueOpen ? 'read the historical marker' : null);

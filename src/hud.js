@@ -2,6 +2,7 @@
 import { Vector3 } from 'three';
 import { GEO, nearestCity } from './geo.js';
 import { AIRPORTS, fieldNear } from './airports.js';
+import { ATMOS } from './sky.js';
 
 // A5 tag text: airline jets show their route, GA/military just the callsign,
 // helis their operator brand (or service when unbranded — government kinds)
@@ -75,8 +76,14 @@ export class HUD {
     this.zoomIdx = 1;
     this.compass = document.getElementById('compass');
     if (localStorage.getItem('lonestar-compass') === 'off') this.compass.style.display = 'none';
-    this.shield = document.getElementById('road-shield');
+    this.shield = document.getElementById('road-shield-wrap'); // outer 3D card: position/centered/transform
+    this.shieldCanvas = document.getElementById('road-shield'); // inner canvas: 2D face raster
     this.shieldInfo = null;
+    this.shieldSway = 0;
+    this.shieldNight = false;
+    this._shieldRaster = 0;
+    this._shieldKey = null;
+    this._shieldFloat = 0;
     this.shield.classList.toggle('centered', this.compass.style.display === 'none');
     // UI scale: CSS is rem-based (1rem = 10px at 100%), so one root font-size drives it all
     this.ui = Math.max(0.9, Math.min(2, parseFloat(localStorage.getItem('lonestar-ui-scale')) || 1));
@@ -254,102 +261,211 @@ export class HUD {
   }
 
   // official-looking Interstate/US/state-route markers, sized for legibility
-  // at HUD scale rather than strict MUTCD proportions
+  // at HUD scale rather than strict MUTCD proportions. Face raster is cached
+  // — re-rasterized only when the route ref or night-state changes; the
+  // sway/float motion is a pure CSS transform on the wrap (animateShield).
   drawShield(road) {
     const info = parseShield(road?.ref);
     this.shieldInfo = info;
-    const ctx = this.shield.getContext('2d');
-    const W = this.shield.width, H = this.shield.height;
+    const night = ATMOS.night > 0.5;
+    this.shieldNight = night;
+    this.shield.classList.toggle('night', night);
+    const key = `${road?.ref ?? ''}|${night}`;
+    if (key === this._shieldKey) return; // same ref + night-state: skip the redraw
+    this._shieldKey = key;
+    this._shieldRaster++;
+    const ctx = this.shieldCanvas.getContext('2d');
+    const W = this.shieldCanvas.width, H = this.shieldCanvas.height;
     ctx.clearRect(0, 0, W, H);
     if (!info) return;
     const cx = W / 2, cy = H / 2 + 2;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    if (info.shape === 'interstate') this.drawInterstateShield(ctx, cx, cy, info);
-    else if (info.shape === 'us') this.drawUsShield(ctx, cx, cy, info);
-    else this.drawCircleShield(ctx, cx, cy, info);
+    if (info.shape === 'interstate') this.drawInterstateShield(ctx, cx, cy, info, night);
+    else if (info.shape === 'us') this.drawUsShield(ctx, cx, cy, info, night);
+    else this.drawCircleShield(ctx, cx, cy, info, night);
   }
 
-  drawInterstateShield(ctx, cx, cy, { num, tag }) {
-    const w = 66, h = 72, top = cy - h / 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - w * 0.32, top);
-    ctx.lineTo(cx + w * 0.32, top);
-    ctx.quadraticCurveTo(cx + w * 0.5, top + h * 0.06, cx + w * 0.5, top + h * 0.26);
-    ctx.lineTo(cx + w * 0.42, top + h * 0.52);
-    ctx.quadraticCurveTo(cx + w * 0.3, top + h * 0.8, cx, top + h);
-    ctx.quadraticCurveTo(cx - w * 0.3, top + h * 0.8, cx - w * 0.42, top + h * 0.52);
-    ctx.lineTo(cx - w * 0.5, top + h * 0.26);
-    ctx.quadraticCurveTo(cx - w * 0.5, top + h * 0.06, cx - w * 0.32, top);
-    ctx.closePath();
-    ctx.fillStyle = '#fff';
+  // chrome-card helpers shared by the three shield shapes: an offset dark
+  // copy of the path for faked extruded thickness, a metallic gradient face,
+  // a clipped diagonal specular streak, a light bevel stroke, and (night) an
+  // amber wireframe lattice traced over the same path
+  chromeExtrude(ctx, path) {
+    path(3, 4);
+    ctx.fillStyle = '#0a0d16';
     ctx.fill();
+  }
+
+  chromeFace(ctx, path, x, y, w, h) {
+    path();
+    const g = ctx.createLinearGradient(x, y, x + w, y + h);
+    g.addColorStop(0, '#f4f6fa');
+    g.addColorStop(0.45, '#c7ccd6');
+    g.addColorStop(0.55, '#eef1f6');
+    g.addColorStop(1, '#a7adb9');
+    ctx.fillStyle = g;
+    ctx.fill();
+  }
+
+  specularStreak(ctx, x, y, w, h) {
+    const g = ctx.createLinearGradient(x, y, x + w * 0.6, y + h * 0.6);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.45, 'rgba(255,255,255,0.5)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+  }
+
+  bevelStroke(ctx, path) {
+    path();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+    ctx.stroke();
+  }
+
+  nightWireframe(ctx, path, x, y, w, h) {
     ctx.save();
+    path();
+    ctx.clip();
+    ctx.strokeStyle = '#ffb020';
+    ctx.globalAlpha = 0.85;
+    path();
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x + w, y + h);
+    ctx.moveTo(x + w, y); ctx.lineTo(x, y + h);
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawInterstateShield(ctx, cx, cy, { num, tag }, night) {
+    const w = 86, h = 94, top = cy - h / 2;
+    const path = (ox = 0, oy = 0) => {
+      const X = (v) => cx + v + ox, Y = (v) => top + v + oy;
+      ctx.beginPath();
+      ctx.moveTo(X(-w * 0.32), Y(0));
+      ctx.lineTo(X(w * 0.32), Y(0));
+      ctx.quadraticCurveTo(X(w * 0.5), Y(h * 0.06), X(w * 0.5), Y(h * 0.26));
+      ctx.lineTo(X(w * 0.42), Y(h * 0.52));
+      ctx.quadraticCurveTo(X(w * 0.3), Y(h * 0.8), X(0), Y(h));
+      ctx.quadraticCurveTo(X(-w * 0.3), Y(h * 0.8), X(-w * 0.42), Y(h * 0.52));
+      ctx.lineTo(X(-w * 0.5), Y(h * 0.26));
+      ctx.quadraticCurveTo(X(-w * 0.5), Y(h * 0.06), X(-w * 0.32), Y(0));
+      ctx.closePath();
+    };
+    this.chromeExtrude(ctx, path);
+    this.chromeFace(ctx, path, cx - w / 2, top, w, h);
+    ctx.save();
+    path();
     ctx.clip();
     ctx.fillStyle = '#1c3f94';
     ctx.fillRect(cx - w / 2, top, w, h * 0.24);
     ctx.fillStyle = '#c8202e';
     ctx.fillRect(cx - w / 2, top + h * 0.24, w, h * 0.09);
+    this.specularStreak(ctx, cx - w / 2, top, w, h);
     ctx.restore();
-    ctx.lineWidth = 2;
+    path();
+    ctx.lineWidth = 2.5;
     ctx.strokeStyle = '#0c1e50';
     ctx.stroke();
+    this.bevelStroke(ctx, path);
     ctx.fillStyle = '#1c3f94';
     // 3-char refs (I 410/610/635, I 35W/35E/69E) need to shrink to fit the
     // shield's narrowing lower half — don't just test the convenient 2-digit case
     const label = num + (tag ?? '');
-    let size = 28;
+    let size = 36;
     ctx.font = `bold ${size}px system-ui`;
-    while (ctx.measureText(label).width > w * 0.62 && size > 14) {
-      size -= 2;
+    while (ctx.measureText(label).width > w * 0.62 && size > 18) {
+      size -= 3;
       ctx.font = `bold ${size}px system-ui`;
     }
     this.shieldFit = { width: ctx.measureText(label).width, max: w * 0.62 };
     ctx.fillText(label, cx, top + h * 0.62);
+    if (night) this.nightWireframe(ctx, path, cx - w / 2, top, w, h);
   }
 
-  drawUsShield(ctx, cx, cy, { num }) {
-    const w = 62, h = 68, top = cy - h / 2;
-    const pts = [
-      [cx - w * 0.22, top], [cx + w * 0.22, top],
-      [cx + w * 0.5, top + h * 0.22], [cx + w * 0.5, top + h * 0.68],
-      [cx + w * 0.3, top + h], [cx - w * 0.3, top + h],
-      [cx - w * 0.5, top + h * 0.68], [cx - w * 0.5, top + h * 0.22],
-    ];
-    ctx.beginPath();
-    pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
-    ctx.closePath();
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-    ctx.lineWidth = 3;
+  drawUsShield(ctx, cx, cy, { num }, night) {
+    const w = 81, h = 88, top = cy - h / 2;
+    const path = (ox = 0, oy = 0) => {
+      const pts = [
+        [cx - w * 0.22, top], [cx + w * 0.22, top],
+        [cx + w * 0.5, top + h * 0.22], [cx + w * 0.5, top + h * 0.68],
+        [cx + w * 0.3, top + h], [cx - w * 0.3, top + h],
+        [cx - w * 0.5, top + h * 0.68], [cx - w * 0.5, top + h * 0.22],
+      ];
+      ctx.beginPath();
+      pts.forEach(([x, y], i) => (i ? ctx.lineTo(x + ox, y + oy) : ctx.moveTo(x + ox, y + oy)));
+      ctx.closePath();
+    };
+    this.chromeExtrude(ctx, path);
+    this.chromeFace(ctx, path, cx - w / 2, top, w, h);
+    ctx.save();
+    path();
+    ctx.clip();
+    this.specularStreak(ctx, cx - w / 2, top, w, h);
+    ctx.restore();
+    path();
+    ctx.lineWidth = 3.5;
     ctx.strokeStyle = '#111';
     ctx.stroke();
+    this.bevelStroke(ctx, path);
     ctx.fillStyle = '#111';
-    ctx.font = 'bold 11px system-ui';
+    ctx.font = 'bold 14px system-ui';
     ctx.fillText('US', cx, top + h * 0.3);
-    ctx.font = 'bold 26px system-ui';
+    ctx.font = 'bold 34px system-ui';
     ctx.fillText(num, cx, top + h * 0.78);
+    if (night) this.nightWireframe(ctx, path, cx - w / 2, top, w, h);
   }
 
-  drawCircleShield(ctx, cx, cy, { num, label }) {
-    const r = 30;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = '#fff';
-    ctx.fill();
-    ctx.lineWidth = 3;
+  drawCircleShield(ctx, cx, cy, { num, label }, night) {
+    const r = 39;
+    const path = (ox = 0, oy = 0) => {
+      ctx.beginPath();
+      ctx.arc(cx + ox, cy + oy, r, 0, Math.PI * 2);
+    };
+    this.chromeExtrude(ctx, path);
+    this.chromeFace(ctx, path, cx - r, cy - r, r * 2, r * 2);
+    ctx.save();
+    path();
+    ctx.clip();
+    this.specularStreak(ctx, cx - r, cy - r, r * 2, r * 2);
+    ctx.restore();
+    path();
+    ctx.lineWidth = 3.5;
     ctx.strokeStyle = '#111';
     ctx.stroke();
+    this.bevelStroke(ctx, path);
     ctx.fillStyle = '#111';
     if (label) {
-      ctx.font = 'bold 11px system-ui';
-      ctx.fillText(label, cx, cy - 8);
-      ctx.font = `bold ${num.length > 3 ? 18 : 22}px system-ui`;
-      ctx.fillText(num, cx, cy + 16);
+      ctx.font = 'bold 14px system-ui';
+      ctx.fillText(label, cx, cy - 10);
+      ctx.font = `bold ${num.length > 3 ? 23 : 29}px system-ui`;
+      ctx.fillText(num, cx, cy + 20);
     } else {
-      ctx.font = `bold ${num.length > 2 ? 22 : 28}px system-ui`;
-      ctx.fillText(num, cx, cy + 10);
+      ctx.font = `bold ${num.length > 2 ? 29 : 36}px system-ui`;
+      ctx.fillText(num, cx, cy + 13);
     }
+    if (night) this.nightWireframe(ctx, path, cx - r, cy - r, r * 2, r * 2);
+  }
+
+  // per-render-frame (not the ~12 Hz HUD tick): steer-driven sway + idle
+  // float on the wrap's CSS transform. GAIN turns DRIVE's tiny ±0.09 tilt
+  // into a readable ~±13° lean; the damped lerp keeps it arcade but smooth.
+  // Ungated by __skipRender in main.js so it ticks headless too.
+  animateShield(player, dt) {
+    const GAIN = 150, MAX_SWAY = 40;
+    const target = Math.max(-MAX_SWAY, Math.min(MAX_SWAY, (player.tilt || 0) * GAIN));
+    const rate = Math.min(1, dt * 8);
+    this.shieldSway += (target - this.shieldSway) * rate;
+    this._shieldFloat += dt;
+    const period = 3.6, w = (Math.PI * 2) / period;
+    const floatY = Math.sin(this._shieldFloat * w) * 1;
+    const floatX = Math.sin(this._shieldFloat * w + Math.PI / 2) * 2;
+    const centered = this.shield.classList.contains('centered');
+    this.shield.style.transform = `${centered ? 'translateX(-50%) ' : ''}translateY(${floatY.toFixed(2)}px) rotateY(${this.shieldSway.toFixed(2)}deg) rotateX(${floatX.toFixed(2)}deg)`;
   }
 
   toast(msg) {

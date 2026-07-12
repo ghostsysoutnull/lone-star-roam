@@ -4,6 +4,16 @@
 
 export default async function hud(t) {
   const austin = await t.ev(`(() => { const c = g.GEO.cities.find((c) => c.name === 'Austin'); return { x: c.x, z: c.z }; })()`);
+  // shared by the 3D-shield checks below: park on the nearest Austin-area
+  // interstate so a real chrome shield is on screen to measure
+  const parkOnInterstate = async () => {
+    await t.tp(austin.x, austin.z + 12);
+    await t.ev(`(() => {
+      const r = g.nearestRoad(g.player.pos.x, g.player.pos.z, 400, (ty) => ty === 'motorway');
+      g.player.pos.set(r.x, 0, r.z);
+    })()`);
+    await t.until(`g.hud.shieldInfo?.shape === 'interstate'`, 8000);
+  };
 
   await t.check('location line: distance, direction, county', async () => {
     await t.tp(austin.x + 18, austin.z - 18); // 25.5 units NE, mid-block nowhere special
@@ -143,6 +153,71 @@ export default async function hud(t) {
       t.ok(`${info.num}${info.tag ?? ''}` === s.ref.replace(/^I ?/, ''), `parsed "${info.num}${info.tag ?? ''}" from ref "${s.ref}"`);
       t.ok(fit.width <= fit.max + 0.5, `"${s.ref}" label overflows the shield: ${fit.width.toFixed(1)}px > ${fit.max.toFixed(1)}px`);
     }
+  });
+
+  await t.check('3D shield sway sign tracks steering input (charging-deer discipline)', async () => {
+    await t.tp(-2767, 334); // clean I-10 west stretch, road-free bubble for a clean drive
+    await t.hold('KeyW');
+    await t.hold('KeyA');
+    await t.simStep(1.5);
+    await t.until(`Math.abs(g.hud.shieldSway) > 2 && Math.sign(g.hud.shieldSway) === Math.sign(g.player.tilt)`, 4000);
+    const left = await t.ev(`({ sway: g.hud.shieldSway, tilt: g.player.tilt })`);
+    t.ok(Math.sign(left.sway) === Math.sign(left.tilt), `left steer: sway ${left.sway.toFixed(2)} tilt ${left.tilt.toFixed(3)}`);
+    t.ok(Math.abs(left.sway) > 2, `left sway too small to be a meaningful lean: ${left.sway.toFixed(2)}`);
+    await t.hold('KeyA', false);
+    await t.hold('KeyD');
+    await t.simStep(1.5);
+    await t.until(`Math.sign(g.hud.shieldSway) === Math.sign(g.player.tilt) && Math.sign(g.hud.shieldSway) === ${-Math.sign(left.sway)}`, 4000);
+    const right = await t.ev(`({ sway: g.hud.shieldSway, tilt: g.player.tilt })`);
+    await t.release();
+    t.ok(Math.sign(right.sway) === Math.sign(right.tilt), `right steer: sway ${right.sway.toFixed(2)} tilt ${right.tilt.toFixed(3)}`);
+    t.ok(Math.sign(right.sway) === -Math.sign(left.sway), `sway did not flip sign: left ${left.sway.toFixed(2)} right ${right.sway.toFixed(2)}`);
+  });
+
+  await t.check('night flips the shield to amber wireframe and genuinely re-rasters', async () => {
+    await parkOnInterstate();
+    await t.setDay();
+    await t.until(`g.hud.shieldNight === false`, 4000);
+    const before = await t.ev(`g.hud._shieldRaster`);
+    await t.setNight();
+    await t.until(`g.hud.shieldNight === true`, 4000);
+    const after = await t.ev(`({ raster: g.hud._shieldRaster, cls: g.hud.shield.classList.contains('night') })`);
+    t.ok(after.cls, 'wrap missing .night class once ATMOS.night crosses the threshold');
+    t.ok(after.raster > before, `raster did not bump across day→night: ${before} → ${after.raster}`);
+    await t.setDay();
+    await t.until(`g.hud.shieldNight === false`, 4000);
+    const dayCls = await t.ev(`g.hud.shield.classList.contains('night')`);
+    t.ok(!dayCls, 'wrap kept .night class after returning to day');
+  });
+
+  await t.check('shield raster is cached — same ref/night-state does not re-rasterize every HUD tick', async () => {
+    await parkOnInterstate();
+    const r0 = await t.ev(`g.hud._shieldRaster`);
+    await t.wait(0.5); // several ~12 Hz HUD ticks, same ref + night-state throughout
+    const r1 = await t.ev(`g.hud._shieldRaster`);
+    await t.wait(0.5);
+    const r2 = await t.ev(`g.hud._shieldRaster`);
+    t.ok(r1 === r0 && r2 === r0, `raster count climbed while parked, motion should be CSS-only: ${r0} → ${r1} → ${r2}`);
+  });
+
+  await t.check('enlarged 3D shield never overlaps the compass, at default and high UI scale', async () => {
+    await parkOnInterstate();
+    const rects = () => t.ev(`({
+      shield: document.getElementById('road-shield-wrap').getBoundingClientRect(),
+      compass: document.getElementById('compass').getBoundingClientRect(),
+    })`);
+    const noOverlap = (a, b) => a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+    const sweep = async (label) => {
+      for (let i = 0; i < 4; i++) { // sample across the idle-float cycle, not just one frame
+        const r = await rects();
+        t.ok(noOverlap(r.shield, r.compass), `overlap ${label} (sample ${i}): shield ${JSON.stringify(r.shield)} compass ${JSON.stringify(r.compass)}`);
+        await t.wait(0.3);
+      }
+    };
+    await sweep('at 100%');
+    for (let i = 0; i < 10; i++) await t.key('Equal'); // up to the 200% clamp
+    await sweep('at high UI scale');
+    for (let i = 0; i < 10; i++) await t.key('Minus'); // restore baseline
   });
 
   await t.check('HUD speed readout never overlaps the mode line at any UI scale', async () => {
