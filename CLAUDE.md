@@ -104,6 +104,7 @@ Headless tests keep passing at *convenient* values while play breaks at *natural
 - Expose every new system on `window.__game` at birth (main.js) — testability is free at creation, expensive to retrofit.
 - Never change `seededRand` seed strings: determinism is what makes bugs cheaply reproducible, and players' saves + spatial memory depend on it.
 - **Per-wave budget, stated up front**: the code + its verify checks are the deliverable and warrant full effort; the layer around them (screenshots, redundant reads, brute-force reruns, prose) is where tokens leak. Open each wave by naming the budget — e.g. "code + checks, no shots, grep-first" — so it's an explicit contract, not a mid-flight judgment call. Doc updates match the established bar and no further: `NEXT_SESSION.md` is a one-paragraph kickoff (not a spec), `MODULES.md` is one line per module.
+- **Check a tool exists before building on it**: before using any non-core CLI tool (`/usr/bin/time`, `bc`, `jq`, …), verify it's installed (`command -v <tool>`, batch-probe several at once); if it's missing, ask Bruno to install it (he can run `! <cmd>` in-session) rather than working around it or letting a command fail silently. Assuming `/usr/bin/time` + `bc` were present cost wasted run cycles once.
 - Session end: update `NEXT_SESSION.md` (current task + gotchas only — queued work lives in BACKLOG.md, history in ROADMAP.md) and run `node tools/verify.mjs` before the final commit.
 
 ### Performance patterns to preserve
