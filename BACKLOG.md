@@ -31,6 +31,21 @@ the next item from here back into it.
    `t.stubGamepad` is already in the harness waiting.
 3. **Big-map click-to-set-waypoint** — generalize the mission target pipeline
    (map diamond + compass diamond + guide arrow) to a map click.
+4. **Helicopter detail pass** (spec ready, scope approved 2026-07-12 — full
+   plan in `HELICOPTER_SPEC.md`): the four `rotors.js` `HeliSystem` kinds
+   (medical/news/coast guard/army) currently share one low-poly body,
+   differentiated only by tint. Give each its own geometry (~3× the current
+   poly count) plus a signature "tell" — medical red-cross panel, news nose
+   camera ball, coast guard hoist basket + bigger radome, army stub-wing
+   tanks + boxier cabin — and split the shared `InstancedMesh` pair into
+   four kind-scoped pairs. Army also gets a real 4-blade rotor
+   (`mkHeliRotor(bladeCount, radius)`) vs. 2-blade elsewhere — the biggest
+   at-a-distance differentiator. Rendering-layer only; cap/weight/despawn
+   logic in `update()` is untouched. Verify: poly-count-increased +
+   four-distinct-geometries + rotor-blade-count assertions, all existing
+   heli behavioral checks as regressions, one `t.shot` of all four kinds
+   for a visual gut-check (explicit exception to the no-screenshots
+   default — this is a genuinely visual change).
 
 ## Later
 
