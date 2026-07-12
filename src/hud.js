@@ -452,23 +452,31 @@ export class HUD {
     if (night) this.nightWireframe(ctx, path, cx - r, cy - r, r * 2, r * 2);
   }
 
-  // per-render-frame (not the ~12 Hz HUD tick): steer-driven sway + idle
-  // float on the INNER card's CSS transform — perspective lives on the OUTER
-  // #road-shield-wrap (a self-transformed element ignores its own
-  // perspective; it only foreshortens a transformed CHILD), so the rotation
-  // must land on shieldCard for the lean to actually be visible. GAIN turns
-  // DRIVE's tiny ±0.09 tilt into a readable ~±13° lean; the damped lerp
-  // keeps it arcade but smooth. Ungated by __skipRender so it ticks headless.
+  // per-render-frame (not the ~12 Hz HUD tick): steer-driven sway + an
+  // always-on idle "rock" on the INNER card's CSS transform. Perspective
+  // lives on the OUTER #road-shield-wrap (a self-transformed element ignores
+  // its own perspective; it only foreshortens a transformed CHILD), so the
+  // rotation must land on shieldCard for the lean to actually be visible.
+  //   • shieldSway — the pure steering component: GAIN turns DRIVE's tiny
+  //     ±0.09 tilt into a readable ~±13° lean, damped for arcade smoothness.
+  //     Kept separate so the verify sign-check reads it cleanly.
+  //   • idle rock — a slow left-right YAW oscillation (the axis that reads as
+  //     a 3D card turning; pitch alone was near-invisible), plus a little
+  //     pitch and a vertical bob on offset periods so it always looks alive
+  //     even driving dead straight.
+  // Total yaw = shieldSway + idle yaw. Ungated by __skipRender (ticks headless).
   animateShield(player, dt) {
     const GAIN = 150, MAX_SWAY = 40;
     const target = Math.max(-MAX_SWAY, Math.min(MAX_SWAY, (player.tilt || 0) * GAIN));
     const rate = Math.min(1, dt * 8);
     this.shieldSway += (target - this.shieldSway) * rate;
     this._shieldFloat += dt;
-    const period = 3.6, w = (Math.PI * 2) / period;
-    const floatY = Math.sin(this._shieldFloat * w) * 1;
-    const floatX = Math.sin(this._shieldFloat * w + Math.PI / 2) * 2;
-    this.shieldCard.style.transform = `translateY(${floatY.toFixed(2)}px) rotateY(${this.shieldSway.toFixed(2)}deg) rotateX(${floatX.toFixed(2)}deg)`;
+    const w = (Math.PI * 2) / 3.4; // ~3.4 s base period — gentle, not frantic
+    const idleYaw = Math.sin(this._shieldFloat * w) * 8;              // ±8° left-right rock (the visible axis)
+    const idlePitch = Math.sin(this._shieldFloat * w * 0.7 + 1) * 4;  // ±4° pitch on an offset period
+    const bob = Math.sin(this._shieldFloat * w * 0.5) * 2.5;          // ±2.5px vertical bob
+    const yaw = this.shieldSway + idleYaw;
+    this.shieldCard.style.transform = `translateY(${bob.toFixed(2)}px) rotateY(${yaw.toFixed(2)}deg) rotateX(${idlePitch.toFixed(2)}deg)`;
   }
 
   toast(msg) {
