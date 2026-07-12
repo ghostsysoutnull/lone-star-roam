@@ -414,15 +414,15 @@ export class HUD {
     // 3-char refs (I 410/610/635, I 35W/35E/69E) need to shrink to fit the
     // shield's narrowing lower half — don't just test the convenient 2-digit case
     const label = num + (tag ?? '');
-    let size = 36;
+    let size = 40;
     ctx.font = `bold ${size}px system-ui`;
     while (ctx.measureText(label).width > w * 0.62 && size > 18) {
       size -= 3;
       ctx.font = `bold ${size}px system-ui`;
     }
     this.shieldFit = { width: ctx.measureText(label).width, max: w * 0.62 };
-    if (night) { this.amberText(ctx, label, cx, top + h * 0.62); }
-    else { ctx.fillStyle = '#1c3f94'; ctx.fillText(label, cx, top + h * 0.62); }
+    if (night) { this.amberText(ctx, label, cx, top + h * 0.66); }
+    else { ctx.fillStyle = '#1c3f94'; ctx.fillText(label, cx, top + h * 0.66); }
     if (night) this.nightWireframe(ctx, path, cx - w / 2, top, w, h);
   }
 
