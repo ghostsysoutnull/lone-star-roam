@@ -23,7 +23,7 @@
 // go-around at ANY field with traffic
 // (physical safety, not a radio behavior) regardless of tower or tier.
 import { hAt } from './geo.js';
-import { AIRPORTS, runwayInUse, windFrom, onRunway } from './airports.js';
+import { AIRPORTS, runwayInUse, windFrom, onRunway, TD_AGL, TD_SPD } from './airports.js';
 import { ATMOS } from './sky.js';
 
 export const TOWERED = AIRPORTS.filter((a) => a.tier === 1); // the 7 hubs with a tower mesh
@@ -33,7 +33,6 @@ export const UNICOM = AIRPORTS.filter((a) => a.tier === 2);  // the 9 regional f
 const RANGE = 250;         // FLY reception ring around a towered field, no perk
 const UNICOM_RANGE = 120;  // CTAF is a shorter-range, quieter frequency
 const CLEAR_DEG = 20;      // alignment cone for "cleared to land"
-const TD_AGL = 3, TD_SPD = 40; // touchdown thresholds
 
 const rwyLabel = (u) => {
   let n = Math.round((((u.hdg % 360) + 360) % 360) / 10);

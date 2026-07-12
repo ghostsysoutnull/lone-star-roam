@@ -57,6 +57,13 @@ export default async function debug(t) {
     await t.ev('g.military.despawnAll()');
   });
 
+  await t.check('charter debug action forces a real charter job through missions.js', async () => {
+    await t.ev('g.debug.actions.charter()');
+    t.ok((await t.ev('g.missions.job?.kind')) === 'charter', 'charter debug action did not start a charter job');
+    t.ok((await t.ev("g.missions.job?.fromId === 'MRF' && g.missions.job?.toId === 'DFW'")), 'wrong airport pair');
+    await t.ev('g.missions.abandon()');
+  });
+
   await t.check('weather actions pin the sky', async () => {
     await t.ev('g.debug.actions.storm()');
     await t.until(`g.ATMOS.weather === 'storm'`, 10000);

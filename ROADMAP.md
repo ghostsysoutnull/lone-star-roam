@@ -151,6 +151,35 @@ ship.
   state machine, not a copy of an existing idiom — see `AVIATION.md`),
   Marfa gliders, crop dusters, the 13th NPC.
 
+- [x] ~~Aviation wave 5 — Charter jobs~~ — done 2026-07-12: a second job type
+  in `missions.js`'s existing single-slot job system (`kind: 'charter'`),
+  offers between airport pairs instead of cities. Arrival is an actual
+  touchdown — the exact physical test `radio.js` already uses for its own
+  landing narration (`onRunway` + AGL/speed thresholds, now promoted to
+  `airports.js` exports `TD_AGL`/`TD_SPD` so both systems share one
+  definition of "landed") — gated on FLY mode, deliberately independent of
+  the towered-only `save.airports` logbook so charter jobs work at all 20
+  fields, including the 4 tier-3 strips (their first real reason to visit).
+  Landing at a towered field for a charter still fires the logbook stamp for
+  free, since both checks are physically identical. Offers: a new `MANIFEST`
+  table (Texas-flavored, some tier-biased toward the strips or the hubs) plus
+  3 hand-curated real routes (Love Field–Hobby shuttle, DFW–Lubbock,
+  DFW–Amarillo) with a small chance to appear over a procedural pair. No
+  ground-haul ×1.5 bonus (flying is mandatory); pays a higher per-km rate
+  than road jobs, half on a late delivery. While a charter is active the
+  plane wears a distinct livery — `vehicle.js`'s `mkWings` now exposes its
+  shared airframe material (`userData.mat`/`stockColor`), swapped by
+  `missions.js`'s `setLivery()` on accept/abandon/deliver, no new geometry.
+  `missions.force(fromId, toId)` injects a specific-airport-pair charter
+  directly (bypassing offer randomness) for deterministic testing — mirrors
+  `military.js`'s `force()`/`despawnAll` idiom, doubles as a debug-menu
+  button (✈️ Charter job). 7 new checks: real-landing-vs-proximity, the
+  DRIVE-mode gate, a full cycle at the shortest tier-3 strip (Armstrong
+  Ranch), livery apply/revert, the fast-travel lock (regression), late-pay
+  math, and the debug action wired through the real loop. Full spec in
+  `CHARTER_JOBS_SPEC.md`. Still open from wave 5: Sheppard T-38 touch-and-go
+  pattern circuits, Marfa gliders, crop dusters, the 13th NPC.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

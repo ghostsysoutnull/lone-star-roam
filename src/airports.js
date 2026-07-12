@@ -192,6 +192,11 @@ function clearOfRunways(a, x, z, rad) {
   return !onRunway(a, x, z, rad);
 }
 
+// what counts as "landed" — below this AGL and speed while on a runway
+// corridor. radio.js's own touchdown narration and missions.js's charter
+// jobs both read these so "landed" means the same physical thing everywhere.
+export const TD_AGL = 3, TD_SPD = 40;
+
 export class AirportSystem {
   constructor(scene) {
     this.layout = airportLayout();

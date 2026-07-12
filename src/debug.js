@@ -8,7 +8,7 @@ import { EROCK } from './haunts.js';
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -68,6 +68,10 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       const ok = military.force('lowlevel', aviation, -2600, 300); // explicit — see military.js force() comment
       hud.toast(ok ? '✈️ Low-level trainer pair, West Texas' : '✈️ Sky already at the fixed-wing cap');
     },
+    charter() {
+      const offer = missions.force('MRF', 'DFW'); // Marfa strip → DFW: the tier-3 strip's moment
+      hud.toast(offer ? `✈️ Charter forced: ${offer.from} → ${offer.to} — go land it` : '✈️ Job already active — finish or abandon it first');
+    },
     testRadio() {
       const tw = radio.nearestTowered(player.pos.x, player.pos.z);
       const un = radio.nearestUnicom(player.pos.x, player.pos.z);
@@ -88,7 +92,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       ['day', '🌞 Day'], ['night', '🌙 Night'], ['midnight', '🕛 Midnight'],
       ['hauntCemetery', '👻 Haunt cemetery'], ['ghostFires', '🔥 Ghost fires'],
       ['saucer', '🛸 Saucer'], ['formation', '✨ Lubbock lights'], ['bats', '🦇 Bat show'],
-      ['departure', '🛫 Departure'], ['arrival', '🛬 Arrival'], ['testRadio', '📻 Test radio'],
+      ['departure', '🛫 Departure'], ['arrival', '🛬 Arrival'], ['testRadio', '📻 Test radio'], ['charter', '✈️ Charter job'],
       ['heli', '🚁 Heli'], ['blimp', '🎈 Blimp'], ['nasa', '✈️ NASA T-38'], ['lowlevel', '✈️ Low-level pair'],
       ['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'], ['storm', '⛈ Storm'], ['dust', '🌪 Dust'],
     ];

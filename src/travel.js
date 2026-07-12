@@ -111,20 +111,26 @@ export class TravelMenu {
     const money = `💵 $${(this.gameplay.save.bank ?? 0).toLocaleString()} · ${this.gameplay.save.jobsDone ?? 0} deliveries`;
     let html = `<div style="grid-column:1/-1;font-size:1.3rem;opacity:.85;padding:2px 2px 4px">${money}</div>`;
     if (j) {
-      const step = j.phase === 'pickup' ? `load in <b>${j.from}</b>` : `deliver to <b>${j.to}</b>`;
+      const label = j.kind === 'charter' ? j.manifest : j.cargo;
+      const step = j.kind === 'charter'
+        ? `land at <b>${j.phase === 'pickup' ? j.from : j.to}</b>`
+        : j.phase === 'pickup' ? `load in <b>${j.from}</b>` : `deliver to <b>${j.to}</b>`;
       html += `<div style="grid-column:1/-1;background:#243046;border:1px solid rgba(255,211,92,.4);border-radius:8px;padding:10px 12px;font-size:1.3rem">
-        ${j.icon} <b>${j.cargo}</b> — ${j.from} → ${j.to} · ${j.km} km · $${j.pay}${j.rush ? ' · 🔥 RUSH' : ''}<br>
+        ${j.icon} <b>${label}</b> — ${j.from} → ${j.to} · ${j.km} km · $${j.pay}${j.rush ? ' · 🔥 RUSH' : ''}<br>
         <span style="opacity:.75">Now: ${step}</span></div>`;
       html += `<button data-i="abandon" style="grid-column:1/-1">✖ Abandon this job</button>`;
     }
     html += m.offers
-      .map((o, i) => `<button data-i="${i}" ${j ? 'disabled' : ''}>${o.icon} <b>${o.cargo}</b> — ${o.from} → ${o.to}<br>
-        <small style="opacity:.75">${o.km} km · $${o.pay}${o.rush ? ' · 🔥 RUSH (tight clock, +40% pay)' : ''}</small></button>`)
+      .map((o, i) => {
+        const label = o.kind === 'charter' ? o.manifest : o.cargo;
+        return `<button data-i="${i}" ${j ? 'disabled' : ''}>${o.icon} <b>${label}</b> — ${o.from} → ${o.to}<br>
+        <small style="opacity:.75">${o.km} km · $${o.pay}${o.rush ? ' · 🔥 RUSH (tight clock, +40% pay)' : ''}</small></button>`;
+      })
       .join('');
     this.el.querySelector('.poi-list').innerHTML = html;
     this.el.querySelector('.hint').textContent = j
       ? 'One haul at a time — deliver it or abandon it to take another.'
-      : 'Take a job, load up at the origin, beat the clock. Stay out of the air for a ×1.5 road bonus; late pays half.';
+      : 'Take a job, load up at the origin, beat the clock. Road jobs pay a ×1.5 bonus for staying grounded; charter jobs need a real landing at both ends.';
   }
 
   jobClick(i) {

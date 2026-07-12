@@ -193,10 +193,12 @@ named check in `tools/checks/aviation.mjs`, not just "the mechanism exists."
   simple orbit/transit movers used so far; it needs its own state machine,
   not a copy of an existing idiom. No weapons, ever — holds for any future
   military addition too.
-- **Charter jobs** (missions.js): ✈️ offers between airport pairs requiring a
-  logged landing at both ends; separate offer type — the ground-haul ×1.5
-  road bonus stays untouched; fast-travel lock reused. Gives the bankroll an
-  air-side sink/source and the logbook a reason beyond completion.
+- **Charter jobs** — ✅ shipped 2026-07-12: ✈️ offers (missions.js) between
+  airport pairs requiring a logged landing at both ends (the physical
+  touchdown test, not the towered-only logbook — works at all 20 fields);
+  separate offer type — the ground-haul ×1.5 road bonus stays untouched;
+  fast-travel lock reused. Charter livery swap on accept/abandon/deliver.
+  Details in ROADMAP.md; full spec in **`CHARTER_JOBS_SPEC.md`**.
 - **Marfa gliders**: silent soaring circles over the strip on clear
   afternoons (thermal country; pairs with the lights lore).
 - **Crop duster**: dawn runs over Panhandle ag chunks from tier-3 strips

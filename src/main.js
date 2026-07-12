@@ -93,7 +93,7 @@ async function boot() {
   player.onStep = () => audio.step();
   const flares = new FlareSystem(scene, player);
   flares.onSound = (kind) => audio.flare(kind);
-  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military }); // panel only with ?debug=1; actions drive the verify suite
+  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions }); // panel only with ?debug=1; actions drive the verify suite
   player.flares = flares; // hud reads the rack count off the player
 
   // Spawn on I-35 just south of Austin

@@ -521,7 +521,7 @@ function mkWings() {
   landing.visible = false;
   g.add(landing);
 
-  g.userData = { prop, blur, navL, navR, strobe, landing };
+  g.userData = { prop, blur, navL, navR, strobe, landing, mat, stockColor: mat.color.getHex() };
   return g;
 }
 
