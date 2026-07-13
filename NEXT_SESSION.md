@@ -1,17 +1,36 @@
 # Lone Star Roam — next session kickoff
 
-**No active priority track.** The Texas Brands track (Bucky's, H-E-Buddy,
-Lone Star Compute — 3 waves) shipped 2026-07-12 and is folded into
+## Session briefing
+- **This session**: Jetpack track, wave 1 of 2 — physics + shop + verify for
+  the WALK-mode jetpack (unlimited hover, 3-tier thrust). It flies and is
+  fully tested; no VFX/audio yet. Spec: `JETPACK_SPEC.md`. The two in-line
+  shop upgrades (Aviation tune + Cargo rig) shipped 2026-07-13, commit
+  cac8699.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — a structural
+  wave (new WALK sub-state + knob/perk plumbing + a verify suite), not
+  content. Flag it if the running model differs.
+- **Budget**: code + verify checks, no screenshots, grep-first. The knob
+  values and `GRAV`/`AIRDAMP` are playtest-tunable — don't over-polish feel
+  in W1. Expectation: W1 proves the **numbers** (AGL over time, cap, land);
+  it will *not look right* — the WALK camera frames a cowboy up to 70u aloft
+  from close and low. Camera framing is W2.
+- **Then**: the wave-end rewrite points this block at Wave 2 (VFX + audio +
+  camera + dog); resolve W2's open calls (Lacy's airborne behavior, HUD AGL
+  readout, camera feel) at the top of that session.
+
+Gotchas carried over: any verify check that leaves the player airborne or in
+a non-DRIVE mode must restore DRIVE at its end — the horn/Lacy checks depend
+on ambient DRIVE mode (the aviation-tune check learned this the hard way).
+
+**No other active priority track.** The Texas Brands track (Bucky's,
+H-E-Buddy, Lone Star Compute — 3 waves) shipped 2026-07-12 and is folded into
 `ROADMAP.md`; `BRANDS_SPEC.md` stays as history. A follow-up player-controlled
 brand-size feature (`[`/`]`, own `lonestar-brand-scale` localStorage key) also
 shipped 2026-07-12 on top of it — see the `brands.js` gotcha below. A second
 follow-on, the datacenter ID sign + real-facts plaque (all 8 Lone Star Compute
 sites), shipped 2026-07-13 (`DATACENTER_SIGN_SPEC.md`) — see the new
 `lscNear`/`plaqueOpen` gotcha below. Queued work lives in `BACKLOG.md`;
-pending playtests are there too. Pick the next effort from `BACKLOG.md` (or
-start a new multi-wave spec per the `CLAUDE.md` protocol) — there's no
-`## Session briefing` block, so the greeting stays quiet until the next spec
-writes one.
+pending playtests are there too.
 
 Gotchas for whoever touches `brands.js` next:
 - Each spawned site's hero/props are split across TWO parents: the scalable
