@@ -36,14 +36,21 @@ All placed at **hand-authored real-world coordinates** via `LL(lat,lon)`
 - **Flourishes** (chosen): Bucky's highway **approach billboards**;
   datacenter **hum + cooling glow**; datacenter **transmission
   infrastructure** (substation + pylon line).
-- **Night lighting** (revised 2026-07-12): Bucky's and H-E-Buddy are
-  **lit at night** via emissive meshes gated on `ATMOS.night` — no new
-  light rig (the airport-beacon pattern). Scope = **signs + canopy**:
-  Bucky's emissive sign + beaver + glowing white fuel-canopy soffit;
-  H-E-Buddy emissive red sign band only. (Ambient lot-pole glow was
-  considered and dropped.) The datacenter cooling-vent glow is
-  *additional*, and its cold cast is a deliberate contrast to the warm
-  store glow.
+- **Night lighting** (re-revised 2026-07-12, wave 1 playtest): **real
+  light sources, NOT emissive.** The emissive approach shipped first but
+  emissive glow can't keep a yellow sign yellow — white emissive on a
+  light/yellow surface clamps toward white, so signage read as "just
+  white, no glow" in play. Per Bruno's directive, Bucky's is now lit by
+  **two persistent warm `PointLight`s** (canopy + sign) that *illuminate*
+  the geometry, keeping colours true — the walk-mode lantern / truck
+  headlight precedent (localized dynamic lights, not a second ambient/sun
+  rig; sky.js still owns those). Created and added to the scene ONCE, then
+  repositioned to the nearest live site and faded by `ATMOS.night` (adding
+  or removing scene lights at runtime recompiles every lit material's
+  shader — the real reason for the old "no light rig" rule; a persistent
+  pool sidesteps it). **H-E-Buddy (wave 2) and the datacenter
+  cooling-vent glow (wave 3) should follow the same real-light pattern,
+  not emissive.** (Ambient lot-pole glow was considered and dropped.)
 
 ## Placement & data
 

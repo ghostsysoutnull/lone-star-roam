@@ -32,12 +32,19 @@ Gotchas carried over (from wave 1):
   spec said geo+sky only, but the rotors mesh idiom needs the traffic kit;
   it's cycle-safe (nothing imports brands). Keep it that way.
 - The wave-1 `BrandSystem` is built around **shared materials**
-  (`heroMat`/`glowMat`/`propMat`) + **shared prototype geos** in
-  `this.shared` (disposed never; `despawn` skips them). Add H-E-Buddy's
-  prototypes to `this.shared` the same way. The night glow is a single
-  `glowMat.emissiveIntensity` toggle — H-E-Buddy's red band wants its
-  *own* red glow, so give it a second shared glow material (don't reuse
-  the warm Bucky's `glowMat`) and toggle both in `update()`.
+  (`heroMat`/`propMat`) + **shared prototype geos** in `this.shared`
+  (disposed never; `despawn` skips them). Add H-E-Buddy's prototypes to
+  `this.shared` the same way.
+- **Night lighting is REAL LIGHTS, not emissive** (re-decided in wave 1
+  after playtest — emissive can't keep colours true; see BRANDS_SPEC.md).
+  Bucky's uses two persistent `PointLight`s (`canopyLight`/`signLight`)
+  created once, repositioned in `update()` to the nearest live site's
+  world anchors (transformed by the group's Y-rotation trig — NOT
+  `localToWorld`, which reads a stale matrixWorld on a fresh group and
+  drops the light at the world origin). **H-E-Buddy should follow the same
+  pattern**: add its own light(s) to the persistent pool (or extend the
+  nearest-site logic to pick the nearest of *either* brand) and fade by
+  `ATMOS.night`. Do NOT add/remove lights per spawn (shader recompile).
 - `BUCKY_SITES` is a module const; H-E-Buddy sites derive from
   `GEO.cities` at construct time (city list isn't available at module
   load — build the table in the constructor or lazily in `update`).

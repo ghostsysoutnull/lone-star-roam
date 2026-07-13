@@ -45,9 +45,9 @@ export default async function brands(t) {
     const tris = await t.ev(`(() => {
       const r = g.brands.live.get('Katy');
       const tri = (m) => m.geometry.index ? m.geometry.index.count / 3 : m.geometry.attributes.position.count / 3;
-      return { staticT: tri(r.staticMesh), glowT: tri(r.glowMesh) };
+      return { staticT: tri(r.staticMesh) };
     })()`);
-    const total = tris.staticT + tris.glowT;
+    const total = tris.staticT;
     // a heli body is ~120-260 tris; a showpiece storefront must dwarf that
     t.ok(total > 400, `hero not showpiece-tier: ${total} tris (${JSON.stringify(tris)})`);
   });
@@ -118,30 +118,36 @@ export default async function brands(t) {
     t.ok(g0.baseWorld <= pick.mn + 1e-3, `foundation floats above the lot min: base ${g0.baseWorld.toFixed(2)} vs min ${pick.mn.toFixed(2)} (relief ${pick.relief.toFixed(2)})`);
   });
 
-  await t.check('night glow: signage emissive toggles with ATMOS.night and is ~0 by day', async () => {
+  await t.check('night lights: two warm lights light the nearest site at night, dark by day, at the site', async () => {
     await t.tp(katyAt.x, katyAt.z + 3);
     await t.until(`g.brands.live.has('Katy')`, 8000);
+
+    // by day the lights are off (the real loop, no manual brands.update)
     await t.setDay();
     await t.wait(0.4);
-    const day = await t.ev(`g.brands.glowMat.emissiveIntensity`);
-    t.near(day, 0, 0.001, `signage glowed by day: ${day}`);
+    const day = await t.ev(`({ c: g.brands.canopyLight.intensity, s: g.brands.signLight.intensity })`);
+    t.near(day.c, 0, 0.001, `canopy light on by day: ${day.c}`);
+    t.near(day.s, 0, 0.001, `sign light on by day: ${day.s}`);
 
+    // at night both light up...
     await t.setNight();
-    await t.wait(0.4);
-    const night = await t.ev(`({ warm: g.brands.glowMat.emissiveIntensity, red: g.brands.glowRedMat.emissiveIntensity })`);
-    t.ok(night.warm > 0.3 && night.red > 0.3, `signage never lit at night: ${JSON.stringify(night)}`);
-
-    // both glow materials must drive their hero meshes (not strays)
-    const wired = await t.ev(`(() => { const r = g.brands.live.get('Katy');
-      return r.glowMesh.material === g.brands.glowMat && r.glowRedMesh.material === g.brands.glowRedMat; })()`);
-    t.ok(wired, 'a hero glow mesh is not driven by its shared glow material');
-    // signage must read as clearly LIT, not a faint tint (the "just white" bug):
-    // emissive high enough to push a white soffit past medium-gray into bright
-    t.ok(night.warm > 1.0, `signage glow too faint to read as lit: ${night.warm}`);
+    await t.wait(0.5);
+    const night = await t.ev(`(() => {
+      const cl = g.brands.canopyLight, sl = g.brands.signLight, r = g.brands.live.get('Katy');
+      // distance from each light to the store the lights are supposed to sit at
+      const dc = Math.hypot(cl.position.x - r.group.position.x, cl.position.z - r.group.position.z);
+      const ds = Math.hypot(sl.position.x - r.group.position.x, sl.position.z - r.group.position.z);
+      const orig = Math.hypot(cl.position.x, cl.position.z); // guard: not dropped at world origin
+      return { ci: cl.intensity, si: sl.intensity, dc, ds, orig };
+    })()`);
+    t.ok(night.ci > 1 && night.si > 1, `lights never came on at night: ${JSON.stringify(night)}`);
+    // regression guard: the lights must sit AT the site, not the world origin
+    // (localToWorld on a fresh group reads a stale matrixWorld → origin)
+    t.ok(night.dc < 25 && night.ds < 30, `lights not positioned at the site: ${JSON.stringify(night)}`);
+    t.ok(night.orig > 100, `lights collapsed to the world origin: ${night.orig.toFixed(1)}`);
 
     if (process.env.SHOT) {
-      // stand back on the road side and look at the store so the beaver-topped
-      // sign + glowing canopy actually fill the frame (the silhouette read)
+      // stand back on the road side and look at the lit store (colour read)
       await t.ev(`(() => {
         const r = g.brands.live.get('Katy'), h = r.group.rotation.y;
         const fx = Math.sin(h), fz = Math.cos(h);       // group-front (local +z) in world
@@ -151,7 +157,7 @@ export default async function brands(t) {
         g.player.speed = 0;
       })()`);
       await t.wait(0.5);
-      await t.shot('bucky-night-silhouette');
+      await t.shot('bucky-night-lit');
     }
     await t.setDay();
   });

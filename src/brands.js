@@ -56,13 +56,21 @@ const BILLBOARD_COPY = [
 const WALL = 0xe8e2d4, ROOF = 0x9a3b2e, TRIM = 0xc0392b, POLE = 0x3a3a40;
 const SIGN = 0xf2c200, BEAVER = 0x8a5a34, TEETH = 0xfaf3e0, GLASS = 0x9fb8c8;
 const CANOPY = 0xf4f1ea, ASPHALT = 0x3f3f46, PUMP = 0xdddddd;
-// Night glow, in two colors so the store reads as actually LIT rather than a
-// dark box with one faint warm patch: a bright warm-white for the big lit
-// surfaces (canopy soffit, storefront windows, sign, beaver) and a saturated
-// brand red for the roofline/fascia/sign trim. The red channel is what keeps
-// it from washing to plain white — coverage + color together sell "lit".
-const GLOW = 0xfff0d8, GLOW_RED = 0xff3a1e;
-const GLOW_EI = 1.3;     // below ~1.0 the glow reads as a faint tint, not lit
+// Night lighting — REAL light sources, not emissive. Emissive glow washes a
+// yellow sign to white (it can't stay yellow), so per Bruno's directive
+// (2026-07-12) Bucky's is lit at night by a couple of warm PointLights that
+// actually illuminate the geometry, keeping colours true. This is the
+// walk-mode lantern / truck-headlight precedent (localized dynamic lights the
+// player already owns) — NOT a second ambient/sun rig (sky.js still owns
+// those). Two lights only, created ONCE and repositioned to the nearest live
+// site (adding/removing scene lights at runtime recompiles shaders — the real
+// reason for the "no light rig" rule; a persistent pool sidesteps it).
+const LIGHT_COLOR = 0xffdca8;                       // warm canopy/sign light
+// local (x, y, z) anchors within a site group; transformed to world at spawn
+const CANOPY_ANCHOR = [0, 5.6, 9];                  // under the canopy: pumps, soffit, storefront
+const SIGN_ANCHOR = [15.5, 14, 18.5];               // in front of the pylon sign face + beaver
+const CANOPY_I = 30, CANOPY_R = 50;                 // intensity / range (lantern is 14 @ 22)
+const SIGN_I = 16, SIGN_R = 28;
 
 export class BrandSystem {
   constructor(scene, { onHum } = {}) {
@@ -72,16 +80,16 @@ export class BrandSystem {
     this.acc = 0;               // update throttle accumulator
 
     // Shared materials (one instance across all sites, mirroring cities.js
-    // buildingMat) — the two glow materials' emissiveIntensity is the single
-    // knob toggled by ATMOS.night in update() (warm-white + brand red).
+    // buildingMat). No emissive glow material — night lighting is real lights.
     this.heroMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    this.glowMat = new THREE.MeshLambertMaterial({
-      vertexColors: true, flatShading: true, emissive: GLOW, emissiveIntensity: 0,
-    });
-    this.glowRedMat = new THREE.MeshLambertMaterial({
-      vertexColors: true, flatShading: true, emissive: GLOW_RED, emissiveIntensity: 0,
-    });
     this.propMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+
+    // Two persistent warm lights (lantern/headlight precedent): created and
+    // added ONCE, then repositioned to the nearest live site + faded by night
+    // in update(). Never add/remove at runtime (shader recompile hitch).
+    this.canopyLight = new THREE.PointLight(LIGHT_COLOR, 0, CANOPY_R, 1.5);
+    this.signLight = new THREE.PointLight(LIGHT_COLOR, 0, SIGN_R, 1.5);
+    scene.add(this.canopyLight, this.signLight);
 
     // Shared prototype geometries (built once, disposed NEVER) — the pump
     // island (instanced per site), the billboard post/frame, and the flat
@@ -96,17 +104,27 @@ export class BrandSystem {
     this.billboardMats = BILLBOARD_COPY.map((txt) =>
       new THREE.MeshLambertMaterial({ map: mkSignTex(txt), side: THREE.DoubleSide }));
 
-    this.night = -1; // force first setNight
   }
 
   // proximity spawn/despawn over the small hand-authored list (no grid needed)
   update(px, pz, dt = 0) {
-    // signage glow — read ATMOS internally (airports.js pattern), no main.js hook
-    const lit = ATMOS.night > NIGHT_ON ? GLOW_EI : 0;
-    if (lit !== this.night) {
-      this.glowMat.emissiveIntensity = lit;
-      this.glowRedMat.emissiveIntensity = lit;
-      this.night = lit;
+    // night lighting — aim the two persistent lights at the NEAREST live site
+    // and fade by ATMOS.night (read internally, airports.js pattern). Runs
+    // every frame (before the spawn throttle) so the lights track smoothly.
+    const nf = ATMOS.night > NIGHT_ON ? ATMOS.night : 0;
+    let near = null, bestD = Infinity;
+    for (const rec of this.live.values()) {
+      const d = (rec.lightAt.canopy[0] - px) ** 2 + (rec.lightAt.canopy[2] - pz) ** 2;
+      if (d < bestD) { bestD = d; near = rec; }
+    }
+    if (near && nf > 0) {
+      this.canopyLight.position.set(...near.lightAt.canopy);
+      this.signLight.position.set(...near.lightAt.sign);
+      this.canopyLight.intensity = nf * CANOPY_I;
+      this.signLight.intensity = nf * SIGN_I;
+    } else {
+      this.canopyLight.intensity = 0;
+      this.signLight.intensity = 0;
     }
 
     this.acc += dt;
@@ -140,17 +158,24 @@ export class BrandSystem {
     group.position.set(x, padY, z);
     group.rotation.y = heading;
 
-    // Hero: storefront + sign pylon + beaver, split into three merged meshes —
-    // non-glow (heroMat), warm-white glow (soffit/windows/sign/beaver), and
-    // brand-red glow (roofline/fascia/sign trim).
+    // Hero: storefront + fuel canopy + sign pylon + beaver, one static merged
+    // mesh (sign yellow / roofline red / soffit white as plain diffuse — the
+    // night lights below make them read, keeping colours true).
     const hero = buildBuckyHero(skirt);
     const staticMesh = new THREE.Mesh(hero.staticGeo, this.heroMat);
-    const glowMesh = new THREE.Mesh(hero.glowGeo, this.glowMat);
-    const glowRedMesh = new THREE.Mesh(hero.glowRedGeo, this.glowRedMat);
-    group.add(staticMesh, glowMesh, glowRedMesh);
+    group.add(staticMesh);
 
-    // Fuel canopy soffit glows too — it's part of hero.glowGeo above. The
-    // pump islands under it are an InstancedMesh of the shared prototype.
+    // World positions of the two night-light anchors. Transform the local
+    // anchors by the group's Y-rotation with the SAME trig as buildBillboards —
+    // group.localToWorld() would read a stale matrixWorld this early (identity
+    // until the first render), dropping the lights at the world origin.
+    const toWorld = ([lx, ly, lz]) => [
+      x + lx * Math.cos(heading) + lz * Math.sin(heading), padY + ly,
+      z - lx * Math.sin(heading) + lz * Math.cos(heading),
+    ];
+    const lightAt = { canopy: toWorld(CANOPY_ANCHOR), sign: toWorld(SIGN_ANCHOR) };
+
+    // The pump islands under the canopy are an InstancedMesh of the prototype.
     const pumps = new THREE.InstancedMesh(this.pumpGeo, this.propMat, hero.pumpXforms.length);
     hero.pumpXforms.forEach((m, i) => pumps.setMatrixAt(i, m));
     pumps.instanceMatrix.needsUpdate = true;
@@ -161,7 +186,7 @@ export class BrandSystem {
     const boards = this.buildBillboards(site, x, z, padY, group, rand);
 
     this.scene.add(group);
-    this.live.set(site.name, { group, glowMesh, glowRedMesh, staticMesh, pumps, boards });
+    this.live.set(site.name, { group, staticMesh, pumps, boards, lightAt });
   }
 
   // Billboards live along the highway well back from the store — each samples
@@ -278,8 +303,7 @@ function mkSignTex(text) {
 
 // A greebled low-poly beaver head — the at-a-distance recognizer atop the sign
 // pylon. Sphere head, box cap/muzzle, two box buck teeth, disc eyes + nose.
-// All parts return into the GLOW array (warm emissive at night). cx/cy/cz =
-// head center; parts face +z (toward the road, the group's front).
+// cx/cy/cz = head center; parts face +z (toward the road, the group's front).
 function beaverParts(cx, cy, cz) {
   const s = 1.0; // overall scale
   return [
@@ -297,15 +321,14 @@ function beaverParts(cx, cy, cz) {
   ];
 }
 
-// Bucky's hero — long storefront + lit red roofline + glowing storefront
-// windows, a wide fuel canopy (glowing soffit + red fascia) over N pump
-// islands, and a tall roadside sign pylon topped by the beaver. Returns three
-// merged geometries — static, warm-white glow (gw: soffit, windows, sign,
-// beaver), brand-red glow (gr: roofline, fascia, sign trim) — plus the pump
+// Bucky's hero — long storefront + red roofline + storefront windows, a wide
+// fuel canopy (white soffit + red fascia) over N pump islands, and a tall
+// roadside sign pylon topped by the beaver. One static merged geometry (plain
+// diffuse colours — the two night PointLights illuminate it) plus the pump
 // transforms. Built in the group's LOCAL frame: origin at pad center, ground
 // y = 0, +z = toward the road (the group is rotated so its front faces it).
 function buildBuckyHero(skirt = 0.4) {
-  const s = [], gw = [], gr = []; // static / warm-glow / red-glow part arrays
+  const s = []; // all parts merge into one static mesh
 
   // --- foundation lot slab: a raised concrete pad drawn DOWN to below the lot
   // terrain minimum so no corner floats on real relief (the airport skirt) ---
@@ -314,22 +337,22 @@ function buildBuckyHero(skirt = 0.4) {
   // --- storefront (set back from the road, long axis along local x) ---
   s.push(tinted(new THREE.BoxGeometry(26, 5.2, 11).translate(0, 2.6, -7), WALL));         // main box
   s.push(tinted(new THREE.BoxGeometry(27, 0.6, 12).translate(0, 5.2, -7), 0xdedad0));     // roof slab
-  gr.push(tinted(new THREE.BoxGeometry(27.2, 0.8, 0.6).translate(0, 4.9, -1.3), TRIM));   // red roofline band (glows red)
-  gw.push(tinted(new THREE.BoxGeometry(24, 2.6, 0.3).translate(0, 1.9, -1.35), 0xffe6b8)); // lit storefront windows
+  s.push(tinted(new THREE.BoxGeometry(27.2, 0.8, 0.6).translate(0, 4.9, -1.3), TRIM));   // red roofline band (glows red)
+  s.push(tinted(new THREE.BoxGeometry(24, 2.6, 0.3).translate(0, 1.9, -1.35), 0xffe6b8)); // lit storefront windows
   for (let i = -5; i <= 5; i++) // window mullions break up the band so it reads as windows
     s.push(tinted(new THREE.BoxGeometry(0.35, 2.8, 0.36).translate(i * 2.3, 1.9, -1.33), 0x6a6660));
   // entry parapet — the raised centerpiece, with a lit sign band
   s.push(tinted(new THREE.BoxGeometry(7, 2.2, 1.4).translate(0, 6.0, -1.6), WALL));
-  gr.push(tinted(new THREE.BoxGeometry(7.4, 0.5, 1.6).translate(0, 7.2, -1.6), TRIM));    // parapet cap (glows red)
-  gw.push(tinted(new THREE.BoxGeometry(5.6, 1.1, 0.3).translate(0, 6.1, -0.85), 0xffe6b8)); // lit entry sign band
+  s.push(tinted(new THREE.BoxGeometry(7.4, 0.5, 1.6).translate(0, 7.2, -1.6), TRIM));    // parapet cap (glows red)
+  s.push(tinted(new THREE.BoxGeometry(5.6, 1.1, 0.3).translate(0, 6.1, -0.85), 0xffe6b8)); // lit entry sign band
   // a couple of side pilasters for greeble
   for (const px of [-12.6, 12.6]) s.push(tinted(new THREE.BoxGeometry(0.9, 5.2, 0.9).translate(px, 2.6, -1.4), 0xcfc8ba));
 
   // --- fuel canopy (toward the road): glowing white soffit + red fascia ---
   const CZ = 12, CW = 30, CD = 13; // canopy center-z, width(x), depth(z)
   s.push(tinted(new THREE.BoxGeometry(CW, 0.7, CD).translate(0, 6.3, CZ), CANOPY));        // canopy deck
-  gr.push(tinted(new THREE.BoxGeometry(CW + 0.6, 0.5, CD + 0.6).translate(0, 6.7, CZ), TRIM)); // red fascia band (glows red)
-  gw.push(tinted(new THREE.BoxGeometry(CW - 0.6, 0.14, CD - 0.6).translate(0, 5.9, CZ), 0xfff4e2)); // glowing white soffit
+  s.push(tinted(new THREE.BoxGeometry(CW + 0.6, 0.5, CD + 0.6).translate(0, 6.7, CZ), TRIM)); // red fascia band (glows red)
+  s.push(tinted(new THREE.BoxGeometry(CW - 0.6, 0.14, CD - 0.6).translate(0, 5.9, CZ), 0xfff4e2)); // glowing white soffit
   for (const cx of [-13, 0, 13]) for (const cz of [CZ - 5, CZ + 5]) // support columns
     s.push(tinted(new THREE.CylinderGeometry(0.35, 0.4, 6.0, 8).translate(cx, 3.0, cz), 0xb8b2a6));
 
@@ -344,9 +367,9 @@ function buildBuckyHero(skirt = 0.4) {
   const SX = 15.5, SZ = CZ + 4; // right-front, out toward the road
   s.push(tinted(new THREE.CylinderGeometry(0.45, 0.55, 15, 10).translate(SX, 7.5, SZ), POLE));
   s.push(tinted(new THREE.BoxGeometry(6.2, 0.4, 1.2).translate(SX, 13.2, SZ), 0x2a2a30));  // sign backer top
-  gw.push(tinted(new THREE.BoxGeometry(5.6, 4.2, 0.5).translate(SX, 14.6, SZ + 0.65), SIGN)); // glowing yellow sign face
-  gr.push(tinted(new THREE.BoxGeometry(5.6, 0.6, 0.55).translate(SX, 12.6, SZ + 0.66), TRIM)); // sign underline (glows red)
-  for (const p of beaverParts(SX, 18.4, SZ + 0.2)) gw.push(p);
+  s.push(tinted(new THREE.BoxGeometry(5.6, 4.2, 0.5).translate(SX, 14.6, SZ + 0.65), SIGN)); // glowing yellow sign face
+  s.push(tinted(new THREE.BoxGeometry(5.6, 0.6, 0.55).translate(SX, 12.6, SZ + 0.66), TRIM)); // sign underline (glows red)
+  for (const p of beaverParts(SX, 18.4, SZ + 0.2)) s.push(p);
 
-  return { staticGeo: merge(s), glowGeo: merge(gw), glowRedGeo: merge(gr), pumpXforms };
+  return { staticGeo: merge(s), pumpXforms };
 }
