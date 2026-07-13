@@ -128,15 +128,16 @@ export default async function brands(t) {
 
     await t.setNight();
     await t.wait(0.4);
-    const night = await t.ev(`g.brands.glowMat.emissiveIntensity`);
-    t.ok(night > 0.3, `signage never lit at night: ${night}`);
+    const night = await t.ev(`({ warm: g.brands.glowMat.emissiveIntensity, red: g.brands.glowRedMat.emissiveIntensity })`);
+    t.ok(night.warm > 0.3 && night.red > 0.3, `signage never lit at night: ${JSON.stringify(night)}`);
 
-    // the glow material must be the one on the hero glow mesh (not a stray)
-    const wired = await t.ev(`g.brands.live.get('Katy').glowMesh.material === g.brands.glowMat`);
-    t.ok(wired, 'hero glow mesh not driven by the shared glow material');
+    // both glow materials must drive their hero meshes (not strays)
+    const wired = await t.ev(`(() => { const r = g.brands.live.get('Katy');
+      return r.glowMesh.material === g.brands.glowMat && r.glowRedMesh.material === g.brands.glowRedMat; })()`);
+    t.ok(wired, 'a hero glow mesh is not driven by its shared glow material');
     // signage must read as clearly LIT, not a faint tint (the "just white" bug):
     // emissive high enough to push a white soffit past medium-gray into bright
-    t.ok(night > 1.0, `signage glow too faint to read as lit: ${night}`);
+    t.ok(night.warm > 1.0, `signage glow too faint to read as lit: ${night.warm}`);
 
     if (process.env.SHOT) {
       // stand back on the road side and look at the store so the beaver-topped
