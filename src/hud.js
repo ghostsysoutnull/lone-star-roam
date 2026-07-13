@@ -59,6 +59,7 @@ export class HUD {
       dialog: document.getElementById('dialog'),
       interact: document.getElementById('interact-hint'),
       help: document.getElementById('help'),
+      paused: document.getElementById('paused'),
       subtitle: document.getElementById('radio-subtitle'),
       subtitleHeader: document.getElementById('radio-header'),
       subtitleText: document.getElementById('radio-text'),
@@ -172,6 +173,8 @@ export class HUD {
   }
 
   toggleBigMap() { this.big.style.display = this.big.style.display === 'block' ? 'none' : 'block'; }
+
+  setPaused(on) { this.els.paused.style.display = on ? 'flex' : 'none'; }
 
   toggleHelp(stats, ufoCount = 0, bank = 0, jobsDone = 0) {
     const open = this.els.help.style.display !== 'block';

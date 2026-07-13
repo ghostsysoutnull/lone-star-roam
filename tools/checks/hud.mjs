@@ -265,4 +265,41 @@ export default async function hud(t) {
     // the 💵 segment is gated on jobsDone > 0 by design
     t.ok(stats.includes('$') === jobsDone > 0, `money/jobsDone mismatch (jobsDone ${jobsDone}): "${stats}"`);
   });
+
+  // Esc pauses: real-loop sentinel — player.simT (Σ dt inside player.update, which
+  // the main loop skips while paused) must freeze over wall time, then resume.
+  await t.check('Esc pause freezes the world loop, resume restarts it', async () => {
+    await t.tp(austin.x, austin.z); // somewhere off-road; nothing else open
+    await t.key('Escape'); // pause
+    const paused = await t.ev(
+      `({ on: g.isPaused(), disp: g.hud.els.paused.style.display })`);
+    t.ok(paused.on === true, 'isPaused() false after Esc');
+    t.ok(paused.disp === 'flex', `PAUSED overlay not shown: "${paused.disp}"`);
+    // frozen: simT must not advance across real frames
+    const frozenBefore = await t.ev('g.player.simT');
+    await t.wait(1.5);
+    const frozenAfter = await t.ev('g.player.simT');
+    t.near(frozenAfter, frozenBefore, 0.02, `simT advanced ${(frozenAfter - frozenBefore).toFixed(3)} while paused`);
+    // keys are swallowed while paused: V (cycle mode) must be a no-op
+    const modeBefore = await t.ev('g.player.mode');
+    await t.key('KeyV');
+    t.ok((await t.ev('g.player.mode')) === modeBefore, 'KeyV changed mode while paused');
+    // resume: simT ticks again, overlay hides
+    await t.key('Escape');
+    const runBefore = await t.ev('g.player.simT');
+    await t.wait(1.5);
+    const runAfter = await t.ev('g.player.simT');
+    t.ok(runAfter - runBefore > 0.1, `loop still frozen after resume (Δ ${(runAfter - runBefore).toFixed(3)})`);
+    t.ok((await t.ev('g.isPaused()')) === false, 'still paused after second Esc');
+    t.ok((await t.ev('g.hud.els.paused.style.display')) === 'none', 'PAUSED overlay still visible after resume');
+  });
+
+  // Esc is context-aware: an open menu is dismissed first, pause only when clear.
+  await t.check('Esc closes an open menu before it pauses', async () => {
+    await t.key('KeyP'); // open travel menu
+    t.ok((await t.ev(`g.travel.el.style.display`)) === 'flex', 'travel menu did not open');
+    await t.key('Escape'); // should close the menu, NOT pause
+    t.ok((await t.ev(`g.travel.el.style.display`)) === 'none', 'Esc did not close the travel menu');
+    t.ok((await t.ev('g.isPaused()')) === false, 'Esc paused instead of just closing the menu');
+  });
 }

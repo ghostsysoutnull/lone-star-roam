@@ -123,7 +123,18 @@ async function boot() {
 
   let plaqueOpen = false;
   let hornCd = 0;
+  // Pause: the render loop freezes every system update (see setAnimationLoop) and
+  // audio suspends; Esc is context-aware — it dismisses an open menu first, and
+  // only toggles pause when nothing else is showing.
+  let paused = false;
+  const setPaused = (on) => {
+    paused = on;
+    hud.setPaused(on);
+    if (on) audio.freeze(); else audio.unfreeze();
+  };
   addEventListener('keydown', (e) => {
+    // Frozen world swallows every key but Esc, so nothing sneaks through while paused
+    if (paused && e.code !== 'Escape') return;
     // Space is the horn in DRIVE (climb in FLY): scatters critters, startles townsfolk
     if (e.code === 'Space' && player.mode === 'DRIVE' && !e.repeat && performance.now() > hornCd) {
       hornCd = performance.now() + 400;
@@ -139,7 +150,12 @@ async function boot() {
     if (e.code === 'KeyC') hud.toggleCompass();
     if (e.code === 'KeyG') hud.toast(missions.toggleArrow() ? '🧭 Guide arrow on' : '🧭 Guide arrow off');
     if (e.code === 'KeyP') travel.toggle();
-    if (e.code === 'Escape') travel.close();
+    if (e.code === 'Escape') {
+      if (travel.el.style.display === 'flex') travel.close();
+      else if (hud.els.help.style.display === 'block') hud.toggleHelp();
+      else if (hud.big.style.display === 'block') hud.toggleBigMap();
+      else setPaused(!paused);
+    }
     if (e.code === 'KeyN') hud.toast(audio.toggleMute() ? '🔇 Muted' : '🔊 Sound on');
     if (e.code === 'Equal' || e.code === 'NumpadAdd') hud.toast(`🔍 UI size ${hud.uiScale(1)}`);
     if (e.code === 'Minus' || e.code === 'NumpadSubtract') hud.toast(`🔍 UI size ${hud.uiScale(-1)}`);
@@ -170,12 +186,21 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
+    // Paused: keep draining the clock every frame (so resume gets a normal ~16 ms
+    // dt, never a pause-long jump — clock.elapsedTime stays honest & monotonic) and
+    // re-draw the frozen frame, but skip every system update below. The only system
+    // reading elapsedTime (maritime's ±0.06-unit ship bob) merely snaps phase on
+    // resume; its lane travel is dt-integrated, so nothing teleports.
+    if (paused) {
+      if (!window.__skipRender) renderer.render(scene, camera);
+      return;
+    }
     player.update(dt);
     sky.update(dt, player.keys['KeyT'], player.pos.x, player.pos.z, player.pos.y);
     scenery.update(dt, player.pos.x, player.pos.z);

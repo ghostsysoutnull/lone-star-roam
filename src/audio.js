@@ -122,6 +122,12 @@ export class AudioSystem {
     return this.muted;
   }
 
+  // pause: freeze the whole audio graph (oscillators, scheduled envelopes) so a
+  // paused world falls silent and resumes exactly where it left off. Orthogonal
+  // to mute (which is gain-based) — suspend/resume just stops/starts the clock.
+  freeze() { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend(); }
+  unfreeze() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
+
   // called every frame from the game loop
   update(player, atmos) {
     if (!this.ctx || this.muted) return;
