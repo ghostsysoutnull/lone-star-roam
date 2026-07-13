@@ -134,6 +134,9 @@ export default async function brands(t) {
     // the glow material must be the one on the hero glow mesh (not a stray)
     const wired = await t.ev(`g.brands.live.get('Katy').glowMesh.material === g.brands.glowMat`);
     t.ok(wired, 'hero glow mesh not driven by the shared glow material');
+    // signage must read as clearly LIT, not a faint tint (the "just white" bug):
+    // emissive high enough to push a white soffit past medium-gray into bright
+    t.ok(night > 1.0, `signage glow too faint to read as lit: ${night}`);
 
     if (process.env.SHOT) {
       // stand back on the road side and look at the store so the beaver-topped

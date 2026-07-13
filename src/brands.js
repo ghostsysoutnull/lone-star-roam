@@ -56,7 +56,8 @@ const BILLBOARD_COPY = [
 const WALL = 0xe8e2d4, ROOF = 0x9a3b2e, TRIM = 0xc0392b, POLE = 0x3a3a40;
 const SIGN = 0xf2c200, BEAVER = 0x8a5a34, TEETH = 0xfaf3e0, GLASS = 0x9fb8c8;
 const CANOPY = 0xf4f1ea, ASPHALT = 0x3f3f46, PUMP = 0xdddddd;
-const GLOW = 0xfff0d0; // warm-white emissive tint for the night signage
+const GLOW = 0xffe6b0;   // warm-white emissive tint for the night signage
+const GLOW_EI = 1.15;    // lit intensity — below ~1.0 a white soffit reads as gray, not "lit"
 
 export class BrandSystem {
   constructor(scene, { onHum } = {}) {
@@ -93,7 +94,7 @@ export class BrandSystem {
   // proximity spawn/despawn over the small hand-authored list (no grid needed)
   update(px, pz, dt = 0) {
     // signage glow — read ATMOS internally (airports.js pattern), no main.js hook
-    const lit = ATMOS.night > NIGHT_ON ? 0.6 : 0;
+    const lit = ATMOS.night > NIGHT_ON ? GLOW_EI : 0;
     if (lit !== this.night) { this.glowMat.emissiveIntensity = lit; this.night = lit; }
 
     this.acc += dt;
