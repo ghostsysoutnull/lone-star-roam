@@ -680,7 +680,12 @@ export class HUD {
     ctx.translate(W / 2, H / 2);
     ctx.rotate(-player.heading + Math.PI);
     ctx.fillStyle = '#ffd35c';
-    ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 8); ctx.lineTo(-6, 8); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1;
+    // notched chevron: sharp nose leads the heading, concave V-cut tail
+    ctx.beginPath();
+    ctx.moveTo(0, 11); ctx.lineTo(7, -7); ctx.lineTo(0, -3); ctx.lineTo(-7, -7);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
 
