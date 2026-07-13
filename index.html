@@ -19,6 +19,10 @@
   #hud-speed small { font-size: 1.3rem; font-weight: 400; opacity: .8; }
   #hud-odo { font-size: 1.2rem; font-weight: 400; opacity: .65; text-align: right; }
   #hud-mode { bottom: 8.2rem; right: 2.2rem; font-size: 1.3rem; opacity: .9; }
+  #hud-stamina { bottom: 10.4rem; right: 2.2rem; width: 12rem; height: .6rem; border-radius: .4rem;
+    background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); overflow: hidden;
+    opacity: 0; transition: opacity .3s; }
+  #hud-stamina-fill { height: 100%; width: 100%; background: #ffd35c; transition: width .1s linear, background-color .2s; }
   #compass { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); width: 34rem; height: 4rem;
     border-radius: 10px; border: 1px solid rgba(255,255,255,.18); background: rgba(10,14,20,.55); }
   #road-shield-wrap { position: fixed; top: 10px; right: calc(50% + 17rem + 10px); width: 6rem; height: 5.2rem;
@@ -114,6 +118,7 @@
 </div>
 <div id="hud-speed" class="hud">0 <small>mph</small></div>
 <div id="hud-mode" class="hud">🚙 DRIVE — V to change</div>
+<div id="hud-stamina" class="hud"><div id="hud-stamina-fill"></div></div>
 <canvas id="minimap" width="380" height="360"></canvas>
 <canvas id="compass" width="680" height="80"></canvas>
 <div id="road-shield-wrap"><div id="road-shield-card"><canvas id="road-shield" width="120" height="104"></canvas></div></div>

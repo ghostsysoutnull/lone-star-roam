@@ -11,7 +11,7 @@ import { groundYAt } from './airports.js';
 
 const FOLLOW_D = 2.6; // trail distance behind the cowboy
 const CATCHUP = 2.2;  // speed per unit of gap
-const MAX_SPD = 11;   // flat out — a Lacy outruns any cowboy
+const MAX_SPD = 15;   // flat out — a Lacy outruns any cowboy, even a sprinting one (vehicle.js SPRINT_SPEED)
 
 export class DogSystem {
   constructor(scene, player) {

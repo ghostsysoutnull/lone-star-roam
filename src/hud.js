@@ -46,6 +46,8 @@ export class HUD {
       sky: document.getElementById('hud-sky'),
       speed: document.getElementById('hud-speed'),
       mode: document.getElementById('hud-mode'),
+      stamina: document.getElementById('hud-stamina'),
+      staminaFill: document.getElementById('hud-stamina-fill'),
       cities: document.getElementById('score-cities'),
       landmarks: document.getElementById('score-landmarks'),
       roses: document.getElementById('score-roses'),
@@ -646,6 +648,11 @@ export class HUD {
       : `${player.speedMph} <small>mph</small><div id="hud-odo">${Math.round(this.lastDist ?? 0).toLocaleString()} km</div>`;
     const icons = { DRIVE: '🚙', FLY: '✈️', WALK: '🚶' };
     this.els.mode.textContent = `${weatherIcon} ${clock}${forecast ? ` · ${forecast}` : ''} · ${icons[player.mode]} ${player.mode}${player.mode === 'FLY' ? ` — alt ${Math.round(player.pos.y * 100 / 1000 * 10) / 10} km · F 🧨×${player.flares?.charges ?? 0}` : ''} — V to change`;
+    // stamina bar: WALK only, fades in while sprinting or below a full tank
+    const showStamina = player.mode === 'WALK' && (player.sprinting || player.stamina < 1);
+    this.els.stamina.style.opacity = showStamina ? 1 : 0;
+    this.els.staminaFill.style.width = `${Math.round((player.stamina ?? 1) * 100)}%`;
+    this.els.staminaFill.style.backgroundColor = player.sprinting ? '#ff9a4a' : '#ffd35c';
     this.els.cities.textContent = counts.cities;
     this.els.landmarks.textContent = counts.landmarks;
     this.els.roses.textContent = counts.roses;

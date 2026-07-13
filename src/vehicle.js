@@ -21,6 +21,19 @@ export const MODES = ['DRIVE', 'FLY', 'WALK'];
 const GRAV = 45;
 const AIRDAMP = 0.25;
 
+// WALK sprint: builds up after a sustained straight-line forward walk (no
+// modifier key — judged not user-friendly), drains stamina while active, and
+// drops instantly on any turn/stop/back-up so careful movement near
+// wildlife/plaques/dialog stays untouched. Buildup is a dedicated timer, not
+// tied to the animation's `walkPhase` (which free-runs even at rest for the
+// idle sway/lantern flicker) — coupling it to walkPhase let real-frame
+// jitter during a pre-hold settle wait shift the footstep-crossing count.
+const WALK_SPEED = 6;
+const SPRINT_SPEED = 12;
+const SPRINT_BUILDUP = 0.9; // seconds of sustained straight walking before a run kicks in
+const STAMINA_DRAIN = 0.18; // per second while sprinting (full tank ≈ 5.6s of sprint)
+const STAMINA_REGEN = 0.25; // per second while not sprinting
+
 export class Player {
   constructor(scene, camera) {
     this.scene = scene;
@@ -31,6 +44,9 @@ export class Player {
     this.speed = 0;        // units/s
     this.vy = 0;           // vertical speed (fly, jetpack)
     this.hovering = false; // WALK sub-state: jetpack thrust airborne
+    this.sprinting = false;  // WALK sub-state: running after a sustained straight-line approach
+    this.sprintBuildup = 0;  // seconds accumulated toward SPRINT_BUILDUP
+    this.stamina = 1;        // 0-1, drains while sprinting, regens otherwise
     this.keys = {};
     this.onStep = null;    // footstep audio hook
     this.onThrust = null;  // jetpack liftoff hook (fires once on the ground->hovering edge)
@@ -116,6 +132,8 @@ export class Player {
     if (m !== 'FLY') { this.pos.y = 0; this.vy = 0; }
     if (m === 'WALK') this.speed = Math.min(this.speed, 2);
     this.hovering = false; // only WALK can be airborne this way — get out of the truck first
+    this.sprinting = false;
+    this.sprintBuildup = 0;
   }
 
   resetToRoad() {
@@ -177,8 +195,23 @@ export class Player {
       this.tilt = steer * 0.5;
     } else { // WALK
       if (!this.hovering && this.perks.jetpack && k['Space']) { this.hovering = true; this.onThrust?.(); }
-      const maxSpd = this.hovering ? this.perks.jetSpeed : 4.5;
-      if (fwd) this.speed += 18 * dt;
+
+      // sprint build-up/drain — see SPRINT_* constants for the rules
+      const sprintEligible = fwd && !back && steer === 0 && !this.hovering;
+      if (!sprintEligible) { this.sprintBuildup = 0; this.sprinting = false; }
+      else if (!this.sprinting) {
+        this.sprintBuildup += dt;
+        if (this.sprintBuildup >= SPRINT_BUILDUP) this.sprinting = true;
+      }
+      if (this.sprinting) {
+        this.stamina = Math.max(0, this.stamina - STAMINA_DRAIN * dt);
+        if (this.stamina <= 0) { this.sprinting = false; this.sprintBuildup = 0; }
+      } else {
+        this.stamina = Math.min(1, this.stamina + STAMINA_REGEN * dt);
+      }
+
+      const maxSpd = this.hovering ? this.perks.jetSpeed : (this.sprinting ? SPRINT_SPEED : WALK_SPEED);
+      if (fwd) this.speed += (this.sprinting ? 28 : 18) * dt;
       else if (back) this.speed -= 18 * dt;
       else this.speed *= Math.pow(0.02, dt);
       this.speed = THREE.MathUtils.clamp(this.speed, -2.5, maxSpd);
@@ -243,8 +276,9 @@ export class Player {
     // Chase camera — jetpack hover pulls the framing up/back proportional to
     // AGL (the existing camPos.lerp below smooths the rise, no extra easing needed)
     const agl = this.hovering ? Math.max(0, this.pos.y - this.groundY) : 0;
-    const back2 = this.mode === 'FLY' ? 16 : this.mode === 'WALK' ? 7 + agl * 0.12 : 11;
-    const up = this.mode === 'FLY' ? 7 : this.mode === 'WALK' ? 3.2 + agl * 0.15 : 5;
+    const sprintKick = this.mode === 'WALK' && this.sprinting ? 1.4 : 0;
+    const back2 = this.mode === 'FLY' ? 16 : this.mode === 'WALK' ? 7 + agl * 0.12 + sprintKick : 11;
+    const up = this.mode === 'FLY' ? 7 : this.mode === 'WALK' ? 3.2 + agl * 0.15 + sprintKick * 0.3 : 5;
     const target = new THREE.Vector3(
       this.pos.x + Math.sin(this.heading) * back2,
       this.pos.y + up,
@@ -365,7 +399,10 @@ export class Player {
       const prevPhase = this.walkPhase;
       this.walkPhase += dt * (3 + Math.abs(this.speed) * 2.4);
       if (moving) {
-        const s = Math.sin(this.walkPhase) * Math.min(1, Math.abs(this.speed) / 3) * 0.55;
+        // denominator reaches SPRINT_SPEED, not the old WALK_SPEED cap, so
+        // full leg-swing keeps growing into the sprint range instead of
+        // saturating at a fast walk
+        const s = Math.sin(this.walkPhase) * Math.min(1, Math.abs(this.speed) / SPRINT_SPEED) * 0.55;
         c.ll.rotation.x = s; c.rl.rotation.x = -s;
         c.la.rotation.x = -s * 0.8; c.ra.rotation.x = s * 0.8;
         this.cowboy.position.y = this.pos.y + Math.abs(Math.sin(this.walkPhase)) * 0.05;

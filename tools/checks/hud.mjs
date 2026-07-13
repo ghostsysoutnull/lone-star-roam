@@ -235,6 +235,43 @@ export default async function hud(t) {
     for (let i = 0; i < 10; i++) await t.key('Minus'); // restore baseline for later checks
   });
 
+  await t.check('stamina bar shows only when relevant and reflects the tank level', async () => {
+    await t.tp(austin.x - 300, austin.z - 40, 'WALK');
+    await t.ev('(g.player.stamina = 1, g.player.sprinting = false)');
+    await t.wait(0.15); // one HUD tick (~12 Hz)
+    t.ok((await t.ev("document.getElementById('hud-stamina').style.opacity")) === '0', 'stamina bar visible at a full tank');
+
+    await t.ev('(g.player.stamina = 0.6)');
+    await t.wait(0.15);
+    t.ok((await t.ev("document.getElementById('hud-stamina').style.opacity")) === '1', 'stamina bar stayed hidden below a full tank');
+    // idle regen (player isn't sprinting) creeps stamina back up a little
+    // during the wait above, so a tolerance band, not an exact %, is correct
+    const w = parseFloat(await t.ev("document.getElementById('hud-stamina-fill').style.width"));
+    t.near(w, 60, 6, 'fill width did not reflect stamina');
+    await t.ev(`g.player.setMode('DRIVE')`);
+  });
+
+  await t.check('HUD stamina bar never overlaps the mode line at high UI scale (while visible)', async () => {
+    await t.tp(austin.x - 300, austin.z - 40, 'WALK');
+    await t.ev('(g.player.stamina = 0.5)'); // force the bar visible
+    await t.wait(0.15);
+    // stamina sits ABOVE the mode line (bottom: 10.4rem vs 8.2rem), so no
+    // overlap means stamina's bottom edge stays above mode's top edge
+    const rects = () => t.ev(`({
+      stamina: document.getElementById('hud-stamina').getBoundingClientRect().bottom,
+      mode: document.getElementById('hud-mode').getBoundingClientRect().top,
+    })`);
+    const base = await rects();
+    t.ok(base.stamina <= base.mode, `overlap at 100%: stamina.bottom ${base.stamina.toFixed(0)} vs mode.top ${base.mode.toFixed(0)}`);
+    for (let i = 0; i < 10; i++) {
+      await t.key('Equal');
+      const r = await rects();
+      t.ok(r.stamina <= r.mode, `overlap at step ${i + 1}: stamina.bottom ${r.stamina.toFixed(0)} vs mode.top ${r.mode.toFixed(0)}`);
+    }
+    for (let i = 0; i < 10; i++) await t.key('Minus'); // restore baseline for later checks
+    await t.ev(`g.player.setMode('DRIVE')`);
+  });
+
   await t.check('+/- steps the UI scale, resizes HUD text, persists', async () => {
     const px = () => t.ev(`({
       root: parseFloat(getComputedStyle(document.documentElement).fontSize),

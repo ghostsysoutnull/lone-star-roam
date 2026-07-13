@@ -1,5 +1,5 @@
 // Drive/fly/walk physics at natural play values. Caps live in vehicle.js
-// (DRIVE caps{}, WALK 4.5, FLY floor hAt+1.8); rain multiplies caps by
+// (DRIVE caps{}, WALK 6 (12 sprinting), FLY floor hAt+1.8); rain multiplies caps by
 // (1 - rain*0.22), so expected values are computed from live ATMOS.rain.
 // Physics runs use t.simStep (synchronous, ~instant); the walk-cap check
 // deliberately stays on the real render loop (t.simWait) as the one smoke
@@ -99,13 +99,16 @@ export default async function drive(t) {
     t.ok(d1 < d0 - 5, `not pushed back: ${d0.toFixed(0)} → ${d1.toFixed(0)}`);
   });
 
-  await t.check('walk speed caps at 4.5 (real render loop)', async () => {
+  await t.check('walk speed caps at 6 (real render loop)', async () => {
     await t.tp(austin.x - 300, austin.z - 40, 'WALK');
     await t.hold('KeyW');
-    await t.simWait(0.8); // deliberately NOT simStep — the frame-loop smoke test (cap reached in 0.25 sim s)
+    // deliberately NOT simStep — the frame-loop smoke test (cap reached in
+    // 0.33 sim s); stays under vehicle.js's SPRINT_BUILDUP (0.9s) with margin
+    // so a sprint kicking in mid-test can't inflate the reading
+    await t.simWait(0.5);
     const spd = await t.ev('g.player.speed');
     await t.release();
-    t.near(spd, 4.5, 0.2, 'walk speed');
+    t.near(spd, 6, 0.2, 'walk speed');
   });
 
   await t.check('fly floor clamps to terrain + 1.8', async () => {
