@@ -131,6 +131,17 @@ async function boot() {
     [...cities.live.values()].map((g) => g.children.find((c) => c.isInstancedMesh)).filter(Boolean);
 
   let plaqueOpen = false;
+  // Unifies gameplay's historical-marker plaques with brands' LSC ID-sign
+  // plaque (DATACENTER_SIGN_SPEC.md) behind one shape/one `plaqueOpen` name,
+  // so only one plaque source is ever open at a time and walking from one
+  // straight to the other closes-then-opens cleanly.
+  const plaqueNear = (pos, range) => {
+    const lm = gameplay.landmarkNear(pos, range);
+    if (lm) return { name: lm.name, hint: 'read the historical marker', dialog: { name: '\u{1F4DC} ' + lm.name, text: lm.fact } };
+    const lsc = brands.lscNear(pos, range);
+    if (lsc) return { name: lsc.name, hint: 'read the datacenter sign', dialog: { name: '\u{1F5A5}\uFE0F Lone Star Compute — ' + lsc.name, sub: lsc.sign.tagline, text: lsc.sign.fact } };
+    return null;
+  };
   let hornCd = 0;
   // Pause: the render loop freezes every system update (see setAnimationLoop) and
   // audio suspends; Esc is context-aware — it dismisses an open menu first, and
@@ -173,11 +184,11 @@ async function boot() {
     if (e.code === 'KeyR') player.resetToRoad();
     if (e.code === 'KeyE') {
       if (!npcs.interact(player.pos) && !springer.interact(player.pos)) {
-        const lm = gameplay.landmarkNear(player.pos, 28);
-        if (lm && lm.name !== plaqueOpen) {
-          // open (or switch straight to) this landmark's marker
-          hud.dialog({ name: '\u{1F4DC} ' + lm.name, text: lm.fact });
-          plaqueOpen = lm.name;
+        const near = plaqueNear(player.pos, 28);
+        if (near && near.name !== plaqueOpen) {
+          // open (or switch straight to) this plaque
+          hud.dialog(near.dialog);
+          plaqueOpen = near.name;
         } else if (plaqueOpen) {
           hud.dialog(null);
           plaqueOpen = false;
@@ -244,11 +255,11 @@ async function boot() {
     hud.animateShield(player, dt); // per-frame sway/float — headless too, not gated by __skipRender
     const npcName = npcs.update(dt, player.pos);
     const skyHint = npcName ? null : springer.nearHint(player.pos);
-    const lmNear = (npcName || skyHint) ? null : gameplay.landmarkNear(player.pos, 28);
+    const pNear = (npcName || skyHint) ? null : plaqueNear(player.pos, 28);
     hud.interactHint(npcName ? `talk to ${npcName}` : skyHint ? skyHint
-      : lmNear && lmNear.name !== plaqueOpen ? 'read the historical marker' : null);
-    // walked away from an open plaque: close it
-    if (plaqueOpen && (!lmNear || lmNear.name !== plaqueOpen) && !gameplay.landmarkNear(player.pos, 40)) {
+      : pNear && pNear.name !== plaqueOpen ? pNear.hint : null);
+    // walked away from an open plaque (either source): close it
+    if (plaqueOpen && (!pNear || pNear.name !== plaqueOpen) && !plaqueNear(player.pos, 40)) {
       hud.dialog(null);
       plaqueOpen = false;
     }

@@ -465,6 +465,122 @@ export default async function brands(t) {
     await t.setDay();
   });
 
+  // -------------------------------- Datacenter sign (DATACENTER_SIGN_SPEC.md prototype)
+  const lscSAAt = await t.ev(`({
+    x: (-98.65 + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100,
+    z: -(29.42 - 31) * 111320 / 100,
+  })`);
+
+  await t.check('datacenter sign: San Antonio spawns a lit sign panel, other sites stay unsigned', async () => {
+    await t.tp(lscSAAt.x, lscSAAt.z + 3);
+    await t.until(`g.brands.live.has('lsc:San Antonio')`, 8000);
+    const rec = await t.ev(`(() => {
+      const r = g.brands.live.get('lsc:San Antonio');
+      const m = r.signMesh.children.find((c) => c.geometry === g.brands.lscSignGeo);
+      return {
+        hasSign: !!r.signMesh,
+        panelMat: m.material === g.brands.lscSignMats.get('San Antonio'),
+        hasMap: !!m.material.map, hasEmissiveMap: !!m.material.emissiveMap,
+      };
+    })()`);
+    t.ok(rec.hasSign, 'San Antonio LSC site never built a signMesh');
+    t.ok(rec.panelMat, "sign panel isn't using its per-site cached material");
+    t.ok(rec.hasMap && rec.hasEmissiveMap, `sign material missing map/emissiveMap: ${JSON.stringify(rec)}`);
+
+    // Abilene has no `sign` entry — prototype scope is San Antonio only, so it
+    // must NOT grow one (guards against the sign silently rolling out early).
+    await t.tp(lscAt.x, lscAt.z + 3);
+    await t.until(`g.brands.live.has('lsc:Abilene')`, 8000);
+    const abileneSign = await t.ev(`g.brands.live.get('lsc:Abilene').signMesh`);
+    t.ok(abileneSign === null, `Abilene unexpectedly grew a sign: ${abileneSign}`);
+  });
+
+  await t.check("datacenter sign night-gate: emissiveMap glow ~0 by day, lit at night (own material, not ventMat)", async () => {
+    await t.tp(lscSAAt.x, lscSAAt.z + 3);
+    await t.until(`g.brands.live.has('lsc:San Antonio')`, 8000);
+
+    await t.setDay();
+    await t.wait(0.4);
+    const day = await t.ev(`g.brands.lscSignMats.get('San Antonio').emissiveIntensity`);
+    t.near(day, 0, 0.001, `sign glows by day: ${day}`);
+
+    await t.setNight();
+    await t.wait(0.5);
+    const night = await t.ev(`g.brands.lscSignMats.get('San Antonio').emissiveIntensity`);
+    t.ok(night > 0.2, `sign never lit at night: ${night}`);
+    await t.setDay();
+  });
+
+  // The plaque triggers off the SIGN's world position, not the pad center —
+  // hypot(11, 26.1) ≈ 28.3 units apart, so a center-based query missed the
+  // sign entirely (the exact "tested at a convenient radius, not the natural
+  // one" trap CLAUDE.md warns about). Fetch the real anchor from `signAt`
+  // (computed at spawn from heading + SCALE) instead of assuming a fixed offset.
+  const lscSignAt = await (async () => {
+    await t.tp(lscSAAt.x, lscSAAt.z + 3);
+    await t.until(`g.brands.live.has('lsc:San Antonio')`, 8000);
+    return t.ev(`(() => { const [x, z] = g.brands.live.get('lsc:San Antonio').signAt; return { x, z }; })()`);
+  })();
+
+  await t.check('datacenter plaque: lscNear resolves San Antonio at the SIGN (not the pad center), null out of range', async () => {
+    await t.tp(lscSignAt.x, lscSignAt.z + 3);
+    const near = await t.ev(`g.brands.lscNear(g.player.pos, 28)?.name`);
+    t.ok(near === 'San Antonio', `lscNear didn't find San Antonio near its own sign: ${near}`);
+
+    await t.tp(lscSAAt.x, lscSAAt.z + 3); // the PAD CENTER, ~28.3 units from the sign — must now read as out of range
+    const atCenter = await t.ev(`g.brands.lscNear(g.player.pos, 28)`);
+    t.ok(atCenter === null, `lscNear still keyed off the pad center, not the sign: ${JSON.stringify(atCenter)}`);
+
+    await t.tp(lscSignAt.x + 500, lscSignAt.z);
+    const far = await t.ev(`g.brands.lscNear(g.player.pos, 28)`);
+    t.ok(far === null, `lscNear returned a site out of range: ${JSON.stringify(far)}`);
+  });
+
+  await t.check('datacenter plaque: E opens the real-facts dialog with the right hint, E again closes it', async () => {
+    await t.tp(lscSignAt.x, lscSignAt.z + 3, 'WALK');
+    const hint = await t.ev('g.hud.els.interact.textContent');
+    t.ok(hint === 'E — read the datacenter sign', `expected the datacenter-sign hint, got "${hint}"`);
+
+    await t.key('KeyE');
+    const dlg = await t.ev(`({
+      name: g.hud.els.dialog.querySelector('.npc-name').textContent,
+      sub: g.hud.els.dialog.querySelector('.npc-sub').textContent,
+      text: g.hud.els.dialog.querySelector('.npc-text').textContent,
+      shown: g.hud.els.dialog.style.display,
+    })`);
+    t.ok(dlg.name.includes('San Antonio'), `dialog name didn't name the site: "${dlg.name}"`);
+    t.ok(dlg.sub.includes('AI-READY CAMPUS'), `dialog sub missing the tagline: "${dlg.sub}"`);
+    t.ok(dlg.text.includes('334 MW') && dlg.text.includes('gallons'), `dialog text missing the sourced facts: "${dlg.text}"`);
+    t.ok(dlg.shown === 'block', 'dialog not shown after E');
+
+    await t.key('KeyE');
+    const closed = await t.ev('g.hud.els.dialog.style.display');
+    t.ok(closed === 'none', 'second E press did not close the plaque');
+  });
+
+  await t.check('datacenter plaque: switching straight to a landmark plaque replaces it, walking off closes it', async () => {
+    await t.tp(lscSignAt.x, lscSignAt.z + 3, 'WALK');
+    await t.key('KeyE');
+    const lscName = await t.ev(`g.hud.els.dialog.querySelector('.npc-name').textContent`);
+    t.ok(lscName.includes('San Antonio'), `expected the LSC plaque open first, got "${lscName}"`);
+
+    // Big Bend — remote enough that no city's proximity-spawned townsfolk (or
+    // the 12 named characters) shadow the landmark's own E-interact.
+    const bigBend = await t.ev(`(() => {
+      const g2 = g.gameplay.landmarkGroup.children.find((c) => c.userData.lm.name === 'Big Bend');
+      return { x: g2.position.x, z: g2.position.z };
+    })()`);
+    await t.tp(bigBend.x, bigBend.z + 3, 'WALK');
+    await t.key('KeyE');
+    const switched = await t.ev(`g.hud.els.dialog.querySelector('.npc-name').textContent`);
+    t.ok(switched.includes('Big Bend'), `didn't switch straight to the landmark plaque, got "${switched}"`);
+
+    await t.tp(bigBend.x + 500, bigBend.z, 'WALK');
+    await t.wait(0.3);
+    const closed = await t.ev('g.hud.els.dialog.style.display');
+    t.ok(closed === 'none', 'plaque stayed open after walking away from both sources');
+  });
+
   // ---------------------------------------- player-controlled brand size
   await t.check('brand size: setScale rebuilds the hero at the new scale, clamps, and persists', async () => {
     await t.tp(katyAt.x, katyAt.z + 3);

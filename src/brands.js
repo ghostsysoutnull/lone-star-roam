@@ -129,7 +129,23 @@ const HEB_COUNT = 33, HEB_MARGIN = 8, HEB_OFF = 24;
 const LSC_SITES = [
   { name: 'Abilene', at: LL(32.52, -99.88) },      // the real "Stargate" (Crusoe/Oracle/OpenAI)
   { name: 'Corsicana', at: LL(32.05, -96.50) },
-  { name: 'San Antonio', at: LL(29.42, -98.65) },  // Streams San Antonio, west side
+  // `sign` = the datacenter-sign prototype (DATACENTER_SIGN_SPEC.md): an
+  // always-visible ID sign + an "E to read" plaque with real, sourced facts.
+  // San Antonio only for now — other sites deliberately have no `sign` yet,
+  // pending a rollout decision after this reads well in-game.
+  {
+    name: 'San Antonio', at: LL(29.42, -98.65),      // Streams San Antonio, west side
+    sign: {
+      tagline: 'SAN ANTONIO — AI-READY CAMPUS',
+      fact: "Modeled on the real hyperscale campuses rising on San Antonio's "
+        + "west side — Stream's San Antonio III alone plans up to 200 MW of "
+        + 'AI-ready capacity across five buildings, fed by its own 334 MW '
+        + 'substation. A single 100 MW facility can drink 3–6 million '
+        + 'gallons of water a day at peak, as much as a small city, and '
+        + 'training one large model has been estimated to use around 185,000 '
+        + 'gallons of water for cooling alone.',
+    },
+  },
   { name: 'Sweetwater', at: LL(32.47, -100.41) },  // Abilene–Sweetwater corridor
   { name: 'Temple', at: LL(31.08, -97.44) },        // ≥80u off Temple's Bucky's
   { name: 'Amarillo', at: LL(35.30, -101.70) },     // Fermi America 11 GW campus
@@ -149,6 +165,8 @@ const LSC_CONCRETE = 0x9c968a, LSC_STEEL = 0x8a9099, LSC_FENCE = 0x707880;
 const LSC_XFMR = 0x8f959c, LSC_DRUM = 0xcfd3d7, LSC_VENT_DIFF = 0x2a3540;
 const VENT_GLOW = 0x6fb0ff;    // saturated cold blue — reads cold, not white
 const VENT_I = 0.7;            // emissive magnitude (airport-sign tier, gated by night)
+const SIGN_GLOW_I = 0.9;       // ID-sign emissiveMap magnitude — text/border only (dark bg emits ~0)
+const LSC_SIGN_ANCHOR = [11, 3.3, 26.1]; // local: beside the entrance/gate, facing the road
 const HUM_RANGE = 220;         // datacenter hum audible radius (bigger footprint than a heli)
 
 export class BrandSystem {
@@ -203,10 +221,32 @@ export class BrandSystem {
     // dispose on despawn, but this material is shared and never disposed). Dark
     // diffuse + saturated cold emissive so it reads cold, not white.
     this.ventMat = new THREE.MeshLambertMaterial({ color: LSC_VENT_DIFF, emissive: VENT_GLOW, emissiveIntensity: 0, flatShading: true });
+
+    // Lone Star Compute ID sign (DATACENTER_SIGN_SPEC.md prototype). NOT
+    // ventMat's idiom — ventMat is a solid-color emissive with no map, so it'd
+    // glow the whole panel cyan and swamp any text (the same "emissive clamps
+    // signage toward white" trap Bucky's/H-E-Buddy hit, which they escaped
+    // with PointLights — not an option here per "no second light rig"/no new
+    // shader). Instead the sign's own canvas texture is used as BOTH `map`
+    // and `emissiveMap`: dark panel diffuse with cyan glyphs/border baked in,
+    // so only the text/border glows once emissiveIntensity ramps up at night
+    // (toggled alongside ventMat in update()). One material per site.sign
+    // (currently one: the San Antonio prototype).
+    this.lscSignGeo = new THREE.PlaneGeometry(9, 3.6);
+    this.lscSignMats = new Map();
+    this.lscByName = new Map(LSC_SITES.map((s) => [s.name, s])); // lscNear's name -> site lookup
+    for (const site of LSC_SITES) {
+      if (!site.sign) continue;
+      const tex = mkLSCSignTex(site.sign.tagline);
+      this.lscSignMats.set(site.name, new THREE.MeshLambertMaterial({
+        map: tex, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide,
+      }));
+    }
+
     this.shared = new Set([
       this.pumpGeo, this.billboardGeo, this.panelGeo, this.buckySignGeo,
       this.corralGeo, this.cartGeo, this.poleGeo, this.hebSignGeo,
-      this.coolingGeo, this.drumGeo, this.pylonGeo,
+      this.coolingGeo, this.drumGeo, this.pylonGeo, this.lscSignGeo,
     ]);
 
     // One canvas-texture material per copy string, built once (airports.js
@@ -277,6 +317,7 @@ export class BrandSystem {
     // onHum callback (main.js → audio.datacenterHum). Both every frame, like the
     // signage lights above; onHum(Infinity) when no site is live so the hum fades.
     this.ventMat.emissiveIntensity = nf * VENT_I;
+    for (const mat of this.lscSignMats.values()) mat.emissiveIntensity = nf * SIGN_GLOW_I;
     if (this.onHum) this.onHum(bestL === Infinity ? Infinity : Math.sqrt(bestL));
 
     this.acc += dt;
@@ -518,16 +559,65 @@ export class BrandSystem {
     hero.pylonXforms.forEach((m, i) => pylons.setMatrixAt(i, m));
     pylons.instanceMatrix.needsUpdate = true;
 
+    // ID sign (DATACENTER_SIGN_SPEC.md prototype, San Antonio only for now) —
+    // two plain LSC_STEEL posts (folded into heroMat like the rest of the
+    // static geometry) plus the textured, per-site readable panel on top,
+    // planted beside the entrance/gate (the office glazing + front fence
+    // line both sit at z≈24–25) so it faces the road like the rest of the
+    // hero.
+    let signMesh = null, signAt = null;
+    if (site.sign) {
+      // Posts stop at the panel's OWN bottom edge (anchor y 3.3 − half the
+      // 3.6-tall plane = 1.5) instead of running up behind it — they used to
+      // reach y=3.3, into the panel's 1.5–5.1 span, so from an angle the
+      // poles visually crossed the tagline line (Bruno caught this in-game).
+      const postGeo = merge([
+        tinted(new THREE.CylinderGeometry(0.14, 0.14, 1.5, 6).translate(9.2, 0.75, 26), LSC_STEEL),
+        tinted(new THREE.CylinderGeometry(0.14, 0.14, 1.5, 6).translate(12.8, 0.75, 26), LSC_STEEL),
+      ]);
+      const posts = new THREE.Mesh(postGeo, this.heroMat);
+      const signPanel = new THREE.Mesh(this.lscSignGeo, this.lscSignMats.get(site.name));
+      signPanel.position.set(...LSC_SIGN_ANCHOR);
+      signMesh = new THREE.Group();
+      signMesh.add(posts, signPanel);
+
+      // World position of the sign (same trig as spawn()/spawnHEB()'s toWorld,
+      // also scaled) — lscNear reads THIS, not the pad center, so proximity
+      // detection actually centers on the sign a player would be reading, not
+      // a point ~28 units inside the fence (hypot(11,26.1)≈28.3 from center,
+      // just past the pad-center radius this bug shipped at first).
+      signAt = [
+        x + LSC_SIGN_ANCHOR[0] * SCALE * Math.cos(heading) + LSC_SIGN_ANCHOR[2] * SCALE * Math.sin(heading),
+        z - LSC_SIGN_ANCHOR[0] * SCALE * Math.sin(heading) + LSC_SIGN_ANCHOR[2] * SCALE * Math.cos(heading),
+      ];
+    }
+
     // Global brand-size scale, same pattern as the other two brands — no
     // PointLight anchor to rescale here (the LSC night look is emissive-only,
     // position-independent).
     const building = new THREE.Group();
     building.add(staticMesh, vents, cooling, drums, pylons);
+    if (signMesh) building.add(signMesh);
     building.scale.setScalar(SCALE);
     group.add(building);
 
     this.scene.add(group);
-    this.live.set('lsc:' + site.name, { group, building, staticMesh, vents, cooling, drums, pylons, type: 'lsc' });
+    this.live.set('lsc:' + site.name, { group, building, staticMesh, vents, cooling, drums, pylons, signMesh, signAt, type: 'lsc' });
+  }
+
+  // nearest LSC site with a sign/plaque within range, or null (mirrors
+  // gameplay.landmarkNear's shape). DATACENTER_SIGN_SPEC.md. Reads `this.live`
+  // (not the hand-authored table) because it needs each site's actual SIGN
+  // world position — computed at spawn from heading + SCALE, same as signAt
+  // above — not the pad center a landmark-style table lookup would give.
+  lscNear(pos, range = 28) {
+    let best = null, bd = range * range;
+    for (const [key, rec] of this.live) {
+      if (rec.type !== 'lsc' || !rec.signAt) continue;
+      const d = (rec.signAt[0] - pos.x) ** 2 + (rec.signAt[1] - pos.z) ** 2;
+      if (d < bd) { bd = d; best = this.lscByName.get(key.slice(4)); }
+    }
+    return best;
   }
 
   despawn(name) {
@@ -727,6 +817,29 @@ function mkHEBSignTex() {
   ctx.fillStyle = '#f7f4ec'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = 'bold 84px system-ui, sans-serif';
   ctx.fillText('H-E-Buddy', c.width / 2, c.height / 2 + 4);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+// Lone Star Compute ID sign face (DATACENTER_SIGN_SPEC.md) — dark panel with
+// a thin cyan border and the brand name + per-site tagline in cyan, baked
+// into one canvas reused as BOTH the diffuse map (readable by day on
+// contrast alone) and the emissiveMap (only the cyan pixels glow at night —
+// see the constructor comment on why ventMat's idiom doesn't fit here).
+function mkLSCSignTex(tagline) {
+  const c = document.createElement('canvas');
+  c.width = 640; c.height = 256;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#12181c'; ctx.fillRect(0, 0, c.width, c.height);        // near-black panel
+  ctx.strokeStyle = '#35e0ff'; ctx.lineWidth = 6;
+  ctx.strokeRect(10, 10, c.width - 20, c.height - 20);                      // cyan border
+  ctx.fillStyle = '#e8fbff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = 'bold 56px system-ui, sans-serif';
+  ctx.fillText('LONE STAR COMPUTE', c.width / 2, c.height / 2 - 34);
+  ctx.fillStyle = '#35e0ff';
+  ctx.font = 'bold 34px system-ui, sans-serif';
+  ctx.fillText(tagline, c.width / 2, c.height / 2 + 34);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
   return tex;
