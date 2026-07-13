@@ -1,6 +1,34 @@
 # Lone Star Roam — next session kickoff
 
-No active priority track. Queued work lives in `BACKLOG.md`.
+## Session briefing
+- **This session**: Texas Brands track, wave 1 of 3 — build the
+  `src/brands.js` scaffold (`BrandSystem`: real-coord anchor tables,
+  `CitySystem`-style proximity spawn/despawn, `__game.brands` wiring,
+  shared prop-prototype pattern) + the **Bucky's** brand (Buc-ee's
+  parody): showpiece storefront + tall sign with a low-poly **beaver
+  mascot**, heli-tier instanced fuel canopy/pumps, and the highway
+  **approach billboards** (punny copy pool). Spec: `BRANDS_SPEC.md`
+  (locked 2026-07-12). Scenery only — no gameplay/save/mission changes.
+- **Recommended setup**: model **Opus 4.8**, effort **high** — wave 1 is
+  the most structural (new streaming system + `main.js` wiring) *and* the
+  beaver/canopy silhouette needs spatial care. Flag it if the running
+  model differs. (Sonnet 5 high is an acceptable cheaper alternative.)
+- **Budget**: code + `tools/checks/brands.mjs` checks, grep-first
+  (`MODULES.md` anchors; refs — `cities.js:7,33` streaming,
+  `rotors.js` `mk*Body` mesh idiom, `gameplay.js` landmark `LL()`
+  table). **One `t.shot`** of Bucky's for the silhouette read (the
+  visual-judgment exception) — no other shots. Counts: Bucky's ~15 real
+  sites (coords confirmed this wave). Signage stays unlit.
+- **Then**: rewrite this block for wave 2 (**H-E-Buddy** — red-band
+  storefront in the 33 largest cities + lot props).
+
+Gotchas carried over: `brands.js` may import only `geo.js` + `sky.js`
+(ATMOS night gate) to stay cycle-free — audio (wave 3 datacenter hum) is
+a constructor callback, not an import. Shared prop prototypes (beaver,
+pump, cart, pylon) built once, disposed never; only per-site groups get
+disposed on despawn. Placement must dodge `airportClear`/`onRunway`.
+
+No active priority track outside this. Queued work lives in `BACKLOG.md`.
 
 Gotchas for whoever touches `hud.js` next:
 - The road shield is now a CSS-3D chrome card: `this.shield` (constructor)
