@@ -79,6 +79,14 @@
   #travel .tabs button { background: #222a38; color: #cdd6e4; border: 1px solid rgba(255,255,255,.15);
     border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 1.3rem; }
   #travel .tabs button.active { background: #3d5a8a; color: #fff; }
+  #travel .poi-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  #travel .poi-toolbar #city-search { flex: 1; background: #1a2230; color: #e6ecf5;
+    border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 7px 12px; font-size: 1.3rem; }
+  #travel .poi-toolbar #city-search::placeholder { color: #7d8aa0; }
+  #travel .poi-toolbar .sort-btns { display: flex; gap: 6px; }
+  #travel .poi-toolbar .sort-btns button { background: #222a38; color: #cdd6e4;
+    border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 1.15rem; }
+  #travel .poi-toolbar .sort-btns button.active { background: #3d5a8a; color: #fff; }
   #travel .poi-list { overflow-y: auto; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-right: 4px; }
   #travel .poi-list button { background: #1a2230; color: #e6ecf5; border: 1px solid rgba(255,255,255,.1);
     border-radius: 8px; padding: 8px 12px; cursor: pointer; text-align: left; font-size: 1.3rem; }
@@ -145,6 +153,14 @@
     <button data-tab="Nature">🏞 Nature</button>
     <button data-tab="Icons">🌵 Texas Icons</button>
     <button data-tab="Folks">🤠 Folks</button>
+  </div>
+  <div class="poi-toolbar" style="display:none">
+    <input id="city-search" type="text" placeholder="Search cities…" autocomplete="off">
+    <div class="sort-btns">
+      <button data-sort="pop" class="active">Population</button>
+      <button data-sort="dist">Nearest</button>
+      <button data-sort="az">A–Z</button>
+    </div>
   </div>
   <div class="poi-list"></div>
   <div class="hint"></div>
