@@ -376,6 +376,40 @@ ship.
   pool-correct by city size), 40-chat flavored/generic mix, full
   named-line rotation, bystander variant bands. No SHOT blocks.
 
+- [x] ~~Texas Brands (waves 1–3)~~ — done 2026-07-12 (`BRANDS_SPEC.md`):
+  three beloved real Texas institutions as showpiece parody landmarks at
+  their real coordinates, `src/brands.js` `BrandSystem` — CitySystem-style
+  proximity streaming (`SPAWN_DIST` 700 over hand-authored tables; hero + a
+  merged static mesh + instanced heli-tier props per site; shared materials
+  and prototype geos in `this.shared`, disposed never). `groundYAt(x,z)`
+  (airport-pad idiom over rotated-rectangle footprints, read by
+  vehicle.js/npcs.js and wired into traffic.js via callback) rides every
+  site's foundation slab so nothing sinks through it. **Wave 1 — Bucky's**
+  (Buc-ee's): 15 real OSM coords, storefront + fuel canopy + sign pylon with
+  a greebled low-poly beaver, instanced pumps, approach billboards hugging
+  the nearest motorway/trunk, a readable "Bucky's" sign texture. **Wave 2 —
+  H-E-Buddy** (H-E-B): the 33 largest `GEO.cities`, each placed on a
+  city-edge road shoulder clear of the downtown footprint + airports
+  (seeded angle/radius search), big-box hero + red "H-E-Buddy" sign band +
+  instanced cart corrals/carts/light poles. Bucky's + H-E-Buddy night
+  lighting is **real persistent warm `PointLight`s** (repositioned to the
+  nearest live site, faded by `ATMOS.night`) — not emissive, because white
+  emissive can't keep a colored sign colored (re-decided in wave 1 after
+  playtest). **Wave 3 — Lone Star Compute** (AI datacenters): 8 real 2026
+  campus towns (Abilene's "Stargate", Amarillo's Fermi campus, San Antonio,
+  the Abilene–Sweetwater corridor, Corsicana/Temple/Red Oak/Denton), two
+  windowless ribbed-roof server sheds + office + fence + substation feeding
+  an instanced transmission-pylon line, instanced roof/side cooling banks +
+  condenser drums, and `audio.datacenterHum(dist)` (proximity hum wired via
+  `brands.onHum`). Its cold cooling-vent glow is the track's **one emissive
+  exception** (dark diffuse + saturated cold-blue emissive, night-gated — a
+  deliberate cold-vs-warm contrast with the warm store signage). All scenery
+  only: no gameplay, saves, or `seededRand` seed-string changes.
+  `tools/checks/brands.mjs` (21 checks): per-brand real-loop streaming
+  sentinels, showpiece poly floors, placement legality, slab grounding,
+  billboard road-hug, night lighting/glow toggles, and the hum falloff +
+  wiring sentinel. One SHOT per brand for the silhouette/glow read.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

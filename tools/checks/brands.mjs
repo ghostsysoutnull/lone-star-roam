@@ -323,4 +323,145 @@ export default async function brands(t) {
     }
     await t.setDay();
   });
+
+  // -------------------------------------------- Lone Star Compute (Wave 3)
+  // Abilene = the real "Stargate" flagship, first in LSC_SITES.
+  const lscAt = await t.ev(`({
+    x: (-99.88 + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100,
+    z: -(32.52 - 31) * 111320 / 100,
+  })`);
+
+  await t.check('LSC streaming sentinel: the real loop spawns/despawns Abilene, shared protos survive', async () => {
+    await t.tp(lscAt.x, lscAt.z + 3);
+    await t.until(`g.brands.live.has('lsc:Abilene')`, 8000);
+    const near = await t.ev(`(() => {
+      const r = g.brands.live.get('lsc:Abilene');
+      return { has: !!r, kids: r.group.children.length, type: r.type };
+    })()`);
+    t.ok(near.has && near.kids >= 4 && near.type === 'lsc', `spawn incomplete: ${JSON.stringify(near)}`);
+
+    const protoBefore = await t.ev(`({
+      cool: !!g.brands.coolingGeo.attributes, drum: !!g.brands.drumGeo.attributes, pylon: !!g.brands.pylonGeo.attributes,
+    })`);
+    t.ok(protoBefore.cool && protoBefore.drum && protoBefore.pylon, 'LSC prototypes missing before despawn');
+
+    await t.tp(lscAt.x + 1500, lscAt.z);
+    await t.until(`!g.brands.live.has('lsc:Abilene')`, 8000);
+    const after = await t.ev(`({
+      live: g.brands.live.has('lsc:Abilene'),
+      cool: !!(g.brands.coolingGeo.attributes && g.brands.coolingGeo.attributes.position),
+      drum: !!(g.brands.drumGeo.attributes && g.brands.drumGeo.attributes.position),
+      pylon: !!(g.brands.pylonGeo.attributes && g.brands.pylonGeo.attributes.position),
+    })`);
+    t.ok(!after.live, 'LSC site never despawned');
+    t.ok(after.cool && after.drum && after.pylon, `LSC shared prototype geometry was disposed: ${JSON.stringify(after)}`);
+  });
+
+  await t.check('LSC showpiece poly floor: the datacenter hero beats a heli-body baseline', async () => {
+    await t.tp(lscAt.x, lscAt.z + 3);
+    await t.until(`g.brands.live.has('lsc:Abilene')`, 8000);
+    const tris = await t.ev(`(() => {
+      const r = g.brands.live.get('lsc:Abilene');
+      const tri = (m) => m.geometry.index ? m.geometry.index.count / 3 : m.geometry.attributes.position.count / 3;
+      return tri(r.staticMesh);
+    })()`);
+    t.ok(tris > 400, `LSC hero not showpiece-tier: ${tris} tris`);
+  });
+
+  await t.check('LSC placement legality: no datacenter sits on an airport field', async () => {
+    const bad = await t.ev(`(() => {
+      const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100, -(lat - 31) * 111320 / 100];
+      const coords = [
+        ['Abilene',32.52,-99.88],['Corsicana',32.05,-96.50],['San Antonio',29.42,-98.65],
+        ['Sweetwater',32.47,-100.41],['Temple',31.08,-97.44],['Amarillo',35.30,-101.70],
+        ['Red Oak',32.52,-96.80],['Denton',33.24,-97.17],
+      ];
+      return coords.filter(([n, la, lo]) => { const [x, z] = LL(la, lo); return !g.airportClear(x, z); }).map((c) => c[0]);
+    })()`);
+    t.ok(bad.length === 0, `LSC sites on an airport: ${bad.join(', ')}`);
+  });
+
+  await t.check('LSC grounding: walking/driving over the lot rides the slab top, not raw terrain', async () => {
+    await t.tp(lscAt.x, lscAt.z + 3);
+    await t.until(`g.brands.live.has('lsc:Abilene')`, 8000);
+    const expect = await t.ev(`({ padTop: g.brandGroundYAt(${lscAt.x}, ${lscAt.z}), raw: g.hAt(${lscAt.x}, ${lscAt.z}) })`);
+    t.ok(expect.padTop !== null, "brandGroundYAt returned null standing on Lone Star Compute's own lot");
+    t.ok(expect.padTop > expect.raw + 0.3, `pad top barely clears raw terrain: ${JSON.stringify(expect)}`);
+
+    await t.ev(`(() => { g.player.setMode('WALK'); g.player.pos.set(${lscAt.x}, 50, ${lscAt.z}); })()`);
+    await t.simStep(0.3);
+    const walkY = await t.ev(`g.player.pos.y`);
+    t.near(walkY, expect.padTop, 0.05, `WALK sank through the lot to ${walkY}, expected ${expect.padTop}`);
+
+    await t.ev(`(() => { g.player.setMode('DRIVE'); g.player.pos.set(${lscAt.x}, 50, ${lscAt.z}); })()`);
+    await t.simStep(0.3);
+    const driveY = await t.ev(`g.player.pos.y`);
+    t.near(driveY, expect.padTop, 0.05, `DRIVE sank through the lot to ${driveY}, expected ${expect.padTop}`);
+  });
+
+  await t.check('datacenter hum: gain rises as distance shrinks, silent out of range (heliTarget pattern)', async () => {
+    const r = await t.ev(`(() => {
+      g.audio.datacenterHum(10); const gNear = g.audio.datacenterTarget;
+      g.audio.datacenterHum(150); const gFar = g.audio.datacenterTarget;
+      g.audio.datacenterHum(Infinity); const gNone = g.audio.datacenterTarget;
+      return { gNear, gFar, gNone };
+    })()`);
+    t.ok(r.gNear > r.gFar, `hum gain didn't fall off with distance (near ${r.gNear}, far ${r.gFar})`);
+    t.ok(r.gNear > 0, `near hum should be audible, got ${r.gNear}`);
+    t.ok(r.gNone === 0, `hum out of range should be silent, got ${r.gNone}`);
+  });
+
+  await t.check('datacenter hum wiring: the real loop drives the hum via brands.onHum → audio', async () => {
+    // real-loop sentinel — a missing/typo'd brands.onHum in main.js can't hide.
+    await t.tp(lscAt.x, lscAt.z + 3);
+    await t.until(`g.brands.live.has('lsc:Abilene')`, 8000);
+    await t.wait(0.4); // let the loop call onHum with the nearby site
+    const on = await t.ev(`({ wired: !!g.brands.onHum, target: g.audio.datacenterTarget })`);
+    t.ok(on.wired, 'brands.onHum never wired in main.js');
+    t.ok(on.target > 0, `hum never rose standing on a datacenter: ${on.target}`);
+
+    await t.tp(lscAt.x + 1500, lscAt.z);
+    await t.until(`!g.brands.live.has('lsc:Abilene')`, 8000);
+    await t.wait(0.4);
+    const off = await t.ev(`g.audio.datacenterTarget`);
+    t.near(off, 0, 0.001, `hum never faded after leaving every datacenter: ${off}`);
+  });
+
+  await t.check('LSC night glow: cold cooling vents are EMISSIVE (gated on night), ~0 by day', async () => {
+    await t.tp(lscAt.x, lscAt.z + 3);
+    await t.until(`g.brands.live.has('lsc:Abilene')`, 8000);
+
+    // the vents use the shared emissive material — NOT a PointLight
+    const wired = await t.ev(`(() => {
+      const r = g.brands.live.get('lsc:Abilene');
+      return { same: r.vents.material === g.brands.ventMat, emissive: !!r.vents.material.emissive };
+    })()`);
+    t.ok(wired.same && wired.emissive, `LSC vents not on the shared emissive material: ${JSON.stringify(wired)}`);
+
+    await t.setDay();
+    await t.wait(0.4);
+    const day = await t.ev(`g.brands.ventMat.emissiveIntensity`);
+    t.near(day, 0, 0.001, `cooling vents glow by day: ${day}`);
+
+    await t.setNight();
+    await t.wait(0.5);
+    const night = await t.ev(`g.brands.ventMat.emissiveIntensity`);
+    t.ok(night > 0.2, `cooling vents never lit at night: ${night}`);
+
+    if (process.env.SHOT) {
+      // stand back on the road side at night — the read is "does it glow COLD,
+      // not white?" (this track's recurring emissive trap)
+      await t.ev(`(() => {
+        const r = g.brands.live.get('lsc:Abilene'), h = r.group.rotation.y;
+        const fx = Math.sin(h), fz = Math.cos(h);
+        const vx = r.group.position.x + fx * 60, vz = r.group.position.z + fz * 60;
+        g.player.pos.set(vx, g.hAt(vx, vz) + 4, vz);
+        g.player.heading = Math.atan2(-(r.group.position.x - vx), -(r.group.position.z - vz));
+        g.player.speed = 0;
+      })()`);
+      await t.wait(0.5);
+      await t.shot('lonestar-compute-night');
+    }
+    await t.setDay();
+  });
 }

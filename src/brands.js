@@ -99,6 +99,39 @@ const HEB_SIGN_I = 18, HEB_SIGN_R = 30;
 // a safety net for the live airportClear check it can't rehearse offline.
 const HEB_COUNT = 33, HEB_MARGIN = 8, HEB_OFF = 24;
 
+// Lone Star Compute (AI-datacenter parody) — Wave 3. 8 real Texas datacenter
+// towns confirmed against 2026 news/OSM: Abilene ("Stargate", the Crusoe/
+// Oracle/OpenAI flagship), Amarillo (Fermi America's 11 GW campus), San Antonio
+// (Streams SA), the Abilene–Sweetwater corridor, plus Corsicana/Temple/Red Oak/
+// Denton along the SA→Dallas + DFW build-out. Coords sit on each town's
+// OUTSKIRTS (where the campuses actually are). Temple & Denton also carry a
+// Bucky's, so their LSC coords are pulled ≥80 units off the same-town Bucky's
+// (both spawn inside SPAWN_DIST at once — no interpenetration).
+const LSC_SITES = [
+  { name: 'Abilene', at: LL(32.52, -99.88) },      // the real "Stargate" (Crusoe/Oracle/OpenAI)
+  { name: 'Corsicana', at: LL(32.05, -96.50) },
+  { name: 'San Antonio', at: LL(29.42, -98.65) },  // Streams San Antonio, west side
+  { name: 'Sweetwater', at: LL(32.47, -100.41) },  // Abilene–Sweetwater corridor
+  { name: 'Temple', at: LL(31.08, -97.44) },        // ≥80u off Temple's Bucky's
+  { name: 'Amarillo', at: LL(35.30, -101.70) },     // Fermi America 11 GW campus
+  { name: 'Red Oak', at: LL(32.52, -96.80) },
+  { name: 'Denton', at: LL(33.24, -97.17) },        // ≥80u off Denton's Bucky's
+];
+
+// Lone Star Compute palette — cold industrial: gunmetal sheds, pale concrete,
+// galvanized steel. The cooling-vent glow is the ONE emissive exception in this
+// track (a deliberate COLD cast vs. the warm Bucky's/H-E-Buddy signage LIGHTS).
+// It works where the yellow-sign emissive failed because the vents' diffuse is
+// DARK (0x2a3540) — emissive can't wash a dark surface toward white — and the
+// glow colour is a saturated cold blue at a modest airport-sign intensity
+// (emissiveIntensity, NOT the 16–30 of the warm PointLights).
+const LSC_SHED = 0x6b7178, LSC_ROOF = 0x565b61, LSC_OFFICE = 0xb9bec4;
+const LSC_CONCRETE = 0x9c968a, LSC_STEEL = 0x8a9099, LSC_FENCE = 0x707880;
+const LSC_XFMR = 0x8f959c, LSC_DRUM = 0xcfd3d7, LSC_VENT_DIFF = 0x2a3540;
+const VENT_GLOW = 0x6fb0ff;    // saturated cold blue — reads cold, not white
+const VENT_I = 0.7;            // emissive magnitude (airport-sign tier, gated by night)
+const HUM_RANGE = 220;         // datacenter hum audible radius (bigger footprint than a heli)
+
 export class BrandSystem {
   constructor(scene, { onHum } = {}) {
     this.scene = scene;
@@ -141,9 +174,20 @@ export class BrandSystem {
     // punny billboards, so there's no need for a mat-per-copy pool).
     this.hebSignGeo = new THREE.PlaneGeometry(11.5, 2.6);
     this.hebSignMat = new THREE.MeshLambertMaterial({ map: mkHEBSignTex(), side: THREE.DoubleSide });
+    // Lone Star Compute prototypes (instanced per site) — roof/side cooling-fan
+    // unit, rooftop condenser drum, lattice transmission pylon.
+    this.coolingGeo = mkCoolingFan();
+    this.drumGeo = mkCondenserDrum();
+    this.pylonGeo = mkPylon();
+    // The cold cooling-vent glow — one SHARED emissive material toggled by night
+    // in update() (airport-beacon idiom; the vent MESHES are per-site so they
+    // dispose on despawn, but this material is shared and never disposed). Dark
+    // diffuse + saturated cold emissive so it reads cold, not white.
+    this.ventMat = new THREE.MeshLambertMaterial({ color: LSC_VENT_DIFF, emissive: VENT_GLOW, emissiveIntensity: 0, flatShading: true });
     this.shared = new Set([
       this.pumpGeo, this.billboardGeo, this.panelGeo, this.buckySignGeo,
       this.corralGeo, this.cartGeo, this.poleGeo, this.hebSignGeo,
+      this.coolingGeo, this.drumGeo, this.pylonGeo,
     ]);
 
     // One canvas-texture material per copy string, built once (airports.js
@@ -164,11 +208,15 @@ export class BrandSystem {
     // pools) and fade by ATMOS.night (read internally, airports.js pattern).
     // Runs every frame (before the spawn throttle) so lights track smoothly.
     const nf = ATMOS.night > NIGHT_ON ? ATMOS.night : 0;
-    let nearB = null, bestB = Infinity, nearH = null, bestH = Infinity;
+    let nearB = null, bestB = Infinity, nearH = null, bestH = Infinity, bestL = Infinity;
     for (const rec of this.live.values()) {
       if (rec.type === 'heb') {
         const d = (rec.lightAt.sign[0] - px) ** 2 + (rec.lightAt.sign[2] - pz) ** 2;
         if (d < bestH) { bestH = d; nearH = rec; }
+      } else if (rec.type === 'lsc') {
+        // no PointLight — datacenter glow is emissive; track distance for the hum
+        const d = (rec.group.position.x - px) ** 2 + (rec.group.position.z - pz) ** 2;
+        if (d < bestL) bestL = d;
       } else {
         const d = (rec.lightAt.canopy[0] - px) ** 2 + (rec.lightAt.canopy[2] - pz) ** 2;
         if (d < bestB) { bestB = d; nearB = rec; }
@@ -190,6 +238,13 @@ export class BrandSystem {
       this.hebSignLight.intensity = 0;
     }
 
+    // Lone Star Compute — the ONE emissive night glow (cold cooling vents),
+    // gated on night like the airport beacons, and the proximity hum via the
+    // onHum callback (main.js → audio.datacenterHum). Both every frame, like the
+    // signage lights above; onHum(Infinity) when no site is live so the hum fades.
+    this.ventMat.emissiveIntensity = nf * VENT_I;
+    if (this.onHum) this.onHum(bestL === Infinity ? Infinity : Math.sqrt(bestL));
+
     this.acc += dt;
     if (this.acc < 0.25 && dt) return; // ~4 Hz is plenty for 700-unit spawn rings
     this.acc = 0;
@@ -208,6 +263,16 @@ export class BrandSystem {
       const d = Math.hypot(site.x - px, site.z - pz);
       const has = this.live.has(key);
       if (d < SPAWN_DIST && !has) this.spawnHEB(site);
+      else if (d > SPAWN_DIST * 1.25 && has) this.despawn(key);
+    }
+
+    // Lone Star Compute — keyed 'lsc:<name>' (Denton/Temple collide with the
+    // Bucky's + H-E-Buddy tables otherwise).
+    for (const site of LSC_SITES) {
+      const key = 'lsc:' + site.name;
+      const d = Math.hypot(site.at[0] - px, site.at[1] - pz);
+      const has = this.live.has(key);
+      if (d < SPAWN_DIST && !has) this.spawnLSC(site);
       else if (d > SPAWN_DIST * 1.25 && has) this.despawn(key);
     }
   }
@@ -358,6 +423,52 @@ export class BrandSystem {
     this.live.set('heb:' + site.name, { group, staticMesh, corrals, carts, poles, signPanel, lightAt, type: 'heb' });
   }
 
+  // Lone Star Compute site: two windowless server sheds + office + fence +
+  // substation (static hero) with instanced cooling banks / condenser drums /
+  // transmission pylons, plus the cold EMISSIVE cooling-vent mesh (shared
+  // ventMat, toggled by night in update()). Same pad/skirt/heading pattern as
+  // spawn()/spawnHEB(). No PointLight — this brand's night look is emissive.
+  spawnLSC(site) {
+    const [x, z] = site.at;
+    const group = new THREE.Group();
+
+    const road = nearestRoad(x, z, 120, (t) => t === 'motorway' || t === 'trunk' || t === 'primary') || nearestRoad(x, z, 200);
+    const heading = road ? Math.atan2(road.x - x, road.z - z) : 0;
+
+    const fp = footprintRange(x, z);
+    const padY = fp.max;
+    const skirt = Math.min(8, padY - fp.min + 0.4);
+    group.position.set(x, padY, z);
+    group.rotation.y = heading;
+
+    const hero = buildLoneStarHero(skirt);
+    const staticMesh = new THREE.Mesh(hero.staticGeo, this.heroMat);
+    group.add(staticMesh);
+
+    // cold cooling-vent glow — own mesh, SHARED emissive material (per-site geo
+    // disposes on despawn; the material is shared and toggled by night).
+    const vents = new THREE.Mesh(hero.ventGeo, this.ventMat);
+    group.add(vents);
+
+    const cooling = new THREE.InstancedMesh(this.coolingGeo, this.propMat, hero.coolingXforms.length);
+    hero.coolingXforms.forEach((m, i) => cooling.setMatrixAt(i, m));
+    cooling.instanceMatrix.needsUpdate = true;
+    group.add(cooling);
+
+    const drums = new THREE.InstancedMesh(this.drumGeo, this.propMat, hero.drumXforms.length);
+    hero.drumXforms.forEach((m, i) => drums.setMatrixAt(i, m));
+    drums.instanceMatrix.needsUpdate = true;
+    group.add(drums);
+
+    const pylons = new THREE.InstancedMesh(this.pylonGeo, this.propMat, hero.pylonXforms.length);
+    hero.pylonXforms.forEach((m, i) => pylons.setMatrixAt(i, m));
+    pylons.instanceMatrix.needsUpdate = true;
+    group.add(pylons);
+
+    this.scene.add(group);
+    this.live.set('lsc:' + site.name, { group, staticMesh, vents, cooling, drums, pylons, type: 'lsc' });
+  }
+
   despawn(name) {
     const rec = this.live.get(name);
     this.scene.remove(rec.group);
@@ -402,6 +513,7 @@ function footprintRange(x, z, r = 20) {
 // its geometry live too — this query doesn't need to consult `this.live`.
 const BUCKY_FOOT = { hx: 17, z0: -14.5, z1: 20.5 };   // matches buildBuckyHero's slab (34 wide, 35 deep @ z=3)
 const HEB_FOOT = { hx: 22, z0: -14, z1: 12 };          // matches buildHEBHero's slab (44 wide, 26 deep @ z=-1)
+const LSC_FOOT = { hx: 24, z0: -15, z1: 25 };          // matches buildLoneStarHero's slab (48 wide, 40 deep @ z=5)
 const PAD_TOP = 0.42;  // slab's local top surface (both hero builders: -skirt/2+0.2 + (skirt+0.4)/2 = 0.4) + a hair of clearance
 
 let hebSitesCache = null;
@@ -434,6 +546,17 @@ function hebFootprints() {
   return hebFootCache;
 }
 
+let lscFootCache = null;
+function lscFootprints() {
+  if (!lscFootCache) lscFootCache = LSC_SITES.map((site) => {
+    const [x, z] = site.at;
+    // MUST mirror spawnLSC's road query exactly so padY/heading match the slab.
+    const road = nearestRoad(x, z, 120, (t) => t === 'motorway' || t === 'trunk' || t === 'primary') || nearestRoad(x, z, 200);
+    return siteFootprint(x, z, road);
+  });
+  return lscFootCache;
+}
+
 // world (x,z) -> the pad's flat top height if inside this site's rotated
 // rectangular footprint, else null. Inverse of the toWorld() transform used
 // at spawn time (world = site + R(heading)·local), solved for local.
@@ -455,6 +578,10 @@ export function groundYAt(x, z) {
   }
   for (const site of hebFootprints()) {
     const y = footAt(x, z, site, HEB_FOOT);
+    if (y !== null) return y;
+  }
+  for (const site of lscFootprints()) {
+    const y = footAt(x, z, site, LSC_FOOT);
     if (y !== null) return y;
   }
   return null;
@@ -758,4 +885,140 @@ function buildHEBHero(skirt = 0.4) {
     s.push(tinted(new THREE.BoxGeometry(2.6, 3.0, 0.25).translate(dx, 1.5, -12.05), HEB_DOCK)); // roll-up doors
 
   return { staticGeo: merge(s) };
+}
+
+// ------------------------------------------------------ Lone Star Compute (W3)
+// Shared roof/side cooling-fan unit prototype — a boxy housing with a shroud
+// ring + a thin blade cross. Instanced across both shed roofs.
+function mkCoolingFan() {
+  return merge([
+    tinted(new THREE.BoxGeometry(3.2, 1.0, 3.2).translate(0, 0.5, 0), 0x555b62),               // housing
+    tinted(new THREE.CylinderGeometry(1.4, 1.4, 0.2, 12).translate(0, 1.05, 0), 0x3a3f45),     // fan shroud ring
+    tinted(new THREE.BoxGeometry(2.4, 0.08, 0.3).translate(0, 1.12, 0), 0x6a7078),             // blade cross
+    tinted(new THREE.BoxGeometry(0.3, 0.08, 2.4).translate(0, 1.12, 0), 0x6a7078),
+  ]);
+}
+
+// Shared rooftop condenser-drum prototype — a vertical galvanized cylinder with
+// rims + a pipe riser greeble. Instanced along each shed roof.
+function mkCondenserDrum() {
+  return merge([
+    tinted(new THREE.CylinderGeometry(1.1, 1.1, 3.2, 10).translate(0, 1.6, 0), LSC_DRUM),      // drum body
+    tinted(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 10).translate(0, 3.1, 0), 0x9aa0a6),      // top rim
+    tinted(new THREE.CylinderGeometry(1.2, 1.2, 0.3, 10).translate(0, 0.2, 0), 0x9aa0a6),      // base rim
+    tinted(new THREE.BoxGeometry(0.2, 3.2, 0.2).translate(1.05, 1.6, 0), LSC_STEEL),           // pipe riser
+  ]);
+}
+
+// Shared lattice transmission-pylon prototype — four parallel legs, lacing
+// rings at intervals, two crossarms (spanning z) near the top carrying the
+// conductor lines. Instanced along the line marching out from the substation.
+function mkPylon() {
+  const p = [];
+  const H = 13;
+  for (const [lx, lz] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]]) // legs
+    p.push(tinted(new THREE.CylinderGeometry(0.09, 0.11, H, 4).translate(lx, H / 2, lz), LSC_STEEL));
+  for (const ly of [3, 6, 9]) { // horizontal lacing rings
+    p.push(tinted(new THREE.BoxGeometry(1.1, 0.08, 0.08).translate(0, ly, 0.5), LSC_STEEL));
+    p.push(tinted(new THREE.BoxGeometry(1.1, 0.08, 0.08).translate(0, ly, -0.5), LSC_STEEL));
+    p.push(tinted(new THREE.BoxGeometry(0.08, 0.08, 1.1).translate(0.5, ly, 0), LSC_STEEL));
+    p.push(tinted(new THREE.BoxGeometry(0.08, 0.08, 1.1).translate(-0.5, ly, 0), LSC_STEEL));
+  }
+  for (const ay of [10.5, 12]) // crossarms carry the wires (span z)
+    p.push(tinted(new THREE.BoxGeometry(0.4, 0.18, 6.5).translate(0, ay, 0), LSC_STEEL));
+  return merge(p);
+}
+
+// Lone Star Compute hero — two long windowless server sheds with a ribbed
+// (corrugated) roofline, a small office/entry block, a security-fence
+// perimeter, and a back-corner substation (transformers + bushings + gantry)
+// feeding a line of transmission pylons + a sagging-wire hint marching off the
+// lot. One static merged mesh (the pylons/cooling/drums are instanced, the cold
+// cooling vents are a separate emissive mesh). Local frame like the others: pad
+// center origin, ground y=0, +z toward the road. Datacenters sit on flat graded
+// pads, so the pylon line stays on the lot plane (y=0) — keeps the wire hint a
+// clean horizontal. Slab dims are mirrored EXACTLY by LSC_FOOT (grounding).
+function buildLoneStarHero(skirt = 0.4) {
+  const s = [];       // static merged mesh
+  const vents = [];   // cold EMISSIVE cooling-vent louvers (own mesh/material)
+
+  // --- foundation slab (airport-skirt idiom): 48 wide × 40 deep @ z=5 ---
+  s.push(tinted(new THREE.BoxGeometry(48, skirt + 0.4, 40).translate(0, -skirt / 2 + 0.2, 5), LSC_CONCRETE));
+
+  // --- two long windowless server sheds with a ribbed roofline ---
+  for (const bx of [-13, 13]) {
+    s.push(tinted(new THREE.BoxGeometry(18, 6.5, 30).translate(bx, 3.25, 4), LSC_SHED));         // shed body
+    s.push(tinted(new THREE.BoxGeometry(18.6, 0.5, 30.6).translate(bx, 6.6, 4), LSC_ROOF));      // roof cap
+    for (let rz = -10; rz <= 18; rz += 2)                                                        // corrugated ribs
+      s.push(tinted(new THREE.BoxGeometry(18, 0.35, 0.5).translate(bx, 6.95, rz), LSC_STEEL));
+    // dark outer-wall louver band (the emissive vent strip sits just proud of it)
+    s.push(tinted(new THREE.BoxGeometry(0.4, 2.0, 26).translate(bx + (bx < 0 ? -9.05 : 9.05), 3.0, 4), 0x3a4048));
+  }
+
+  // --- cold cooling-vent glow (EMISSIVE): one long outer-wall louver per shed
+  // + a few roof intake grilles. Dark diffuse (LSC_VENT_DIFF) under a saturated
+  // cold emissive so it reads cold, not blown-out white. ---
+  // tinted() only to satisfy merge()'s color-attribute requirement — ventMat
+  // drives the actual (dark) diffuse; the emissive is what reads at night.
+  for (const bx of [-13, 13]) {
+    vents.push(tinted(new THREE.BoxGeometry(0.3, 1.5, 24).translate(bx + (bx < 0 ? -9.25 : 9.25), 3.0, 4), LSC_VENT_DIFF));
+    for (const vz of [-6, 4, 14])
+      vents.push(tinted(new THREE.BoxGeometry(6, 0.25, 2.5).translate(bx, 6.86, vz), LSC_VENT_DIFF));
+  }
+
+  // --- small office / entry block at the road-facing front ---
+  s.push(tinted(new THREE.BoxGeometry(14, 5, 6).translate(0, 2.5, 22), LSC_OFFICE));
+  s.push(tinted(new THREE.BoxGeometry(14.4, 0.5, 6.4).translate(0, 5.0, 22), 0xdedad0));         // office roof cap
+  s.push(tinted(new THREE.BoxGeometry(11, 2.4, 0.3).translate(0, 2.4, 25.05), GLASS));           // entry glazing
+  for (let i = -4; i <= 4; i++)
+    s.push(tinted(new THREE.BoxGeometry(0.3, 2.6, 0.34).translate(i * 1.2, 2.4, 25.06), 0x6a6660));
+
+  // --- perimeter security-fence posts ---
+  const fx = 23, fz0 = -14, fz1 = 24;
+  for (let pz = fz0; pz <= fz1; pz += 4) for (const px of [-fx, fx])
+    s.push(tinted(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 5).translate(px, 1.1, pz), LSC_FENCE));
+  for (let px = -fx + 4; px < fx; px += 4) for (const pz of [fz0, fz1])
+    s.push(tinted(new THREE.CylinderGeometry(0.12, 0.12, 2.2, 5).translate(px, 1.1, pz), LSC_FENCE));
+
+  // --- substation (greebled transformers + bushings + gantry) at the back-right,
+  // on-slab so the "enormous power draw" story reads up close ---
+  const subX = 18, subZ = -9;
+  for (const dx of [-3, 0, 3]) {
+    s.push(tinted(new THREE.BoxGeometry(2.4, 3.0, 2.4).translate(subX + dx, 1.5, subZ), LSC_XFMR));   // tank
+    s.push(tinted(new THREE.BoxGeometry(2.6, 0.4, 2.6).translate(subX + dx, 3.1, subZ), 0x6a6f76));    // lid
+    for (const bo of [-0.6, 0.6])                                                                       // bushings
+      s.push(tinted(new THREE.CylinderGeometry(0.16, 0.22, 1.2, 6).translate(subX + dx + bo, 3.7, subZ), LSC_DRUM));
+  }
+  s.push(tinted(new THREE.BoxGeometry(9, 0.3, 0.3).translate(subX, 5.2, subZ - 1.6), LSC_STEEL));       // gantry beam
+  for (const gx of [subX - 4, subX + 4])
+    s.push(tinted(new THREE.BoxGeometry(0.3, 5.2, 0.3).translate(gx, 2.6, subZ - 1.6), LSC_STEEL));     // gantry posts
+
+  // --- cooling banks (instanced fan units) in rows on each shed roof ---
+  const coolingXforms = [], m4 = new THREE.Matrix4();
+  for (const bx of [-13, 13]) for (let cz = -8; cz <= 16; cz += 4) for (const cx of [bx - 4, bx + 4])
+    coolingXforms.push(m4.clone().makeTranslation(cx, 6.9, cz));
+
+  // --- rooftop condenser drums (instanced) ---
+  const drumXforms = [];
+  for (const bx of [-13, 13]) for (const dz of [-9, 0, 12])
+    drumXforms.push(m4.clone().makeTranslation(bx, 7.4, dz));
+
+  // --- transmission pylons marching out from the substation (instanced) + a
+  // sagging-wire hint (thin conductor boxes between consecutive crossarm ends,
+  // with a dip box at midspan). Kept on the lot plane (y=0). ---
+  const pylonXforms = [], pxs = [];
+  for (let px = 27; px <= 67; px += 10) pxs.push(px);
+  for (const px of pxs) pylonXforms.push(m4.clone().makeTranslation(px, 0, subZ));
+  for (let i = 0; i + 1 < pxs.length; i++) {
+    const x0 = pxs[i], x1 = pxs[i + 1], mx = (x0 + x1) / 2, span = x1 - x0;
+    for (const wz of [-3, 3]) for (const wy of [10.5, 12]) {
+      s.push(tinted(new THREE.BoxGeometry(span, 0.07, 0.07).translate(mx, wy, subZ + wz), 0x2a2e33));
+      s.push(tinted(new THREE.BoxGeometry(span * 0.45, 0.07, 0.07).translate(mx, wy - 0.5, subZ + wz), 0x2a2e33)); // midspan sag
+    }
+  }
+  // stub conductors from the substation gantry to the first pylon
+  for (const wz of [-3, 3]) for (const wy of [10.5, 12])
+    s.push(tinted(new THREE.BoxGeometry(27 - subX, 0.07, 0.07).translate((subX + 27) / 2, wy, subZ + wz), 0x2a2e33));
+
+  return { staticGeo: merge(s), ventGeo: merge(vents), coolingXforms, drumXforms, pylonXforms };
 }

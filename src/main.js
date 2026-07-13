@@ -91,6 +91,7 @@ async function boot() {
   const missions = new MissionSystem(scene, gameplay, player, (m) => hud.toast(m), (k) => audio.chime(k));
   const dog = new DogSystem(scene, player);
   dog.onBark = () => audio.bark();
+  brands.onHum = (d) => audio.datacenterHum(d); // Lone Star Compute proximity hum (audio built at line 70)
   applyGear(gameplay.save, player, dog); // saved shop upgrades take effect at boot
   const travel = new TravelMenu(player, gameplay, sky, npcs, missions, dog, (m) => hud.toast(m), (k) => audio.chime(k));
   const trains = new TrainSystem(scene);

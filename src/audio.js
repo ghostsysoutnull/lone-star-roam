@@ -82,6 +82,19 @@ export class AudioSystem {
     heliLfo.connect(heliDepth).connect(heliChop.gain);
     heliLfo.start();
 
+    // --- datacenter hum: a low-frequency filtered-noise bed + a faint
+    // transformer whine, gain fades by distance (mirrors the heli bed). ---
+    this.datacenterGain = chan();
+    this.datacenterTarget = 0; // last commanded gain target (verify reads this, not the ramping param)
+    noiseSrc('lowpass', 90, 0.7).connect(this.datacenterGain);
+    const dcWhine = ctx.createOscillator();
+    dcWhine.type = 'sawtooth';
+    dcWhine.frequency.value = 60; // mains-frequency transformer whine
+    const dcWhineGain = ctx.createGain();
+    dcWhineGain.gain.value = 0.14;
+    dcWhine.connect(dcWhineGain).connect(this.datacenterGain);
+    dcWhine.start();
+
     // --- crickets: pulsed high tone at night ---
     this.cricketGain = chan();
     const cricket = ctx.createOscillator();
@@ -172,6 +185,14 @@ export class AudioSystem {
     this.heliTarget = Math.max(0, 0.05 * (1 - dist / 140));
     if (!this.ctx || this.muted) return;
     this.heliGain.gain.setTargetAtTime(this.heliTarget, this.ctx.currentTime, 0.25);
+  }
+
+  // datacenter ambience: nearest live Lone Star Compute distance -> gain, faded
+  // like heli(). Called every frame via brands.onHum (main.js wires it).
+  datacenterHum(dist = Infinity) {
+    this.datacenterTarget = Math.max(0, 0.04 * (1 - dist / 220));
+    if (!this.ctx || this.muted) return;
+    this.datacenterGain.gain.setTargetAtTime(this.datacenterTarget, this.ctx.currentTime, 0.3);
   }
 
   // one-shot helpers ---------------------------------------------------------
