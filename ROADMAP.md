@@ -410,6 +410,27 @@ ship.
   billboard road-hug, night lighting/glow toggles, and the hum falloff +
   wiring sentinel. One SHOT per brand for the silhouette/glow read.
 
+- [x] ~~Special friends: Sky, Maggy & Chowns~~ — done 2026-07-13: named animal
+  companions, explicitly not lumped with `animals.js` wildlife or gear-gated
+  like `dog.js`'s Lacy — each gets its own module. `src/springer.js`
+  `SpringerSystem`: Sky, an English Springer Spaniel living around Cedar
+  Park, more detailed box-primitive geometry than any existing dog (~18
+  primitives vs Lacy's 11); notices and walks toward the player in any mode,
+  settles into a happy tail-wag/bark once close, pats via the E key.
+  `src/rabbits.js` `RabbitSystem`: Maggy & Chowns, a pair living around
+  Georgetown, sized a little larger than the common wild jackrabbit; they
+  only notice the player in WALK mode (a passing truck is ignored, no flee
+  behavior) and frolic in a small orbit near them rather than settling
+  still. Both are leashed to a 3 km radius of their city's real center
+  (`ROAM_R`, clamped-target-then-approach idiom, replicated per module
+  rather than shared — the trigger and near-player behavior differ enough
+  per instance) — deliberately no discoverability marker (unlike the 12
+  bespoke NPCs' floating cone): the fix for "couldn't find them" was
+  shrinking the leash to hug the town center, not adding a beacon.
+  `tools/checks/springer.mjs` (6 checks) / `tools/checks/rabbits.mjs`
+  (7 checks): leash-never-exceeded, approach/frolic gating, fence-line
+  clamp, real-loop sentinels. No SHOT blocks.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin
