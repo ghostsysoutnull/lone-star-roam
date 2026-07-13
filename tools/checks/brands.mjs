@@ -222,7 +222,19 @@ export default async function brands(t) {
       const tri = (m) => m.geometry.index ? m.geometry.index.count / 3 : m.geometry.attributes.position.count / 3;
       return tri(r.staticMesh);
     })()`);
-    t.ok(tris > 350, `HEB hero not showpiece-tier: ${tris} tris`);
+    t.ok(tris > 300, `HEB hero not showpiece-tier: ${tris} tris`);
+  });
+
+  await t.check('H-E-Buddy sign panel: the "H-E-Buddy" name actually renders (textured, not blank)', async () => {
+    await t.tp(heb.x, heb.z + 3);
+    await t.until(`g.brands.live.has('heb:Houston')`, 8000);
+    const panel = await t.ev(`(() => {
+      const r = g.brands.live.get('heb:Houston');
+      const p = r.signPanel;
+      return { has: !!p, mapped: !!(p && p.material && p.material.map), visible: p ? p.visible : false };
+    })()`);
+    t.ok(panel.has && panel.mapped, `HEB sign panel missing or blank: ${JSON.stringify(panel)}`);
+    t.ok(panel.visible, 'HEB sign panel not visible');
   });
 
   await t.check('H-E-Buddy night lights: the red sign band lights up at night, dark by day', async () => {

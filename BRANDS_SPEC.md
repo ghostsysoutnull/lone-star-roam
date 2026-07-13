@@ -118,15 +118,19 @@ exposed on `window.__game.brands` at birth.
   underside of the fuel canopy (soffit) glow warm-white — the signature
   "visible from the interstate" look. Emissive-only, no light rig.
 
-### H-E-Buddy (H-E-B) — Wave 2
+### H-E-Buddy (H-E-B) — Wave 2 — shipped 2026-07-12
 - **Hero**: a big-box storefront (wide showpiece box with a raised
-  entry parapet), the **red "H-E-Buddy" sign band** across the front
-  (tinted box lettering block — no texture, reads by color + proportion),
-  a curved entry canopy.
+  entry parapet), the **red "H-E-Buddy" sign band** across the front —
+  a red backer frame (baked into the merged geometry) carrying the
+  readable name as a canvas-texture panel (added post-ship, at Bruno's
+  request — the original "reads by color + proportion, no texture" plan
+  didn't actually name the store), a curved entry canopy.
 - **Props (heli-tier, instanced)**: parking-lot cart corrals, a row of
   carts (instanced), lot light poles, a loading dock on the back.
-- **Night glow** (emissive, `ATMOS.night`): the red sign band glows —
-  the recognizer in the dark. Emissive-only, no light rig.
+- **Night glow**: a real persistent `PointLight` (`hebSignLight`, part of
+  the same pool as Bucky's `canopyLight`/`signLight`) illuminates the sign
+  band, gated on `ATMOS.night` — not emissive (see the wave-1 re-decision
+  above; this spec previously said emissive for H-E-Buddy, superseded).
 - Placed on a city-edge road shoulder (33 largest cities), disposed with
   distance like the hero.
 

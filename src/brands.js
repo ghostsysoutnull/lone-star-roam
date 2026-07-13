@@ -126,9 +126,14 @@ export class BrandSystem {
     this.corralGeo = mkCartCorral();
     this.cartGeo = mkCart();
     this.poleGeo = mkLightPole();
+    // H-E-Buddy's sign panel — one shared plane + one shared canvas-texture
+    // material (the name is identical at every site, unlike Bucky's per-site
+    // punny billboards, so there's no need for a mat-per-copy pool).
+    this.hebSignGeo = new THREE.PlaneGeometry(11.5, 2.6);
+    this.hebSignMat = new THREE.MeshLambertMaterial({ map: mkHEBSignTex(), side: THREE.DoubleSide });
     this.shared = new Set([
       this.pumpGeo, this.billboardGeo, this.panelGeo,
-      this.corralGeo, this.cartGeo, this.poleGeo,
+      this.corralGeo, this.cartGeo, this.poleGeo, this.hebSignGeo,
     ]);
 
     // One canvas-texture material per copy string, built once (airports.js
@@ -310,6 +315,12 @@ export class BrandSystem {
     ];
     const lightAt = { sign: toWorld(HEB_SIGN_ANCHOR) };
 
+    // Sign panel: the readable "H-E-Buddy" name, mounted just proud of the
+    // red backer baked into staticGeo (a hair further in z to avoid z-fighting).
+    const signPanel = new THREE.Mesh(this.hebSignGeo, this.hebSignMat);
+    signPanel.position.set(HEB_SIGN_ANCHOR[0], HEB_SIGN_ANCHOR[1], HEB_SIGN_ANCHOR[2] + 0.1);
+    group.add(signPanel);
+
     const lot = buildHEBLot(rand);
     const corrals = new THREE.InstancedMesh(this.corralGeo, this.propMat, lot.corralXforms.length);
     lot.corralXforms.forEach((m, i) => corrals.setMatrixAt(i, m));
@@ -327,7 +338,7 @@ export class BrandSystem {
     group.add(poles);
 
     this.scene.add(group);
-    this.live.set('heb:' + site.name, { group, staticMesh, corrals, carts, poles, lightAt, type: 'heb' });
+    this.live.set('heb:' + site.name, { group, staticMesh, corrals, carts, poles, signPanel, lightAt, type: 'heb' });
   }
 
   despawn(name) {
@@ -402,6 +413,24 @@ function mkSignTex(text) {
     ctx.font = `bold ${ln.length > 12 ? 40 : 52}px system-ui, sans-serif`;
     ctx.fillText(ln, c.width / 2, y0 + i * lh);
   });
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  return tex;
+}
+
+// H-E-Buddy's sign face — the readable name, identical at every site (unlike
+// Bucky's per-site punny copy), so this is built ONCE in the constructor and
+// shared across all 33 sites via a single material.
+function mkHEBSignTex() {
+  const c = document.createElement('canvas');
+  c.width = 640; c.height = 144;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#c0272d'; ctx.fillRect(0, 0, c.width, c.height);        // H-E-B red
+  ctx.strokeStyle = '#f0ece0'; ctx.lineWidth = 10;
+  ctx.strokeRect(6, 6, c.width - 12, c.height - 12);                        // cream border
+  ctx.fillStyle = '#f7f4ec'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = 'bold 84px system-ui, sans-serif';
+  ctx.fillText('H-E-Buddy', c.width / 2, c.height / 2 + 4);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
   return tex;
@@ -571,10 +600,11 @@ function buildHEBLot(rand) {
 }
 
 // H-E-Buddy hero — big-box storefront with a raised entry parapet carrying
-// the red "H-E-Buddy" sign band (color/proportion only, no texture: a red
-// backer + three pale blocks in an H/E/B width cadence + a slim subtitle
-// strip), a curved quarter-round entry canopy, and a back loading dock.
-// Local frame matches Bucky's: pad center origin, +z toward the road.
+// the red "H-E-Buddy" sign band (a red backer frame baked into the merged
+// static geo, with the readable name itself a canvas-texture panel mounted
+// in spawnHEB — see hebSignGeo/hebSignMat), a curved quarter-round entry
+// canopy, and a back loading dock. Local frame matches Bucky's: pad center
+// origin, +z toward the road.
 function buildHEBHero(skirt = 0.4) {
   const s = [];
 
@@ -593,13 +623,9 @@ function buildHEBHero(skirt = 0.4) {
   s.push(tinted(new THREE.BoxGeometry(16, 3.0, 1.6).translate(0, 10.0, 8.4), HEB_WALL));
   s.push(tinted(new THREE.BoxGeometry(16.4, 0.4, 1.8).translate(0, 11.7, 8.4), HEB_RED));    // parapet cap (lit at night)
 
-  // sign band: red backer + H/E/B proportion cadence + a slim "buddy" strip —
-  // no texture, reads by color + block width alone (spec requirement).
+  // sign band: red backer frame — the readable name is a textured panel
+  // mounted on top of this in spawnHEB (this.hebSignGeo/hebSignMat).
   s.push(tinted(new THREE.BoxGeometry(13, 3.0, 0.35).translate(0, 10.0, 9.25), HEB_RED_DARK)); // backer (lit at night)
-  const HEB_TABS = [[-3.0, 2.6], [0.3, 2.0], [3.3, 2.0]]; // [x, width] — H, E, B cadence
-  for (const [tx, tw] of HEB_TABS)
-    s.push(tinted(new THREE.BoxGeometry(tw, 1.6, 0.14).translate(tx, 10.2, 9.34), HEB_WALL));
-  s.push(tinted(new THREE.BoxGeometry(9, 0.6, 0.16).translate(0, 8.35, 9.3), HEB_WALL));     // "buddy" subtitle strip
   s.push(tinted(new THREE.BoxGeometry(13.4, 0.3, 0.18).translate(0, 8.05, 9.2), HEB_RED));   // sign underline (lit at night)
 
   // --- curved entry canopy: quarter-round barrel, high at the wall curving
