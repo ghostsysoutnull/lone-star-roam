@@ -6,9 +6,12 @@
   `CitySystem`-style proximity spawn/despawn, `__game.brands` wiring,
   shared prop-prototype pattern) + the **Bucky's** brand (Buc-ee's
   parody): showpiece storefront + tall sign with a low-poly **beaver
-  mascot**, heli-tier instanced fuel canopy/pumps, and the highway
-  **approach billboards** (punny copy pool). Spec: `BRANDS_SPEC.md`
-  (locked 2026-07-12). Scenery only — no gameplay/save/mission changes.
+  mascot**, heli-tier instanced fuel canopy/pumps, the highway
+  **approach billboards** (punny copy pool), and **night glow**
+  (emissive sign + beaver + white fuel-canopy soffit, gated on
+  `ATMOS.night` — no new light rig, the airport-beacon pattern). Spec:
+  `BRANDS_SPEC.md` (locked 2026-07-12). Scenery only — no gameplay/save/
+  mission changes.
 - **Recommended setup**: model **Opus 4.8**, effort **high** — wave 1 is
   the most structural (new streaming system + `main.js` wiring) *and* the
   beaver/canopy silhouette needs spatial care. Flag it if the running
@@ -18,7 +21,9 @@
   `rotors.js` `mk*Body` mesh idiom, `gameplay.js` landmark `LL()`
   table). **One `t.shot`** of Bucky's for the silhouette read (the
   visual-judgment exception) — no other shots. Counts: Bucky's ~15 real
-  sites (coords confirmed this wave). Signage stays unlit.
+  sites (coords confirmed this wave). Night glow is emissive-only on
+  `ATMOS.night` (no light rig) — verify asserts it toggles and is ~0 by
+  day.
 - **Then**: rewrite this block for wave 2 (**H-E-Buddy** — red-band
   storefront in the 33 largest cities + lot props).
 

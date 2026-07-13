@@ -36,9 +36,14 @@ All placed at **hand-authored real-world coordinates** via `LL(lat,lon)`
 - **Flourishes** (chosen): Bucky's highway **approach billboards**;
   datacenter **hum + cooling glow**; datacenter **transmission
   infrastructure** (substation + pylon line).
-- **Signage stays unlit** — no emissive lit sign text at night. (The
-  datacenter *cooling-vent glow* is the one night-emissive element, part
-  of the hum+glow flourish; it is not signage.)
+- **Night lighting** (revised 2026-07-12): Bucky's and H-E-Buddy are
+  **lit at night** via emissive meshes gated on `ATMOS.night` — no new
+  light rig (the airport-beacon pattern). Scope = **signs + canopy**:
+  Bucky's emissive sign + beaver + glowing white fuel-canopy soffit;
+  H-E-Buddy emissive red sign band only. (Ambient lot-pole glow was
+  considered and dropped.) The datacenter cooling-vent glow is
+  *additional*, and its cold cast is a deliberate contrast to the warm
+  store glow.
 
 ## Placement & data
 
@@ -102,6 +107,9 @@ exposed on `window.__game.brands` at birth.
   polyline outward) carrying a rotating pool of punny copy
   ("You can hold it — Bucky's ahead", mileage countdowns). Signs face
   the road; copy is a seeded pick per site so it's stable.
+- **Night glow** (emissive, `ATMOS.night`): the sign face + beaver + the
+  underside of the fuel canopy (soffit) glow warm-white — the signature
+  "visible from the interstate" look. Emissive-only, no light rig.
 
 ### H-E-Buddy (H-E-B) — Wave 2
 - **Hero**: a big-box storefront (wide showpiece box with a raised
@@ -110,6 +118,8 @@ exposed on `window.__game.brands` at birth.
   a curved entry canopy.
 - **Props (heli-tier, instanced)**: parking-lot cart corrals, a row of
   carts (instanced), lot light poles, a loading dock on the back.
+- **Night glow** (emissive, `ATMOS.night`): the red sign band glows —
+  the recognizer in the dark. Emissive-only, no light rig.
 - Placed on a city-edge road shoulder (33 largest cities), disposed with
   distance like the hero.
 
@@ -130,7 +140,8 @@ exposed on `window.__game.brands` at birth.
     with the nearest active site distance.
   - **Cooling-vent glow** — emissive vent meshes gated on `ATMOS.night`
     (the airport-beacon precedent; sky.js still owns all real lights).
-    This is the only night-emissive element; **no lit signage**.
+    Its cold cast is a deliberate contrast to the warm Bucky's/H-E-Buddy
+    signage glow (those are lit too — see their sections).
 
 ## Wave split
 
@@ -140,8 +151,8 @@ brand. Wave 1 also builds the shared `BrandSystem` scaffold (streaming,
 
 | Wave | Deliverable | Recommended model + effort | Budget |
 |------|-------------|---------------------------|--------|
-| **1** | `brands.js` scaffold + streaming + `main.js`/`__game` wiring + **Bucky's** (hero, beaver, fuel canopy, approach billboards) + checks | **Opus 4.8, high** — most structural (new system) *and* the beaver/canopy silhouette needs spatial care; Sonnet 5 high also fine if you prefer | code + checks, grep-first, **one `t.shot`** of Bucky's for the silhouette read (the visual-judgment exception), no other shots |
-| **2** | **H-E-Buddy** (storefront hero + red sign band + lot props) + 33 real coords + checks | **Opus 4.8** or **Sonnet 5**, high — mesh + table plumbing | code + checks, one `t.shot`, grep-first |
+| **1** | `brands.js` scaffold + streaming + `main.js`/`__game` wiring + **Bucky's** (hero, beaver, fuel canopy, approach billboards, night glow: sign+beaver+canopy soffit) + checks | **Opus 4.8, high** — most structural (new system) *and* the beaver/canopy silhouette needs spatial care; Sonnet 5 high also fine if you prefer | code + checks, grep-first, **one `t.shot`** of Bucky's for the silhouette read (the visual-judgment exception), no other shots |
+| **2** | **H-E-Buddy** (storefront hero + red sign band + lot props + night glow: red band) + 33 real coords + checks | **Opus 4.8** or **Sonnet 5**, high — mesh + table plumbing | code + checks, one `t.shot`, grep-first |
 | **3** | **Lone Star Compute** (sheds + cooling + substation + pylon line) + `audio.datacenterHum` + night glow + 8 coords + checks | **Opus 4.8, high** — most systems touched (audio + emissive + instanced infra) | code + checks, one `t.shot`, grep-first |
 
 Last wave (3) deletes the `## Session briefing` block and folds the whole
@@ -165,9 +176,10 @@ New suite `tools/checks/brands.mjs` (assert numbers, not pixels):
 - **Hum** (W3): step `audio.datacenterHum(dist)` across distances, assert
   `datacenterTarget` rises as distance shrinks and is 0 out of range
   (the `heliTarget` test pattern).
-- **Night glow** (W3): set `ATMOS.night` true/false, assert cooling-vent
-  emissive intensity toggles; assert **no** sign mesh is emissive (proves
-  "signage stays unlit").
+- **Night glow**: set `ATMOS.night` true/false, assert emissive intensity
+  toggles — Bucky's sign+beaver+canopy soffit (W1), H-E-Buddy red band
+  (W2), datacenter cooling vents (W3). Assert **daytime** emissive is ~0
+  for all of these (night-gated, not always-on).
 - **One `t.shot` per wave** of the hero + props for the "does it read"
   gut-check — the CLAUDE.md visual-judgment exception, never the pass/
   fail signal.
@@ -176,8 +188,9 @@ New suite `tools/checks/brands.mjs` (assert numbers, not pixels):
 
 - No gameplay: no collectible, no save keys, no missions, no fuel
   mechanic. Pure scenery.
-- No new scene lights — sky.js owns lighting; the cooling glow is
-  emissive geometry gated on `ATMOS.night` (beacon precedent).
+- No new scene lights — sky.js owns lighting; all night glow (store
+  signage + datacenter cooling) is emissive geometry gated on
+  `ATMOS.night` (beacon precedent).
 - No new fetch at runtime; coords are hand-authored constants.
 - Shared prototype geometries built once, disposed never (perf pattern).
 - `seededRand` seed strings unchanged (billboard copy uses a new
