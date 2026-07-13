@@ -1,11 +1,13 @@
-# Datacenter Sign — spec (prototype)
+# Datacenter Sign — spec
 
 Follow-on to the shipped `BRANDS_SPEC.md` track: Lone Star Compute (the
 AI-datacenter parody in `brands.js`) has architecture, hum, and cold
 cooling-vent glow, but nothing tells the player what it is. This adds an
-identity sign plus a real-world-facts plaque, **prototyped at the San
-Antonio site only** — full 8-site rollout is a separate decision after
-this reads well in-game.
+identity sign plus a real-world-facts plaque. **Status: shipped at all 8
+LSC sites** — prototyped at San Antonio first, then rolled out to the
+remaining 7 (Abilene, Corsicana, Sweetwater, Temple, Amarillo, Red Oak,
+Denton) after the prototype read well in-game. See "Open calls" for how
+that decision resolved.
 
 Deliberate deviation from BRANDS_SPEC's "no gameplay change" stance: this
 adds one interaction (a plaque). Scoped narrowly — no save key, no
@@ -85,15 +87,32 @@ center") is in `tools/checks/brands.mjs` to catch a repeat.
     already runs comparable lengths).
 
 ## Sources (for the plaque copy)
-- Stream Data Centers, San Antonio III groundbreaking — 135 acres, up to
-  200 MW IT capacity across 5 buildings, on-site 334 MW substation, $400M
-  investment. streamdatacenters.com/news/breaks-ground-hyperscale-campus-san-antonio/
-- Water: a 100 MW hyperscale facility can consume 3–6 million gallons/day
-  at peak (EESI; MOST Policy Initiative science note on data center
-  water use).
-- Training-run water estimate (~185,000 gal / 700,000 L for a GPT-4-scale
-  model): UC Riverside 2024 study, widely cited (e.g. AMPAC Water
-  Systems' 2026 summary).
+- San Antonio: Stream Data Centers, San Antonio III groundbreaking — 135
+  acres, up to 200 MW IT capacity across 5 buildings, on-site 334 MW
+  substation, $400M investment (streamdatacenters.com). Water: a 100 MW
+  hyperscale facility can consume 3–6 million gallons/day at peak (EESI;
+  MOST Policy Initiative). Training-run estimate (~185,000 gal / 700,000 L
+  for a GPT-4-scale model): UC Riverside 2024 study.
+- Abilene: Crusoe's Stargate campus for Oracle/OpenAI, 1,100+ acres,
+  200+ MW operational on the way to a planned 1.2 GW (Data Center
+  Dynamics, Epoch AI, Silicon Report).
+- Amarillo: Fermi America's Project Matador — 5,769 acres near Pantex,
+  up to 11 GW, gas turbines delivered, up to 4 nuclear reactors planned
+  (fermiamerica.com, Data Center Dynamics).
+- Corsicana: Riot Platforms' 858-acre Navarro County campus, 600 MW
+  converting from Bitcoin mining to AI/HPC, AMD contracted to 50 MW
+  (Data Center Dynamics, Baxtel).
+- Sweetwater: IREN's 2,200-acre, 2 GW liquid-cooled campus on 345 kV/
+  138 kV ERCOT transmission (iren.com, Data Center Dynamics).
+- Temple: Meta's $800M/900,000 sq ft hyperscale data center + Rowan's
+  300 MW Project Temple next door, ~2,000 workers at peak (rowan.digital,
+  Data Center Knowledge).
+- Red Oak: DataBank's Red Oak campus, 292 acres/8 buildings/480 MW
+  planned, $2B construction loan, Oracle anchor tenant (databank.com,
+  Hoodline).
+- Denton: CoreWeave's ~253k H100-equivalent chips on 262 MW; Core
+  Scientific's separate 394 MW site by the Denton Energy Center (Epoch
+  AI, Baxtel).
 
 ## Verify plan
 - Add to `tools/checks/brands.mjs` (existing LSC section):
@@ -115,13 +134,13 @@ center") is in `tools/checks/brands.mjs` to catch a repeat.
 - No new suite file — folds into the existing `brands` suite.
 - Budget: code + checks, no shots, grep-first (per CLAUDE.md default).
 
-## Open calls
-1. **Full rollout timing** — after this prototype ships and reads well,
-   decide whether all 8 sites get sign + plaque with per-site real facts
-   researched the same way, or whether San Antonio stays the only one
-   (e.g. if 8 near-identical plaques feel repetitive rather than
-   informative). *Your call after playtesting the prototype.*
-2. **Sign-only vs sign+plaque for the other 7 sites** — could ship the
-   always-visible identity sign everywhere cheaply while reserving the
-   researched-facts plaque for a subset. *Deferred to the rollout
-   decision.*
+## Open calls — resolved
+1. **Full rollout timing**: resolved — all 8 sites shipped in the same
+   session as the prototype, once San Antonio's sign/plaque read well
+   in-game (verified with a screenshot at an angle after Bruno caught the
+   support posts crossing the tagline text; fixed by shortening the posts
+   to stop at the panel's own bottom edge instead of running up behind
+   the face).
+2. **Sign-only vs sign+plaque for the other 7**: resolved — all 7 got
+   both, matching San Antonio (no reason found to split them once the
+   per-site research was done anyway).

@@ -465,13 +465,29 @@ export default async function brands(t) {
     await t.setDay();
   });
 
-  // -------------------------------- Datacenter sign (DATACENTER_SIGN_SPEC.md prototype)
+  // -------------------------------- Datacenter sign (DATACENTER_SIGN_SPEC.md — rolled out to all 8 sites)
   const lscSAAt = await t.ev(`({
     x: (-98.65 + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100,
     z: -(29.42 - 31) * 111320 / 100,
   })`);
 
-  await t.check('datacenter sign: San Antonio spawns a lit sign panel, other sites stay unsigned', async () => {
+  await t.check('datacenter sign: LSC_SITES table is fully signed, 8/8, no duplicate tagline/fact copy', async () => {
+    const info = await t.ev(`(() => {
+      const names = [...g.brands.lscByName.keys()];
+      const signs = names.map((n) => g.brands.lscByName.get(n).sign).filter(Boolean);
+      return {
+        total: names.length, signed: signs.length, mats: g.brands.lscSignMats.size,
+        taglines: new Set(signs.map((s) => s.tagline)).size,
+        facts: new Set(signs.map((s) => s.fact)).size,
+      };
+    })()`);
+    t.ok(info.total === 8, `expected 8 LSC sites, found ${info.total}`);
+    t.ok(info.signed === 8, `not every LSC site has a sign: ${info.signed}/8`);
+    t.ok(info.mats === 8, `lscSignMats missing an entry for a signed site: ${info.mats}/8`);
+    t.ok(info.taglines === 8 && info.facts === 8, `duplicate tagline/fact copy across sites: ${JSON.stringify(info)}`);
+  });
+
+  await t.check('datacenter sign: San Antonio spawns a lit sign panel using its own per-site material', async () => {
     await t.tp(lscSAAt.x, lscSAAt.z + 3);
     await t.until(`g.brands.live.has('lsc:San Antonio')`, 8000);
     const rec = await t.ev(`(() => {
@@ -486,13 +502,23 @@ export default async function brands(t) {
     t.ok(rec.hasSign, 'San Antonio LSC site never built a signMesh');
     t.ok(rec.panelMat, "sign panel isn't using its per-site cached material");
     t.ok(rec.hasMap && rec.hasEmissiveMap, `sign material missing map/emissiveMap: ${JSON.stringify(rec)}`);
+  });
 
-    // Abilene has no `sign` entry — prototype scope is San Antonio only, so it
-    // must NOT grow one (guards against the sign silently rolling out early).
+  await t.check('datacenter sign: Abilene spawns its OWN distinct sign panel (rollout, not a San-Antonio-only special case)', async () => {
     await t.tp(lscAt.x, lscAt.z + 3);
     await t.until(`g.brands.live.has('lsc:Abilene')`, 8000);
-    const abileneSign = await t.ev(`g.brands.live.get('lsc:Abilene').signMesh`);
-    t.ok(abileneSign === null, `Abilene unexpectedly grew a sign: ${abileneSign}`);
+    const rec = await t.ev(`(() => {
+      const r = g.brands.live.get('lsc:Abilene');
+      const m = r.signMesh.children.find((c) => c.geometry === g.brands.lscSignGeo);
+      return {
+        hasSign: !!r.signMesh,
+        panelMat: m.material === g.brands.lscSignMats.get('Abilene'),
+        distinctFromSA: m.material !== g.brands.lscSignMats.get('San Antonio'),
+      };
+    })()`);
+    t.ok(rec.hasSign, 'Abilene never built a signMesh after the rollout');
+    t.ok(rec.panelMat, "Abilene's sign panel isn't using ITS OWN per-site material");
+    t.ok(rec.distinctFromSA, "Abilene's sign is reusing San Antonio's material — per-site text wouldn't read correctly");
   });
 
   await t.check("datacenter sign night-gate: emissiveMap glow ~0 by day, lit at night (own material, not ventMat)", async () => {

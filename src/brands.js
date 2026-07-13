@@ -126,13 +126,31 @@ const HEB_COUNT = 33, HEB_MARGIN = 8, HEB_OFF = 24;
 // OUTSKIRTS (where the campuses actually are). Temple & Denton also carry a
 // Bucky's, so their LSC coords are pulled ≥80 units off the same-town Bucky's
 // (both spawn inside SPAWN_DIST at once — no interpenetration).
+// `sign` = the datacenter-sign prototype (DATACENTER_SIGN_SPEC.md): an
+// always-visible ID sign + an "E to read" plaque with real, sourced facts
+// about the actual facility each site is modeled on. Rolled out to all 8
+// sites after the San Antonio prototype read well in-game.
 const LSC_SITES = [
-  { name: 'Abilene', at: LL(32.52, -99.88) },      // the real "Stargate" (Crusoe/Oracle/OpenAI)
-  { name: 'Corsicana', at: LL(32.05, -96.50) },
-  // `sign` = the datacenter-sign prototype (DATACENTER_SIGN_SPEC.md): an
-  // always-visible ID sign + an "E to read" plaque with real, sourced facts.
-  // San Antonio only for now — other sites deliberately have no `sign` yet,
-  // pending a rollout decision after this reads well in-game.
+  {
+    name: 'Abilene', at: LL(32.52, -99.88),          // the real "Stargate" (Crusoe/Oracle/OpenAI)
+    sign: {
+      tagline: 'ABILENE — HOME OF STARGATE',
+      fact: "Modeled on the real flagship next door: Crusoe's Stargate campus "
+        + 'for Oracle and OpenAI spans over 1,100 acres south of Abilene. Its '
+        + 'first buildings already deliver 200+ MW of IT power on the way to '
+        + 'a planned 1.2 gigawatts — enough to rival a full nuclear power plant.',
+    },
+  },
+  {
+    name: 'Corsicana', at: LL(32.05, -96.50),
+    sign: {
+      tagline: 'CORSICANA — AI/HPC CAMPUS',
+      fact: "Modeled on Riot Platforms' 858-acre Navarro County campus, "
+        + 'originally built for Bitcoin mining and now converting part of its '
+        + '600 MW of approved capacity to AI/HPC — AMD alone has doubled its '
+        + 'contracted load here to 50 MW.',
+    },
+  },
   {
     name: 'San Antonio', at: LL(29.42, -98.65),      // Streams San Antonio, west side
     sign: {
@@ -146,11 +164,56 @@ const LSC_SITES = [
         + 'gallons of water for cooling alone.',
     },
   },
-  { name: 'Sweetwater', at: LL(32.47, -100.41) },  // Abilene–Sweetwater corridor
-  { name: 'Temple', at: LL(31.08, -97.44) },        // ≥80u off Temple's Bucky's
-  { name: 'Amarillo', at: LL(35.30, -101.70) },     // Fermi America 11 GW campus
-  { name: 'Red Oak', at: LL(32.52, -96.80) },
-  { name: 'Denton', at: LL(33.24, -97.17) },        // ≥80u off Denton's Bucky's
+  {
+    name: 'Sweetwater', at: LL(32.47, -100.41),      // Abilene–Sweetwater corridor
+    sign: {
+      tagline: 'SWEETWATER — 2GW AI CAMPUS',
+      fact: "Modeled on IREN's Sweetwater campus — 2,200 acres of West Texas "
+        + 'rangeland built for 2 gigawatts of liquid-cooled AI compute, about '
+        + 'as much electricity as a mid-sized American city, tied directly '
+        + "into ERCOT's 345 kV transmission grid.",
+    },
+  },
+  {
+    name: 'Temple', at: LL(31.08, -97.44),           // ≥80u off Temple's Bucky's
+    sign: {
+      tagline: 'TEMPLE — HYPERSCALE CAMPUS',
+      fact: "Modeled on Temple's real twin build-out: Meta's $800 million, "
+        + '900,000-square-foot hyperscale data center sits beside Rowan\'s '
+        + '300 MW Project Temple next door — together drawing nearly 2,000 '
+        + 'construction workers at peak.',
+    },
+  },
+  {
+    name: 'Amarillo', at: LL(35.30, -101.70),        // Fermi America 11 GW campus
+    sign: {
+      tagline: 'AMARILLO — PROJECT MATADOR',
+      fact: "Modeled on Fermi America's Project Matador — a planned "
+        + '5,769-acre energy-and-compute campus near Pantex designed for up '
+        + 'to 11 gigawatts. Natural gas turbines have already arrived, with '
+        + 'up to four nuclear reactors planned for its final phase.',
+    },
+  },
+  {
+    name: 'Red Oak', at: LL(32.52, -96.80),
+    sign: {
+      tagline: 'RED OAK — SOUTH DALLAS AI',
+      fact: "Modeled on DataBank's Red Oak campus 21 miles south of Dallas — "
+        + 'a $2 billion, eight-building build-out planned for 480 megawatts, '
+        + 'with Oracle signed on as the anchor tenant for the first four '
+        + 'buildings.',
+    },
+  },
+  {
+    name: 'Denton', at: LL(33.24, -97.17),           // ≥80u off Denton's Bucky's
+    sign: {
+      tagline: 'DENTON — AI COMPUTE HUB',
+      fact: "Modeled on Denton's real cluster: CoreWeave's campus alone runs "
+        + 'an estimated 253,000 H100-equivalent chips on 262 MW for OpenAI '
+        + "workloads, next to Core Scientific's separate 394 MW site by the "
+        + 'Denton Energy Center.',
+    },
+  },
 ];
 
 // Lone Star Compute palette — cold industrial: gunmetal sheds, pale concrete,

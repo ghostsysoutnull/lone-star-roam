@@ -410,6 +410,20 @@ ship.
   billboard road-hug, night lighting/glow toggles, and the hum falloff +
   wiring sentinel. One SHOT per brand for the silhouette/glow read.
 
+- [x] ~~Datacenter ID sign + real-facts plaque~~ — done 2026-07-13
+  (`DATACENTER_SIGN_SPEC.md`): every Lone Star Compute site now carries an
+  always-visible ID sign (canvas texture doubling as both `map` and
+  `emissiveMap` — dark panel diffuse, cyan glyphs/border, so only the
+  text/border glows at night instead of washing the whole panel cyan) and
+  an "E to read" plaque with real, sourced facts about the actual Texas
+  facility each site is modeled on. `brands.lscNear()` triggers off the
+  sign's real world position (not the pad center — the two are `hypot(11,
+  26.1) ≈ 28.3` units apart, just past a naive 28-unit query). `main.js`'s
+  `plaqueOpen` now unifies this with `gameplay.js`'s historical-marker
+  plaques behind one `plaqueNear()` lookup. Prototyped at San Antonio,
+  then rolled out to all 8 sites the same session. Scenery + one
+  interaction only — no save key, no collectible.
+
 - [x] ~~Special friends: Sky, Maggy & Chowns~~ — done 2026-07-13: named animal
   companions, explicitly not lumped with `animals.js` wildlife or gear-gated
   like `dog.js`'s Lacy — each gets its own module. `src/springer.js`

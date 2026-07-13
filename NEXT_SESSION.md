@@ -4,11 +4,14 @@
 Lone Star Compute — 3 waves) shipped 2026-07-12 and is folded into
 `ROADMAP.md`; `BRANDS_SPEC.md` stays as history. A follow-up player-controlled
 brand-size feature (`[`/`]`, own `lonestar-brand-scale` localStorage key) also
-shipped 2026-07-12 on top of it — see the `brands.js` gotcha below. Queued
-work lives in `BACKLOG.md`; pending playtests are there too. Pick the next
-effort from `BACKLOG.md` (or start a new multi-wave spec per the `CLAUDE.md`
-protocol) — there's no `## Session briefing` block, so the greeting stays
-quiet until the next spec writes one.
+shipped 2026-07-12 on top of it — see the `brands.js` gotcha below. A second
+follow-on, the datacenter ID sign + real-facts plaque (all 8 Lone Star Compute
+sites), shipped 2026-07-13 (`DATACENTER_SIGN_SPEC.md`) — see the new
+`lscNear`/`plaqueOpen` gotcha below. Queued work lives in `BACKLOG.md`;
+pending playtests are there too. Pick the next effort from `BACKLOG.md` (or
+start a new multi-wave spec per the `CLAUDE.md` protocol) — there's no
+`## Session briefing` block, so the greeting stays quiet until the next spec
+writes one.
 
 Gotchas for whoever touches `brands.js` next:
 - Each spawned site's hero/props are split across TWO parents: the scalable
@@ -33,6 +36,14 @@ Gotchas for whoever touches `brands.js` next:
   `SCALE` is read live (not cached) — the footprint site caches
   (`buckyFootprints()` etc.) only cache the scale-INDEPENDENT geometry
   (`padY`/`heading`/`x`/`z`), never the scale factor itself.
+- `brands.lscNear(pos, range)` triggers off each LSC site's **sign** world
+  position (`signAt`, stashed on the live record at spawn from heading +
+  `SCALE`), NOT `site.at` (the pad center) — the sign's local anchor is
+  `hypot(11, 26.1) ≈ 28.3` units from center, just past a naive `range=28`
+  query on the table. `main.js`'s `plaqueOpen` is shared with
+  `gameplay.landmarkNear` behind one `plaqueNear()` lookup — don't add a
+  second independent "which plaque is open" state var if a third plaque
+  source shows up later; extend `plaqueNear` instead.
 
 Gotchas for whoever touches `hud.js` next:
 - The road shield is a CSS-3D chrome card: `this.shield` (constructor) is the
