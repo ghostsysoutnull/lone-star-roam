@@ -86,11 +86,17 @@
   #travel .poi-list button:disabled { opacity: .38; cursor: default; }
   #travel .hint { margin-top: 10px; font-size: 1.2rem; opacity: .55; }
   kbd { background: #2a3140; border-radius: 4px; padding: 1px 7px; font-family: inherit; font-size: 1.2rem; margin-right: 4px; }
-  #debug { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); width: 17rem;
+  #debug { position: fixed; right: 14px; top: 50%; transform: translateY(-50%); width: 25.137rem;
     max-height: 86vh; overflow-y: auto; background: rgba(12,16,24,.95); color: #fff;
     border: 1px solid rgba(255,255,255,.2); border-radius: 12px;
     padding: 12px 14px; z-index: 13; grid-template-columns: 1fr; gap: 5px; }
   #debug h2 { margin: 0 0 4px; color: #ffd35c; font-size: 1.5rem; }
+  #debug-state { font-size: 1.15rem; opacity: .7; margin-bottom: 8px; padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255,255,255,.15); }
+  #debug .debug-section { margin-bottom: 6px; }
+  #debug .debug-section h3 { margin: 0 0 4px; font-size: 1.1rem; letter-spacing: .05em;
+    text-transform: uppercase; color: #9fb3cc; opacity: .8; }
+  #debug .debug-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
   #debug button { background: #1a2230; color: #e6ecf5; border: 1px solid rgba(255,255,255,.1);
     border-radius: 8px; padding: 6px 10px; cursor: pointer; text-align: left; font-size: 1.3rem; }
   #debug button:hover { background: #2c3c58; }

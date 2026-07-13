@@ -90,23 +90,35 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
   for (const w of ['clear', 'clouds', 'rain', 'storm', 'dust']) actions[w] = () => setWeather(w);
 
   if (new URLSearchParams(location.search).has('debug')) {
-    const rows = [
-      ['day', '🌞 Day'], ['night', '🌙 Night'], ['midnight', '🕛 Midnight'],
-      ['hauntCemetery', '👻 Haunt cemetery'], ['ghostFires', '🔥 Ghost fires'],
-      ['saucer', '🛸 Saucer'], ['formation', '✨ Lubbock lights'], ['bats', '🦇 Bat show'],
-      ['departure', '🛫 Departure'], ['arrival', '🛬 Arrival'], ['testRadio', '📻 Test radio'], ['charter', '✈️ Charter job'],
-      ['heli', '🚁 Heli'], ['blimp', '🎈 Blimp'], ['nasa', '✈️ NASA T-38'], ['lowlevel', '✈️ Low-level pair'],
-      ['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'], ['storm', '⛈ Storm'], ['dust', '🌪 Dust'],
+    const sections = [
+      ['Time', [['day', '🌞 Day'], ['night', '🌙 Night'], ['midnight', '🕛 Midnight']]],
+      ['Haunts', [['hauntCemetery', '👻 Cemetery'], ['ghostFires', '🔥 Ghost fires'],
+        ['saucer', '🛸 Saucer'], ['formation', '✨ Lubbock lights'], ['bats', '🦇 Bats']]],
+      ['Aircraft', [['departure', '🛫 Departure'], ['arrival', '🛬 Arrival'],
+        ['testRadio', '📻 Test radio'], ['charter', '✈️ Charter'],
+        ['heli', '🚁 Heli'], ['blimp', '🎈 Blimp'],
+        ['nasa', '✈️ NASA T-38'], ['lowlevel', '✈️ Low-level']]],
+      ['Weather', [['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'],
+        ['storm', '⛈ Storm'], ['dust', '🌪 Dust']]],
     ];
     const el = document.createElement('div');
     el.id = 'debug';
-    el.innerHTML = '<h2>🔧 Debug</h2>' + rows.map(([k, label]) => `<button data-act="${k}">${label}</button>`).join('');
+    el.innerHTML = '<h2>🔧 Debug</h2><div id="debug-state"></div>' + sections.map(([title, rows]) =>
+      `<div class="debug-section"><h3>${title}</h3><div class="debug-rows">` +
+      rows.map(([k, label]) => `<button data-act="${k}">${label}</button>`).join('') +
+      '</div></div>').join('');
     el.style.display = 'none';
     document.body.appendChild(el);
-    el.addEventListener('click', (e) => { const a = e.target.dataset?.act; if (a) actions[a](); });
+    const stateEl = el.querySelector('#debug-state');
+    const refreshState = () => {
+      if (el.style.display === 'none') return;
+      stateEl.textContent = `${sky.clockString()} · ${sky.weatherName()} · ${player.mode}`;
+    };
+    el.addEventListener('click', (e) => { const a = e.target.dataset?.act; if (a) { actions[a](); refreshState(); } });
     addEventListener('keydown', (e) => {
-      if (e.code === 'Backquote') el.style.display = el.style.display === 'none' ? 'grid' : 'none';
+      if (e.code === 'Backquote') { el.style.display = el.style.display === 'none' ? 'grid' : 'none'; refreshState(); }
     });
+    setInterval(refreshState, 500);
   }
 
   return { actions };
