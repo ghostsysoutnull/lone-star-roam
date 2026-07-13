@@ -21,6 +21,7 @@ import { MaritimeSystem } from './maritime.js';
 import { UFOSystem } from './ufo.js';
 import { FlareSystem } from './flares.js';
 import { DogSystem } from './dog.js';
+import { SpringerSystem } from './springer.js';
 import { AirportSystem, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt } from './airports.js';
 import { AviationSystem, daySchedule, AIRLINES } from './aviation.js';
 import { TowerRadio } from './radio.js';
@@ -91,6 +92,8 @@ async function boot() {
   const missions = new MissionSystem(scene, gameplay, player, (m) => hud.toast(m), (k) => audio.chime(k));
   const dog = new DogSystem(scene, player);
   dog.onBark = () => audio.bark();
+  const springer = new SpringerSystem(scene);
+  springer.onBark = () => audio.bark();
   brands.onHum = (d) => audio.datacenterHum(d); // Lone Star Compute proximity hum (audio built at line 70)
   applyGear(gameplay.save, player, dog); // saved shop upgrades take effect at boot
   const travel = new TravelMenu(player, gameplay, sky, npcs, missions, dog, (m) => hud.toast(m), (k) => audio.chime(k));
@@ -167,7 +170,7 @@ async function boot() {
     if (e.code === 'BracketLeft') hud.toast(`🏪 Brand size ${brands.setScale(brands.scale - 0.05)}`);
     if (e.code === 'KeyR') player.resetToRoad();
     if (e.code === 'KeyE') {
-      if (!npcs.interact(player.pos)) {
+      if (!npcs.interact(player.pos) && !springer.interact(player.pos)) {
         const lm = gameplay.landmarkNear(player.pos, 28);
         if (lm && lm.name !== plaqueOpen) {
           // open (or switch straight to) this landmark's marker
@@ -192,7 +195,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -227,6 +230,7 @@ async function boot() {
     haunts.update(dt, player.pos.x, player.pos.z, sky.t, sky.days);
     flares.update(dt);
     dog.update(dt);
+    springer.update(dt, player.pos);
     ATMOS.ufo = ufo.near;
     radio.update(dt, player, aviation, sky);
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
@@ -236,8 +240,10 @@ async function boot() {
     missions.update(dt, player.pos, player.mode, player.pos.y - hAt(player.pos.x, player.pos.z));
     hud.animateShield(player, dt); // per-frame sway/float — headless too, not gated by __skipRender
     const npcName = npcs.update(dt, player.pos);
-    const lmNear = npcName ? null : gameplay.landmarkNear(player.pos, 28);
-    hud.interactHint(npcName ? `talk to ${npcName}` : lmNear && lmNear.name !== plaqueOpen ? 'read the historical marker' : null);
+    const skyHint = npcName ? null : springer.nearHint(player.pos);
+    const lmNear = (npcName || skyHint) ? null : gameplay.landmarkNear(player.pos, 28);
+    hud.interactHint(npcName ? `talk to ${npcName}` : skyHint ? skyHint
+      : lmNear && lmNear.name !== plaqueOpen ? 'read the historical marker' : null);
     // walked away from an open plaque: close it
     if (plaqueOpen && (!lmNear || lmNear.name !== plaqueOpen) && !gameplay.landmarkNear(player.pos, 40)) {
       hud.dialog(null);
