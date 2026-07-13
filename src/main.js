@@ -118,6 +118,7 @@ async function boot() {
   sky.onBolt = () => audio.thunder();
   gameplay.onCollect = (kind) => audio.chime(kind);
   player.onStep = () => audio.step();
+  player.onThrust = () => audio.jetWhomp();
   const flares = new FlareSystem(scene, player);
   flares.onSound = (kind) => audio.flare(kind);
   const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions }); // panel only with ?debug=1; actions drive the verify suite

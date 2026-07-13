@@ -1,51 +1,9 @@
 # Lone Star Roam — next session kickoff
 
-## Session briefing
-- **This session**: Jetpack track, wave 2 of 2 (final) — feel: VFX + audio +
-  camera + dog for the WALK-mode jetpack. Wave 1 (physics + shop + verify)
-  shipped 2026-07-13, commit (pending). It flies, is fully tested, and
-  measurably correct (AGL/cap/land/tiers) — it just doesn't *look* like
-  anything yet: no backpack prop, no flame, no sound, camera doesn't
-  react to altitude. Spec: `JETPACK_SPEC.md`.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — content/feel
-  wave (avatar prop + flame VFX, audio hook, camera lerp, dog behavior),
-  but still touches real physics/render wiring, so keep the structural bar.
-  Flag it if the running model differs.
-- **Budget**: code + checks, at most **one** flame-feel screenshot and only
-  on request. Resolve W2's open calls first (see below), then plan before
-  coding.
-- **Then**: this is the last wave — the session-end rewrite deletes this
-  briefing block and folds the whole Jetpack track into one `ROADMAP.md`
-  entry; `JETPACK_SPEC.md` stays as history.
-
-Open calls to resolve at the top of this session (`JETPACK_SPEC.md` §"Open
-calls for W2"):
-- Lacy's airborne behavior — spec recommends: stays grounded, waits below,
-  yips at liftoff (reuse `honked()` bark queue), rejoins the follow on
-  landing. Confirm with Bruno before implementing.
-- Whether a HUD AGL readout is worth the rem-based UI work.
-- Camera feel: fixed higher framing vs. AGL-proportional lerp.
-
-Gotchas carried over from W1:
-- `vehicle.js`: `hovering` is a WALK-only sub-state (`GRAV=45`,
-  `AIRDAMP=0.25`, module constants) — thrust XOR gravity each frame, no
-  stable hover point by design (see spec's physics tuning notes). The
-  ground-clamp guard is `if (this.mode !== 'FLY' && !this.hovering)`; don't
-  remove the `!this.hovering` half or WALK re-pins to terrain every frame.
-- `shop.js`: `jetpack` perk gates capability at level 0 (index 0 of
-  `JET_THRUST`/`JET_ALT`/`JET_SPEED` = 0/unowned) — `applyGear` always
-  writes `jetThrust`/`jetAlt`/`jetSpeed` regardless of ownership, only
-  `jetpack: lvl>0` gates whether Space does anything airborne.
-- Any verify check that leaves the player airborne or in a non-DRIVE mode
-  must restore DRIVE at its end — the horn/Lacy checks depend on ambient
-  DRIVE mode (the aviation-tune check learned this the hard way; jetpack.mjs
-  follows it too).
-- `dog.js` needs no change for hovering to be *safe* (she grounds her own y
-  independent of the player's), but W2 is where her behavior should become
-  *intentional* per the open call above.
-
-**No other active priority track.** The Texas Brands track (Bucky's,
-H-E-Buddy, Lone Star Compute — 3 waves) shipped 2026-07-12 and is folded into
+No active priority track. The Jetpack track (`JETPACK_SPEC.md`, 2 waves —
+physics/shop, then feel) shipped 2026-07-13 and is folded into `ROADMAP.md`;
+the spec file stays as history. The Texas Brands track (Bucky's, H-E-Buddy,
+Lone Star Compute — 3 waves) shipped 2026-07-12 and is folded into
 `ROADMAP.md`; `BRANDS_SPEC.md` stays as history. A follow-up player-controlled
 brand-size feature (`[`/`]`, own `lonestar-brand-scale` localStorage key) also
 shipped 2026-07-12 on top of it — see the `brands.js` gotcha below. A second
@@ -53,6 +11,33 @@ follow-on, the datacenter ID sign + real-facts plaque (all 8 Lone Star Compute
 sites), shipped 2026-07-13 (`DATACENTER_SIGN_SPEC.md`) — see the new
 `lscNear`/`plaqueOpen` gotcha below. Queued work lives in `BACKLOG.md`;
 pending playtests are there too.
+
+Gotchas for whoever touches the jetpack (`vehicle.js`/`shop.js`/`dog.js`/
+`audio.js`) next:
+- `hovering` is a WALK-only sub-state (`GRAV=45`, `AIRDAMP=0.25`, module
+  constants in vehicle.js) — thrust XOR gravity each frame, no stable hover
+  point by design. The ground-clamp guard is
+  `if (this.mode !== 'FLY' && !this.hovering)`; don't drop the
+  `!this.hovering` half or WALK re-pins to terrain every frame.
+- `shop.js`: `jetpack` perk gates capability at level 0 (index 0 of
+  `JET_THRUST`/`JET_ALT`/`JET_SPEED` = 0/unowned) — `applyGear` always
+  writes `jetThrust`/`jetAlt`/`jetSpeed` regardless of ownership, only
+  `jetpack: lvl>0` gates whether Space does anything airborne.
+- The flame prop and jet-whoosh audio are both keyed off **active thrust**
+  (`hovering && keys['Space']`), not merely `hovering` — falling/coasting is
+  silent and dark by design, matching the spec's "cuts the instant thrust
+  cuts." Don't loosen either gate to just `hovering`.
+- `audio.jetTarget` is computed at the top of `update()`, before the
+  `!ctx || muted` early return — same pattern as `heliTarget`/
+  `datacenterTarget` — so it's always correct even pre-AudioContext-init;
+  verify reads this field, never the ramping AudioParam.
+- `player.onThrust` fires exactly once per liftoff (edge-triggered on the
+  `!this.hovering` guard), not every frame it's held. A verify check that
+  spies on it must restore the real callback afterward or later checks in
+  the same suite lose the real `main.js` wiring.
+- Any verify check that leaves the player airborne or in a non-DRIVE mode
+  must restore DRIVE at its end — the horn/Lacy checks depend on ambient
+  DRIVE mode; `jetpack.mjs` follows this throughout.
 
 Gotchas for whoever touches `brands.js` next:
 - Each spawned site's hero/props are split across TWO parents: the scalable

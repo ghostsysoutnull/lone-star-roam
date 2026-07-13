@@ -3,10 +3,9 @@
 Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 132 city stars, 14 landmarks, 300 roses, 12 NPCs, persistent progress.
 
-**Active priority track: `AVIATION.md`** — airports, AI air traffic, tower
-radio, rotorcraft, in 5 waves. Runs ahead of every candidate below until
-shipped or descoped (decided 2026-07-11); fold waves into this file as they
-ship.
+No active priority track (the aviation track shipped in full 2026-07-12;
+Brands and Jetpack followed and are folded in below). Queued work lives in
+`BACKLOG.md`.
 
 - [x] ~~Aviation wave 1 — Fields~~ — done 2026-07-11: 20 real airports
   (7 hubs / 9 regional / 4 strips incl. Terlingua's dirt strip and the 6666 +
@@ -444,6 +443,34 @@ ship.
   `tools/checks/springer.mjs` (6 checks) / `tools/checks/rabbits.mjs`
   (7 checks): leash-never-exceeded, approach/frolic gating, fence-line
   clamp, real-loop sentinels. No SHOT blocks.
+
+- [x] ~~Jetpack (waves 1–2)~~ — done 2026-07-13 (`JETPACK_SPEC.md`): a
+  shop-bought GTA San Andreas-style unlimited-hover jetpack — an *airborne
+  sub-state of WALK* (`this.hovering`), not a fourth mode. Hold Space to
+  thrust, WASD to drift, release to fall; `Ctrl`/`Shift` add a faster
+  controlled descent. Gated on the `jetpack` shop perk (3 tiers: thrust/max
+  AGL/air speed all rise together), unowned = Space does nothing airborne.
+  No stable hover point by design — thrust XOR gravity each frame, so a held
+  altitude comes from feathering Space, not a balance point. **Wave 1 —
+  physics + shop**: `vehicle.js` thrust/gravity/air-damping/ceiling-clamp/
+  land integration reusing FLY's `vy` field, the ground-clamp guarded by
+  `!this.hovering`; `shop.js` tiered knobs (`JET_THRUST`/`JET_ALT`/
+  `JET_SPEED`) + `applyGear` wiring. **Wave 2 — feel**: a backpack + twin
+  flame-cone prop on the cowboy avatar (visible only while actively
+  thrusting, cuts instantly on release — not merely "airborne"); a
+  noise-bed jet whoosh (`audio.jetGain`/`jetTarget`, heli/datacenter-hum
+  pattern) that follows the same active-thrust gate, plus a one-shot
+  `jetWhomp()` liftoff thump wired through a new `player.onThrust` hook
+  (edge-fires once per liftoff); the WALK chase camera pulls up/back
+  proportional to AGL (existing `camPos.lerp` smooths it, no new easing);
+  Lacy can't follow a liftoff, so `dog.js` just yips once (reusing the horn's
+  `honked()` bark queue) on the hover rising-edge and otherwise keeps
+  tracking x/z on the ground, which already reads as waiting/rejoining.
+  `tools/checks/jetpack.mjs` (11 checks): no-perk grounding, a real-rAF
+  liftoff sentinel, tier comparison, ceiling/descent/land, horizontal speed
+  cap, flame toggle, the `onThrust` wiring + fire-once-per-liftoff sentinel,
+  jet-gain-target real-loop sentinel, camera-height-rises-with-AGL, and the
+  dog liftoff yip. No SHOT blocks.
 
 ## Known limitations (v1)
 

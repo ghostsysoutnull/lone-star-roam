@@ -1,8 +1,9 @@
-// Jetpack (WALK sub-state, shop.js `jetpack` perk) wave 1 — physics + shop
-// only, no VFX/audio yet (JETPACK_SPEC.md). Every check runs in a road-free
-// flat bubble (caps/behaviors change within 4 units of any road) and restores
-// DRIVE at the end — later checks in this suite and other suites depend on
-// ambient DRIVE mode. Assert AGL (pos.y - hAt), never raw pos.y.
+// Jetpack (WALK sub-state, shop.js `jetpack` perk) — wave 1: physics + shop.
+// Wave 2: feel (flame VFX, jet whoosh audio, AGL-proportional camera, dog
+// liftoff yip) (JETPACK_SPEC.md). Every check runs in a road-free flat bubble
+// (caps/behaviors change within 4 units of any road) and restores DRIVE at
+// the end — later checks in this suite and other suites depend on ambient
+// DRIVE mode. Assert AGL (pos.y - hAt), never raw pos.y.
 
 async function roadFreeSpot(t) {
   const spot = await t.ev(`(() => {
@@ -119,6 +120,88 @@ export default async function jetpack(t) {
     await t.release();
     t.ok(maxSpeed > 6, `air speed never beat the 4.5 walk cap: ${maxSpeed.toFixed(1)}`);
     t.near(maxSpeed, jetSpeed, 1.5, 'tier III horizontal air speed');
+    await t.simStep(4); // settle back down
+    await t.ev(`g.player.setMode('DRIVE')`);
+  });
+
+  // --- wave 2: feel (flame VFX, jet whoosh audio, camera, dog) ---
+
+  await t.check('flame: visible only while actively thrusting, hidden while falling or grounded', async () => {
+    await t.tp(spot.x, spot.z, 'WALK');
+    await t.hold('Space');
+    await t.simStep(0.5);
+    t.ok(await t.ev('g.player.cowboy.userData.flameL.visible && g.player.cowboy.userData.flameR.visible'),
+      'flame not visible while thrusting');
+    await t.release();
+    await t.simStep(0.2);
+    t.ok(!(await t.ev('g.player.cowboy.userData.flameL.visible')), 'flame still visible after releasing Space (falling)');
+    await t.simStep(4); // settle to ground
+    t.ok(!(await t.ev('g.player.cowboy.userData.flameL.visible')), 'flame visible while grounded');
+    await t.ev(`g.player.setMode('DRIVE')`);
+  });
+
+  await t.check('onThrust: liftoff hook wired and fires exactly once per liftoff (jetWhomp sentinel)', async () => {
+    t.ok(await t.ev('!!g.player.onThrust'), 'player.onThrust not wired in main.js');
+    await t.tp(spot.x, spot.z, 'WALK');
+    await t.ev(`(() => {
+      g.player._thrustSpy = 0;
+      window.__realOnThrust = g.player.onThrust;
+      g.player.onThrust = () => g.player._thrustSpy++;
+    })()`);
+    await t.hold('Space');
+    await t.simStep(1); // stays hovering the whole step — must fire only on the entry edge
+    const n = await t.ev('g.player._thrustSpy');
+    await t.release();
+    t.ok(n === 1, `onThrust fired ${n} times during one continuous liftoff, expected exactly 1`);
+    await t.ev('g.player.onThrust = window.__realOnThrust'); // restore the real wiring
+    await t.simStep(4); // settle back down
+    await t.ev(`g.player.setMode('DRIVE')`);
+  });
+
+  await t.check('audio: jet whoosh gain target follows active thrust (heliTarget pattern)', async () => {
+    await t.tp(spot.x, spot.z, 'WALK');
+    const idle = await t.ev('g.audio.jetTarget');
+    await t.hold('Space');
+    await t.wait(0.3); // jetTarget is driven by audio.update() on the real rAF loop, not simStep
+    const on = await t.ev('g.audio.jetTarget');
+    await t.release();
+    await t.wait(0.3);
+    const off = await t.ev('g.audio.jetTarget');
+    t.ok(idle === 0, `jet gain target nonzero before liftoff: ${idle}`);
+    t.ok(on > 0, `jet gain target didn't rise while thrusting: ${on}`);
+    t.ok(off === 0, `jet gain target didn't drop after releasing Space: ${off}`);
+    await t.simStep(4); // settle back down
+    await t.ev(`g.player.setMode('DRIVE')`);
+  });
+
+  await t.check('camera: chase height above the player rises with AGL (AGL-proportional lerp)', async () => {
+    await t.tp(spot.x, spot.z, 'WALK');
+    const groundCamY = await t.ev('g.player.camera.position.y - g.player.pos.y');
+    await t.hold('Space');
+    await t.simStep(6); // climb toward the ceiling
+    await t.simStep(1); // let the chase-cam lerp settle at the new AGL
+    const topCamY = await t.ev('g.player.camera.position.y - g.player.pos.y');
+    await t.release();
+    t.ok(topCamY > groundCamY + 1, `camera didn't rise with AGL: ${groundCamY.toFixed(2)} -> ${topCamY.toFixed(2)}`);
+    await t.simStep(4); // settle back down
+    await t.ev(`g.player.setMode('DRIVE')`);
+  });
+
+  await t.check('dog: stays grounded and yips at liftoff (reuses honked() bark queue)', async () => {
+    await t.ev('g.gameplay.save.bank = 750');
+    const bank = await buyOut(t, 'dog', 1);
+    t.ok(bank === 0, `dog price not deducted exactly, $${750 - bank} spent`);
+    await t.tp(spot.x, spot.z, 'WALK');
+    await t.simStep(0.4); // let her settle in behind the player at ground level first
+    const groundedY = await t.ev('g.dog.g.position.y - g.hAt(g.dog.g.position.x, g.dog.g.position.z)');
+    await t.hold('Space');
+    await t.simStep(0.3);
+    const barks = await t.ev('g.dog.barks');
+    const dogAgl = await t.ev('g.dog.g.position.y - g.hAt(g.dog.g.position.x, g.dog.g.position.z)');
+    await t.release();
+    t.near(groundedY, 0, 0.5, 'dog AGL before liftoff');
+    t.ok(barks >= 1 && barks <= 2, `expected 1-2 queued yips at liftoff, got ${barks}`);
+    t.near(dogAgl, 0, 0.5, 'dog left the ground during player liftoff');
     await t.simStep(4); // settle back down
     await t.ev(`g.player.setMode('DRIVE')`);
   });

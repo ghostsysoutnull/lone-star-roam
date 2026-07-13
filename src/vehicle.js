@@ -33,6 +33,7 @@ export class Player {
     this.hovering = false; // WALK sub-state: jetpack thrust airborne
     this.keys = {};
     this.onStep = null;    // footstep audio hook
+    this.onThrust = null;  // jetpack liftoff hook (fires once on the ground->hovering edge)
     this.walkPhase = 0;
     this.steerVis = 0;
     this.prevSpeed = 0;
@@ -175,7 +176,7 @@ export class Player {
       this.pos.z -= Math.cos(this.heading) * this.speed * dt;
       this.tilt = steer * 0.5;
     } else { // WALK
-      if (!this.hovering && this.perks.jetpack && k['Space']) this.hovering = true;
+      if (!this.hovering && this.perks.jetpack && k['Space']) { this.hovering = true; this.onThrust?.(); }
       const maxSpd = this.hovering ? this.perks.jetSpeed : 4.5;
       if (fwd) this.speed += 18 * dt;
       else if (back) this.speed -= 18 * dt;
@@ -239,9 +240,11 @@ export class Player {
     this.shadow.scale.setScalar(shScale);
     this.shadow.material.opacity = 0.26 * Math.max(0, 1 - alt / 80);
 
-    // Chase camera
-    const back2 = this.mode === 'FLY' ? 16 : this.mode === 'WALK' ? 7 : 11;
-    const up = this.mode === 'FLY' ? 7 : this.mode === 'WALK' ? 3.2 : 5;
+    // Chase camera — jetpack hover pulls the framing up/back proportional to
+    // AGL (the existing camPos.lerp below smooths the rise, no extra easing needed)
+    const agl = this.hovering ? Math.max(0, this.pos.y - this.groundY) : 0;
+    const back2 = this.mode === 'FLY' ? 16 : this.mode === 'WALK' ? 7 + agl * 0.12 : 11;
+    const up = this.mode === 'FLY' ? 7 : this.mode === 'WALK' ? 3.2 + agl * 0.15 : 5;
     const target = new THREE.Vector3(
       this.pos.x + Math.sin(this.heading) * back2,
       this.pos.y + up,
@@ -376,6 +379,14 @@ export class Player {
       const lampOn = night && !(ATMOS.ufo > 0 && Math.random() < ATMOS.ufo * 0.35);
       c.lampGlow.visible = lampOn;
       c.lampLight.intensity = lampOn ? 14 + Math.sin(this.walkPhase * 2) * 1.5 : 0;
+      // jetpack flame: only while actively thrusting, cuts the instant Space releases
+      const thrust = this.hovering && !!this.keys['Space'];
+      c.flameL.visible = c.flameR.visible = thrust;
+      if (thrust) {
+        const flick = 0.75 + Math.random() * 0.5;
+        c.flameL.scale.set(1, flick, 1);
+        c.flameR.scale.set(1, flick, 1);
+      }
     }
 
     // puff pool
@@ -623,8 +634,29 @@ function mkCowboy() {
   ra.add(lantern);
   lampGlow.visible = false;
 
-  g.add(torso, belt, buckle, bandana, head, brim, crown);
-  g.userData = { ll, rl, la, ra, lampGlow, lampLight };
+  // jetpack backpack + thruster flames (worn on the back — local -z is the
+  // avatar's facing direction after rotY(heading), so +z is behind the torso)
+  const pack = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.42, 0.2),
+    new THREE.MeshLambertMaterial({ color: 0x4a4f57 }));
+  pack.position.set(0, 1.08, 0.27);
+  const nozzleMat = new THREE.MeshLambertMaterial({ color: 0x2e3138 });
+  const mkNozzle = (x) => {
+    const n = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.12, 6), nozzleMat);
+    n.position.set(x, 0.82, 0.27);
+    return n;
+  };
+  const flameMat = new THREE.MeshBasicMaterial({ color: 0xffa030 });
+  const mkFlame = (x) => {
+    const f = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.32, 6), flameMat);
+    f.position.set(x, 0.6, 0.27);
+    f.rotation.x = Math.PI; // tip points down, away from the nozzle
+    f.visible = false;
+    return f;
+  };
+  const flameL = mkFlame(-0.09), flameR = mkFlame(0.09);
+
+  g.add(torso, belt, buckle, bandana, head, brim, crown, pack, mkNozzle(-0.09), mkNozzle(0.09), flameL, flameR);
+  g.userData = { ll, rl, la, ra, lampGlow, lampLight, flameL, flameR };
   return g;
 }
 

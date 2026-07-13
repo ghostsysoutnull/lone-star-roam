@@ -95,6 +95,11 @@ export class AudioSystem {
     dcWhine.connect(dcWhineGain).connect(this.datacenterGain);
     dcWhine.start();
 
+    // --- jetpack whoosh: bright filtered noise, gain follows active thrust ---
+    this.jetGain = chan();
+    this.jetTarget = 0; // last commanded gain target (verify reads this, not the ramping param)
+    noiseSrc('bandpass', 1400, 0.9).connect(this.jetGain);
+
     // --- crickets: pulsed high tone at night ---
     this.cricketGain = chan();
     const cricket = ctx.createOscillator();
@@ -143,10 +148,14 @@ export class AudioSystem {
 
   // called every frame from the game loop
   update(player, atmos) {
+    // computed unconditionally (heli()/datacenterHum() pattern) so verify can
+    // read the commanded target even before the AudioContext exists
+    this.jetTarget = player.mode === 'WALK' && player.hovering && !!player.keys['Space'] ? 0.09 : 0;
     if (!this.ctx || this.muted) return;
     const t = this.ctx.currentTime;
     const spd = Math.abs(player.speed);
     const set = (param, v, tc = 0.08) => param.setTargetAtTime(v, t, tc);
+    set(this.jetGain.gain, this.jetTarget, 0.12);
 
     // near a UFO: engine sputters (the Levelland effect) and the theremin swells
     const ufo = atmos.ufo || 0;
@@ -336,6 +345,24 @@ export class AudioSystem {
       this.note(1560, 0, 0.06, 0.022, 'triangle');
       this.note(2090, 0.04, 0.05, 0.016, 'triangle');
     }
+  }
+
+  // jetpack liftoff: a soft low thump (backpack firing) under a quick rising whoosh
+  jetWhomp() {
+    if (!this.ctx || this.muted) return;
+    const ctx = this.ctx;
+    this.note(85, 0, 0.22, 0.1, 'sine');
+    const o = ctx.createOscillator();
+    o.type = 'sawtooth';
+    const t0 = ctx.currentTime;
+    o.frequency.setValueAtTime(200, t0);
+    o.frequency.exponentialRampToValueAtTime(650, t0 + 0.22);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(0.05, t0 + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.28);
+    o.connect(g).connect(this.sfx);
+    o.start(t0); o.stop(t0 + 0.3);
   }
 
   // Lacy: a bright little double-yip — pitch whips up then falls back

@@ -1,7 +1,10 @@
 // Lacy — a Blue Lacy, the state dog of Texas, bought once in the shop.
 // Rides in the truck bed (perched on the cargo crates mid-haul), hops out to
-// trail the cowboy in WALK, and yips a beat after the horn. Hidden until
-// save.gear.dog is set (shop.js applyGear → setOwned).
+// trail the cowboy in WALK, and yips a beat after the horn. She can't follow
+// a jetpack liftoff, so she stays grounded, yips at the moment of liftoff, and
+// just keeps tracking x/z underneath — which reads as waiting/rejoining, no
+// extra state needed. Hidden until save.gear.dog is set (shop.js applyGear →
+// setOwned).
 import * as THREE from 'three';
 import { hAt } from './geo.js';
 import { groundYAt } from './airports.js';
@@ -26,6 +29,7 @@ export class DogSystem {
     this.barks = 0;
     this.barkT = 0;
     this.onBark = null;
+    this._hoveringPrev = false; // jetpack liftoff edge (she's grounded, but reacts)
   }
 
   setOwned(on) {
@@ -52,6 +56,9 @@ export class DogSystem {
       }
     }
     const p = this.player;
+    const hovering = p.mode === 'WALK' && p.hovering;
+    if (hovering && !this._hoveringPrev) this.honked(); // liftoff — she stays grounded but yips
+    this._hoveringPrev = hovering;
     if (p.mode !== 'WALK') {
       // ride in the bed facing backward; mid-haul she sits up on the crates
       if (this.g.parent !== p.truck) {
