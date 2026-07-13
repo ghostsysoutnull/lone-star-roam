@@ -52,6 +52,18 @@ export default async function brands(t) {
     t.ok(total > 400, `hero not showpiece-tier: ${total} tris (${JSON.stringify(tris)})`);
   });
 
+  await t.check('sign panel: the "Bucky\'s" name actually renders (textured, not blank)', async () => {
+    await t.tp(katyAt.x, katyAt.z + 3);
+    await t.until(`g.brands.live.has('Katy')`, 8000);
+    const panel = await t.ev(`(() => {
+      const r = g.brands.live.get('Katy');
+      const p = r.signPanel;
+      return { has: !!p, mapped: !!(p && p.material && p.material.map), visible: p ? p.visible : false };
+    })()`);
+    t.ok(panel.has && panel.mapped, `Bucky's sign panel missing or blank: ${JSON.stringify(panel)}`);
+    t.ok(panel.visible, "Bucky's sign panel not visible");
+  });
+
   await t.check('placement legality: no Bucky\'s sits on an airport field', async () => {
     // scan every site coord through the pure exclusion query
     const bad = await t.ev(`(() => {

@@ -105,7 +105,10 @@ exposed on `window.__game.brands` at birth.
 - **Hero**: long low storefront (showpiece box-loft with a pitched
   canopy roof), a **tall roadside sign pylon** topped by the **beaver
   mascot** — a greebled low-poly beaver head (sphere head, two box buck
-  teeth, box cap, disc eyes) that is the at-a-distance recognizer.
+  teeth, box cap, disc eyes) that is the at-a-distance recognizer. The
+  sign face carries the readable "Bucky's" name as a canvas-texture panel
+  (added post-ship, at Bruno's request, same idiom as H-E-Buddy's sign —
+  one texture built once and reused across all 15 sites).
 - **Props (heli-tier, instanced)**: a wide **fuel canopy** over a row of
   ~12–16 pump islands (canopy = merged beam grid; pumps = instanced
   prototype), cart corrals, a couple of parked-truck boxes.

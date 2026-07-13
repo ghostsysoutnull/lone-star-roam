@@ -122,6 +122,10 @@ export class BrandSystem {
     this.pumpGeo = mkPump();
     this.billboardGeo = mkBillboard();
     this.panelGeo = new THREE.PlaneGeometry(5.0, 2.4);
+    // Bucky's sign panel — one shared plane + canvas-texture material (the
+    // name is identical at all 15 sites, unlike the per-site punny billboards).
+    this.buckySignGeo = new THREE.PlaneGeometry(5.0, 3.6);
+    this.buckySignMat = new THREE.MeshLambertMaterial({ map: mkBuckySignTex(), side: THREE.DoubleSide });
     // H-E-Buddy lot-prop prototypes (cart corral, cart, light pole).
     this.corralGeo = mkCartCorral();
     this.cartGeo = mkCart();
@@ -132,7 +136,7 @@ export class BrandSystem {
     this.hebSignGeo = new THREE.PlaneGeometry(11.5, 2.6);
     this.hebSignMat = new THREE.MeshLambertMaterial({ map: mkHEBSignTex(), side: THREE.DoubleSide });
     this.shared = new Set([
-      this.pumpGeo, this.billboardGeo, this.panelGeo,
+      this.pumpGeo, this.billboardGeo, this.panelGeo, this.buckySignGeo,
       this.corralGeo, this.cartGeo, this.poleGeo, this.hebSignGeo,
     ]);
 
@@ -237,6 +241,12 @@ export class BrandSystem {
     ];
     const lightAt = { canopy: toWorld(CANOPY_ANCHOR), sign: toWorld(SIGN_ANCHOR) };
 
+    // Sign panel: the readable "Bucky's" name, mounted just proud of the
+    // yellow sign face baked into staticGeo.
+    const signPanel = new THREE.Mesh(this.buckySignGeo, this.buckySignMat);
+    signPanel.position.set(...hero.signPanelAt);
+    group.add(signPanel);
+
     // The pump islands under the canopy are an InstancedMesh of the prototype.
     const pumps = new THREE.InstancedMesh(this.pumpGeo, this.propMat, hero.pumpXforms.length);
     hero.pumpXforms.forEach((m, i) => pumps.setMatrixAt(i, m));
@@ -248,7 +258,7 @@ export class BrandSystem {
     const boards = this.buildBillboards(site, x, z, padY, group, rand);
 
     this.scene.add(group);
-    this.live.set(site.name, { group, staticMesh, pumps, boards, lightAt, type: 'bucky' });
+    this.live.set(site.name, { group, staticMesh, pumps, boards, signPanel, lightAt, type: 'bucky' });
   }
 
   // Billboards live along the highway well back from the store — each samples
@@ -418,6 +428,23 @@ function mkSignTex(text) {
   return tex;
 }
 
+// Bucky's roadside sign face — the readable name atop the pylon, below the
+// beaver. Identical at all 15 sites, so this is built ONCE in the
+// constructor (mirrors the billboard atlas idiom, one texture per string —
+// here there's only ever one string).
+function mkBuckySignTex() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 384;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#f2c200'; ctx.fillRect(0, 0, c.width, c.height);         // yellow, matches SIGN
+  ctx.fillStyle = '#c0392b'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = "bold italic 108px 'Georgia', serif";
+  ctx.fillText("Bucky's", c.width / 2, c.height / 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.anisotropy = 4;
+  return tex;
+}
+
 // H-E-Buddy's sign face — the readable name, identical at every site (unlike
 // Bucky's per-site punny copy), so this is built ONCE in the constructor and
 // shared across all 33 sites via a single material.
@@ -506,7 +533,11 @@ function buildBuckyHero(skirt = 0.4) {
   s.push(tinted(new THREE.BoxGeometry(5.6, 0.6, 0.55).translate(SX, 12.6, SZ + 0.66), TRIM)); // sign underline (glows red)
   for (const p of beaverParts(SX, 18.4, SZ + 0.2)) s.push(p);
 
-  return { staticGeo: merge(s), pumpXforms };
+  // the readable name is a textured panel mounted just proud of the yellow
+  // face (spawn() places it — same pattern as H-E-Buddy's sign panel).
+  const signPanelAt = [SX, 14.6, SZ + 0.95];
+
+  return { staticGeo: merge(s), pumpXforms, signPanelAt };
 }
 
 // ----------------------------------------------------------- H-E-Buddy (W2)
