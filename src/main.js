@@ -251,6 +251,7 @@ async function boot() {
     bats.update(dt, player.pos.x, player.pos.z, sky.t);
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed);
+    gameplay.checkTouchdown(player, missions.job?.kind === 'charter');
     missions.update(dt, player.pos, player.mode, player.pos.y - hAt(player.pos.x, player.pos.z));
     hud.animateShield(player, dt); // per-frame sway/float — headless too, not gated by __skipRender
     const npcName = npcs.update(dt, player.pos);

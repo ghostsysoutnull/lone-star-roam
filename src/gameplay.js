@@ -5,8 +5,18 @@ import { GEO, seededRand, nearestCity, hAt } from './geo.js';
 import { mkStarMesh } from './vehicle.js';
 import { cityRadius } from './cities.js';
 import { merge, tinted } from './traffic.js';
+import { fieldNear, onRunway, TD_AGL, TD_SPD } from './airports.js';
 
 const SAVE_KEY = 'lonestar-roam-save-v1';
+const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+
+// flavor only, every field (unlike the towered-only save.airports logbook in radio.js)
+const WELCOME_LINES = [
+  (n) => `🛬 Touchdown at ${n}.`,
+  (n) => `🛬 Wheels down — welcome to ${n}.`,
+  (n) => `🛬 You've made it to ${n}. Boots on the ground.`,
+  (n) => `🛬 Nice landing! Welcome to ${n}.`,
+];
 
 // Real landmarks at real coordinates (projected same as pipeline: 1u=100m, center 31N 99.5W)
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
@@ -120,6 +130,22 @@ export class Gameplay {
     this.persist();
     this.onToast?.(`✈️ ${name} — logbook stamped (${this.save.airports.length}/7)`);
     this.onCollect?.('stamp');
+  }
+
+  // touchdown greeting + auto-walk — every field (ranch strips included), no
+  // save state touched. Self-resets: setMode('WALK') takes mode off 'FLY',
+  // so the guard below can't refire until the player flies and lands again.
+  // `duringCharter` is true while an active charter job owns this landing
+  // (its own pickup/deliver flow drives the field, and haul legs need the
+  // player to stay in FLY) — skip so we don't yank the mode out from under it.
+  checkTouchdown(player, duringCharter = false) {
+    if (duringCharter || player.mode !== 'FLY') return;
+    const agl = player.pos.y - hAt(player.pos.x, player.pos.z);
+    if (agl >= TD_AGL || Math.abs(player.speed) >= TD_SPD) return;
+    const a = fieldNear(player.pos.x, player.pos.z);
+    if (!a || !onRunway(a, player.pos.x, player.pos.z, 1.5)) return;
+    this.onToast?.(pick(WELCOME_LINES)(a.name));
+    player.setMode('WALK');
   }
 
   persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); }

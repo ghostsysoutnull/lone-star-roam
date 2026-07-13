@@ -620,6 +620,60 @@ export default async function aviation(t) {
     t.ok(r.after2 === 1, `second landing at the same field double-stamped (${r.after2})`);
   });
 
+  await t.check('touchdown greeting: clean landing toasts a welcome and auto-switches to WALK', async () => {
+    const r = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      const day = Math.floor(g.sky.days);
+      const u = g.runwayInUse(a, day);
+      document.getElementById('toast').textContent = '';
+      g.player.setMode('FLY');
+      g.player.heading = -Math.atan2(u.dx, -u.dz);
+      g.player.pos.set(u.tx, g.hAt(u.tx, u.tz) + 1, u.tz);
+      g.player.vy = -3; g.player.speed = 25;
+      g.gameplay.checkTouchdown(g.player);
+      return { toast: document.getElementById('toast').textContent, mode: g.player.mode, name: a.name };
+    })()`);
+    t.ok(r.toast.includes(r.name), `toast "${r.toast}" doesn't mention ${r.name}`);
+    t.ok(r.mode === 'WALK', `mode after touchdown is ${r.mode}, expected WALK`);
+  });
+
+  await t.check('touchdown greeting fires at an untowered ranch strip too (unlike the /7 logbook)', async () => {
+    const r = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'SSS');
+      const day = Math.floor(g.sky.days);
+      const u = g.runwayInUse(a, day);
+      document.getElementById('toast').textContent = '';
+      g.player.setMode('FLY');
+      g.player.heading = -Math.atan2(u.dx, -u.dz);
+      g.player.pos.set(u.tx, g.hAt(u.tx, u.tz) + 1, u.tz);
+      g.player.vy = -3; g.player.speed = 25;
+      g.gameplay.checkTouchdown(g.player);
+      return { toast: document.getElementById('toast').textContent, mode: g.player.mode, name: a.name };
+    })()`);
+    t.ok(r.toast.includes(r.name), `toast "${r.toast}" doesn't mention ${r.name}`);
+    t.ok(r.mode === 'WALK', `mode after touchdown is ${r.mode}, expected WALK`);
+  });
+
+  await t.check('touchdown greeting gate rejects too-fast and too-high (no toast, stays FLY)', async () => {
+    const r = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((x) => x.id === 'AUS');
+      const day = Math.floor(g.sky.days);
+      const u = g.runwayInUse(a, day);
+      const attempt = (agl, speed) => {
+        document.getElementById('toast').textContent = '';
+        g.player.setMode('FLY');
+        g.player.heading = -Math.atan2(u.dx, -u.dz);
+        g.player.pos.set(u.tx, g.hAt(u.tx, u.tz) + agl, u.tz);
+        g.player.vy = -3; g.player.speed = speed;
+        g.gameplay.checkTouchdown(g.player);
+        return { toast: document.getElementById('toast').textContent, mode: g.player.mode };
+      };
+      return { tooFast: attempt(1, 62), tooHigh: attempt(21, 25) };
+    })()`);
+    t.ok(r.tooFast.toast === '' && r.tooFast.mode === 'FLY', `too-fast touchdown greeted: "${r.tooFast.toast}" (${r.tooFast.mode})`);
+    t.ok(r.tooHigh.toast === '' && r.tooHigh.mode === 'FLY', `too-high touchdown greeted: "${r.tooHigh.toast}" (${r.tooHigh.mode})`);
+  });
+
   await t.check('a player parked on the active runway forces an inbound flight to go around', async () => {
     await t.tp(aus[0] + 20, aus[1] + 16, 'WALK');
     const r = await t.ev(`(() => {
