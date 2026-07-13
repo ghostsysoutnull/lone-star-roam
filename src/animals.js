@@ -54,9 +54,9 @@ function regionTable(x, z) {
   if (z < -2300 && x > -3300 && x < 1600) // High Plains / Panhandle
     return [['pronghorn', 3, 6, 1, 0.5], ['jackrabbit', 1, 2, 1, 0.55], ['coyote', 1, 2, 1, 0.5], ['vulture', 2, 4, 1, 0.5]];
   if (x < -2200) // Trans-Pecos desert
-    return [['jackrabbit', 1, 2, 1, 0.55], ['roadrunner', 1, 1, 1, 0.55], ['coyote', 1, 2, 1, 0.55], ['vulture', 2, 4, 1, 0.55], ['javelina', 2, 5, 1, 0.4], ['rattlesnake', 1, 1, 1, 0.15]];
+    return [['jackrabbit', 1, 2, 1, 0.55], ['roadrunner', 1, 1, 1, 0.55], ['coyote', 1, 2, 1, 0.55], ['vulture', 2, 4, 1, 0.55], ['javelina', 2, 5, 1, 0.4], ['rattlesnake', 1, 1, 1, 0.35]];
   if (x > 3400) // Piney Woods
-    return [['deer', 2, 4, 1, 0.55], ['hog', 2, 5, 1, 0.55], ['turkey', 3, 7, 1, 0.4], ['gator', 1, 2, 1, 0.15]];
+    return [['deer', 2, 4, 1, 0.55], ['hog', 2, 5, 1, 0.55], ['turkey', 3, 7, 1, 0.4], ['gator', 1, 2, 1, 0.3]];
   if (x > -900 && x < 1100 && z > -400 && z < 1500) // Hill Country
     return [['deer', 2, 4, 1, 0.55], ['turkey', 3, 6, 1, 0.45], ['armadillo', 1, 2, 1, 0.5], ['longhorn', 3, 6, 1, 0.5]];
   if (z > 2600) // South Texas brush
@@ -72,6 +72,7 @@ export class AnimalSystem {
     this.sndCd = {};            // per-kind cooldowns
     this.live = new Map(); // chunk key -> { group, animals: [] }
     this.t = 0;
+    this.regionTable = regionTable; // exposed for verify — reads spawn odds without resampling chunks
   }
 
   update(dt, px, pz, py = 0) {
@@ -146,7 +147,7 @@ export class AnimalSystem {
 
     // voices: lonesome howls at night, a rattle warning underfoot, distant gobbles
     if (a.species === 'coyote' && ATMOS.night > 0.3 && d2 < 140 * 140) this.sound('howl', 22 + Math.random() * 20);
-    if (a.species === 'rattlesnake' && d2 < 9 * 9) this.sound('rattle', 2.5);
+    if (a.species === 'rattlesnake' && d2 < 16 * 16) this.sound('rattle', 2.5);
     if (a.species === 'turkey' && d2 < 30 * 30) this.sound('gobble', 9 + Math.random() * 14);
 
     if (spec.behavior === 'circle') { // vultures ride thermals, pelicans patrol low

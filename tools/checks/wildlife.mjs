@@ -85,4 +85,41 @@ export default async function wildlife(t) {
     t.ok(wrong === 0, `${wrong}/${total} animals ignore their hours at night`);
     await t.setDay(); // leave the world in daylight
   });
+
+  // rattlesnake (Trans-Pecos) and gator (Piney Woods) were 0.15 keep-odds
+  // outliers vs. 0.3-0.55 everywhere else — pin the retuned values directly
+  // via g.animals.regionTable rather than resampling chunks statistically
+  await t.check('rattlesnake and gator keep-odds match the retuned values', async () => {
+    const snakeOdds = await t.ev(`g.animals.regionTable(-2700, 600).find((e) => e[0] === 'rattlesnake')[4]`);
+    const gatorOdds = await t.ev(`g.animals.regionTable(4000, 0).find((e) => e[0] === 'gator')[4]`);
+    t.near(snakeOdds, 0.35, 0.001, 'rattlesnake keep-odds');
+    t.near(gatorOdds, 0.3, 0.001, 'Piney Woods gator keep-odds');
+  });
+
+  await t.check('rattle warning carries to 16 units, not just 9', async () => {
+    await t.tp(-2700, 600, 'WALK');
+    await t.wait(0.5); // chunks spawn on the next update
+    const snake = await t.ev(`(() => {
+      for (const { animals } of g.animals.live.values())
+        for (const a of animals)
+          if (a.species === 'rattlesnake') return { x: a.g.position.x, z: a.g.position.z };
+      return null;
+    })()`);
+    t.ok(snake, 'no rattlesnake spawned near the Trans-Pecos test spot');
+    if (!snake) return;
+
+    await t.ev(`(window.__rattleSpy = [], window.__origOnSound = g.animals.onSound,
+      g.animals.onSound = (k) => { window.__rattleSpy.push(k); window.__origOnSound?.(k); })`);
+
+    await t.tp(snake.x + 30, snake.z, 'WALK');
+    await t.wait(0.4);
+    t.ok(!(await t.ev(`window.__rattleSpy.includes('rattle')`)), 'rattle audible from 30 units away');
+
+    await t.ev(`window.__rattleSpy = []`);
+    await t.tp(snake.x + 13, snake.z, 'WALK'); // between the old 9-unit cutoff and the new 16-unit one
+    await t.wait(0.4);
+    t.ok(await t.ev(`window.__rattleSpy.includes('rattle')`), 'rattle silent at 13 units — still gated at the old 9-unit radius?');
+
+    await t.ev(`g.animals.onSound = window.__origOnSound`);
+  });
 }
