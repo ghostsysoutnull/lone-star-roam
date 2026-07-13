@@ -2,11 +2,34 @@
 
 **No active priority track.** The Texas Brands track (Bucky's, H-E-Buddy,
 Lone Star Compute — 3 waves) shipped 2026-07-12 and is folded into
-`ROADMAP.md`; `BRANDS_SPEC.md` stays as history. Queued work lives in
-`BACKLOG.md`; pending playtests are there too. Pick the next effort from
-`BACKLOG.md` (or start a new multi-wave spec per the `CLAUDE.md` protocol) —
-there's no `## Session briefing` block, so the greeting stays quiet until the
-next spec writes one.
+`ROADMAP.md`; `BRANDS_SPEC.md` stays as history. A follow-up player-controlled
+brand-size feature (`[`/`]`, own `lonestar-brand-scale` localStorage key) also
+shipped 2026-07-12 on top of it — see the `brands.js` gotcha below. Queued
+work lives in `BACKLOG.md`; pending playtests are there too. Pick the next
+effort from `BACKLOG.md` (or start a new multi-wave spec per the `CLAUDE.md`
+protocol) — there's no `## Session briefing` block, so the greeting stays
+quiet until the next spec writes one.
+
+Gotchas for whoever touches `brands.js` next:
+- Each spawned site's hero/props are split across TWO parents: the scalable
+  `building` sub-group (holds staticMesh/signPanel/props, carries
+  `.scale.setScalar(SCALE)`) and `group` itself (billboards only, at Bucky's).
+  If you add a new prop, decide which one it belongs in — anything that
+  should shrink/grow with the store goes in `building`; anything that must
+  stay grounded on its OWN terrain sample independent of store size (like the
+  approach billboards) stays a direct `group` child with its own `.scale`.
+- The foundation skirt's authored depth is `(relief + 0.4) / SCALE` —
+  deliberately counter-scaled so its WORLD-space reach stays constant
+  regardless of brand size (a shrunk building's shrunk skirt would otherwise
+  float off sloped real terrain; El Paso's H-E-Buddy lot, ~1.8u relief, is
+  the worst real case and is what the verify check exercises). Don't
+  "simplify" this back to a plain `relief + 0.4` — that reintroduces the float
+  at any scale below 1.
+- `footAt`'s footprint half-extents and `PAD_TOP` are also scaled by the same
+  module-level `SCALE`, so the walkable pad always matches the rendered slab.
+  `SCALE` is read live (not cached) — the footprint site caches
+  (`buckyFootprints()` etc.) only cache the scale-INDEPENDENT geometry
+  (`padY`/`heading`/`x`/`z`), never the scale factor itself.
 
 Gotchas for whoever touches `hud.js` next:
 - The road shield is a CSS-3D chrome card: `this.shield` (constructor) is the

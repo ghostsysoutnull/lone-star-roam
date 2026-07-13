@@ -17,7 +17,7 @@ export default async function brands(t) {
     await t.until(`g.brands.live.has('Katy')`, 8000);
     const near = await t.ev(`(() => {
       const r = g.brands.live.get('Katy');
-      return { has: !!r, y: r.group.position.y, kids: r.group.children.length };
+      return { has: !!r, y: r.group.position.y, kids: r.building.children.length };
     })()`);
     t.ok(near.has && near.kids >= 3, `spawn incomplete: ${JSON.stringify(near)}`);
 
@@ -226,7 +226,7 @@ export default async function brands(t) {
     await t.until(`g.brands.live.has('heb:Houston')`, 8000);
     const near = await t.ev(`(() => {
       const r = g.brands.live.get('heb:Houston');
-      return { has: !!r, kids: r.group.children.length, type: r.type };
+      return { has: !!r, kids: r.building.children.length, type: r.type };
     })()`);
     t.ok(near.has && near.kids >= 4 && near.type === 'heb', `spawn incomplete: ${JSON.stringify(near)}`);
 
@@ -336,7 +336,7 @@ export default async function brands(t) {
     await t.until(`g.brands.live.has('lsc:Abilene')`, 8000);
     const near = await t.ev(`(() => {
       const r = g.brands.live.get('lsc:Abilene');
-      return { has: !!r, kids: r.group.children.length, type: r.type };
+      return { has: !!r, kids: r.building.children.length, type: r.type };
     })()`);
     t.ok(near.has && near.kids >= 4 && near.type === 'lsc', `spawn incomplete: ${JSON.stringify(near)}`);
 
@@ -463,5 +463,125 @@ export default async function brands(t) {
       await t.shot('lonestar-compute-night');
     }
     await t.setDay();
+  });
+
+  // ---------------------------------------- player-controlled brand size
+  await t.check('brand size: setScale rebuilds the hero at the new scale, clamps, and persists', async () => {
+    await t.tp(katyAt.x, katyAt.z + 3);
+    await t.until(`g.brands.live.has('Katy')`, 8000);
+
+    await t.ev(`g.brands.setScale(0.6)`);
+    await t.until(`g.brands.live.has('Katy')`, 2000);
+    const shrunk = await t.ev(`({ scale: g.brands.live.get('Katy').building.scale.x, stored: localStorage.getItem('lonestar-brand-scale') })`);
+    t.near(shrunk.scale, 0.6, 0.001, `building sub-group not scaled: ${shrunk.scale}`);
+    t.ok(shrunk.stored === '0.6', `scale not persisted to localStorage: ${shrunk.stored}`);
+
+    const clampHi = await t.ev(`g.brands.setScale(5)`);
+    const clampLo = await t.ev(`g.brands.setScale(-5)`);
+    t.ok(clampHi.endsWith('125%'), `scale not clamped to the max: ${clampHi}`);
+    t.ok(clampLo.endsWith('50%'), `scale not clamped to the min: ${clampLo}`);
+
+    await t.ev(`g.brands.setScale(1)`); // reset for the rest of the suite
+    await t.until(`g.brands.live.has('Katy')`, 2000);
+  });
+
+  await t.check('brand size: groundYAt footprint + pad height scale with the slab', async () => {
+    await t.tp(katyAt.x, katyAt.z + 3);
+    await t.until(`g.brands.live.has('Katy')`, 8000);
+    const h = await t.ev(`g.brands.live.get('Katy').group.rotation.y`);
+    // ~15 local units off-axis (toWorld's convention): inside the full pad
+    // (BUCKY_FOOT.hx = 17) but outside a half-scale pad (hx*0.5 = 8.5).
+    const ex = katyAt.x + 15 * Math.cos(h), ez = katyAt.z - 15 * Math.sin(h);
+
+    await t.ev(`g.brands.setScale(1)`);
+    const r1 = await t.ev(`g.brandGroundYAt(${katyAt.x}, ${katyAt.z})`);
+    const edgeFull = await t.ev(`g.brandGroundYAt(${ex}, ${ez})`);
+
+    await t.ev(`g.brands.setScale(0.5)`);
+    const r2 = await t.ev(`g.brandGroundYAt(${katyAt.x}, ${katyAt.z})`);
+    const edgeHalf = await t.ev(`g.brandGroundYAt(${ex}, ${ez})`);
+
+    t.ok(r1 !== null && r2 !== null, `pad center should stay on the pad at both scales: ${r1}, ${r2}`);
+    // PAD_TOP (0.42) is the only term that changes between the two reads —
+    // padY (max terrain under the lot) doesn't move.
+    t.near(r1 - r2, 0.42 * 0.5, 0.02, `pad top didn't shrink proportionally: full ${r1}, half ${r2}`);
+    t.ok(edgeFull !== null, `edge point should be inside the full-size pad, got ${edgeFull}`);
+    t.ok(edgeHalf === null, `edge point should fall outside the half-size pad, got ${edgeHalf}`);
+
+    await t.ev(`g.brands.setScale(1)`);
+    await t.until(`g.brands.live.has('Katy')`, 2000);
+  });
+
+  await t.check('brand size: approach billboards resize in place, never drift off their ground point', async () => {
+    await t.tp(katyAt.x, katyAt.z + 3);
+    await t.until(`g.brands.live.has('Katy')`, 8000);
+    const full = await t.ev(`g.brands.live.get('Katy').boards.map((p) => ({ wx: p.wx, wz: p.wz }))`);
+
+    await t.ev(`g.brands.setScale(0.5)`);
+    await t.until(`g.brands.live.has('Katy')`, 2000);
+    const half = await t.ev(`g.brands.live.get('Katy').boards.map((p) => ({ wx: p.wx, wz: p.wz, scale: p.mesh.scale.x }))`);
+
+    t.ok(half.length === full.length && half.length >= 3, `billboard count changed across a rescale: ${full.length} -> ${half.length}`);
+    t.near(half[0].scale, 0.5, 0.01, `billboard mesh didn't pick up the new scale: ${half[0].scale}`);
+    for (let i = 0; i < full.length; i++) {
+      t.near(half[i].wx, full[i].wx, 0.01, `billboard ${i} drifted in x when the store rescaled`);
+      t.near(half[i].wz, full[i].wz, 0.01, `billboard ${i} drifted in z when the store rescaled`);
+    }
+
+    await t.ev(`g.brands.setScale(1)`);
+    await t.until(`g.brands.live.has('Katy')`, 2000);
+  });
+
+  await t.check('brand size: night-light anchors track the rescaled sign/canopy, not the unscaled offset', async () => {
+    await t.tp(katyAt.x, katyAt.z + 3);
+    await t.until(`g.brands.live.has('Katy')`, 8000);
+    await t.setNight();
+    await t.wait(0.5);
+    const full = await t.ev(`g.brands.live.get('Katy').lightAt.sign`);
+
+    await t.ev(`g.brands.setScale(0.5)`);
+    await t.until(`g.brands.live.has('Katy')`, 2000);
+    await t.wait(0.5); // let update() retarget the persistent lights to the respawned site
+    const half = await t.ev(`(() => {
+      const r = g.brands.live.get('Katy');
+      const dc = Math.hypot(g.brands.canopyLight.position.x - r.lightAt.canopy[0], g.brands.canopyLight.position.z - r.lightAt.canopy[2]);
+      return { sign: r.lightAt.sign, dc };
+    })()`);
+
+    // the sign anchor sits 15.5 local units out from pad center — at half
+    // scale it should sit roughly half as far from the pad, not unchanged.
+    const fullDist = Math.hypot(full[0] - katyAt.x, full[2] - katyAt.z);
+    const halfDist = Math.hypot(half.sign[0] - katyAt.x, half.sign[2] - katyAt.z);
+    t.near(halfDist, fullDist * 0.5, 0.5, `sign light anchor didn't scale toward the pad: full ${fullDist.toFixed(2)}, half ${halfDist.toFixed(2)}`);
+    t.ok(half.dc < 5, `canopy light not retargeted to the rescaled anchor: ${half.dc.toFixed(2)}`);
+
+    await t.setDay();
+    await t.ev(`g.brands.setScale(1)`);
+    await t.until(`g.brands.live.has('Katy')`, 2000);
+  });
+
+  await t.check('brand size: shrunk skirt still drapes to the lot min on the steepest real site', async () => {
+    // El Paso's H-E-Buddy lot is the steepest real relief in the whole
+    // table (~1.78u, found via a one-off scan) — the site most likely to
+    // expose a skirt that floats once the building group is scaled down.
+    const site = await t.ev(`g.brands.hebSites.find((s) => s.name === 'El Paso')`);
+    await t.ev(`g.brands.setScale(0.5)`);
+    await t.tp(site.x, site.z + 3);
+    await t.until(`g.brands.live.has('heb:El Paso')`, 8000);
+    const g0 = await t.ev(`(() => {
+      const r = g.brands.live.get('heb:El Paso');
+      r.staticMesh.geometry.computeBoundingBox();
+      const range = (x, z) => { let mn = Infinity;
+        for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) mn = Math.min(mn, g.hAt(x + i * 20, z + j * 20));
+        return mn; };
+      return {
+        mn: range(r.group.position.x, r.group.position.z),
+        baseWorld: r.group.position.y + r.building.scale.y * r.staticMesh.geometry.boundingBox.min.y,
+      };
+    })()`);
+    t.ok(g0.baseWorld <= g0.mn + 1e-3, `shrunk skirt floats above the lot min: base ${g0.baseWorld.toFixed(3)} vs min ${g0.mn.toFixed(3)}`);
+
+    await t.ev(`g.brands.setScale(1)`);
+    await t.until(`g.brands.live.has('heb:El Paso')`, 2000);
   });
 }

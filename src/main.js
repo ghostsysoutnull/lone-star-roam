@@ -163,6 +163,8 @@ async function boot() {
     if (e.code === 'KeyN') hud.toast(audio.toggleMute() ? '🔇 Muted' : '🔊 Sound on');
     if (e.code === 'Equal' || e.code === 'NumpadAdd') hud.toast(`🔍 UI size ${hud.uiScale(1)}`);
     if (e.code === 'Minus' || e.code === 'NumpadSubtract') hud.toast(`🔍 UI size ${hud.uiScale(-1)}`);
+    if (e.code === 'BracketRight') hud.toast(`🏪 Brand size ${brands.setScale(brands.scale + 0.05)}`);
+    if (e.code === 'BracketLeft') hud.toast(`🏪 Brand size ${brands.setScale(brands.scale - 0.05)}`);
     if (e.code === 'KeyR') player.resetToRoad();
     if (e.code === 'KeyE') {
       if (!npcs.interact(player.pos)) {

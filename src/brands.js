@@ -6,7 +6,10 @@
 // the 33 largest GEO.cities, placed on a city-edge road shoulder + instanced
 // lot props. Night glow for both is REAL persistent PointLights (not
 // emissive — emissive washes a colored sign toward white), gated on
-// ATMOS.night. Scenery only: no gameplay/save/mission/seed-string changes.
+// ATMOS.night. Scenery only: no gameplay.save/mission/seed-string changes —
+// the player-controlled global size (`[`/`]`, main.js) owns its own
+// `lonestar-brand-scale` localStorage key instead (hud.js's ui-scale idiom),
+// same reasoning: a world-appearance preference, not gameplay progression.
 //
 // Imports geo+sky (site data + night gate), traffic (the tinted/merge
 // geometry kit), and — for H-E-Buddy's placement — cities.js (cityRadius)
@@ -27,6 +30,22 @@ import { cityRadius } from './cities.js';
 import { airportClear } from './airports.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
+
+// Player-controlled global size for all three brand categories — a world-
+// appearance preference (own localStorage key, ui-scale idiom in hud.js), NOT
+// gameplay progression, so it never touches gameplay.save. One factor for all
+// three brands (not per-category): asked for and answered by Bruno 2026-07-12.
+// Every hero/prop mesh at a site is parented under a `building` sub-group that
+// carries this scale (spawn()/spawnHEB()/spawnLSC()) — scaling `group` itself
+// would also drag the Bucky's approach billboards, which live in WORLD space
+// well off the pad and must resize IN PLACE on their own ground point instead
+// (buildBillboards scales each billboard's own local group, not `group`).
+// groundYAt's footprint/pad-height math reads this same module value so the
+// physical floor always matches the shrunk/grown slab.
+const SCALE_KEY = 'lonestar-brand-scale';
+const SCALE_MIN = 0.5, SCALE_MAX = 1.25;
+const clampScale = (v) => Math.round(Math.min(SCALE_MAX, Math.max(SCALE_MIN, v)) * 100) / 100;
+let SCALE = clampScale(parseFloat(localStorage.getItem(SCALE_KEY)) || 1);
 
 const SPAWN_DIST = 700;      // bigger footprints than cities — hold geometry sooner
 const NIGHT_ON = 0.25;       // ATMOS.night threshold for the signage glow (airports.js)
@@ -201,6 +220,21 @@ export class BrandSystem {
     this.hebSites = getHebSites();
   }
 
+  get scale() { return SCALE; }
+
+  // Absolute setter (not a step) — main.js computes the next step from
+  // `this.scale` the same way hud.uiScale does. Despawns every live site so
+  // the next real-loop tick (update()'s 4 Hz throttle) rebuilds them at the
+  // new size; groundYAt reads the new SCALE immediately (pure function, no
+  // dependency on `this.live`), so the physical floor never lags the visual
+  // rebuild by more than that same quarter second. Returns a HUD-ready "N%".
+  setScale(v) {
+    SCALE = clampScale(v);
+    localStorage.setItem(SCALE_KEY, SCALE);
+    for (const name of [...this.live.keys()]) this.despawn(name);
+    return Math.round(SCALE * 100) + '%';
+  }
+
   // proximity spawn/despawn over the small hand-authored list (no grid needed)
   update(px, pz, dt = 0) {
     // night lighting — aim the persistent lights at the NEAREST live site OF
@@ -292,7 +326,13 @@ export class BrandSystem {
     // the lot MIN hides the lip (brand sites aren't pad-flattened).
     const fp = footprintRange(x, z);
     const padY = fp.max;
-    const skirt = Math.min(8, padY - fp.min + 0.4); // cap so steep sites don't wall up absurdly
+    // Authored BEFORE `building`'s scale is applied (the slab lives inside
+    // it, like everything else) — dividing by SCALE here keeps the slab's
+    // WORLD-space reach (padY - SCALE*skirt) constant at any brand size, so
+    // a shrunk store's shrunk skirt still dips below the lot min instead of
+    // floating on sloped terrain (real worst case ~1.8u relief needs ~4.4u
+    // authored skirt at the 0.5x floor — comfortably under the cap below).
+    const skirt = Math.min(8, (padY - fp.min + 0.4) / SCALE); // cap so steep sites don't wall up absurdly
     group.position.set(x, padY, z);
     group.rotation.y = heading;
 
@@ -301,36 +341,43 @@ export class BrandSystem {
     // night lights below make them read, keeping colours true).
     const hero = buildBuckyHero(skirt);
     const staticMesh = new THREE.Mesh(hero.staticGeo, this.heroMat);
-    group.add(staticMesh);
-
-    // World positions of the two night-light anchors. Transform the local
-    // anchors by the group's Y-rotation with the SAME trig as buildBillboards —
-    // group.localToWorld() would read a stale matrixWorld this early (identity
-    // until the first render), dropping the lights at the world origin.
-    const toWorld = ([lx, ly, lz]) => [
-      x + lx * Math.cos(heading) + lz * Math.sin(heading), padY + ly,
-      z - lx * Math.sin(heading) + lz * Math.cos(heading),
-    ];
-    const lightAt = { canopy: toWorld(CANOPY_ANCHOR), sign: toWorld(SIGN_ANCHOR) };
 
     // Sign panel: the readable "Bucky's" name, mounted just proud of the
     // yellow sign face baked into staticGeo.
     const signPanel = new THREE.Mesh(this.buckySignGeo, this.buckySignMat);
     signPanel.position.set(...hero.signPanelAt);
-    group.add(signPanel);
 
     // The pump islands under the canopy are an InstancedMesh of the prototype.
     const pumps = new THREE.InstancedMesh(this.pumpGeo, this.propMat, hero.pumpXforms.length);
     hero.pumpXforms.forEach((m, i) => pumps.setMatrixAt(i, m));
     pumps.instanceMatrix.needsUpdate = true;
-    group.add(pumps);
+
+    // Everything above shares the player's global brand-size scale, applied
+    // about the pad origin (the SAME pivot groundYAt scales its footprint
+    // about) — this sub-group is what setScale() resizes. The approach
+    // billboards are NOT in here (see buildBillboards).
+    const building = new THREE.Group();
+    building.add(staticMesh, signPanel, pumps);
+    building.scale.setScalar(SCALE);
+    group.add(building);
+
+    // World positions of the two night-light anchors. Transform the local
+    // anchors by the group's Y-rotation with the SAME trig as buildBillboards
+    // (also scaled, so a shrunk sign keeps its light glued to it) —
+    // group.localToWorld() would read a stale matrixWorld this early (identity
+    // until the first render), dropping the lights at the world origin.
+    const toWorld = ([lx, ly, lz]) => [
+      x + lx * SCALE * Math.cos(heading) + lz * SCALE * Math.sin(heading), padY + ly * SCALE,
+      z - lx * SCALE * Math.sin(heading) + lz * SCALE * Math.cos(heading),
+    ];
+    const lightAt = { canopy: toWorld(CANOPY_ANCHOR), sign: toWorld(SIGN_ANCHOR) };
 
     // Approach billboards — placed in WORLD space along the nearest freeway,
     // then de-rotated into the group's local frame so grounding stays exact.
     const boards = this.buildBillboards(site, x, z, padY, group, rand);
 
     this.scene.add(group);
-    this.live.set(site.name, { group, staticMesh, pumps, boards, signPanel, lightAt, type: 'bucky' });
+    this.live.set(site.name, { group, building, staticMesh, pumps, boards, signPanel, lightAt, type: 'bucky' });
   }
 
   // Billboards live along the highway well back from the store — each samples
@@ -357,6 +404,10 @@ export class BrandSystem {
       const bg = new THREE.Group();
       bg.position.copy(local);
       bg.rotation.y = faceWorld - group.rotation.y;
+      // Scales about its OWN base (by, sampled from real terrain, not the
+      // store's pad) — a billboard shrinks/grows in place rather than
+      // sliding toward the store the way it would if `group` itself scaled.
+      bg.scale.setScalar(SCALE);
       const frame = new THREE.Mesh(this.billboardGeo, this.propMat);
       const copy = (base + i) % BILLBOARD_COPY.length; // each sign a different pun, stable
       const panel = new THREE.Mesh(this.panelGeo, this.billboardMats[copy]);
@@ -381,46 +432,50 @@ export class BrandSystem {
 
     const fp = footprintRange(x, z);
     const padY = fp.max;
-    const skirt = Math.min(8, padY - fp.min + 0.4);
+    const skirt = Math.min(8, (padY - fp.min + 0.4) / SCALE); // see spawn()'s comment — keeps the slab draped at any brand size
+
     group.position.set(x, padY, z);
     group.rotation.y = heading;
 
     const hero = buildHEBHero(skirt);
     const staticMesh = new THREE.Mesh(hero.staticGeo, this.heroMat);
-    group.add(staticMesh);
-
-    // Same trig transform as Bucky's — group.localToWorld() would read a
-    // stale matrixWorld this early and drop the light at the world origin.
-    const toWorld = ([lx, ly, lz]) => [
-      x + lx * Math.cos(heading) + lz * Math.sin(heading), padY + ly,
-      z - lx * Math.sin(heading) + lz * Math.cos(heading),
-    ];
-    const lightAt = { sign: toWorld(HEB_SIGN_ANCHOR) };
 
     // Sign panel: the readable "H-E-Buddy" name, mounted just proud of the
     // red backer baked into staticGeo (a hair further in z to avoid z-fighting).
     const signPanel = new THREE.Mesh(this.hebSignGeo, this.hebSignMat);
     signPanel.position.set(HEB_SIGN_ANCHOR[0], HEB_SIGN_ANCHOR[1], HEB_SIGN_ANCHOR[2] + 0.1);
-    group.add(signPanel);
 
     const lot = buildHEBLot(rand);
     const corrals = new THREE.InstancedMesh(this.corralGeo, this.propMat, lot.corralXforms.length);
     lot.corralXforms.forEach((m, i) => corrals.setMatrixAt(i, m));
     corrals.instanceMatrix.needsUpdate = true;
-    group.add(corrals);
 
     const carts = new THREE.InstancedMesh(this.cartGeo, this.propMat, lot.cartXforms.length);
     lot.cartXforms.forEach((m, i) => carts.setMatrixAt(i, m));
     carts.instanceMatrix.needsUpdate = true;
-    group.add(carts);
 
     const poles = new THREE.InstancedMesh(this.poleGeo, this.propMat, lot.poleXforms.length);
     lot.poleXforms.forEach((m, i) => poles.setMatrixAt(i, m));
     poles.instanceMatrix.needsUpdate = true;
-    group.add(poles);
+
+    // Global brand-size scale, same pattern as spawn() (Bucky's) — no
+    // billboards here, so everything for this brand lives inside `building`.
+    const building = new THREE.Group();
+    building.add(staticMesh, signPanel, corrals, carts, poles);
+    building.scale.setScalar(SCALE);
+    group.add(building);
+
+    // Same trig transform as Bucky's (also scaled) — group.localToWorld()
+    // would read a stale matrixWorld this early and drop the light at the
+    // world origin.
+    const toWorld = ([lx, ly, lz]) => [
+      x + lx * SCALE * Math.cos(heading) + lz * SCALE * Math.sin(heading), padY + ly * SCALE,
+      z - lx * SCALE * Math.sin(heading) + lz * SCALE * Math.cos(heading),
+    ];
+    const lightAt = { sign: toWorld(HEB_SIGN_ANCHOR) };
 
     this.scene.add(group);
-    this.live.set('heb:' + site.name, { group, staticMesh, corrals, carts, poles, signPanel, lightAt, type: 'heb' });
+    this.live.set('heb:' + site.name, { group, building, staticMesh, corrals, carts, poles, signPanel, lightAt, type: 'heb' });
   }
 
   // Lone Star Compute site: two windowless server sheds + office + fence +
@@ -437,36 +492,39 @@ export class BrandSystem {
 
     const fp = footprintRange(x, z);
     const padY = fp.max;
-    const skirt = Math.min(8, padY - fp.min + 0.4);
+    const skirt = Math.min(8, (padY - fp.min + 0.4) / SCALE); // see spawn()'s comment — keeps the slab draped at any brand size
     group.position.set(x, padY, z);
     group.rotation.y = heading;
 
     const hero = buildLoneStarHero(skirt);
     const staticMesh = new THREE.Mesh(hero.staticGeo, this.heroMat);
-    group.add(staticMesh);
 
     // cold cooling-vent glow — own mesh, SHARED emissive material (per-site geo
     // disposes on despawn; the material is shared and toggled by night).
     const vents = new THREE.Mesh(hero.ventGeo, this.ventMat);
-    group.add(vents);
 
     const cooling = new THREE.InstancedMesh(this.coolingGeo, this.propMat, hero.coolingXforms.length);
     hero.coolingXforms.forEach((m, i) => cooling.setMatrixAt(i, m));
     cooling.instanceMatrix.needsUpdate = true;
-    group.add(cooling);
 
     const drums = new THREE.InstancedMesh(this.drumGeo, this.propMat, hero.drumXforms.length);
     hero.drumXforms.forEach((m, i) => drums.setMatrixAt(i, m));
     drums.instanceMatrix.needsUpdate = true;
-    group.add(drums);
 
     const pylons = new THREE.InstancedMesh(this.pylonGeo, this.propMat, hero.pylonXforms.length);
     hero.pylonXforms.forEach((m, i) => pylons.setMatrixAt(i, m));
     pylons.instanceMatrix.needsUpdate = true;
-    group.add(pylons);
+
+    // Global brand-size scale, same pattern as the other two brands — no
+    // PointLight anchor to rescale here (the LSC night look is emissive-only,
+    // position-independent).
+    const building = new THREE.Group();
+    building.add(staticMesh, vents, cooling, drums, pylons);
+    building.scale.setScalar(SCALE);
+    group.add(building);
 
     this.scene.add(group);
-    this.live.set('lsc:' + site.name, { group, staticMesh, vents, cooling, drums, pylons, type: 'lsc' });
+    this.live.set('lsc:' + site.name, { group, building, staticMesh, vents, cooling, drums, pylons, type: 'lsc' });
   }
 
   despawn(name) {
@@ -564,8 +622,12 @@ function footAt(x, z, site, foot) {
   const dx = x - site.x, dz = z - site.z;
   const c = Math.cos(site.heading), s = Math.sin(site.heading);
   const lx = dx * c - dz * s, lz = dx * s + dz * c;
-  if (Math.abs(lx) > foot.hx || lz < foot.z0 || lz > foot.z1) return null;
-  return site.padY + PAD_TOP;
+  // foot.hx/z0/z1 describe the slab at SCALE 1 (footprints are cached and
+  // scale-independent — see buckyFootprints() etc.); scale them here by the
+  // CURRENT brand size so the walkable region always matches the rendered
+  // slab, which is `building`-scaled at spawn time.
+  if (Math.abs(lx) > foot.hx * SCALE || lz < foot.z0 * SCALE || lz > foot.z1 * SCALE) return null;
+  return site.padY + PAD_TOP * SCALE;
 }
 
 // ground height for player/vehicle placement: a brand site's flat pad top
