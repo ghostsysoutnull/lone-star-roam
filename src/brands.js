@@ -2,18 +2,23 @@
 // their real-world coordinates, proximity-streamed like CitySystem so only
 // nearby sites hold geometry. Wave 1: Bucky's (Buc-ee's) travel centers —
 // showpiece storefront + beaver-topped sign pylon + instanced fuel canopy +
-// highway approach billboards, night-lit via emissive meshes gated on
-// ATMOS.night (no new light rig — the airport-beacon pattern). Scenery only:
-// no gameplay/save/mission/seed-string changes.
+// highway approach billboards. Wave 2: H-E-Buddy (H-E-B) big-box stores at
+// the 33 largest GEO.cities, placed on a city-edge road shoulder + instanced
+// lot props. Night glow for both is REAL persistent PointLights (not
+// emissive — emissive washes a colored sign toward white), gated on
+// ATMOS.night. Scenery only: no gameplay/save/mission/seed-string changes.
 //
-// Imports geo+sky (site data + night gate) and traffic (the tinted/merge
-// geometry kit) — cycle-safe because nothing imports brands, matching the
-// rotors.js precedent. Datacenter audio (wave 3) will arrive as an onHum
-// constructor callback, never an import.
+// Imports geo+sky (site data + night gate), traffic (the tinted/merge
+// geometry kit), and — for H-E-Buddy's placement — cities.js (cityRadius)
+// and airports.js (airportClear). Cycle-safe: nothing imports brands.js.
+// Datacenter audio (wave 3) will arrive as an onHum constructor callback,
+// never an import.
 import * as THREE from 'three';
-import { seededRand, hAt, nearestRoad } from './geo.js';
+import { GEO, seededRand, hAt, nearestRoad } from './geo.js';
 import { ATMOS } from './sky.js';
 import { tinted, merge } from './traffic.js';
+import { cityRadius } from './cities.js';
+import { airportClear } from './airports.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 
@@ -72,6 +77,22 @@ const SIGN_ANCHOR = [15.5, 14, 18.5];               // in front of the pylon sig
 const CANOPY_I = 30, CANOPY_R = 50;                 // intensity / range (lantern is 14 @ 22)
 const SIGN_I = 16, SIGN_R = 28;
 
+// H-E-Buddy (H-E-B parody) — Wave 2. Palette distinct from Bucky's: cream
+// big-box + H-E-B red, not yellow/red.
+const HEB_WALL = 0xf0ece0, HEB_RED = 0xc0272d, HEB_RED_DARK = 0x8a1e22;
+const HEB_GLASS = 0x8fb0c2, HEB_CANOPY = 0xf7f4ec, HEB_DOCK = 0x55555c;
+const HEB_CART = 0xb9bcc0, HEB_CORRAL = 0x707078;
+// Same real-light approach as Bucky's (one persistent PointLight, no emissive)
+const HEB_SIGN_ANCHOR = [0, 10.0, 9.5];              // the red sign band on the parapet face
+const HEB_SIGN_I = 18, HEB_SIGN_R = 30;
+// Placement: 33 largest GEO.cities, snapped to the nearest real road just
+// outside the downtown footprint (cityRadius) via a seeded angle+radius
+// search, then offset further from the road away from downtown so the lot
+// clears both the road and the procedural buildings. Dry-run against real
+// data (2026-07-12) converges all 33 on the first attempt; the retry loop is
+// a safety net for the live airportClear check it can't rehearse offline.
+const HEB_COUNT = 33, HEB_MARGIN = 8, HEB_OFF = 24;
+
 export class BrandSystem {
   constructor(scene, { onHum } = {}) {
     this.scene = scene;
@@ -89,7 +110,11 @@ export class BrandSystem {
     // in update(). Never add/remove at runtime (shader recompile hitch).
     this.canopyLight = new THREE.PointLight(LIGHT_COLOR, 0, CANOPY_R, 1.5);
     this.signLight = new THREE.PointLight(LIGHT_COLOR, 0, SIGN_R, 1.5);
-    scene.add(this.canopyLight, this.signLight);
+    // H-E-Buddy's own persistent light (the red sign band) — same pool, same
+    // rule: created once here, repositioned/faded in update(), never added
+    // or removed per spawn.
+    this.hebSignLight = new THREE.PointLight(LIGHT_COLOR, 0, HEB_SIGN_R, 1.5);
+    scene.add(this.canopyLight, this.signLight, this.hebSignLight);
 
     // Shared prototype geometries (built once, disposed NEVER) — the pump
     // island (instanced per site), the billboard post/frame, and the flat
@@ -97,34 +122,56 @@ export class BrandSystem {
     this.pumpGeo = mkPump();
     this.billboardGeo = mkBillboard();
     this.panelGeo = new THREE.PlaneGeometry(5.0, 2.4);
-    this.shared = new Set([this.pumpGeo, this.billboardGeo, this.panelGeo]);
+    // H-E-Buddy lot-prop prototypes (cart corral, cart, light pole).
+    this.corralGeo = mkCartCorral();
+    this.cartGeo = mkCart();
+    this.poleGeo = mkLightPole();
+    this.shared = new Set([
+      this.pumpGeo, this.billboardGeo, this.panelGeo,
+      this.corralGeo, this.cartGeo, this.poleGeo,
+    ]);
 
     // One canvas-texture material per copy string, built once (airports.js
     // sign-atlas pattern) — the billboards actually READ. Never disposed.
     this.billboardMats = BILLBOARD_COPY.map((txt) =>
       new THREE.MeshLambertMaterial({ map: mkSignTex(txt), side: THREE.DoubleSide }));
 
+    // H-E-Buddy sites derive from GEO.cities (unavailable at module load —
+    // GEO is loaded before BrandSystem is constructed, so this is safe here).
+    this.hebSites = buildHEBSites();
   }
 
   // proximity spawn/despawn over the small hand-authored list (no grid needed)
   update(px, pz, dt = 0) {
-    // night lighting — aim the two persistent lights at the NEAREST live site
-    // and fade by ATMOS.night (read internally, airports.js pattern). Runs
-    // every frame (before the spawn throttle) so the lights track smoothly.
+    // night lighting — aim the persistent lights at the NEAREST live site OF
+    // EACH BRAND (Bucky's canopy+sign vs. H-E-Buddy's sign are independent
+    // pools) and fade by ATMOS.night (read internally, airports.js pattern).
+    // Runs every frame (before the spawn throttle) so lights track smoothly.
     const nf = ATMOS.night > NIGHT_ON ? ATMOS.night : 0;
-    let near = null, bestD = Infinity;
+    let nearB = null, bestB = Infinity, nearH = null, bestH = Infinity;
     for (const rec of this.live.values()) {
-      const d = (rec.lightAt.canopy[0] - px) ** 2 + (rec.lightAt.canopy[2] - pz) ** 2;
-      if (d < bestD) { bestD = d; near = rec; }
+      if (rec.type === 'heb') {
+        const d = (rec.lightAt.sign[0] - px) ** 2 + (rec.lightAt.sign[2] - pz) ** 2;
+        if (d < bestH) { bestH = d; nearH = rec; }
+      } else {
+        const d = (rec.lightAt.canopy[0] - px) ** 2 + (rec.lightAt.canopy[2] - pz) ** 2;
+        if (d < bestB) { bestB = d; nearB = rec; }
+      }
     }
-    if (near && nf > 0) {
-      this.canopyLight.position.set(...near.lightAt.canopy);
-      this.signLight.position.set(...near.lightAt.sign);
+    if (nearB && nf > 0) {
+      this.canopyLight.position.set(...nearB.lightAt.canopy);
+      this.signLight.position.set(...nearB.lightAt.sign);
       this.canopyLight.intensity = nf * CANOPY_I;
       this.signLight.intensity = nf * SIGN_I;
     } else {
       this.canopyLight.intensity = 0;
       this.signLight.intensity = 0;
+    }
+    if (nearH && nf > 0) {
+      this.hebSignLight.position.set(...nearH.lightAt.sign);
+      this.hebSignLight.intensity = nf * HEB_SIGN_I;
+    } else {
+      this.hebSignLight.intensity = 0;
     }
 
     this.acc += dt;
@@ -136,6 +183,16 @@ export class BrandSystem {
       const has = this.live.has(site.name);
       if (d < SPAWN_DIST && !has) this.spawn(site);
       else if (d > SPAWN_DIST * 1.25 && has) this.despawn(site.name);
+    }
+
+    // H-E-Buddy sites are keyed 'heb:<name>' — Denton/Temple etc. appear in
+    // BOTH tables, so a bare name would collide in `this.live`.
+    for (const site of this.hebSites) {
+      const key = 'heb:' + site.name;
+      const d = Math.hypot(site.x - px, site.z - pz);
+      const has = this.live.has(key);
+      if (d < SPAWN_DIST && !has) this.spawnHEB(site);
+      else if (d > SPAWN_DIST * 1.25 && has) this.despawn(key);
     }
   }
 
@@ -186,7 +243,7 @@ export class BrandSystem {
     const boards = this.buildBillboards(site, x, z, padY, group, rand);
 
     this.scene.add(group);
-    this.live.set(site.name, { group, staticMesh, pumps, boards, lightAt });
+    this.live.set(site.name, { group, staticMesh, pumps, boards, lightAt, type: 'bucky' });
   }
 
   // Billboards live along the highway well back from the store — each samples
@@ -222,6 +279,55 @@ export class BrandSystem {
       posts.push({ mesh: bg, panel, wx: bx, wz: bz, copy });
     }
     return posts;
+  }
+
+  // H-E-Buddy site: big-box hero (storefront + red sign band + curved entry
+  // canopy + back dock) + instanced lot props (cart corrals, carts, light
+  // poles). Same pad/skirt/heading pattern as spawn() (buildBuckyHero).
+  spawnHEB(site) {
+    const { x, z } = site;
+    const rand = seededRand('heblot:' + site.name); // independent of the placement-search stream
+    const group = new THREE.Group();
+
+    const road = nearestRoad(x, z, 90) || nearestRoad(x, z, 150);
+    const heading = road ? Math.atan2(road.x - x, road.z - z) : 0;
+
+    const fp = footprintRange(x, z);
+    const padY = fp.max;
+    const skirt = Math.min(8, padY - fp.min + 0.4);
+    group.position.set(x, padY, z);
+    group.rotation.y = heading;
+
+    const hero = buildHEBHero(skirt);
+    const staticMesh = new THREE.Mesh(hero.staticGeo, this.heroMat);
+    group.add(staticMesh);
+
+    // Same trig transform as Bucky's — group.localToWorld() would read a
+    // stale matrixWorld this early and drop the light at the world origin.
+    const toWorld = ([lx, ly, lz]) => [
+      x + lx * Math.cos(heading) + lz * Math.sin(heading), padY + ly,
+      z - lx * Math.sin(heading) + lz * Math.cos(heading),
+    ];
+    const lightAt = { sign: toWorld(HEB_SIGN_ANCHOR) };
+
+    const lot = buildHEBLot(rand);
+    const corrals = new THREE.InstancedMesh(this.corralGeo, this.propMat, lot.corralXforms.length);
+    lot.corralXforms.forEach((m, i) => corrals.setMatrixAt(i, m));
+    corrals.instanceMatrix.needsUpdate = true;
+    group.add(corrals);
+
+    const carts = new THREE.InstancedMesh(this.cartGeo, this.propMat, lot.cartXforms.length);
+    lot.cartXforms.forEach((m, i) => carts.setMatrixAt(i, m));
+    carts.instanceMatrix.needsUpdate = true;
+    group.add(carts);
+
+    const poles = new THREE.InstancedMesh(this.poleGeo, this.propMat, lot.poleXforms.length);
+    lot.poleXforms.forEach((m, i) => poles.setMatrixAt(i, m));
+    poles.instanceMatrix.needsUpdate = true;
+    group.add(poles);
+
+    this.scene.add(group);
+    this.live.set('heb:' + site.name, { group, staticMesh, corrals, carts, poles, lightAt, type: 'heb' });
   }
 
   despawn(name) {
@@ -372,4 +478,146 @@ function buildBuckyHero(skirt = 0.4) {
   for (const p of beaverParts(SX, 18.4, SZ + 0.2)) s.push(p);
 
   return { staticGeo: merge(s), pumpXforms };
+}
+
+// ----------------------------------------------------------- H-E-Buddy (W2)
+// Site table: 33 largest GEO.cities, each snapped to the nearest real road
+// just outside its downtown footprint. A seeded angle + growing radius picks
+// a candidate direction; nearestRoad snaps it to pavement; the final spot is
+// offset further from the road AWAY from the city center (clears both the
+// road and the procedural downtown). Rejected on either downtown overlap or
+// an airport footprint — retries with a wider radius, matching the roadShoulder
+// idiom in npcs.js (mirrored here rather than imported: that function is
+// module-private and this table's shape — reject-and-retry over many sites —
+// doesn't fit a single-point helper).
+function buildHEBSites() {
+  const top = [...GEO.cities].sort((a, b) => b.pop - a.pop).slice(0, HEB_COUNT);
+  const sites = [];
+  for (const city of top) {
+    const R = cityRadius(city.pop);
+    const rand = seededRand('heb:' + city.name);
+    let spot = null;
+    for (let attempt = 0; attempt < 12 && !spot; attempt++) {
+      const a = rand() * Math.PI * 2;
+      const rr = R + 40 + attempt * 20; // push further out each retry
+      const cx = city.x + Math.cos(a) * rr, cz = city.z + Math.sin(a) * rr;
+      const road = nearestRoad(cx, cz, 300);
+      if (!road) continue;
+      const awayX = road.x - city.x, awayZ = road.z - city.z; // road point, relative to downtown
+      const dAway = Math.hypot(awayX, awayZ) || 1;
+      const ox = awayX / dAway, oz = awayZ / dAway;
+      const x = road.x + ox * HEB_OFF, z = road.z + oz * HEB_OFF; // set back from the road, away from downtown
+      if (Math.hypot(x - city.x, z - city.z) < R + HEB_MARGIN) continue; // still overlaps downtown
+      if (!airportClear(x, z)) continue;
+      spot = { x, z };
+    }
+    if (spot) sites.push({ name: city.name, x: spot.x, z: spot.z });
+  }
+  return sites;
+}
+
+// Shared cart-corral prototype — 4 posts + top/bottom rail, a low fenced
+// rectangle carts get parked inside. Built once, instanced per site.
+function mkCartCorral() {
+  const hw = 1.6, hd = 0.8, ph = 0.9; // half-width, half-depth, post height
+  const parts = [];
+  for (const [px, pz] of [[-hw, -hd], [hw, -hd], [-hw, hd], [hw, hd]])
+    parts.push(tinted(new THREE.CylinderGeometry(0.05, 0.05, ph, 6).translate(px, ph / 2, pz), HEB_CORRAL));
+  parts.push(tinted(new THREE.BoxGeometry(hw * 2 + 0.1, 0.06, 0.06).translate(0, ph, -hd), HEB_CORRAL));
+  parts.push(tinted(new THREE.BoxGeometry(hw * 2 + 0.1, 0.06, 0.06).translate(0, ph, hd), HEB_CORRAL));
+  parts.push(tinted(new THREE.BoxGeometry(0.06, 0.06, hd * 2 + 0.1).translate(-hw, ph, 0), HEB_CORRAL));
+  parts.push(tinted(new THREE.BoxGeometry(0.06, 0.06, hd * 2 + 0.1).translate(hw, ph, 0), HEB_CORRAL));
+  return merge(parts);
+}
+
+// Shared cart prototype — abstracted low-poly shopping cart: basket box,
+// handle bar, two wheels. Instanced in small clusters inside each corral.
+function mkCart() {
+  return merge([
+    tinted(new THREE.BoxGeometry(0.5, 0.5, 0.85).translate(0, 0.5, 0), HEB_CART),        // basket
+    tinted(new THREE.BoxGeometry(0.5, 0.06, 0.06).translate(0, 0.78, -0.46), HEB_CORRAL), // handle bar
+    tinted(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 8).rotateZ(Math.PI / 2).translate(-0.2, 0.1, 0.38), 0x2a2a30), // wheel L
+    tinted(new THREE.CylinderGeometry(0.09, 0.09, 0.06, 8).rotateZ(Math.PI / 2).translate(0.2, 0.1, 0.38), 0x2a2a30),  // wheel R
+  ]);
+}
+
+// Shared lot light-pole prototype — tall pole + a boxy fixture head.
+function mkLightPole() {
+  return merge([
+    tinted(new THREE.CylinderGeometry(0.1, 0.13, 6.0, 6).translate(0, 3.0, 0), POLE),
+    tinted(new THREE.BoxGeometry(0.6, 0.3, 0.6).translate(0, 6.05, 0), 0xdddddd),
+  ]);
+}
+
+// Per-site lot layout: 3 cart corrals (each with a small cluster of carts)
+// scattered across the parking apron, 6 light poles around its perimeter.
+// Seeded off `rand` (heblot:<name>, independent of the placement-search
+// stream so retries there never reshuffle this layout).
+function buildHEBLot(rand) {
+  const corralXforms = [], cartXforms = [], poleXforms = [];
+  const m4 = new THREE.Matrix4();
+  const corralSpots = [[-14, 16], [14, 16], [0, 20]]; // front apron, toward the road (+z)
+  for (const [cx, cz] of corralSpots) {
+    const rot = rand() * 0.6 - 0.3;
+    corralXforms.push(m4.clone().makeRotationY(rot).setPosition(cx, 0, cz));
+    for (let i = 0; i < 4; i++) {
+      const jx = (rand() - 0.5) * 2.0, jz = (rand() - 0.5) * 0.8;
+      cartXforms.push(m4.clone().makeRotationY(rand() * Math.PI * 2).setPosition(cx + jx, 0, cz + jz));
+    }
+  }
+  const poleSpots = [[-18, 10], [18, 10], [-18, 22], [18, 22], [-9, 24], [9, 24]];
+  for (const [px, pz] of poleSpots) poleXforms.push(m4.clone().makeTranslation(px, 0, pz));
+  return { corralXforms, cartXforms, poleXforms };
+}
+
+// H-E-Buddy hero — big-box storefront with a raised entry parapet carrying
+// the red "H-E-Buddy" sign band (color/proportion only, no texture: a red
+// backer + three pale blocks in an H/E/B width cadence + a slim subtitle
+// strip), a curved quarter-round entry canopy, and a back loading dock.
+// Local frame matches Bucky's: pad center origin, +z toward the road.
+function buildHEBHero(skirt = 0.4) {
+  const s = [];
+
+  // --- foundation slab, drawn down to the lot minimum (airport-skirt idiom) ---
+  s.push(tinted(new THREE.BoxGeometry(44, skirt + 0.4, 26).translate(0, -skirt / 2 + 0.2, -1), 0x9c968a));
+
+  // --- main big-box (wide, set back from the road at local -z..+z) ---
+  s.push(tinted(new THREE.BoxGeometry(38, 8.5, 20).translate(0, 4.25, -2), HEB_WALL));       // main box
+  s.push(tinted(new THREE.BoxGeometry(38.6, 0.6, 20.6).translate(0, 8.5, -2), 0xdedad0));    // roof cap
+  s.push(tinted(new THREE.BoxGeometry(38.8, 0.7, 0.5).translate(0, 8.1, 8.05), HEB_RED));    // red roofline band (lit at night)
+  s.push(tinted(new THREE.BoxGeometry(30, 3.0, 0.3).translate(0, 2.4, 8.05), HEB_GLASS));    // storefront glazing
+  for (let i = -6; i <= 6; i++) // mullions break the glazing band up so it reads as windows
+    s.push(tinted(new THREE.BoxGeometry(0.32, 3.2, 0.34).translate(i * 2.3, 2.4, 8.06), 0x6a6660));
+
+  // --- entry parapet: the raised centerpiece carrying the sign band ---
+  s.push(tinted(new THREE.BoxGeometry(16, 3.0, 1.6).translate(0, 10.0, 8.4), HEB_WALL));
+  s.push(tinted(new THREE.BoxGeometry(16.4, 0.4, 1.8).translate(0, 11.7, 8.4), HEB_RED));    // parapet cap (lit at night)
+
+  // sign band: red backer + H/E/B proportion cadence + a slim "buddy" strip —
+  // no texture, reads by color + block width alone (spec requirement).
+  s.push(tinted(new THREE.BoxGeometry(13, 3.0, 0.35).translate(0, 10.0, 9.25), HEB_RED_DARK)); // backer (lit at night)
+  const HEB_TABS = [[-3.0, 2.6], [0.3, 2.0], [3.3, 2.0]]; // [x, width] — H, E, B cadence
+  for (const [tx, tw] of HEB_TABS)
+    s.push(tinted(new THREE.BoxGeometry(tw, 1.6, 0.14).translate(tx, 10.2, 9.34), HEB_WALL));
+  s.push(tinted(new THREE.BoxGeometry(9, 0.6, 0.16).translate(0, 8.35, 9.3), HEB_WALL));     // "buddy" subtitle strip
+  s.push(tinted(new THREE.BoxGeometry(13.4, 0.3, 0.18).translate(0, 8.05, 9.2), HEB_RED));   // sign underline (lit at night)
+
+  // --- curved entry canopy: quarter-round barrel, high at the wall curving
+  // down and out over the entrance. CylinderGeometry's axis is Y by default;
+  // rotateZ(90°) maps it to local X (canopy spans the entrance width), and
+  // thetaStart=0/thetaLength=PI/2 keeps only the arc quadrant from
+  // "straight up at the wall" to "level, projecting outward" — the scoop. ---
+  const R = 4.0, mountY = 6.6, wallZ = 8.05;
+  const canopyGeo = new THREE.CylinderGeometry(R, R, 11, 12, 1, true, 0, Math.PI / 2).rotateZ(Math.PI / 2);
+  canopyGeo.translate(0, mountY, wallZ);
+  s.push(tinted(canopyGeo, HEB_CANOPY));
+  s.push(tinted(new THREE.BoxGeometry(11, 0.2, 0.2).translate(0, mountY + R, wallZ), HEB_RED)); // canopy edge trim at the wall
+
+  // --- back loading dock (opposite the road-facing side) ---
+  s.push(tinted(new THREE.BoxGeometry(10, 1.2, 3).translate(0, 0.6, -13.5), 0x9c968a));       // dock platform
+  s.push(tinted(new THREE.BoxGeometry(11, 0.3, 4).translate(0, 3.4, -13.5), HEB_DOCK));       // dock canopy
+  for (const dx of [-4, 0, 4])
+    s.push(tinted(new THREE.BoxGeometry(2.6, 3.0, 0.25).translate(dx, 1.5, -12.05), HEB_DOCK)); // roll-up doors
+
+  return { staticGeo: merge(s) };
 }

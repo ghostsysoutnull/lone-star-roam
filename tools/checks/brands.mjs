@@ -161,4 +161,103 @@ export default async function brands(t) {
     }
     await t.setDay();
   });
+
+  // ------------------------------------------------------ H-E-Buddy (Wave 2)
+  const heb = await t.ev(`(() => {
+    // Houston is #1 by population — guaranteed to be in the 33-site table.
+    const site = g.brands.hebSites.find((s) => s.name === 'Houston');
+    return site;
+  })()`);
+
+  await t.check('H-E-Buddy site table: 33 sites, all clear of airports and downtown footprints', async () => {
+    const legality = await t.ev(`(() => {
+      const bad = [];
+      for (const s of g.brands.hebSites) {
+        const city = g.GEO.cities.find((c) => c.name === s.name);
+        if (!city) { bad.push(s.name + ':no-city'); continue; }
+        if (!g.airportClear(s.x, s.z)) { bad.push(s.name + ':airport'); continue; }
+        // downtown clearance — cityRadius isn't exported to __game, so mirror
+        // the same formula the placement search itself used
+        const R = Math.min(90, 6 + Math.pow(city.pop, 0.38) / 9);
+        const d = Math.hypot(s.x - city.x, s.z - city.z);
+        if (d < R + 8) bad.push(s.name + ':downtown ' + d.toFixed(1) + '<' + R.toFixed(1));
+      }
+      return { n: g.brands.hebSites.length, bad };
+    })()`);
+    t.ok(legality.n === 33, `expected 33 H-E-Buddy sites, got ${legality.n}`);
+    t.ok(legality.bad.length === 0, `illegal sites: ${legality.bad.join(', ')}`);
+  });
+
+  await t.check('H-E-Buddy streaming sentinel: the real loop spawns/despawns Houston by distance', async () => {
+    await t.tp(heb.x, heb.z + 3);
+    await t.until(`g.brands.live.has('heb:Houston')`, 8000);
+    const near = await t.ev(`(() => {
+      const r = g.brands.live.get('heb:Houston');
+      return { has: !!r, kids: r.group.children.length, type: r.type };
+    })()`);
+    t.ok(near.has && near.kids >= 4 && near.type === 'heb', `spawn incomplete: ${JSON.stringify(near)}`);
+
+    const protoBefore = await t.ev(`({
+      corral: !!g.brands.corralGeo.attributes, cart: !!g.brands.cartGeo.attributes, pole: !!g.brands.poleGeo.attributes,
+    })`);
+    t.ok(protoBefore.corral && protoBefore.cart && protoBefore.pole, 'HEB prototypes missing before despawn');
+
+    await t.tp(heb.x + 1200, heb.z);
+    await t.until(`!g.brands.live.has('heb:Houston')`, 8000);
+    const after = await t.ev(`({
+      live: g.brands.live.has('heb:Houston'),
+      corral: !!(g.brands.corralGeo.attributes && g.brands.corralGeo.attributes.position),
+      cart: !!(g.brands.cartGeo.attributes && g.brands.cartGeo.attributes.position),
+      pole: !!(g.brands.poleGeo.attributes && g.brands.poleGeo.attributes.position),
+    })`);
+    t.ok(!after.live, 'HEB site never despawned');
+    t.ok(after.corral && after.cart && after.pole, `HEB shared prototype geometry was disposed: ${JSON.stringify(after)}`);
+  });
+
+  await t.check('H-E-Buddy showpiece poly floor: big-box hero beats a heli-body baseline', async () => {
+    await t.tp(heb.x, heb.z + 3);
+    await t.until(`g.brands.live.has('heb:Houston')`, 8000);
+    const tris = await t.ev(`(() => {
+      const r = g.brands.live.get('heb:Houston');
+      const tri = (m) => m.geometry.index ? m.geometry.index.count / 3 : m.geometry.attributes.position.count / 3;
+      return tri(r.staticMesh);
+    })()`);
+    t.ok(tris > 350, `HEB hero not showpiece-tier: ${tris} tris`);
+  });
+
+  await t.check('H-E-Buddy night lights: the red sign band lights up at night, dark by day', async () => {
+    await t.tp(heb.x, heb.z + 3);
+    await t.until(`g.brands.live.has('heb:Houston')`, 8000);
+
+    await t.setDay();
+    await t.wait(0.4);
+    const day = await t.ev(`({ s: g.brands.hebSignLight.intensity })`);
+    t.near(day.s, 0, 0.001, `HEB sign light on by day: ${day.s}`);
+
+    await t.setNight();
+    await t.wait(0.5);
+    const night = await t.ev(`(() => {
+      const sl = g.brands.hebSignLight, r = g.brands.live.get('heb:Houston');
+      const ds = Math.hypot(sl.position.x - r.group.position.x, sl.position.z - r.group.position.z);
+      const orig = Math.hypot(sl.position.x, sl.position.z);
+      return { si: sl.intensity, ds, orig };
+    })()`);
+    t.ok(night.si > 1, `HEB sign light never came on at night: ${JSON.stringify(night)}`);
+    t.ok(night.ds < 30, `HEB sign light not positioned at the site: ${JSON.stringify(night)}`);
+    t.ok(night.orig > 100, `HEB sign light collapsed to the world origin: ${night.orig.toFixed(1)}`);
+
+    if (process.env.SHOT) {
+      await t.ev(`(() => {
+        const r = g.brands.live.get('heb:Houston'), h = r.group.rotation.y;
+        const fx = Math.sin(h), fz = Math.cos(h);
+        const vx = r.group.position.x + fx * 40, vz = r.group.position.z + fz * 40;
+        g.player.pos.set(vx, g.hAt(vx, vz), vz);
+        g.player.heading = Math.atan2(-(r.group.position.x - vx), -(r.group.position.z - vz));
+        g.player.speed = 0;
+      })()`);
+      await t.wait(0.5);
+      await t.shot('heb-night-lit');
+    }
+    await t.setDay();
+  });
 }

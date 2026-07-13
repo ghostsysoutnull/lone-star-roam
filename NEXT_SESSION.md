@@ -1,57 +1,78 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Texas Brands track, wave 2 of 3 — the **H-E-Buddy**
-  brand (H-E-B parody): a big-box **storefront hero** (wide box + raised
-  entry parapet + curved entry canopy), the **red "H-E-Buddy" sign band**
-  across the front (tinted lettering block, reads by color + proportion),
-  and heli-tier lot props (instanced cart corrals/carts, lot light poles,
-  a back loading dock). Placed on a **city-edge road shoulder in the 33
-  largest `GEO.cities`** (reuse the city list) via a clear-spot query so it
-  never overlaps a downtown building or runway. **Night glow** = the red
-  sign band only, emissive on `ATMOS.night`. Wave 1 (Bucky's scaffold +
-  streaming) shipped 2026-07-12, commit ead3ad6.
-- **Recommended setup**: model **Opus 4.8** or **Sonnet 5**, effort
-  **high** — mesh + table plumbing (one new brand into the existing
-  `BrandSystem`), less structural than wave 1. Flag it if the running
-  model differs.
+- **This session**: Texas Brands track, wave 3 of 3 — **Lone Star
+  Compute** (AI-datacenter parody): one or two windowless **server-shed**
+  heroes (ribbed roofline, small office block, perimeter fence posts),
+  heli-tier instanced **cooling banks** (roof/side fan units + rooftop
+  condenser drums), a **substation + pylon line** flourish (greebled
+  transformer boxes + instanced lattice pylons marching toward the shed),
+  and `audio.datacenterHum(dist)` (mirrors `audio.heli(dist)`, proximity
+  gain, `datacenterTarget` exposed for tests). ~8 hand-authored real coords
+  (Abilene "Stargate" site, Corsicana, San Antonio, Sweetwater, Temple,
+  Amarillo, Red Oak, Denton — confirm final list against current news/OSM
+  at session start). **Night glow** = cooling-vent glow — this one *is*
+  emissive (a deliberate cold-vs-warm contrast with Bucky's/H-E-Buddy's
+  real-light signage), gated on `ATMOS.night`, per BRANDS_SPEC.md. Wave 2
+  (H-E-Buddy: big-box hero + red sign band + 33-site placement search +
+  lot props) shipped 2026-07-12, commit (this session's, see git log).
+- **Recommended setup**: model **Opus 4.8**, effort **high** — most
+  systems touched this wave (new audio method + emissive gating + two
+  kinds of instanced infrastructure + real coords needing a freshness
+  check). Flag it if the running model differs.
 - **Budget**: code + new checks in `tools/checks/brands.mjs`, grep-first.
-  **One `t.shot`** of H-E-Buddy for the read — no other shots. 33 real
-  coords come from `GEO.cities` (sort by pop, take 33) — no OSM fetch
-  needed. Placement must dodge `airportClear`/`onRunway` **and** the
-  procedural downtown footprint (`cities.js` `cityRadius` gives the
-  downtown radius to place *outside*). Note: `roadShoulder` in npcs.js is
-  a good clear-spot idiom but is **module-private** — export it or mirror
-  the pattern in brands.js, don't assume it's importable. Night glow
-  asserts toggle + ~0 by day.
-- **Then**: rewrite this block for wave 3 (**Lone Star Compute** — server
-  sheds + cooling banks + substation/pylon line + `audio.datacenterHum`).
+  **One `t.shot`** of Lone Star Compute for the read — no other shots.
+  `onHum` is already wired as a constructor callback param (unused since
+  wave 1) — this is the wave that calls it; `main.js` must wire it to
+  `audio.datacenterHum` the same way other proximity sounds are wired
+  (grep `onHonk`/`onBark` in traffic.js/dog.js for the pattern). Hum test
+  mirrors the existing `heliTarget` pattern in `tools/checks/*` — step
+  `audio.datacenterHum(dist)` across distances, assert `datacenterTarget`
+  rises as distance shrinks and is 0 out of range.
+- **Then**: this is the **last wave** — delete this whole session-briefing
+  block, fold Texas Brands (all 3 waves) into one `ROADMAP.md` entry, and
+  leave `BRANDS_SPEC.md` as history (per the multi-wave protocol).
 
-Gotchas carried over (from wave 1):
-- `brands.js` imports **geo + sky + traffic** (`tinted`/`merge`) — the
-  spec said geo+sky only, but the rotors mesh idiom needs the traffic kit;
-  it's cycle-safe (nothing imports brands). Keep it that way.
-- The wave-1 `BrandSystem` is built around **shared materials**
-  (`heroMat`/`propMat`) + **shared prototype geos** in `this.shared`
-  (disposed never; `despawn` skips them). Add H-E-Buddy's prototypes to
-  `this.shared` the same way.
-- **Night lighting is REAL LIGHTS, not emissive** (re-decided in wave 1
-  after playtest — emissive can't keep colours true; see BRANDS_SPEC.md).
-  Bucky's uses two persistent `PointLight`s (`canopyLight`/`signLight`)
-  created once, repositioned in `update()` to the nearest live site's
-  world anchors (transformed by the group's Y-rotation trig — NOT
-  `localToWorld`, which reads a stale matrixWorld on a fresh group and
-  drops the light at the world origin). **H-E-Buddy should follow the same
-  pattern**: add its own light(s) to the persistent pool (or extend the
-  nearest-site logic to pick the nearest of *either* brand) and fade by
-  `ATMOS.night`. Do NOT add/remove lights per spawn (shader recompile).
-- `BUCKY_SITES` is a module const; H-E-Buddy sites derive from
-  `GEO.cities` at construct time (city list isn't available at module
-  load — build the table in the constructor or lazily in `update`).
+Gotchas carried over (from waves 1-2):
+- `brands.js` imports **geo + sky + traffic** (`tinted`/`merge`) +, since
+  wave 2, **cities.js** (`cityRadius`) + **airports.js** (`airportClear`)
+  for H-E-Buddy's placement search. All cycle-safe (nothing imports
+  brands.js) — adding datacenter's substation/pylon builders needs no new
+  imports beyond what's already there.
+- `BrandSystem` is built around **shared materials** (`heroMat`/`propMat`)
+  + **shared prototype geos** in `this.shared` (disposed never; `despawn`
+  skips them). Add Lone Star Compute's prototypes (cooling-fan unit,
+  condenser drum, pylon) to `this.shared` the same way.
+- **Night lighting for Bucky's + H-E-Buddy is REAL LIGHTS, not emissive**
+  (re-decided in wave 1 after playtest) — three persistent `PointLight`s
+  now exist (`canopyLight`/`signLight` for Bucky's, `hebSignLight` for
+  H-E-Buddy), each repositioned in `update()` to the nearest live site of
+  its own brand type (`rec.type === 'heb'` vs the Bucky's branch), using
+  the group's Y-rotation trig (NOT `localToWorld`, which reads a stale
+  matrixWorld on a fresh group and drops the light at the world origin).
+  **Lone Star Compute's cooling-vent glow is the one exception — spec
+  calls for emissive there** (cold cast, deliberate contrast with the
+  warm signage lighting) — don't add a 4th persistent light for it.
+- `this.live` is now keyed by **bare city name for Bucky's** but
+  **`'heb:'+name` for H-E-Buddy** (name collisions exist across the two
+  tables — Denton, Temple). Datacenter sites should get their own prefix
+  too (e.g. `'lsc:'+name`) for the same reason, and `rec.type` needs a
+  third value (`'lsc'`) so the per-brand light-finding loop in `update()`
+  can tell all three apart.
+- `BUCKY_SITES` is a module const; `HEB_SITES` is built at construct time
+  via `buildHEBSites()` (needs `GEO.cities`, unavailable at module load —
+  `main.js` awaits `loadGeo()` before constructing `BrandSystem`, so the
+  constructor is safe). Lone Star Compute's ~8 sites are hand-authored
+  real coords (like Bucky's), so a module-const table is fine — no
+  placement search needed.
 - Streaming `update(px, pz, dt)` throttles at 0.25 s accumulated dt; the
   verify streaming sentinel drives the **real loop** (`t.until` on
-  `brands.live.has(name)`, no manual `update()` call) — keep that shape.
-- `onHum` constructor callback is still reserved for wave 3 (unused).
+  `brands.live.has(key)`, no manual `update()` call) — keep that shape.
+- H-E-Buddy's 33-site placement search (seeded angle + growing radius,
+  snap to `nearestRoad`, offset away from downtown, reject on
+  `airportClear`/downtown-radius overlap) converged on attempt 0 for all
+  33 real cities in a dry run — don't be surprised if it looks
+  over-provisioned with retries; it's a safety net, not the common case.
 
 No active priority track outside this. Queued work lives in `BACKLOG.md`.
 
