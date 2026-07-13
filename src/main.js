@@ -5,6 +5,7 @@ import { buildWorld, chapelSitesNear } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { initDebug } from './debug.js';
 import { CitySystem } from './cities.js';
+import { BrandSystem } from './brands.js';
 import { Player } from './vehicle.js';
 import { Gameplay } from './gameplay.js';
 import { TrafficSystem } from './traffic.js';
@@ -57,6 +58,7 @@ async function boot() {
   const airports = new AirportSystem(scene);
   const aviation = new AviationSystem(scene, airports);
   const cities = new CitySystem(scene);
+  const brands = new BrandSystem(scene);
   const player = new Player(scene, camera);
   const gameplay = new Gameplay(scene);
   const traffic = new TrafficSystem(scene);
@@ -186,7 +188,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -208,6 +210,7 @@ async function boot() {
     aviation.update(dt, player.pos.x, player.pos.z, sky.days);
     cities.update(player.pos.x, player.pos.z);
     cities.setNight(ATMOS.night);
+    brands.update(player.pos.x, player.pos.z, dt);
     traffic.update(dt, player.pos.x, player.pos.z, player.pos.y);
     traffic.setNight(ATMOS.night);
     trains.update(dt, player.pos.x, player.pos.z);

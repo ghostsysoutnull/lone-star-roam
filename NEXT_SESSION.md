@@ -1,37 +1,50 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Texas Brands track, wave 1 of 3 — build the
-  `src/brands.js` scaffold (`BrandSystem`: real-coord anchor tables,
-  `CitySystem`-style proximity spawn/despawn, `__game.brands` wiring,
-  shared prop-prototype pattern) + the **Bucky's** brand (Buc-ee's
-  parody): showpiece storefront + tall sign with a low-poly **beaver
-  mascot**, heli-tier instanced fuel canopy/pumps, the highway
-  **approach billboards** (punny copy pool), and **night glow**
-  (emissive sign + beaver + white fuel-canopy soffit, gated on
-  `ATMOS.night` — no new light rig, the airport-beacon pattern). Spec:
-  `BRANDS_SPEC.md` (locked 2026-07-12). Scenery only — no gameplay/save/
-  mission changes.
-- **Recommended setup**: model **Opus 4.8**, effort **high** — wave 1 is
-  the most structural (new streaming system + `main.js` wiring) *and* the
-  beaver/canopy silhouette needs spatial care. Flag it if the running
-  model differs. (Sonnet 5 high is an acceptable cheaper alternative.)
-- **Budget**: code + `tools/checks/brands.mjs` checks, grep-first
-  (`MODULES.md` anchors; refs — `cities.js:7,33` streaming,
-  `rotors.js` `mk*Body` mesh idiom, `gameplay.js` landmark `LL()`
-  table). **One `t.shot`** of Bucky's for the silhouette read (the
-  visual-judgment exception) — no other shots. Counts: Bucky's ~15 real
-  sites (coords confirmed this wave). Night glow is emissive-only on
-  `ATMOS.night` (no light rig) — verify asserts it toggles and is ~0 by
-  day.
-- **Then**: rewrite this block for wave 2 (**H-E-Buddy** — red-band
-  storefront in the 33 largest cities + lot props).
+- **This session**: Texas Brands track, wave 2 of 3 — the **H-E-Buddy**
+  brand (H-E-B parody): a big-box **storefront hero** (wide box + raised
+  entry parapet + curved entry canopy), the **red "H-E-Buddy" sign band**
+  across the front (tinted lettering block, reads by color + proportion),
+  and heli-tier lot props (instanced cart corrals/carts, lot light poles,
+  a back loading dock). Placed on a **city-edge road shoulder in the 33
+  largest `GEO.cities`** (reuse the city list) via a clear-spot query so it
+  never overlaps a downtown building or runway. **Night glow** = the red
+  sign band only, emissive on `ATMOS.night`. Wave 1 (Bucky's scaffold +
+  streaming) shipped 2026-07-12, commit ead3ad6.
+- **Recommended setup**: model **Opus 4.8** or **Sonnet 5**, effort
+  **high** — mesh + table plumbing (one new brand into the existing
+  `BrandSystem`), less structural than wave 1. Flag it if the running
+  model differs.
+- **Budget**: code + new checks in `tools/checks/brands.mjs`, grep-first.
+  **One `t.shot`** of H-E-Buddy for the read — no other shots. 33 real
+  coords come from `GEO.cities` (sort by pop, take 33) — no OSM fetch
+  needed. Placement must dodge `airportClear`/`onRunway` **and** the
+  procedural downtown footprint (`cities.js` `cityRadius` gives the
+  downtown radius to place *outside*). Note: `roadShoulder` in npcs.js is
+  a good clear-spot idiom but is **module-private** — export it or mirror
+  the pattern in brands.js, don't assume it's importable. Night glow
+  asserts toggle + ~0 by day.
+- **Then**: rewrite this block for wave 3 (**Lone Star Compute** — server
+  sheds + cooling banks + substation/pylon line + `audio.datacenterHum`).
 
-Gotchas carried over: `brands.js` may import only `geo.js` + `sky.js`
-(ATMOS night gate) to stay cycle-free — audio (wave 3 datacenter hum) is
-a constructor callback, not an import. Shared prop prototypes (beaver,
-pump, cart, pylon) built once, disposed never; only per-site groups get
-disposed on despawn. Placement must dodge `airportClear`/`onRunway`.
+Gotchas carried over (from wave 1):
+- `brands.js` imports **geo + sky + traffic** (`tinted`/`merge`) — the
+  spec said geo+sky only, but the rotors mesh idiom needs the traffic kit;
+  it's cycle-safe (nothing imports brands). Keep it that way.
+- The wave-1 `BrandSystem` is built around **shared materials**
+  (`heroMat`/`glowMat`/`propMat`) + **shared prototype geos** in
+  `this.shared` (disposed never; `despawn` skips them). Add H-E-Buddy's
+  prototypes to `this.shared` the same way. The night glow is a single
+  `glowMat.emissiveIntensity` toggle — H-E-Buddy's red band wants its
+  *own* red glow, so give it a second shared glow material (don't reuse
+  the warm Bucky's `glowMat`) and toggle both in `update()`.
+- `BUCKY_SITES` is a module const; H-E-Buddy sites derive from
+  `GEO.cities` at construct time (city list isn't available at module
+  load — build the table in the constructor or lazily in `update`).
+- Streaming `update(px, pz, dt)` throttles at 0.25 s accumulated dt; the
+  verify streaming sentinel drives the **real loop** (`t.until` on
+  `brands.live.has(name)`, no manual `update()` call) — keep that shape.
+- `onHum` constructor callback is still reserved for wave 3 (unused).
 
 No active priority track outside this. Queued work lives in `BACKLOG.md`.
 
