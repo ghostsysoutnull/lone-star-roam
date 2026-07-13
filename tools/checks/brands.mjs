@@ -130,6 +130,27 @@ export default async function brands(t) {
     t.ok(g0.baseWorld <= pick.mn + 1e-3, `foundation floats above the lot min: base ${g0.baseWorld.toFixed(2)} vs min ${pick.mn.toFixed(2)} (relief ${pick.relief.toFixed(2)})`);
   });
 
+  await t.check('grounding: walking/driving over the pad rides the slab top, not raw terrain underneath', async () => {
+    await t.tp(katyAt.x, katyAt.z + 3);
+    await t.until(`g.brands.live.has('Katy')`, 8000);
+    const expect = await t.ev(`({ padTop: g.brandGroundYAt(${katyAt.x}, ${katyAt.z}), raw: g.hAt(${katyAt.x}, ${katyAt.z}) })`);
+    t.ok(expect.padTop !== null, "brandGroundYAt returned null standing on Bucky's own pad");
+    // PAD_TOP (0.42) is added on top of the pad's max-terrain sample, which is
+    // itself >= raw hAt at the same point — so the two must diverge by at
+    // least that much, proving the pad (not raw relief) drives the number.
+    t.ok(expect.padTop > expect.raw + 0.3, `pad top barely clears raw terrain: ${JSON.stringify(expect)}`);
+
+    await t.ev(`(() => { g.player.setMode('WALK'); g.player.pos.set(${katyAt.x}, 50, ${katyAt.z}); })()`);
+    await t.simStep(0.3);
+    const walkY = await t.ev(`g.player.pos.y`);
+    t.near(walkY, expect.padTop, 0.05, `WALK sank through the pad to ${walkY}, expected ${expect.padTop}`);
+
+    await t.ev(`(() => { g.player.setMode('DRIVE'); g.player.pos.set(${katyAt.x}, 50, ${katyAt.z}); })()`);
+    await t.simStep(0.3);
+    const driveY = await t.ev(`g.player.pos.y`);
+    t.near(driveY, expect.padTop, 0.05, `DRIVE sank through the pad to ${driveY}, expected ${expect.padTop}`);
+  });
+
   await t.check('night lights: two warm lights light the nearest site at night, dark by day, at the site', async () => {
     await t.tp(katyAt.x, katyAt.z + 3);
     await t.until(`g.brands.live.has('Katy')`, 8000);
@@ -247,6 +268,24 @@ export default async function brands(t) {
     })()`);
     t.ok(panel.has && panel.mapped, `HEB sign panel missing or blank: ${JSON.stringify(panel)}`);
     t.ok(panel.visible, 'HEB sign panel not visible');
+  });
+
+  await t.check('H-E-Buddy grounding: walking/driving over the lot rides the slab top, not raw terrain', async () => {
+    await t.tp(heb.x, heb.z + 3);
+    await t.until(`g.brands.live.has('heb:Houston')`, 8000);
+    const expect = await t.ev(`({ padTop: g.brandGroundYAt(${heb.x}, ${heb.z}), raw: g.hAt(${heb.x}, ${heb.z}) })`);
+    t.ok(expect.padTop !== null, "brandGroundYAt returned null standing on H-E-Buddy's own lot");
+    t.ok(expect.padTop > expect.raw + 0.3, `pad top barely clears raw terrain: ${JSON.stringify(expect)}`);
+
+    await t.ev(`(() => { g.player.setMode('WALK'); g.player.pos.set(${heb.x}, 50, ${heb.z}); })()`);
+    await t.simStep(0.3);
+    const walkY = await t.ev(`g.player.pos.y`);
+    t.near(walkY, expect.padTop, 0.05, `WALK sank through the lot to ${walkY}, expected ${expect.padTop}`);
+
+    await t.ev(`(() => { g.player.setMode('DRIVE'); g.player.pos.set(${heb.x}, 50, ${heb.z}); })()`);
+    await t.simStep(0.3);
+    const driveY = await t.ev(`g.player.pos.y`);
+    t.near(driveY, expect.padTop, 0.05, `DRIVE sank through the lot to ${driveY}, expected ${expect.padTop}`);
   });
 
   await t.check('H-E-Buddy night lights: the red sign band lights up at night, dark by day', async () => {

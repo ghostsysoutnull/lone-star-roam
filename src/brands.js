@@ -10,7 +10,13 @@
 //
 // Imports geo+sky (site data + night gate), traffic (the tinted/merge
 // geometry kit), and — for H-E-Buddy's placement — cities.js (cityRadius)
-// and airports.js (airportClear). Cycle-safe: nothing imports brands.js.
+// and airports.js (airportClear). Cycle-safe: brands.js imports nothing that
+// imports it back. Its exported groundYAt() (airport-pad idiom, so
+// players/NPCs/traffic ride a brand's foundation slab instead of sinking
+// through it) is read directly by vehicle.js and npcs.js (neither imports
+// brands.js back); traffic.js CANNOT import it directly (brands.js already
+// imports traffic.js for tinted/merge, so that would cycle) — main.js wires
+// traffic.groundYAt as a callback instead, same pattern as traffic.onHonk.
 // Datacenter audio (wave 3) will arrive as an onHum constructor callback,
 // never an import.
 import * as THREE from 'three';
@@ -147,7 +153,8 @@ export class BrandSystem {
 
     // H-E-Buddy sites derive from GEO.cities (unavailable at module load —
     // GEO is loaded before BrandSystem is constructed, so this is safe here).
-    this.hebSites = buildHEBSites();
+    // Shared with groundYAt's footprint cache below (getHebSites memoizes).
+    this.hebSites = getHebSites();
   }
 
   // proximity spawn/despawn over the small hand-authored list (no grid needed)
@@ -381,6 +388,76 @@ function footprintRange(x, z, r = 20) {
     if (h < min) min = h; if (h > max) max = h;
   }
   return { min, max };
+}
+
+// --------------------------------------------------------- ground query (walk/drive)
+// Static pad footprints for player/vehicle grounding — the airport-pad idiom
+// (groundYAt in airports.js) extended to brand sites. Without this, vehicle.js
+// falls back to raw hAt() under a brand's foundation slab, so the player
+// walked/drove through the base instead of over it (the same bug airports.js
+// already fixes for runway pads). Heading + padY here mirror spawn()/spawnHEB()
+// exactly (same nearestRoad calls, same footprintRange) so the physical floor
+// always matches the rendered slab. Computed once and cached: SPAWN_DIST (700)
+// is far larger than any footprint, so a player standing on a pad always has
+// its geometry live too — this query doesn't need to consult `this.live`.
+const BUCKY_FOOT = { hx: 17, z0: -14.5, z1: 20.5 };   // matches buildBuckyHero's slab (34 wide, 35 deep @ z=3)
+const HEB_FOOT = { hx: 22, z0: -14, z1: 12 };          // matches buildHEBHero's slab (44 wide, 26 deep @ z=-1)
+const PAD_TOP = 0.42;  // slab's local top surface (both hero builders: -skirt/2+0.2 + (skirt+0.4)/2 = 0.4) + a hair of clearance
+
+let hebSitesCache = null;
+function getHebSites() {
+  if (!hebSitesCache) hebSitesCache = buildHEBSites();
+  return hebSitesCache;
+}
+
+function siteFootprint(x, z, road) {
+  const heading = road ? Math.atan2(road.x - x, road.z - z) : 0;
+  return { x, z, heading, padY: footprintRange(x, z).max };
+}
+
+let buckyFootCache = null;
+function buckyFootprints() {
+  if (!buckyFootCache) buckyFootCache = BUCKY_SITES.map((site) => {
+    const [x, z] = site.at;
+    const road = nearestRoad(x, z, 90, (t) => t === 'motorway' || t === 'trunk' || t === 'primary') || nearestRoad(x, z, 120);
+    return siteFootprint(x, z, road);
+  });
+  return buckyFootCache;
+}
+
+let hebFootCache = null;
+function hebFootprints() {
+  if (!hebFootCache) hebFootCache = getHebSites().map((site) => {
+    const road = nearestRoad(site.x, site.z, 90) || nearestRoad(site.x, site.z, 150);
+    return siteFootprint(site.x, site.z, road);
+  });
+  return hebFootCache;
+}
+
+// world (x,z) -> the pad's flat top height if inside this site's rotated
+// rectangular footprint, else null. Inverse of the toWorld() transform used
+// at spawn time (world = site + R(heading)·local), solved for local.
+function footAt(x, z, site, foot) {
+  const dx = x - site.x, dz = z - site.z;
+  const c = Math.cos(site.heading), s = Math.sin(site.heading);
+  const lx = dx * c - dz * s, lz = dx * s + dz * c;
+  if (Math.abs(lx) > foot.hx || lz < foot.z0 || lz > foot.z1) return null;
+  return site.padY + PAD_TOP;
+}
+
+// ground height for player/vehicle placement: a brand site's flat pad top
+// when (x,z) is inside its footprint, else null so vehicle.js falls back to
+// raw hAt (mirrors airports.js's groundYAt so main.js can chain both).
+export function groundYAt(x, z) {
+  for (const site of buckyFootprints()) {
+    const y = footAt(x, z, site, BUCKY_FOOT);
+    if (y !== null) return y;
+  }
+  for (const site of hebFootprints()) {
+    const y = footAt(x, z, site, HEB_FOOT);
+    if (y !== null) return y;
+  }
+  return null;
 }
 
 // Shared pump-island prototype (heli-tier greebles): base + dispenser + two

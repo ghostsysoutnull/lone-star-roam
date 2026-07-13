@@ -31,6 +31,24 @@ export default async function traffic(t) {
     t.ok(moved >= Math.min(4, before.length), `only ${moved}/${before.length} sampled cars moved`);
   });
 
+  await t.check('grounding: traffic.groundYAt is wired to airport+brand pad height (main.js callback)', async () => {
+    // Katy's Bucky's pad — brands.js can't be imported by traffic.js directly
+    // (brands.js already imports traffic.js for tinted/merge, so that would
+    // cycle), so main.js wires traffic.groundYAt as a callback instead. This
+    // proves the wiring, not just the underlying pure function (already
+    // covered by tools/checks/brands.mjs).
+    const katy = await t.ev(`({
+      x: (-95.8475 + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100,
+      z: -(29.7787 - 31) * 111320 / 100,
+    })`);
+    const r = await t.ev(`(() => ({
+      expect: g.brandGroundYAt(${katy.x}, ${katy.z}),
+      wired: typeof g.traffic.groundYAt === 'function' ? g.traffic.groundYAt(${katy.x}, ${katy.z}) : null,
+    }))()`);
+    t.ok(r.expect !== null, "brandGroundYAt returned null standing on Bucky's own pad at Katy");
+    t.near(r.wired, r.expect, 0.001, `traffic.groundYAt not wired to brandGroundYAt: ${JSON.stringify(r)}`);
+  });
+
   await t.check('desert gets a trickle, not a metro pool', async () => {
     // road-poor Big Bend country — supply-based density should starve the pool
     const spot = await t.ev(`(() => {

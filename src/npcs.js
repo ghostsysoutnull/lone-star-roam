@@ -6,10 +6,16 @@ import { GEO, seededRand, nearestRoad, hAt } from './geo.js';
 import { cityRadius } from './cities.js';
 import { ATMOS } from './sky.js';
 import { AIRPORTS, runwayInUse, rwyLabel, windFrom, groundYAt } from './airports.js';
+import { groundYAt as brandGroundYAt } from './brands.js';
 
 // ground height for NPC placement: airport pad plateau when inside a
-// footprint (bystanders spawn at the terminal gate), else raw terrain
-const gY = (x, z) => groundYAt(x, z) ?? hAt(x, z);
+// footprint (bystanders spawn at the terminal gate), else a brand site's
+// foundation slab (roadShoulder can park a named character right at a
+// Bucky's/H-E-Buddy lot edge), else raw terrain — without the brand fallback
+// an NPC standing at a lot edge would sink to the terrain under the slab.
+// Exported (unused internally as an import) so tests can call it directly,
+// same dynamic-import pattern already used for POOLS.
+export const gY = (x, z) => groundYAt(x, z) ?? brandGroundYAt(x, z) ?? hAt(x, z);
 
 const TALK_R = 6, FACE_R = 10;
 

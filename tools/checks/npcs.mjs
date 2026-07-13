@@ -14,6 +14,23 @@ const BASELINE = {
 };
 
 export default async function npcs(t) {
+  await t.check('grounding: NPC ground height (gY) rides a brand pad, not raw terrain underneath it', async () => {
+    // Katy's Bucky's pad — same wiring bug as vehicle.js/traffic.js: without
+    // the brandGroundYAt fallback, an NPC placed at a lot edge (roadShoulder)
+    // would sink to the terrain under the slab instead of standing on it.
+    const katy = await t.ev(`({
+      x: (-95.8475 + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100,
+      z: -(29.7787 - 31) * 111320 / 100,
+    })`);
+    const r = await t.ev(`(async () => {
+      const { gY } = await import('/src/npcs.js');
+      return { gy: gY(${katy.x}, ${katy.z}), padTop: g.brandGroundYAt(${katy.x}, ${katy.z}), raw: g.hAt(${katy.x}, ${katy.z}) };
+    })()`);
+    t.ok(r.padTop !== null, "brandGroundYAt returned null standing on Bucky's own pad at Katy");
+    t.ok(r.padTop > r.raw + 0.3, `pad top barely clears raw terrain: ${JSON.stringify(r)}`);
+    t.near(r.gy, r.padTop, 0.001, `npcs.js gY sank through the pad: ${JSON.stringify(r)}`);
+  });
+
   await t.check('pools are not degenerate (sizes, disjoint city/town professions, flavored keys resolve)', async () => {
     const r = await t.ev(`(async () => {
       const { POOLS: P } = await import('/src/npcs.js');

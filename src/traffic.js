@@ -195,6 +195,12 @@ export class TrafficSystem {
     this.candTimer = 0;
     this.nightF = 0;
     this.onHonk = null; // (type) => void, wired by main
+    // (x,z) => number|null, wired by main to airport pad / brand pad height —
+    // traffic.js can't import airports.js/brands.js directly (brands.js
+    // imports traffic.js for the tinted/merge kit; importing back would
+    // cycle), so this mirrors the onHonk callback-wiring pattern instead.
+    // Without it, cars crossing a pad drop to raw terrain underneath it.
+    this.groundYAt = null;
   }
 
   // Body paint at night: boost the material color multiplier above 1 so the
@@ -358,8 +364,9 @@ export class TrafficSystem {
     const wx = 1 - (ATMOS.rain || 0) * 0.35; // everyone slows in the rain
     const lampsOn = this.nightF > 0.45 || (ATMOS.rain || 0) > 0.15;
     for (const lm of Object.values(this.lampMeshes)) lm.visible = lampsOn;
+    const gAt = (x, z) => this.groundYAt?.(x, z) ?? hAt(x, z);
     // only a grounded player blocks traffic; the plane overhead doesn't
-    const playerGrounded = py - hAt(px, pz) < 2.5;
+    const playerGrounded = py - gAt(px, pz) < 2.5;
 
     let alive = 0;
     for (const car of this.cars) if (car.alive) alive++;
@@ -461,7 +468,7 @@ export class TrafficSystem {
       const i = counts[car.type]++;
       this.q.setFromAxisAngle(this.up, Math.atan2(-hx, -hz));
       this.m4.compose(
-        new THREE.Vector3(x, hAt(x, z) + 0.12, z), this.q,
+        new THREE.Vector3(x, gAt(x, z) + 0.12, z), this.q,
         new THREE.Vector3(car.scale, car.scale, car.scale)
       );
       mesh.setMatrixAt(i, this.m4);

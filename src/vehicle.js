@@ -3,7 +3,13 @@
 import * as THREE from 'three';
 import { nearestRoad, nearestCity, inTexas, hAt } from './geo.js';
 import { ATMOS } from './sky.js';
-import { groundYAt } from './airports.js';
+import { groundYAt as airportGroundYAt } from './airports.js';
+import { groundYAt as brandGroundYAt } from './brands.js';
+
+// flat-pad ground height (airport runway pad or a Bucky's/H-E-Buddy
+// foundation slab), else null so callers fall back to raw hAt — without this
+// a player walks/drives through those bases instead of over them.
+const groundYAt = (x, z) => airportGroundYAt(x, z) ?? brandGroundYAt(x, z);
 
 export const MODES = ['DRIVE', 'FLY', 'WALK'];
 

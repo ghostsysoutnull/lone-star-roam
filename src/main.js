@@ -5,7 +5,7 @@ import { buildWorld, chapelSitesNear } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { initDebug } from './debug.js';
 import { CitySystem } from './cities.js';
-import { BrandSystem } from './brands.js';
+import { BrandSystem, groundYAt as brandGroundYAt } from './brands.js';
 import { Player } from './vehicle.js';
 import { Gameplay } from './gameplay.js';
 import { TrafficSystem } from './traffic.js';
@@ -101,6 +101,7 @@ async function boot() {
   radio.helis = heli; radio.militaryAir = military; // A3 scanner sources (property pattern, like onRadio)
   trains.onHorn = () => audio.trainHorn();
   traffic.onHonk = (type) => audio.honk(type);
+  traffic.groundYAt = (x, z) => groundYAt(x, z) ?? brandGroundYAt(x, z);
   animals.onSound = (kind) => audio[kind]?.();
   const ufo = new UFOSystem(scene, () => gameplay.ufoSighting());
   const haunts = new HauntSystem(scene,
@@ -188,7 +189,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
