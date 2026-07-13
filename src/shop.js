@@ -11,6 +11,9 @@ const LIGHT_I = [30, 45, 62, 80];            // headlight PointLight intensity
 const FLY_CAP = [150, 165, 180, 195];        // FLY cruise speed cap (+10/20/30%)
 const FLY_CLIMB = [60, 69, 78, 87];          // FLY climb rate (+15/30/45%)
 const CARGO_PAY = [1, 1.15, 1.3, 1.45];      // mission payout multiplier
+const JET_THRUST = [0, 55, 70, 85];          // jetpack ascent thrust (0 = not owned)
+const JET_ALT = [0, 40, 55, 70];             // jetpack max AGL cap
+const JET_SPEED = [0, 9, 12, 15];            // jetpack horizontal air speed
 
 export const ROMAN = ['I', 'II', 'III'];
 
@@ -25,6 +28,8 @@ export const SHOP = [
     tiers: ['+10% cruise, faster climb', '+20% cruise, quicker climb', '+30% cruise, mountain-goat climb'] },
   { id: 'cargo', icon: '📦', name: 'Cargo rig', prices: [350, 900, 1800],
     tiers: ['+15% haul pay', '+30% haul pay', '+45% haul pay'] },
+  { id: 'jetpack', icon: '🚀', name: 'Jetpack', prices: [900, 1800, 3200],
+    tiers: ['hover up to 40u, on foot', 'higher and quicker: 55u', 'top tier: 70u, fastest climb and drift'] },
   { id: 'dog', icon: '🐕', name: 'Lacy the Blue Lacy', prices: [750],
     tiers: ['the state dog of Texas — rides in the bed, follows you on foot'],
     done: 'She rides with you' },
@@ -83,6 +88,10 @@ export function applyGear(save, player, dog) {
     flyCap: FLY_CAP[lvl('airframe')],
     flyClimb: FLY_CLIMB[lvl('airframe')],
     cargoPay: CARGO_PAY[lvl('cargo')],
+    jetpack: lvl('jetpack') > 0,
+    jetThrust: JET_THRUST[lvl('jetpack')],
+    jetAlt: JET_ALT[lvl('jetpack')],
+    jetSpeed: JET_SPEED[lvl('jetpack')],
     radio: lvl('radio') > 0,
     avionics: lvl('avionics') > 0,
   };

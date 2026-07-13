@@ -13,6 +13,14 @@ const groundYAt = (x, z) => airportGroundYAt(x, z) ?? brandGroundYAt(x, z);
 
 export const MODES = ['DRIVE', 'FLY', 'WALK'];
 
+// jetpack (WALK sub-state) physics constants — not tiered, tuned once here.
+// No stable hover point by design (thrust XOR gravity each frame, see
+// JETPACK_SPEC.md): holding Space always rises to the ceiling, releasing
+// always falls. AIRDAMP is gentler than FLY's 0.2 so the climb/fall feels
+// floaty rather than snappy.
+const GRAV = 45;
+const AIRDAMP = 0.25;
+
 export class Player {
   constructor(scene, camera) {
     this.scene = scene;
@@ -21,7 +29,8 @@ export class Player {
     this.pos = new THREE.Vector3(0, 0, 0);
     this.heading = 0;      // radians, 0 = -z (north)
     this.speed = 0;        // units/s
-    this.vy = 0;           // vertical speed (fly)
+    this.vy = 0;           // vertical speed (fly, jetpack)
+    this.hovering = false; // WALK sub-state: jetpack thrust airborne
     this.keys = {};
     this.onStep = null;    // footstep audio hook
     this.walkPhase = 0;
@@ -105,6 +114,7 @@ export class Player {
     this.truck.visible = m !== 'WALK';
     if (m !== 'FLY') { this.pos.y = 0; this.vy = 0; }
     if (m === 'WALK') this.speed = Math.min(this.speed, 2);
+    this.hovering = false; // only WALK can be airborne this way — get out of the truck first
   }
 
   resetToRoad() {
@@ -165,7 +175,8 @@ export class Player {
       this.pos.z -= Math.cos(this.heading) * this.speed * dt;
       this.tilt = steer * 0.5;
     } else { // WALK
-      const maxSpd = 4.5;
+      if (!this.hovering && this.perks.jetpack && k['Space']) this.hovering = true;
+      const maxSpd = this.hovering ? this.perks.jetSpeed : 4.5;
       if (fwd) this.speed += 18 * dt;
       else if (back) this.speed -= 18 * dt;
       else this.speed *= Math.pow(0.02, dt);
@@ -174,6 +185,20 @@ export class Player {
       this.pos.x -= Math.sin(this.heading) * this.speed * dt;
       this.pos.z -= Math.cos(this.heading) * this.speed * dt;
       this.tilt = 0;
+
+      if (this.hovering) {
+        // own ground sample (FLY's floor does the same) — the shared `ground`
+        // clamp below runs after this branch and is skipped while hovering
+        const groundHere = groundYAt(this.pos.x, this.pos.z) ?? hAt(this.pos.x, this.pos.z);
+        if (k['Space']) this.vy += this.perks.jetThrust * dt; else this.vy -= GRAV * dt;
+        if (k['ControlLeft'] || k['ControlRight'] || k['ShiftLeft']) this.vy -= GRAV * dt;
+        this.vy *= Math.pow(AIRDAMP, dt);
+        const wantY = this.pos.y + this.vy * dt;
+        const cap = groundHere + this.perks.jetAlt;
+        this.pos.y = THREE.MathUtils.clamp(wantY, groundHere, cap);
+        if (this.pos.y !== wantY) this.vy = 0; // soft bonk: ceiling or touchdown
+        if (this.pos.y <= groundHere && !k['Space']) this.hovering = false; // landed, thrust off
+      }
     }
 
     // Soft wall at the state line — you roam Texas, not New Mexico
@@ -188,7 +213,7 @@ export class Player {
 
     // ground modes ride the terrain (or an airport pad's flat plateau)
     const ground = groundYAt(this.pos.x, this.pos.z) ?? hAt(this.pos.x, this.pos.z);
-    if (this.mode !== 'FLY') this.pos.y = ground;
+    if (this.mode !== 'FLY' && !this.hovering) this.pos.y = ground;
     this.groundY = ground;
 
     // Place avatar

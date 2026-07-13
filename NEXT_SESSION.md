@@ -1,26 +1,48 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Jetpack track, wave 1 of 2 — physics + shop + verify for
-  the WALK-mode jetpack (unlimited hover, 3-tier thrust). It flies and is
-  fully tested; no VFX/audio yet. Spec: `JETPACK_SPEC.md`. The two in-line
-  shop upgrades (Aviation tune + Cargo rig) shipped 2026-07-13, commit
-  cac8699.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — a structural
-  wave (new WALK sub-state + knob/perk plumbing + a verify suite), not
-  content. Flag it if the running model differs.
-- **Budget**: code + verify checks, no screenshots, grep-first. The knob
-  values and `GRAV`/`AIRDAMP` are playtest-tunable — don't over-polish feel
-  in W1. Expectation: W1 proves the **numbers** (AGL over time, cap, land);
-  it will *not look right* — the WALK camera frames a cowboy up to 70u aloft
-  from close and low. Camera framing is W2.
-- **Then**: the wave-end rewrite points this block at Wave 2 (VFX + audio +
-  camera + dog); resolve W2's open calls (Lacy's airborne behavior, HUD AGL
-  readout, camera feel) at the top of that session.
+- **This session**: Jetpack track, wave 2 of 2 (final) — feel: VFX + audio +
+  camera + dog for the WALK-mode jetpack. Wave 1 (physics + shop + verify)
+  shipped 2026-07-13, commit (pending). It flies, is fully tested, and
+  measurably correct (AGL/cap/land/tiers) — it just doesn't *look* like
+  anything yet: no backpack prop, no flame, no sound, camera doesn't
+  react to altitude. Spec: `JETPACK_SPEC.md`.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — content/feel
+  wave (avatar prop + flame VFX, audio hook, camera lerp, dog behavior),
+  but still touches real physics/render wiring, so keep the structural bar.
+  Flag it if the running model differs.
+- **Budget**: code + checks, at most **one** flame-feel screenshot and only
+  on request. Resolve W2's open calls first (see below), then plan before
+  coding.
+- **Then**: this is the last wave — the session-end rewrite deletes this
+  briefing block and folds the whole Jetpack track into one `ROADMAP.md`
+  entry; `JETPACK_SPEC.md` stays as history.
 
-Gotchas carried over: any verify check that leaves the player airborne or in
-a non-DRIVE mode must restore DRIVE at its end — the horn/Lacy checks depend
-on ambient DRIVE mode (the aviation-tune check learned this the hard way).
+Open calls to resolve at the top of this session (`JETPACK_SPEC.md` §"Open
+calls for W2"):
+- Lacy's airborne behavior — spec recommends: stays grounded, waits below,
+  yips at liftoff (reuse `honked()` bark queue), rejoins the follow on
+  landing. Confirm with Bruno before implementing.
+- Whether a HUD AGL readout is worth the rem-based UI work.
+- Camera feel: fixed higher framing vs. AGL-proportional lerp.
+
+Gotchas carried over from W1:
+- `vehicle.js`: `hovering` is a WALK-only sub-state (`GRAV=45`,
+  `AIRDAMP=0.25`, module constants) — thrust XOR gravity each frame, no
+  stable hover point by design (see spec's physics tuning notes). The
+  ground-clamp guard is `if (this.mode !== 'FLY' && !this.hovering)`; don't
+  remove the `!this.hovering` half or WALK re-pins to terrain every frame.
+- `shop.js`: `jetpack` perk gates capability at level 0 (index 0 of
+  `JET_THRUST`/`JET_ALT`/`JET_SPEED` = 0/unowned) — `applyGear` always
+  writes `jetThrust`/`jetAlt`/`jetSpeed` regardless of ownership, only
+  `jetpack: lvl>0` gates whether Space does anything airborne.
+- Any verify check that leaves the player airborne or in a non-DRIVE mode
+  must restore DRIVE at its end — the horn/Lacy checks depend on ambient
+  DRIVE mode (the aviation-tune check learned this the hard way; jetpack.mjs
+  follows it too).
+- `dog.js` needs no change for hovering to be *safe* (she grounds her own y
+  independent of the player's), but W2 is where her behavior should become
+  *intentional* per the open call above.
 
 **No other active priority track.** The Texas Brands track (Bucky's,
 H-E-Buddy, Lone Star Compute — 3 waves) shipped 2026-07-12 and is folded into
