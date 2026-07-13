@@ -4,6 +4,7 @@
 import { GEO, nearestRoad } from './geo.js';
 import { LANDMARKS } from './gameplay.js';
 import { SHOP, ROMAN, PAINTS, PAINT_PRICE, buy, buyPaint, applyGear, gearLevel } from './shop.js';
+import { TOWERED } from './radio.js';
 
 // same projection as the data pipeline
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
@@ -48,6 +49,8 @@ export class TravelMenu {
     this.tab = 'Cities';
     this.citySearch = '';
     this.citySort = 'pop';
+    this.airportSearch = '';
+    this.airportSort = 'dist';
     this.el = document.getElementById('travel');
     this.toolbar = this.el.querySelector('.poi-toolbar');
     this.searchInput = this.el.querySelector('#city-search');
@@ -55,11 +58,15 @@ export class TravelMenu {
       if (e.target.dataset.tab) { this.tab = e.target.dataset.tab; this.render(); }
     });
     this.searchInput.addEventListener('input', () => {
-      this.citySearch = this.searchInput.value;
+      if (this.tab === 'Cities') this.citySearch = this.searchInput.value;
+      else if (this.tab === 'Airports') this.airportSearch = this.searchInput.value;
       this.render();
     });
     this.toolbar.querySelector('.sort-btns').addEventListener('click', (e) => {
-      if (e.target.dataset.sort) { this.citySort = e.target.dataset.sort; this.render(); }
+      if (!e.target.dataset.sort) return;
+      if (this.tab === 'Cities') this.citySort = e.target.dataset.sort;
+      else if (this.tab === 'Airports') this.airportSort = e.target.dataset.sort;
+      this.render();
     });
     this.el.querySelector('.poi-list').addEventListener('click', (e) => {
       const b = e.target.closest('button[data-i]');
@@ -82,9 +89,20 @@ export class TravelMenu {
   render() {
     for (const t of this.el.querySelectorAll('.tabs button'))
       t.classList.toggle('active', t.dataset.tab === this.tab);
-    this.toolbar.style.display = this.tab === 'Cities' ? 'flex' : 'none';
-    for (const b of this.toolbar.querySelectorAll('.sort-btns button'))
-      b.classList.toggle('active', b.dataset.sort === this.citySort);
+    const poiTab = this.tab === 'Cities' || this.tab === 'Airports';
+    this.toolbar.style.display = poiTab ? 'flex' : 'none';
+    if (poiTab) {
+      const activeSearch = this.tab === 'Cities' ? this.citySearch : this.airportSearch;
+      if (this.searchInput.value !== activeSearch) this.searchInput.value = activeSearch;
+      this.searchInput.placeholder = this.tab === 'Cities' ? 'Search cities…' : 'Search your logbook…';
+      const activeSort = this.tab === 'Cities' ? this.citySort : this.airportSort;
+      const sortOpts = this.tab === 'Cities'
+        ? [['pop', 'Population'], ['dist', 'Nearest'], ['az', 'A–Z']]
+        : [['dist', 'Nearest'], ['az', 'A–Z']];
+      this.toolbar.querySelector('.sort-btns').innerHTML = sortOpts
+        .map(([k, label]) => `<button data-sort="${k}" class="${k === activeSort ? 'active' : ''}">${label}</button>`)
+        .join('');
+    }
     if (this.tab === 'Jobs') { this.renderJobs(); return; }
     if (this.tab === 'Shop') { this.renderShop(); return; }
     // teleporting with cargo aboard would gut the missions — lock travel mid-haul
@@ -92,6 +110,8 @@ export class TravelMenu {
     const visited = new Set(this.gameplay.save.cities);
     const collected = new Set(this.gameplay.save.landmarks);
     let cityFilterEmpty = false;
+    let airportFilterEmpty = false;
+    let airportLoggedCount = 0;
     if (this.tab === 'Cities') {
       const px = this.player.pos.x, pz = this.player.pos.z;
       const dist = (c) => Math.hypot(c.x - px, c.z - pz) * 0.1; // km — 1 game unit = 100 m
@@ -105,6 +125,18 @@ export class TravelMenu {
         name: c.name, at: [c.x, c.z], drive: true, locked: !visited.has(c.name), star: visited.has(c.name),
         meta: `${fmtPop(c.pop)} · ${dist(c).toFixed(0)} km`,
       }));
+    } else if (this.tab === 'Airports') {
+      const px = this.player.pos.x, pz = this.player.pos.z;
+      const dist = (a) => Math.hypot(a.at[0] - px, a.at[1] - pz) * 0.1; // km
+      const loggedIds = new Set(this.gameplay.save.airports);
+      const logged = TOWERED.filter((a) => loggedIds.has(a.id));
+      airportLoggedCount = logged.length;
+      const q = this.airportSearch.trim().toLowerCase();
+      let list = logged.filter((a) => !q || a.name.toLowerCase().includes(q));
+      airportFilterEmpty = q && list.length === 0 && logged.length > 0;
+      if (this.airportSort === 'az') list = [...list].sort((a, b) => a.name.localeCompare(b.name));
+      else list = [...list].sort((a, b) => dist(a) - dist(b));
+      this.current = list.map((a) => ({ name: a.name, at: a.at, fly: 35, meta: `${a.city} · ${dist(a).toFixed(0)} km` }));
     } else if (this.tab === 'Landmarks') {
       this.current = LANDMARKS.map((l) => ({ name: l.name, at: l.at, fly: 15, star: collected.has(l.name) }));
     } else if (this.tab === 'Nature') {
@@ -122,12 +154,17 @@ export class TravelMenu {
     } else {
       this.current = ICONS;
     }
-    this.el.querySelector('.poi-list').innerHTML = this.current
+    const airportsSummary = this.tab === 'Airports'
+      ? `<div style="grid-column:1/-1;font-size:1.3rem;opacity:.85;padding:2px 2px 4px">✈️ ${airportLoggedCount}/7 towered fields logged</div>`
+      : '';
+    this.el.querySelector('.poi-list').innerHTML = airportsSummary + this.current
       .map((p, i) => `<button data-i="${i}" ${p.locked || hauling ? 'disabled' : ''}>${p.star ? '⭐ ' : ''}${p.name}${p.locked ? ' 🔒' : ''}${p.meta ? `<br><small style="opacity:.7">${p.meta}</small>` : ''}</button>`)
       .join('');
     this.el.querySelector('.hint').textContent =
       hauling ? '📦 Cargo aboard — finish (or abandon) your delivery before fast-traveling.'
       : cityFilterEmpty ? `No cities match "${this.citySearch.trim()}".`
+      : airportFilterEmpty ? `No logged airports match "${this.airportSearch.trim()}".`
+      : this.tab === 'Airports' && airportLoggedCount === 0 ? 'Your logbook is empty — tune in and land at a towered field to stamp it.'
       : this.tab === 'Cities' ? 'Locked cities unlock as fast-travel once you visit them.'
       : this.tab === 'Folks' ? 'Meet the locals — you can drop in on anyone whose town you’ve visited.'
       : 'Click to travel.';
