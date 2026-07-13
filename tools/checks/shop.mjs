@@ -19,6 +19,24 @@ async function motorwayTopSpeed(t) {
   return maxSpeed;
 }
 
+// climb a plane at the empty I-10 spot, heading east away from the west state
+// line: throttle to the cruise cap, then measure AGL gained on pure climb
+async function flyPerf(t) {
+  await t.tp(-2767, 334, 'FLY', 40);
+  await t.ev('g.player.heading = -Math.PI / 2'); // due east, stays deep inside Texas
+  await t.hold('KeyW');
+  const cruise = (await t.simStep(6)).maxSpeed; // accel ramps speed to the cap
+  await t.release();
+  await t.tp(-2767, 334, 'FLY', 40); // reset (tp zeroes speed + vy)
+  await t.ev('g.player.heading = -Math.PI / 2');
+  const agl0 = await t.ev('g.player.pos.y - g.hAt(g.player.pos.x, g.player.pos.z)');
+  await t.hold('Space'); // climb only — min-speed clamp still drifts ~18u east
+  await t.simStep(3);
+  await t.release();
+  const agl1 = await t.ev('g.player.pos.y - g.hAt(g.player.pos.x, g.player.pos.z)');
+  return { cruise, climb: agl1 - agl0 };
+}
+
 // buy one shop line to max through the real travel-menu path
 const buyOut = (t, id, times) => t.ev(`(() => {
   for (let i = 0; i < ${times}; i++) g.travel.buyItem('${id}');
@@ -36,7 +54,7 @@ export default async function shop(t) {
       return { n: btns.length - swatches.length, sw: swatches.length, disabled: btns.every((b) => b.disabled),
                lvl: g.gameplay.save.gear.engine ?? 0, bank: g.gameplay.save.bank };
     })()`);
-    t.ok(r.n === 6, `${r.n} shop items rendered, expected 6`);
+    t.ok(r.n === 8, `${r.n} shop items rendered, expected 8`);
     t.ok(r.sw === 7, `${r.sw} paint swatches rendered, expected 7`);
     t.ok(r.disabled, 'an unaffordable item was clickable');
     t.ok(r.lvl === 0 && r.bank === 0, `broke purchase went through (lvl ${r.lvl}, bank ${r.bank})`);
@@ -91,6 +109,33 @@ export default async function shop(t) {
     const rain = Math.min(1, await t.ev('g.ATMOS.rain'));
     t.near(i, 80 + rain * 12, 4, 'upgraded headlight intensity');
     await t.setDay();
+  });
+
+  await t.check('aviation tune III: cruise cap and climb both rise', async () => {
+    const stock = await flyPerf(t);
+    t.near(stock.cruise, 150, 5, 'stock cruise cap'); // baseline before comparing
+    t.ok(stock.climb > 30, `stock never climbed (AGL gain ${stock.climb.toFixed(1)})`);
+    await t.ev('g.gameplay.save.bank = 3050');
+    const bank = await buyOut(t, 'airframe', 3);
+    t.ok(bank === 0, `tiers should cost exactly $3050, $${3050 - bank} spent`);
+    const tuned = await flyPerf(t);
+    t.near(tuned.cruise, 195, 5, 'tuned cruise cap');
+    t.ok(tuned.cruise > stock.cruise + 20, `no cruise gain: ${stock.cruise.toFixed(1)} → ${tuned.cruise.toFixed(1)}`);
+    t.ok(tuned.climb > stock.climb + 15, `no climb gain: ${stock.climb.toFixed(1)} → ${tuned.climb.toFixed(1)}`);
+    await t.ev(`g.player.setMode('DRIVE')`); // leave the baseline mode the later checks expect
+  });
+
+  await t.check('cargo rig III: haul pay scales to ×1.45', async () => {
+    // deliver a fixed ground job on foot (flew:true kills the ×1.5 road bonus,
+    // left>0 keeps it on time) so the only variable is the rig multiplier
+    const job = `{ kind: 'ground', pay: 1000, left: 100, flew: true, cargo: 'Test crate', to: 'Austin', icon: '📦' }`;
+    const stock = await t.ev(`(() => { g.gameplay.save.bank = 0; g.missions.deliver(${job}); return g.gameplay.save.bank; })()`);
+    t.ok(stock === 1000, `stock haul paid $${stock}, expected 1000`);
+    await t.ev('g.gameplay.save.bank = 3050');
+    const bank = await buyOut(t, 'cargo', 3);
+    t.ok(bank === 0, `tiers should cost exactly $3050, $${3050 - bank} spent`);
+    const tuned = await t.ev(`(() => { g.gameplay.save.bank = 0; g.missions.deliver(${job}); return g.gameplay.save.bank; })()`);
+    t.ok(tuned === 1450, `rig III haul paid $${tuned}, expected 1450 (×1.45)`);
   });
 
   await t.check('Lacy rides the bed, perches on cargo crates, yips after the horn', async () => {
@@ -163,7 +208,7 @@ export default async function shop(t) {
 
   await t.check('gear levels persist in the save', async () => {
     const gear = await t.ev(`JSON.parse(localStorage['lonestar-roam-save-v1']).gear`);
-    for (const [id, lvl] of [['engine', 3], ['tires', 3], ['lights', 3], ['dog', 1], ['radio', 1], ['paint', 5]])
+    for (const [id, lvl] of [['engine', 3], ['tires', 3], ['lights', 3], ['airframe', 3], ['cargo', 3], ['dog', 1], ['radio', 1], ['paint', 5]])
       t.ok(gear?.[id] === lvl, `gear.${id} = ${gear?.[id]}, expected ${lvl}`);
   });
 }

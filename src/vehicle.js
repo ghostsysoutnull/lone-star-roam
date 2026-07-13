@@ -153,9 +153,9 @@ export class Player {
     } else if (this.mode === 'FLY') {
       if (fwd) this.speed += 40 * dt;
       else if (back) this.speed -= 50 * dt;
-      this.speed = THREE.MathUtils.clamp(this.speed, 6, 150); // planes don't hover
+      this.speed = THREE.MathUtils.clamp(this.speed, 6, this.perks.flyCap); // planes don't hover
       this.heading += steer * dt * 1.35;
-      if (k['Space']) this.vy += 60 * dt;
+      if (k['Space']) this.vy += this.perks.flyClimb * dt;
       if (k['ControlLeft'] || k['ControlRight'] || k['ShiftLeft']) this.vy -= 60 * dt;
       this.vy *= Math.pow(0.2, dt);
       // soft clamp: skim the terrain (or airport pad), never crash into it

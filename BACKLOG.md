@@ -72,6 +72,9 @@ landmark with night glow, painted-church landmark (St. Mary's High Hill).
   menu Landmarks tab.
 - **Shop loop**: engine I + tires I worth $350? Lacy's yips, crate perch,
   weather-radio window, paint colors at night — knobs in `src/shop.js` /
-  `src/sky.js` (`forecastT`) / `src/audio.js`.
+  `src/sky.js` (`forecastT`) / `src/audio.js`. New items to balance-check:
+  **Aviation tune** (climb/cruise, `FLY_CAP`/`FLY_CLIMB`) — do +10/20/30%
+  cruise and +15/30/45% climb feel worth it in the air? **Cargo rig**
+  (`CARGO_PAY` payout ×) — does +15/30/45% haul pay change which jobs you take?
 - Also still pending: traffic honk chorus on I-35, flares at night, headlight
   throw, wildlife voices mix, UI scale at 170%+ on 1080p.

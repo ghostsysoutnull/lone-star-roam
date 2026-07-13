@@ -8,6 +8,9 @@ const TIRE_CAP = [20, 24, 28, 32];           // offroad speed cap
 const TIRE_ACCEL = [14, 17, 20, 23];         // offroad accel
 const TIRE_RAIN = [0.22, 0.16, 0.12, 0.08];  // rain slowdown fraction
 const LIGHT_I = [30, 45, 62, 80];            // headlight PointLight intensity
+const FLY_CAP = [150, 165, 180, 195];        // FLY cruise speed cap (+10/20/30%)
+const FLY_CLIMB = [60, 69, 78, 87];          // FLY climb rate (+15/30/45%)
+const CARGO_PAY = [1, 1.15, 1.3, 1.45];      // mission payout multiplier
 
 export const ROMAN = ['I', 'II', 'III'];
 
@@ -18,6 +21,10 @@ export const SHOP = [
     tiers: ['faster offroad, less rain drag', 'ranch roads like highways', 'mud, caliche, downpours — all the same'] },
   { id: 'lights', icon: '💡', name: 'Headlights', prices: [350, 900, 1800],
     tiers: ['brighter beam', 'much brighter beam', 'the full Marfa searchlight'] },
+  { id: 'airframe', icon: '🛩️', name: 'Aviation tune', prices: [350, 900, 1800],
+    tiers: ['+10% cruise, faster climb', '+20% cruise, quicker climb', '+30% cruise, mountain-goat climb'] },
+  { id: 'cargo', icon: '📦', name: 'Cargo rig', prices: [350, 900, 1800],
+    tiers: ['+15% haul pay', '+30% haul pay', '+45% haul pay'] },
   { id: 'dog', icon: '🐕', name: 'Lacy the Blue Lacy', prices: [750],
     tiers: ['the state dog of Texas — rides in the bed, follows you on foot'],
     done: 'She rides with you' },
@@ -73,6 +80,9 @@ export function applyGear(save, player, dog) {
     offroadAccel: TIRE_ACCEL[lvl('tires')],
     rainDrag: TIRE_RAIN[lvl('tires')],
     lightI: LIGHT_I[lvl('lights')],
+    flyCap: FLY_CAP[lvl('airframe')],
+    flyClimb: FLY_CLIMB[lvl('airframe')],
+    cargoPay: CARGO_PAY[lvl('cargo')],
     radio: lvl('radio') > 0,
     avionics: lvl('avionics') > 0,
   };

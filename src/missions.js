@@ -303,14 +303,15 @@ export class MissionSystem {
 
   deliver(j) {
     const late = j.left <= 0;
+    const rig = this.player.perks?.cargoPay ?? 1; // Cargo rig upgrade, applied at payout
     if (j.kind === 'charter') {
-      const payout = Math.round((j.pay * (late ? 0.5 : 1)) / 5) * 5;
+      const payout = Math.round((j.pay * rig * (late ? 0.5 : 1)) / 5) * 5;
       this.setLivery(false);
       this.finishJob(payout, `💵 ${j.manifest} delivered to ${j.to}! +$${payout}${late ? ' (late — half pay)' : ''}`);
       return;
     }
     const bonus = !j.flew;
-    const payout = Math.round((j.pay * (late ? 0.5 : 1) * (bonus ? 1.5 : 1)) / 5) * 5;
+    const payout = Math.round((j.pay * rig * (late ? 0.5 : 1) * (bonus ? 1.5 : 1)) / 5) * 5;
     this.crate(false);
     const notes = [bonus && '×1.5 road bonus', late && 'late — half pay'].filter(Boolean).join(', ');
     this.finishJob(payout, `💵 ${j.cargo} delivered! +$${payout}${notes ? ` (${notes})` : ''}`);
