@@ -628,12 +628,16 @@ function buildHEBHero(skirt = 0.4) {
   s.push(tinted(new THREE.BoxGeometry(13, 3.0, 0.35).translate(0, 10.0, 9.25), HEB_RED_DARK)); // backer (lit at night)
   s.push(tinted(new THREE.BoxGeometry(13.4, 0.3, 0.18).translate(0, 8.05, 9.2), HEB_RED));   // sign underline (lit at night)
 
-  // --- curved entry canopy: quarter-round barrel, high at the wall curving
-  // down and out over the entrance. CylinderGeometry's axis is Y by default;
-  // rotateZ(90°) maps it to local X (canopy spans the entrance width), and
-  // thetaStart=0/thetaLength=PI/2 keeps only the arc quadrant from
-  // "straight up at the wall" to "level, projecting outward" — the scoop. ---
-  const R = 4.0, mountY = 6.6, wallZ = 8.05;
+  // --- curved entry canopy: quarter-round barrel over the entrance doors
+  // (the glazing band, y 0.9-3.9), well BELOW the parapet/sign band (y
+  // 8.5-11.5) — a taller mountY/R here reaches up into the sign band's own
+  // space and visually blocks it (shipped-then-caught regression: mountY=6.6,
+  // R=4.0 put the canopy's peak at y=10.6, cutting right through the sign).
+  // CylinderGeometry's axis is Y by default; rotateZ(90°) maps it to local X
+  // (canopy spans the entrance width), and thetaStart=0/thetaLength=PI/2
+  // keeps only the arc quadrant from "straight up at the wall" to "level,
+  // projecting outward" — the scoop. ---
+  const R = 3.4, mountY = 3.6, wallZ = 8.05; // top reach = mountY+R = 7.0, clear of the sign at y >= 8.5
   const canopyGeo = new THREE.CylinderGeometry(R, R, 11, 12, 1, true, 0, Math.PI / 2).rotateZ(Math.PI / 2);
   canopyGeo.translate(0, mountY, wallZ);
   s.push(tinted(canopyGeo, HEB_CANOPY));
