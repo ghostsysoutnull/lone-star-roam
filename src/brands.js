@@ -45,7 +45,7 @@ const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180)
 const SCALE_KEY = 'lonestar-brand-scale';
 const SCALE_MIN = 0.1, SCALE_MAX = 1.25; // down to a tenth size — Bruno 2026-07-12
 const clampScale = (v) => Math.round(Math.min(SCALE_MAX, Math.max(SCALE_MIN, v)) * 100) / 100;
-let SCALE = clampScale(parseFloat(localStorage.getItem(SCALE_KEY)) || 1);
+let SCALE = clampScale(parseFloat(localStorage.getItem(SCALE_KEY)) || 0.15);
 
 const SPAWN_DIST = 700;      // bigger footprints than cities — hold geometry sooner
 const NIGHT_ON = 0.25;       // ATMOS.night threshold for the signage glow (airports.js)
@@ -803,6 +803,20 @@ export function groundYAt(x, z) {
     if (y !== null) return y;
   }
   return null;
+}
+
+// true when (x,z) is within `range` of any brand site's unscaled center — for
+// the "[ / ] resizes buildings" HUD hint. Deliberately SCALE-independent
+// (unlike footAt/groundYAt above): at a shrunk-down size the rendered
+// footprint itself gets tiny, so gating on it would make the hint nearly
+// undiscoverable exactly when it's most useful. Reuses the same footprint
+// caches, so no `this.live` (streaming) dependency either.
+export function brandNear(x, z, range) {
+  const r2 = range * range;
+  for (const site of buckyFootprints()) if ((site.x - x) ** 2 + (site.z - z) ** 2 < r2) return true;
+  for (const site of hebFootprints()) if ((site.x - x) ** 2 + (site.z - z) ** 2 < r2) return true;
+  for (const site of lscFootprints()) if ((site.x - x) ** 2 + (site.z - z) ** 2 < r2) return true;
+  return false;
 }
 
 // Shared pump-island prototype (heli-tier greebles): base + dispenser + two

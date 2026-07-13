@@ -22,6 +22,7 @@ export default async function npcs(t) {
       x: (-95.8475 + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100,
       z: -(29.7787 - 31) * 111320 / 100,
     })`);
+    await t.ev(`g.brands.setScale(1)`); // pad-clearance margin below assumes unscaled geometry
     const r = await t.ev(`(async () => {
       const { gY } = await import('/src/npcs.js');
       return { gy: gY(${katy.x}, ${katy.z}), padTop: g.brandGroundYAt(${katy.x}, ${katy.z}), raw: g.hAt(${katy.x}, ${katy.z}) };

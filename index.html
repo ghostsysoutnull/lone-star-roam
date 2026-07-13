@@ -48,6 +48,9 @@
     opacity: 0; transition: opacity .3s; z-index: 9; pointer-events: none; }
   #interact-hint { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); color: #fff;
     background: rgba(12,16,24,.8); padding: 6px 14px; border-radius: 16px; font-size: 1.3rem; display: none; z-index: 8; }
+  #brand-size-hint { position: fixed; left: 50%; bottom: 190px; transform: translateX(-50%); color: #fff;
+    opacity: .8; background: rgba(12,16,24,.8); padding: 6px 14px; border-radius: 16px; font-size: 1.3rem;
+    display: none; z-index: 8; }
   #radio-subtitle { position: fixed; left: 50%; bottom: 19rem; transform: translateX(-50%);
     max-width: min(48rem, 90vw); background: rgba(14,18,26,.85); color: #9fd8ff;
     padding: 6px 16px; border-radius: 8px; font-size: 1.3rem; text-align: center;
@@ -139,6 +142,7 @@
 <div id="bigmap"><canvas id="bigmap-canvas"></canvas></div>
 <div id="dialog"><div class="npc-name"></div><div class="npc-sub"></div><div class="npc-text"></div><div class="hint">E — continue / close</div></div>
 <div id="interact-hint"></div>
+<div id="brand-size-hint">[ / ] — resize buildings</div>
 <div id="toast"></div>
 <div id="radio-subtitle"><div id="radio-header"></div><span id="radio-text"></span></div>
 <div id="air-tags"></div>

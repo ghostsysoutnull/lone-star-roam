@@ -131,6 +131,7 @@ export default async function brands(t) {
   });
 
   await t.check('grounding: walking/driving over the pad rides the slab top, not raw terrain underneath', async () => {
+    await t.ev(`g.brands.setScale(1)`); // PAD_TOP margin below assumes unscaled geometry
     await t.tp(katyAt.x, katyAt.z + 3);
     await t.until(`g.brands.live.has('Katy')`, 8000);
     const expect = await t.ev(`({ padTop: g.brandGroundYAt(${katyAt.x}, ${katyAt.z}), raw: g.hAt(${katyAt.x}, ${katyAt.z}) })`);
@@ -149,6 +150,20 @@ export default async function brands(t) {
     await t.simStep(0.3);
     const driveY = await t.ev(`g.player.pos.y`);
     t.near(driveY, expect.padTop, 0.05, `DRIVE sank through the pad to ${driveY}, expected ${expect.padTop}`);
+  });
+
+  await t.check('brand size hint: HUD hint shows near a site even shrunk small, hides far away', async () => {
+    // shrunk to the new first-load default, at an ugly mid-approach offset
+    // (not the pad center) — proving the hint is keyed off the site's real
+    // location, not the now-tiny scaled footprint that motivated brandNear.
+    await t.ev(`g.brands.setScale(0.15)`);
+    await t.tp(katyAt.x + 42, katyAt.z - 17);
+    await t.until(`g.hud.els.brandSize.style.display === 'block'`, 8000);
+
+    await t.tp(katyAt.x + 400, katyAt.z + 400);
+    await t.until(`g.hud.els.brandSize.style.display === 'none'`, 8000);
+
+    await t.ev(`g.brands.setScale(1)`); // reset for the rest of the suite
   });
 
   await t.check('night lights: two warm lights light the nearest site at night, dark by day, at the site', async () => {
@@ -271,6 +286,7 @@ export default async function brands(t) {
   });
 
   await t.check('H-E-Buddy grounding: walking/driving over the lot rides the slab top, not raw terrain', async () => {
+    await t.ev(`g.brands.setScale(1)`); // PAD_TOP margin below assumes unscaled geometry
     await t.tp(heb.x, heb.z + 3);
     await t.until(`g.brands.live.has('heb:Houston')`, 8000);
     const expect = await t.ev(`({ padTop: g.brandGroundYAt(${heb.x}, ${heb.z}), raw: g.hAt(${heb.x}, ${heb.z}) })`);

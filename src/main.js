@@ -5,7 +5,7 @@ import { buildWorld, chapelSitesNear } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { initDebug } from './debug.js';
 import { CitySystem } from './cities.js';
-import { BrandSystem, groundYAt as brandGroundYAt } from './brands.js';
+import { BrandSystem, groundYAt as brandGroundYAt, brandNear } from './brands.js';
 import { Player } from './vehicle.js';
 import { Gameplay } from './gameplay.js';
 import { TrafficSystem } from './traffic.js';
@@ -260,6 +260,7 @@ async function boot() {
     const pNear = (npcName || skyHint) ? null : plaqueNear(player.pos, 28);
     hud.interactHint(npcName ? `talk to ${npcName}` : skyHint ? skyHint
       : pNear && pNear.name !== plaqueOpen ? pNear.hint : null);
+    hud.brandSizeHint(brandNear(player.pos.x, player.pos.z, 60));
     // walked away from an open plaque (either source): close it
     if (plaqueOpen && (!pNear || pNear.name !== plaqueOpen) && !plaqueNear(player.pos, 40)) {
       hud.dialog(null);
