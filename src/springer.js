@@ -8,8 +8,8 @@ import { GEO, nearestRoad, hAt } from './geo.js';
 import { groundYAt } from './airports.js';
 import { groundYAt as brandGroundYAt } from './brands.js';
 
-const ROAM_R = 70;       // leash radius around HOME — never exceeded
-const APPROACH_R = 45;   // notices + approaches once player is within ROAM_R + this
+const ROAM_R = 30;       // leash radius around HOME — never exceeded (3km: she stays near town center)
+const APPROACH_R = 20;   // notices + approaches once player is within ROAM_R + this
 const PET_R = 4;         // close enough to pet, and how near she settles when approaching
 const CATCHUP = 2.0, MAX_SPD = 10; // dog.js-style approach speed
 const WANDER_SPD = 3;

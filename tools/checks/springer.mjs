@@ -1,8 +1,8 @@
 // Sky — the Cedar Park springer spaniel (src/springer.js). Mirrors the
-// module's own constants (ROAM_R=70, APPROACH_R=45, PET_R=4) since they
+// module's own constants (ROAM_R=30, APPROACH_R=20, PET_R=4) since they
 // aren't exported — same idiom as dog.js's FOLLOW_D=2.6 being asserted by
 // value in shop.mjs rather than imported.
-const ROAM_R = 70, APPROACH_R = 45, PET_R = 4;
+const ROAM_R = 30, APPROACH_R = 20, PET_R = 4;
 
 // force Sky to a known position/state before a check drives her — checks in
 // a suite share one live game, so each one arranges the precondition it needs
@@ -27,9 +27,9 @@ export default async function springer(t) {
 
   await t.check('approaches when in range: gap to the player strictly closes', async () => {
     await resetSky(t, home.x, home.z);
-    // inside ROAM_R itself (not the fence-clamp case) but well outside PET_R,
-    // so the approach target is the player directly
-    await t.tp(home.x + ROAM_R - 30, home.z, 'WALK');
+    // inside ROAM_R itself (not the fence-clamp case) but far enough that a
+    // single MAX_SPD-capped step can't close the whole gap in one sample
+    await t.tp(home.x + ROAM_R - 2, home.z, 'WALK');
     const gaps = [];
     for (let i = 0; i < 6; i++) {
       await t.step(1.5, 'g.springer.update(dt, g.player.pos)');
@@ -42,7 +42,7 @@ export default async function springer(t) {
 
   await t.check('fence-line wait: a player outside ROAM_R pulls Sky to the boundary, not past it', async () => {
     await resetSky(t, home.x, home.z);
-    await t.tp(home.x + ROAM_R + 20, home.z, 'WALK'); // inside detection range, outside the leash
+    await t.tp(home.x + ROAM_R + 10, home.z, 'WALK'); // inside detection range (< ROAM_R+APPROACH_R), outside the leash
     let last = -1;
     for (let i = 0; i < 8; i++) {
       await t.step(1.5, 'g.springer.update(dt, g.player.pos)');
@@ -56,10 +56,11 @@ export default async function springer(t) {
   });
 
   await t.check('pet interaction: E near Sky triggers a happy hop and the HUD prompts for it', async () => {
-    // 40 units off downtown Cedar Park — well clear of any procedurally
-    // spawned townsfolk (bounded within cityRadius, ~14u here), so the pet
-    // hint isn't shadowed by an unrelated NPC hint (see the priority check below)
-    await resetSky(t, home.x + 40, home.z);
+    // 20 units off downtown Cedar Park — inside her own leash but still well
+    // clear of any procedurally spawned townsfolk (bounded within cityRadius,
+    // ~14u here), so the pet hint isn't shadowed by an unrelated NPC hint
+    // (see the priority check below)
+    await resetSky(t, home.x + 20, home.z);
     const pos = await t.ev('({ x: g.springer.g.position.x, z: g.springer.g.position.z })');
     await t.tp(pos.x + 1.5, pos.z, 'WALK');
     const hint = await t.ev('g.hud.els.interact.textContent');

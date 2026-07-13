@@ -22,6 +22,7 @@ import { UFOSystem } from './ufo.js';
 import { FlareSystem } from './flares.js';
 import { DogSystem } from './dog.js';
 import { SpringerSystem } from './springer.js';
+import { RabbitSystem } from './rabbits.js';
 import { AirportSystem, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt } from './airports.js';
 import { AviationSystem, daySchedule, AIRLINES } from './aviation.js';
 import { TowerRadio } from './radio.js';
@@ -94,6 +95,7 @@ async function boot() {
   dog.onBark = () => audio.bark();
   const springer = new SpringerSystem(scene);
   springer.onBark = () => audio.bark();
+  const rabbits = new RabbitSystem(scene);
   brands.onHum = (d) => audio.datacenterHum(d); // Lone Star Compute proximity hum (audio built at line 70)
   applyGear(gameplay.save, player, dog); // saved shop upgrades take effect at boot
   const travel = new TravelMenu(player, gameplay, sky, npcs, missions, dog, (m) => hud.toast(m), (k) => audio.chime(k));
@@ -195,7 +197,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, chapelSitesNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -231,6 +233,7 @@ async function boot() {
     flares.update(dt);
     dog.update(dt);
     springer.update(dt, player.pos);
+    rabbits.update(dt, player.pos, player.mode);
     ATMOS.ufo = ufo.near;
     radio.update(dt, player, aviation, sky);
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
