@@ -43,7 +43,7 @@ const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180)
 // groundYAt's footprint/pad-height math reads this same module value so the
 // physical floor always matches the shrunk/grown slab.
 const SCALE_KEY = 'lonestar-brand-scale';
-const SCALE_MIN = 0.5, SCALE_MAX = 1.25;
+const SCALE_MIN = 0.1, SCALE_MAX = 1.25; // down to a tenth size — Bruno 2026-07-12
 const clampScale = (v) => Math.round(Math.min(SCALE_MAX, Math.max(SCALE_MIN, v)) * 100) / 100;
 let SCALE = clampScale(parseFloat(localStorage.getItem(SCALE_KEY)) || 1);
 
@@ -327,12 +327,15 @@ export class BrandSystem {
     const fp = footprintRange(x, z);
     const padY = fp.max;
     // Authored BEFORE `building`'s scale is applied (the slab lives inside
-    // it, like everything else) — dividing by SCALE here keeps the slab's
-    // WORLD-space reach (padY - SCALE*skirt) constant at any brand size, so
-    // a shrunk store's shrunk skirt still dips below the lot min instead of
-    // floating on sloped terrain (real worst case ~1.8u relief needs ~4.4u
-    // authored skirt at the 0.5x floor — comfortably under the cap below).
-    const skirt = Math.min(8, (padY - fp.min + 0.4) / SCALE); // cap so steep sites don't wall up absurdly
+    // it, like everything else) — capping the TRUE relief first, then
+    // dividing the result by SCALE, keeps the slab's WORLD-space reach
+    // (padY - SCALE*skirt) constant at any brand size: SCALE * (min(8,
+    // relief+0.4)/SCALE) == min(8, relief+0.4), same depth as uncounter-
+    // scaled. Real worst case ~1.8u relief (El Paso's H-E-Buddy lot) is
+    // nowhere near the 8-unit cap, so it's untouched by it at any scale down
+    // to the 0.1x floor — the shrunk skirt still dips below the lot min
+    // instead of floating on sloped terrain.
+    const skirt = Math.min(8, padY - fp.min + 0.4) / SCALE; // cap FIRST (on true relief), then divide — dividing first would let a small SCALE undershoot the cap and clip the needed depth
     group.position.set(x, padY, z);
     group.rotation.y = heading;
 
@@ -432,7 +435,7 @@ export class BrandSystem {
 
     const fp = footprintRange(x, z);
     const padY = fp.max;
-    const skirt = Math.min(8, (padY - fp.min + 0.4) / SCALE); // see spawn()'s comment — keeps the slab draped at any brand size
+    const skirt = Math.min(8, padY - fp.min + 0.4) / SCALE; // see spawn()'s comment — cap BEFORE dividing by SCALE
 
     group.position.set(x, padY, z);
     group.rotation.y = heading;
@@ -492,7 +495,7 @@ export class BrandSystem {
 
     const fp = footprintRange(x, z);
     const padY = fp.max;
-    const skirt = Math.min(8, (padY - fp.min + 0.4) / SCALE); // see spawn()'s comment — keeps the slab draped at any brand size
+    const skirt = Math.min(8, padY - fp.min + 0.4) / SCALE; // see spawn()'s comment — cap BEFORE dividing by SCALE
     group.position.set(x, padY, z);
     group.rotation.y = heading;
 

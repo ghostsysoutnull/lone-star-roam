@@ -18,13 +18,16 @@ Gotchas for whoever touches `brands.js` next:
   should shrink/grow with the store goes in `building`; anything that must
   stay grounded on its OWN terrain sample independent of store size (like the
   approach billboards) stays a direct `group` child with its own `.scale`.
-- The foundation skirt's authored depth is `(relief + 0.4) / SCALE` —
-  deliberately counter-scaled so its WORLD-space reach stays constant
-  regardless of brand size (a shrunk building's shrunk skirt would otherwise
-  float off sloped real terrain; El Paso's H-E-Buddy lot, ~1.8u relief, is
-  the worst real case and is what the verify check exercises). Don't
-  "simplify" this back to a plain `relief + 0.4` — that reintroduces the float
-  at any scale below 1.
+- The foundation skirt's authored depth is `Math.min(8, relief + 0.4) / SCALE`
+  — cap the TRUE relief FIRST, THEN divide by SCALE, deliberately
+  counter-scaled so its WORLD-space reach stays constant regardless of brand
+  size (a shrunk building's shrunk skirt would otherwise float off sloped
+  real terrain; El Paso's H-E-Buddy lot, ~1.8u relief, is the worst real case
+  and is what the verify check exercises, now at the 0.1x floor). Dividing
+  BEFORE capping (`Math.min(8, relief / SCALE)`) shipped once and undershot
+  the needed depth at small scale — the cap must see the real relief, not the
+  already-shrunk one. Range is 0.1–1.25 (Bruno 2026-07-12, widened from the
+  original 0.5–1.25 same day).
 - `footAt`'s footprint half-extents and `PAD_TOP` are also scaled by the same
   module-level `SCALE`, so the walkable pad always matches the rendered slab.
   `SCALE` is read live (not cached) — the footprint site caches

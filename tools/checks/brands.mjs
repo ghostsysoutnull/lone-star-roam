@@ -479,7 +479,7 @@ export default async function brands(t) {
     const clampHi = await t.ev(`g.brands.setScale(5)`);
     const clampLo = await t.ev(`g.brands.setScale(-5)`);
     t.ok(clampHi.endsWith('125%'), `scale not clamped to the max: ${clampHi}`);
-    t.ok(clampLo.endsWith('50%'), `scale not clamped to the min: ${clampLo}`);
+    t.ok(clampLo.endsWith('10%'), `scale not clamped to the min: ${clampLo}`);
 
     await t.ev(`g.brands.setScale(1)`); // reset for the rest of the suite
     await t.until(`g.brands.live.has('Katy')`, 2000);
@@ -564,8 +564,11 @@ export default async function brands(t) {
     // El Paso's H-E-Buddy lot is the steepest real relief in the whole
     // table (~1.78u, found via a one-off scan) — the site most likely to
     // expose a skirt that floats once the building group is scaled down.
+    // Test at the 0.1x FLOOR, not some mid-range value: that's where a
+    // cap-before-divide ordering bug in the skirt formula would actually
+    // clip the needed depth and reintroduce the float (caught once already).
     const site = await t.ev(`g.brands.hebSites.find((s) => s.name === 'El Paso')`);
-    await t.ev(`g.brands.setScale(0.5)`);
+    await t.ev(`g.brands.setScale(0.1)`);
     await t.tp(site.x, site.z + 3);
     await t.until(`g.brands.live.has('heb:El Paso')`, 8000);
     const g0 = await t.ev(`(() => {
