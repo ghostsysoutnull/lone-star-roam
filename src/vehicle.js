@@ -21,6 +21,10 @@ export const MODES = ['DRIVE', 'FLY', 'WALK'];
 const GRAV = 45;
 const AIRDAMP = 0.25;
 
+// WALK-only flashlight: max on-time per press before it auto-extinguishes
+// and the ambient lantern resumes (see toggleFlashlight()).
+const FLASHLIGHT_DURATION = 10;
+
 // WALK sprint: builds up after a sustained straight-line forward walk (no
 // modifier key — judged not user-friendly), drains stamina while active, and
 // drops instantly on any turn/stop/back-up so careful movement near
@@ -82,6 +86,18 @@ export class Player {
     this.headLight.visible = false;
     scene.add(this.headLight);
 
+    // WALK-only flashlight: KeyL swaps the cowboy's always-on ambient lantern
+    // (mkCowboy) for a stronger forward-aimed beam, capped at
+    // FLASHLIGHT_DURATION seconds (see toggleFlashlight() + animate()'s WALK
+    // branch, which also resumes the lantern once this goes off). Aimed ahead
+    // of heading each frame — SpotLight.target doesn't inherit a parent
+    // transform, so both light and target live at scene level, not on the rig.
+    this.flashlightOn = false;
+    this.flashlightTimer = 0;
+    this.flashLight = new THREE.SpotLight(0xfff2d0, 0, 34, 0.34, 0.4, 1.6);
+    this.flashLight.visible = false;
+    scene.add(this.flashLight, this.flashLight.target);
+
     // fake light decals: landing pool (fly low) + brake glow. A decal headlight
     // pool shipped once and read flat (lit nothing, buried itself on slopes —
     // terrain triangles are ~30 units); DRIVE now uses the real light above.
@@ -134,6 +150,12 @@ export class Player {
     this.hovering = false; // only WALK can be airborne this way — get out of the truck first
     this.sprinting = false;
     this.sprintBuildup = 0;
+  }
+
+  toggleFlashlight() {
+    this.flashlightOn = !this.flashlightOn;
+    this.flashlightTimer = this.flashlightOn ? FLASHLIGHT_DURATION : 0;
+    return this.flashlightOn;
   }
 
   resetToRoad() {
@@ -321,6 +343,8 @@ export class Player {
     this.lightPool.visible = this.brakePool.visible = false;
     this.headLight.visible = false;
     this.headLight.intensity = 0;
+    this.flashLight.visible = false;
+    this.flashLight.intensity = 0;
     u.beams.visible = false;
     this.wings.userData.landing.visible = false;
 
@@ -412,10 +436,28 @@ export class Player {
         for (const part of [c.ll, c.rl, c.la, c.ra]) part.rotation.x *= Math.pow(0.01, dt);
         c.la.rotation.z = 0.06 * Math.sin(performance.now() * 0.0012); // idle sway
       }
-      // lantern glows after dark — and the UFO Levelland flicker reaches it too
-      const lampOn = night && !(ATMOS.ufo > 0 && Math.random() < ATMOS.ufo * 0.35);
+      // flashlight: KeyL swaps the ambient lantern for a stronger forward
+      // beam, capped at FLASHLIGHT_DURATION — ticks down here since this WALK
+      // branch is the only place both lights are driven, and auto-off must
+      // hand lighting back to the lantern the instant the beam expires.
+      if (this.flashlightOn) {
+        this.flashlightTimer -= dt;
+        if (this.flashlightTimer <= 0) { this.flashlightOn = false; this.flashlightTimer = 0; }
+      }
+      // lantern glows after dark, unless the flashlight has taken over — and
+      // the UFO Levelland flicker reaches it too
+      const lampOn = night && !this.flashlightOn && !(ATMOS.ufo > 0 && Math.random() < ATMOS.ufo * 0.35);
       c.lampGlow.visible = lampOn;
       c.lampLight.intensity = lampOn ? 14 + Math.sin(this.walkPhase * 2) * 1.5 : 0;
+      if (this.flashlightOn) {
+        const fx = this.pos.x + fwdX * 0.6, fz = this.pos.z + fwdZ * 0.6;
+        const fy = hAt(fx, fz) + 1.5;
+        this.flashLight.visible = true;
+        this.flashLight.intensity = 26;
+        this.flashLight.position.set(fx, fy, fz);
+        this.flashLight.target.position.set(this.pos.x + fwdX * 10, fy - 0.3, this.pos.z + fwdZ * 10);
+        this.flashLight.target.updateMatrixWorld();
+      }
       // jetpack flame: only while actively thrusting, cuts the instant Space releases
       const thrust = this.hovering && !!this.keys['Space'];
       c.flameL.visible = c.flameR.visible = thrust;

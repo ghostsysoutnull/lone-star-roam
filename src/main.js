@@ -170,6 +170,7 @@ async function boot() {
     if (e.code === 'KeyZ') hud.cycleZoom();
     if (e.code === 'KeyC') hud.toggleCompass();
     if (e.code === 'KeyG') hud.toast(missions.toggleArrow() ? '🧭 Guide arrow on' : '🧭 Guide arrow off');
+    if (e.code === 'KeyL' && !e.repeat) hud.toast(player.toggleFlashlight() ? '🔦 Flashlight on' : '🔦 Flashlight off');
     if (e.code === 'KeyP') travel.toggle();
     if (e.code === 'Escape') {
       if (travel.el.style.display === 'flex') travel.close();

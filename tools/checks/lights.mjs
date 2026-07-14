@@ -1,7 +1,10 @@
 // Night vehicle lights (vehicle.js): DRIVE runs a real PointLight ahead of the
 // truck nose (player.headLight) + fake beam cones; FLY keeps the decal landing
 // pool gated on height above ground; brake glow decal. All driven by
-// ATMOS.night/rain, following headlights.visible.
+// ATMOS.night/rain, following headlights.visible. WALK's ambient lantern
+// (cowboy.userData.lampLight) is always on after dark; KeyL swaps it for a
+// stronger forward-aimed SpotLight (player.flashLight) for up to 10s
+// (flashlightTimer), then hands lighting back to the lantern.
 // Set SHOT=1 to grab the one allowed screenshot for the visual judgment.
 
 export default async function lights(t) {
@@ -49,6 +52,68 @@ export default async function lights(t) {
     }
     await t.release();
     t.ok(seen, 'no brake glow while braking');
+  });
+
+  await t.check('walk flashlight: swaps out the lantern, aims ahead, auto-off after 10s', async () => {
+    await t.setNight();
+    await t.tp(austin.x, austin.z + 12, 'WALK');
+    await t.ev('g.player.heading = 3.87'); // natural mid-walk value
+    await t.wait(0.4); // let the lantern settle on
+    const before = await t.ev(`({ glow: g.player.cowboy.userData.lampGlow.visible, i: g.player.cowboy.userData.lampLight.intensity, flOn: g.player.flashlightOn })`);
+    t.ok(before.glow && before.i > 0 && !before.flOn, `lantern not on before flashlight: ${JSON.stringify(before)}`);
+
+    await t.key('KeyL');
+    await t.wait(0.2);
+    const s = await t.ev(`(() => {
+      const p = g.player, fl = p.flashLight, c = p.cowboy.userData;
+      return {
+        on: p.flashlightOn, timer: p.flashlightTimer, visible: fl.visible, i: fl.intensity,
+        agl: fl.position.y - g.hAt(fl.position.x, fl.position.z),
+        ahead: (fl.position.x - p.pos.x) * -Math.sin(p.heading) + (fl.position.z - p.pos.z) * -Math.cos(p.heading),
+        targetAhead: (fl.target.position.x - p.pos.x) * -Math.sin(p.heading) + (fl.target.position.z - p.pos.z) * -Math.cos(p.heading),
+        lampGlow: c.lampGlow.visible, lampI: c.lampLight.intensity,
+      };
+    })()`);
+    t.ok(s.on && s.visible, `flashlight didn't turn on: ${JSON.stringify(s)}`);
+    t.ok(s.i >= 20, `flashlight too dim: ${s.i}`);
+    t.near(s.agl, 1.5, 0.3, 'flashlight height above ground');
+    t.ok(s.ahead > 0.3, `flashlight not in front: ${s.ahead.toFixed(2)}`);
+    t.ok(s.targetAhead > s.ahead, `target not further ahead than the light: ${JSON.stringify(s)}`);
+    t.ok(!s.lampGlow && s.lampI === 0, `lantern didn't yield to the flashlight: ${JSON.stringify(s)}`);
+    t.near(s.timer, 10, 0.3, 'flashlight duration on activation');
+
+    // mode-gated: switching to DRIVE hides the beam (and freezes the timer) even though the toggle stays on
+    await t.ev(`g.player.setMode('DRIVE')`);
+    await t.wait(0.2);
+    const drive = await t.ev(`({ on: g.player.flashlightOn, visible: g.player.flashLight.visible })`);
+    t.ok(drive.on && !drive.visible, `flashlight leaked into DRIVE: ${JSON.stringify(drive)}`);
+    await t.ev(`g.player.setMode('WALK')`);
+    await t.wait(0.2);
+    t.ok(await t.ev('g.player.flashLight.visible'), 'flashlight state lost across mode switch');
+
+    // auto-off past the 10s cap — the lantern must resume since it's still night
+    await t.simStep(10.5);
+    const after = await t.ev(`(() => {
+      const p = g.player, c = p.cowboy.userData;
+      return { on: p.flashlightOn, visible: p.flashLight.visible, lampGlow: c.lampGlow.visible, lampI: c.lampLight.intensity };
+    })()`);
+    t.ok(!after.on && !after.visible, `flashlight didn't auto-off: ${JSON.stringify(after)}`);
+    t.ok(after.lampGlow && after.lampI > 0, `lantern didn't resume after auto-off: ${JSON.stringify(after)}`);
+
+    // manual toggle-off before the cap also hands lighting back immediately
+    await t.key('KeyL');
+    await t.wait(0.2);
+    t.ok(await t.ev('g.player.flashLight.visible'), 'flashlight refused to re-arm');
+    await t.key('KeyL');
+    await t.wait(0.2);
+    const manualOff = await t.ev(`(() => {
+      const p = g.player, c = p.cowboy.userData;
+      return { visible: p.flashLight.visible, lampGlow: c.lampGlow.visible, lampI: c.lampLight.intensity };
+    })()`);
+    t.ok(!manualOff.visible && manualOff.lampGlow && manualOff.lampI > 0, `manual off didn't restore the lantern: ${JSON.stringify(manualOff)}`);
+
+    await t.ev(`g.player.setMode('DRIVE')`);
+    await t.setNight(); // the next check (landing light, FLY) expects night carried over
   });
 
   await t.check('landing light gates on height above ground (not raw y)', async () => {
