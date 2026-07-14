@@ -515,6 +515,50 @@ export function feedlotAt(cx, cz) {
   return null;
 }
 
+// Ranch headquarters compounds — wave 5. One per named gate arch (gameplay.js
+// LANDMARKS 'rancharch' / animals.js RANCH_ARCHES — same LL projections, keep
+// all three in sync). Pure seeded site pattern (chapelAt precedent): scenery
+// dresses the compound and animals.js homes each ranch's signature herds at
+// the exact same site, no cross-module spawn coupling. sig picks the dressing.
+const RANCH_HQ = [
+  { name: 'King Ranch', ax: 1538.2, az: 3870.1, sig: 'king' },
+  { name: 'Four Sixes Ranch', ax: -781.1, az: -2917.3, sig: 'foursixes' },
+  { name: 'Waggoner Ranch', ax: 209.9, az: -3261.7, sig: 'waggoner' },
+  { name: 'Y.O. Ranch', ax: -119.3, az: 1025.3, sig: 'yo' },
+];
+const hqSites = [];
+export function ranchHQSite(i) {
+  if (i in hqSites) return hqSites[i];
+  const r = RANCH_HQ[i];
+  const rand = seededRand('ranchhq:' + r.sig);
+  let site = null;
+  for (let t = 0; t < 24 && !site; t++) {
+    const ang = rand() * Math.PI * 2, d = 32 + rand() * 10; // set back off the gate
+    const x = r.ax + Math.cos(ang) * d, z = r.az + Math.sin(ang) * d;
+    if (!inTexas(x, z) || !airportClear(x, z) || brandNear(x, z, 30)) continue;
+    const road = nearestRoad(x, z, 12); // compounds sprawl — deeper clearance than a farmstead
+    if (road && road.dist < 10) continue;
+    const { city, dist } = nearestCity(x, z);
+    if (city && dist < cityRadius(city.pop) + 12) continue;
+    const rot = Math.atan2(-(r.ax - x), -(r.az - z)); // HQ house faces its gate
+    const cr = Math.cos(rot), sr = Math.sin(rot);
+    const pens = [];
+    for (let p = 0; p < 3; p++) { // working pens along local +x, gate side open
+      const lx = 4.5 + p * 5.6, lz = 5.5;
+      pens.push({ x: x + lx * cr + lz * sr, z: z - lx * sr + lz * cr });
+    }
+    site = { ...r, x, z, rot, pens };
+  }
+  return (hqSites[i] = site); // null = every try unlawful; verify asserts all four resolve
+}
+export function ranchHQAt(cx, cz) {
+  for (let i = 0; i < RANCH_HQ.length; i++) {
+    const s = ranchHQSite(i);
+    if (s && Math.floor(s.x / CHUNK) === cx && Math.floor(s.z / CHUNK) === cz) return s;
+  }
+  return null;
+}
+
 // Pure query: is (x,z) standing inside a rendered field/pivot decal? Replays
 // the exact same 'crops'+key draw sequence and filters as spawn() (world.js
 // field/pivot loop) — must stay in lockstep with that code or this reports
@@ -765,6 +809,52 @@ class ScenerySystem {
         lg.add(mill);
         group.add(lg);
       }
+    }
+
+    // ranch HQ compound behind a named gate arch (wave 5) — the shared kit
+    // plus a per-ranch signature; animals.js homes the signature herds at
+    // this same ranchHQAt site. Own stream; outside the ag gate on purpose.
+    const hq = ranchHQAt(cx, cz);
+    if (hq) {
+      const hr = seededRand('hqprops' + key);
+      const hg = new THREE.Group();
+      hg.userData.kind = 'ranchhq';
+      const cr = Math.cos(hq.rot), sr = Math.sin(hq.rot);
+      const at = (obj, prop, lx, lz, ry = 0, s = 1) => { // site frame: -z faces the gate
+        const x = hq.x + lx * cr + lz * sr, z = hq.z - lx * sr + lz * cr;
+        obj.position.set(x, hAt(x, z), z);
+        obj.rotation.y = hq.rot + ry;
+        if (s !== 1) obj.scale.setScalar(s);
+        obj.userData.prop = prop;
+        hg.add(obj);
+        return obj;
+      };
+      const anim = (obj) => {
+        const entry = { obj: obj.userData.animate, kind: obj.userData.kind, phase: hr() * Math.PI * 2 };
+        this.animated.push(entry);
+        group.userData.animated.push(entry);
+      };
+      at(mkHQHouse(), 'hqhouse', -6, 1);
+      at(mkWaterTower(hq.sig), 'watertower', -11, 6);
+      anim(at(mkWindmill(hr), 'windmill', -8.5, 9.2));
+      at(mkStockTank(), 'stocktank', -7.1, 9.8);
+      const barn = hq.sig === 'foursixes' ? mkHorseBarn : mkBarn; // quarter-horse stables at the 6666
+      const bProp = hq.sig === 'foursixes' ? 'horsebarn' : 'barn';
+      at(barn(), bProp, 1.5, 11.5, (hr() - 0.5) * 0.3, 1.4);
+      at(barn(), bProp, 9, 12.5, (hr() - 0.5) * 0.3, 1.4);
+      if (hq.sig === 'king') at(mkBarn(), 'barn', -3.5, 15, (hr() - 0.5) * 0.3, 1.4); // the King scale read
+      for (const p of hq.pens) {
+        const pen = mkCorral(hr);
+        pen.position.set(p.x, hAt(p.x, p.z), p.z);
+        pen.rotation.y = hq.rot;
+        pen.userData.prop = 'pen';
+        hg.add(pen);
+      }
+      if (hq.sig === 'waggoner') // oil hit drilling for water in 1902 — jacks among the cattle
+        for (const [lx, lz] of [[-13, 13], [12, 17]]) anim(at(mkPumpjack(hr), 'pumpjack', lx, lz, hr() * Math.PI * 2));
+      for (let c = 0, cn = 3 + ((hr() * 3) | 0); c < cn; c++)
+        anim(at(mkChicken(), 'chicken', -4.5 + (hr() - 0.5) * 4, 3.2 + (hr() - 0.5) * 3, hr() * Math.PI * 2));
+      group.add(hg);
     }
     this.scene.add(group);
     this.live.set(key, group);
@@ -1161,6 +1251,98 @@ function mkChicken() {
   g.add(bird);
   g.userData.animate = bird;
   g.userData.kind = 'chicken';
+  return g;
+}
+
+// Ranch HQ main house (wave 5): two-story with a full front porch — reads
+// "headquarters" where mkFarmhouse reads "homestead".
+function mkHQHouse() {
+  const g = new THREE.Group();
+  const walls = lamb(0xf2efe6);
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.9, 2.0), walls);
+  body.position.y = 0.95;
+  const roofG = new THREE.CylinderGeometry(1.7, 1.7, 2.2, 3, 1);
+  roofG.rotateX(-Math.PI / 2);
+  const roof = new THREE.Mesh(roofG, lamb(0x5a5450));
+  roof.position.y = 2.6;
+  const porch = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.07, 0.75), lamb(0x9a8a72));
+  porch.position.set(0, 1.02, -1.35);
+  g.add(body, roof, porch);
+  for (const px of [-1.25, -0.42, 0.42, 1.25]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.07, 1.0, 0.07), walls);
+    post.position.set(px, 0.5, -1.6);
+    g.add(post);
+  }
+  const pane = lamb(0x4a4440);
+  for (const [wx, wy] of [[-0.8, 1.4], [0, 1.4], [0.8, 1.4], [-0.8, 0.55], [0.8, 0.55]]) {
+    const win = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.36, 0.04), pane);
+    win.position.set(wx, wy, -1.01);
+    g.add(win);
+  }
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.7, 0.05), lamb(0x6a5238));
+  door.position.set(0, 0.35, -1.01);
+  const chim = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.2, 0.22), lamb(0x8a4a3a));
+  chim.position.set(1.0, 2.6, 0.4);
+  g.add(door, chim);
+  return g;
+}
+
+// Water tower — the compound showpiece: red tank on splayed legs, ranch name
+// banded on the gate side. Sign materials cached per ranch (4 total, shared
+// across respawns — never disposed, shared-prototype precedent).
+const towerSigns = new Map();
+function towerSignMat(sig) {
+  let m = towerSigns.get(sig);
+  if (!m) {
+    const c = document.createElement('canvas');
+    c.width = 128; c.height = 40;
+    const cx = c.getContext('2d');
+    cx.fillStyle = '#e8e2d4'; cx.fillRect(0, 0, 128, 40);
+    cx.fillStyle = '#5a2018'; cx.font = 'bold 24px Georgia';
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText({ king: 'KING', foursixes: '6666', waggoner: 'W', yo: 'Y·O' }[sig] ?? '', 64, 21);
+    towerSigns.set(sig, (m = new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(c) })));
+  }
+  return m;
+}
+function mkWaterTower(sig) {
+  const g = new THREE.Group();
+  const steel = lamb(0xb8bcc2);
+  for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 4.8, 0.12), steel);
+    leg.position.set(sx * 0.75, 2.4, sz * 0.75);
+    leg.rotation.z = sx * 0.09;  // splay: tops lean in to carry the tank
+    leg.rotation.x = -sz * 0.09;
+    g.add(leg);
+  }
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.4, 10), lamb(0x8f2f24));
+  tank.position.y = 5.2;
+  const cap = new THREE.Mesh(new THREE.ConeGeometry(1.2, 0.55, 10), lamb(0x6b6560));
+  cap.position.y = 6.15;
+  const sign = towerSignMat(sig);
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 0.06), [steel, steel, steel, steel, sign, sign]);
+  plate.position.set(0, 5.2, -1.14);
+  g.add(tank, cap, plate);
+  return g;
+}
+
+// Quarter-horse stable (Four Sixes signature): long, low, dark-roofed, a run
+// of stall doors down the yard side.
+function mkHorseBarn() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.0, 1.2, 5.4), lamb(0x8a6a48));
+  body.position.y = 0.6;
+  const roofG = new THREE.CylinderGeometry(1.3, 1.3, 5.6, 3, 1);
+  roofG.rotateX(-Math.PI / 2);
+  const roof = new THREE.Mesh(roofG, lamb(0x33363c));
+  roof.position.y = 1.72;
+  g.add(body, roof);
+  const dark = lamb(0x2e2824);
+  for (let i = 0; i < 5; i++) {
+    const stall = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 0.55), dark);
+    stall.position.set(-1.02, 0.42, -2.1 + i * 1.05);
+    g.add(stall);
+  }
   return g;
 }
 

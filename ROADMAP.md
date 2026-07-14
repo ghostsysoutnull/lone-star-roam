@@ -3,9 +3,9 @@
 Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 132 city stars, 14 landmarks, 300 roses, 12 NPCs, persistent progress.
 
-No active priority track (the aviation track shipped in full 2026-07-12;
-Brands and Jetpack followed and are folded in below). Queued work lives in
-`BACKLOG.md`.
+No active priority track (aviation shipped in full 2026-07-12; Brands,
+Jetpack, and Agriculture followed and are folded in below). Queued work
+lives in `BACKLOG.md`.
 
 - [x] ~~Aviation wave 1 — Fields~~ — done 2026-07-11: 20 real airports
   (7 hubs / 9 regional / 4 strips incl. Terlingua's dirt strip and the 6666 +
@@ -471,6 +471,37 @@ Brands and Jetpack followed and are folded in below). Queued work lives in
   cap, flame toggle, the `onThrust` wiring + fire-once-per-liftoff sentinel,
   jet-gain-target real-loop sentinel, camera-height-rises-with-AGL, and the
   dog liftoff yip. No SHOT blocks.
+
+- [x] ~~Agriculture (waves 1–5, + 4.5/5.5 follow-ons)~~ — done 2026-07-14
+  (`AGRICULTURE_SPEC.md`): the working-Texas layer, painted from the real
+  USDA 2022 Census of Agriculture. **Wave 1 — data** (07-13):
+  `tools/build-ag.mjs` bakes the county extract → `data/agriculture.json`
+  (254/254 join asserted), `geo.js` loads `GEO.ag` + `agAt(x,z)`. **Wave 2 —
+  land**: census-painted crop decals (`CROP_STYLE` by dominant crop,
+  hAt-draped) + center-pivot circles (skipped in rice counties) + `farmsteadAt`
+  pure seeded sites (odds straight from census herd/crop density) dressed
+  with the barn/house/tank/corral/windmill/silo/pecking-chicken kit. **Wave
+  3 — livestock**: 5 census species rows (`censusTable`, head-per-km² odds),
+  farm herds homed at `farmsteadAt`, `feedlotAt` (onFeed ≥30/km² = top 9
+  Panhandle counties) with penned leashed angus, the Caprock bison herd.
+  **Wave 4 — destinations**: 4 named-ranch gate arches as landmarks
+  (King/6666/Waggoner/Y.O., real coords, plaque facts), `RANCH_ARCHES` herd
+  boost rows, 5 ag NPCs with weather-context openers. **Wave 4.5 — crop
+  visuals** (07-14): furrow/windrow/levee vertex-color striping, ×1.6 row
+  density (cap 420), rice/hay/pivot polish, split `'crops'`/`'crops2'`
+  streams so visuals can never shift placement. **Wave 5.5 — HUD** (07-14,
+  unplanned): ground-level crop/wildlife nature readout (`fieldAt`,
+  `animals.nearby`), FLY-gated. **Wave 5 — ranch compounds** (07-14): HQ
+  compounds behind all four arches — pure seeded lawful sites
+  (`ranchHQSite`/`ranchHQAt`, chapelAt pattern, 3 corrals each) dressed with
+  a shared kit (two-story `mkHQHouse`, `mkWaterTower` with per-ranch sign,
+  barns, windmill/tank/chickens) + per-ranch signatures: King's third barn +
+  cherry-red Santa Gertrudis herds, Four Sixes' quarter-horse stables
+  (`mkHorseBarn`) with horses homed in the corrals, Waggoner's two nodding
+  in-compound pumpjacks, Y.O.'s axis deer + blackbuck (3 new log-worthy
+  species, critter log now 23). `tools/checks/ag.mjs` grew to 37 checks
+  (placement frozen at a live-captured baseline, distance-over-time flee
+  asserts, site legality sweeps). Arch prop untouched; save additive.
 
 ## Known limitations (v1)
 

@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Lone Star Roam** — a single-page Three.js free-roam game over a 1:100-scale, geographically real Texas. Real OSM highway geometry + real border + 132 real cities; procedural downtowns, drive/fly/walk modes, collectibles, NPCs. No build step, no framework, no npm install — plain ES modules with Three.js from CDN (importmap in `index.html`).
 
-See `ROADMAP.md` for planned work and known limitations before proposing features. The aviation priority track (`AVIATION.md`, 5 waves + the observability spec's waves A/B) shipped in full on 2026-07-12. The active priority track is Agriculture (`AGRICULTURE_SPEC.md`, 4 waves + an optional 5th; waves 1–3 shipped 2026-07-13, wave 4 next) — other queued work lives in `BACKLOG.md`.
+See `ROADMAP.md` for planned work and known limitations before proposing features. No active priority track: aviation shipped 2026-07-12, Agriculture (`AGRICULTURE_SPEC.md`, all 5 waves + 4.5/5.5 follow-ons) shipped 2026-07-14 — both folded into `ROADMAP.md`. Queued work lives in `BACKLOG.md`.
 
 ## Session briefing (greeting)
 

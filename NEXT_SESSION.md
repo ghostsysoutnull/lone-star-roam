@@ -1,178 +1,93 @@
 # Lone Star Roam — next session kickoff
 
-## Session briefing
-- **This session**: Agriculture wave 5 — ranch compounds at all four
-  gate arches (King/Four Sixes/Waggoner/Y.O.): shared HQ house/barns/
-  pens/water tower prop kit (brands-track idiom — showpiece + heli-tier
-  props), each with a per-ranch signature — King's Santa Gertrudis tint,
-  Four Sixes' quarter-horse barns, Waggoner's in-ranch pumpjacks, Y.O.'s
-  axis deer/blackbuck. Gate decided 2026-07-14 (Bruno drove all four
-  arches after wave 4.5 shipped) — **wave 5 runs**. The arch prop itself
-  is NOT touched (stays the existing low-poly gate); this wave adds a
-  separate nearby compound. Full design is pre-written in
-  `AGRICULTURE_SPEC.md`'s "Optional wave 5" section.
-- **Recommended setup**: model **Fable 5**, effort **high** —
-  content/prop-kit wave, not structural plumbing. Flag it if the
-  running model differs.
-- **Budget**: code + checks, one `t.shot` (compound silhouette),
-  grep-first.
-- **Then**: this is the last wave of the Agriculture track — at session
-  end, fold the whole track (waves 1–5) into one `ROADMAP.md` entry and
-  delete this briefing block; `AGRICULTURE_SPEC.md` stays as history.
+No active priority track. The Agriculture track (waves 1–5, + the 4.5 crop
+visuals and 5.5 HUD follow-ons) shipped in full 2026-07-14 and is folded
+into `ROADMAP.md`; `AGRICULTURE_SPEC.md` stays as history. Queued work and
+pending playtests live in `BACKLOG.md`. A playtest of the wave-5 ranch
+compounds (drive all four arches again) is the natural next Bruno errand.
 
-Gotchas carried over from wave 4.5 (whoever does wave 5, or touches
-crops/pivots again, must know):
-- Field decals now carry an optional vertex-color `stripe` on
-  `mkFieldPatch` (own `lambVC()` material, its own `matCache` slot,
-  `'vc'` key) — furrow/windrow/levee bands computed from local `lz`
-  (pre-rotation), no RNG involved. Don't add a second vertex-color
-  material; extend `CROP_STYLE[...].stripe` or `defaultStripe()`
-  instead.
-- **Two separate seeded streams per ag chunk now**: `'crops'+key`
-  (field/pivot **placement** — fx/fz/w/d/rot/rowRoll, exactly 6
-  draws/field and 4/pivot, never touched by visual code) and
-  `'crops2'+key` (all row-instance jitter/scale + hay-bale scatter —
-  free to consume whatever it wants). Never let row/bale code read
-  from `crand` again — that's what let visual branching perturb field
-  positions before this wave.
-- Row overlays (`mkCropRows`) always render now when `style.row` exists
-  (no more 45%-chance gate); sizes are ×1.6 (`MUL` const), cap raised
-  240→420, orchard (`tree`) jitter tightened for a planted-grid look.
-- Pivot discs stay solid green; the new "freshly watered" wedge
-  (`mkPivotWedge`) is a separate static mesh sharing the `deck`
-  y-stagger — arm itself is **not** animated (in-wave scope call); if
-  wave 5 or later wants the sweep, register it in
-  `group.userData.animated` (pumpjack idiom).
-- `tools/checks/ag.mjs` grew to 30 checks; the placement-frozen check
-  hardcodes a known Hale chunk's first field centroid
-  (x≈-2147.501, z≈-3607.705) — captured live before any wave-4.5 edit,
-  confirmed byte-identical after. Don't hand-wave future placement
-  changes past this check — recapture the real baseline the same way
-  (git stash the old code, read the live centroid, hardcode it) if a
-  future wave deliberately moves fields.
-- The pre-existing "Cy NPC rain register" check raced under wave 4.5's
-  heavier per-chunk geometry (denser crop instancing slowed frame
-  throughput enough to expose a latent timing gap); a fixed
-  `t.wait(0.3)` patched it once but re-raced when the wave-5.5 HUD
-  readout (below) added its own per-frame cost. It's now a poll —
-  `t.until("g.npcs.npcNear(g.player.pos)?.name === 'Cy'", 5000)` —
-  so it can't re-race no matter how frame throughput shifts. If any
-  other check does an instant teleport + synchronous proximity/state
-  read with a *fixed* wait instead of polling the real condition,
-  treat it as latently racy too.
+Gotchas from wave 5 (whoever touches the ranch compounds, `world.js`
+sites, or `animals.js` next must know):
+- `ranchHQSite(i)`/`ranchHQAt(cx,cz)` (world.js) are the pure seeded site
+  functions for the four compounds — arch coords are duplicated in
+  gameplay.js `LANDMARKS` and animals.js `RANCH_ARCHES`; keep all three in
+  sync. animals.js homes the signature herds (`SIG` table in `spawn()`) at
+  the exact same sites — never re-derive or hand-place them.
+- Compound props are tagged `userData.prop` (`hqhouse`/`watertower`/`barn`/
+  `horsebarn`/`pen`/…) and the group is `userData.kind === 'ranchhq'` — the
+  ag.mjs wave-5 checks tally these; keep the tags if you rearrange the kit.
+- Water-tower sign materials are cached per ranch in a module-level Map
+  (`towerSigns`) and never disposed (shared-prototype precedent) — don't
+  create canvases inside `mkWaterTower` per spawn.
+- `RANCH_ARCHES` wave-5 rows (King santagertrudis, Y.O. axisdeer/blackbuck)
+  are APPENDED to each arch's rows so pre-wave-5 chunk draws stay identical.
+  Any future row must also append, never insert.
+- The "Cy NPC rain register" check no longer waits out townsfolk drift — it
+  now *displaces* any non-Cy NPC out of talk range (position + home) before
+  polling. Townsfolk positions are real-loop-accumulated (they walk), so any
+  check near a city that needs a specific NPC nearest must drive to that
+  state the same way, not extend timeouts.
 
-Gotchas from the (unplanned, non-spec) wave-5.5 HUD session
-(2026-07-14, shipped ahead of the wave-5 gate decision below — see
-`git log` for commit) — whoever touches `world.js`/`animals.js`/
-`hud.js` next must know:
-- `world.js` exports `fieldAt(x,z)`, a pure query that replays the
-  exact same `'crops'+key` draw sequence and filters as the chunk
-  builder's field/pivot loop to test whether (x,z) sits inside a
-  rendered field rect or pivot circle. It must stay in lockstep with
-  that loop's draw order/count and filters — if you change field/pivot
-  placement, update `fieldAt` in the same edit, not later.
-- `AnimalSystem.nearby` (`{species, d2}` or `null`) is set inside the
-  existing per-frame `step()` loop, reusing `SPOT_R` (24 units, same
-  range as the critter log) and the same visibility gate — covers
-  every species including small critters (rattlesnake, armadillo,
-  roadrunner) for free since they share one code path. Bats are
-  excluded (separate system, own dusk-window visibility in bats.js).
-- `main.js`'s per-frame nature-hint block: wildlife (`animals.nearby`)
-  beats crop (`fieldAt`) when both are true; both suppressed in
-  `player.mode === 'FLY'`. The brand-resize hint is now also FLY-gated
-  (`brandNear` is XZ-only with no altitude check, so it used to show
-  while flying high over a distant site).
-- New `#nature-hint` DOM element/`hud.natureHint(text)` method, same
-  show/hide-by-textContent pattern as `interactHint`/`brandSizeHint`.
+Gotchas carried over from wave 4.5 (crops/pivots):
+- Field decals carry an optional vertex-color `stripe` on `mkFieldPatch`
+  (own `lambVC()` material, `'vc'` matCache key). Don't add a second
+  vertex-color material; extend `CROP_STYLE[...].stripe` or
+  `defaultStripe()` instead.
+- **Two seeded streams per ag chunk**: `'crops'+key` (placement — exactly 6
+  draws/field, 4/pivot, never touched by visual code) and `'crops2'+key`
+  (row/bale visual jitter, free to consume anything). Never let visual code
+  read from `crand`.
+- `tools/checks/ag.mjs` (37 checks) hardcodes a known Hale chunk's first
+  field centroid (x≈-2147.501, z≈-3607.705) as the placement-frozen
+  baseline. If a future wave deliberately moves fields, recapture the real
+  baseline (git stash, read live centroid, hardcode) — don't hand-wave it.
+- `fieldAt(x,z)` (world.js) replays the `'crops'+key` draw sequence — if you
+  change field/pivot placement, update `fieldAt` in the same edit.
+- Pivot arm is static by scope call; if a wave wants the sweep, register it
+  in `group.userData.animated` (pumpjack idiom).
 
-The Jetpack track (`JETPACK_SPEC.md`, 2 waves —
-physics/shop, then feel) shipped 2026-07-13 and is folded into `ROADMAP.md`;
-the spec file stays as history. The Texas Brands track (Bucky's, H-E-Buddy,
-Lone Star Compute — 3 waves) shipped 2026-07-12 and is folded into
-`ROADMAP.md`; `BRANDS_SPEC.md` stays as history. A follow-up player-controlled
-brand-size feature (`[`/`]`, own `lonestar-brand-scale` localStorage key) also
-shipped 2026-07-12 on top of it — see the `brands.js` gotcha below. A second
-follow-on, the datacenter ID sign + real-facts plaque (all 8 Lone Star Compute
-sites), shipped 2026-07-13 (`DATACENTER_SIGN_SPEC.md`) — see the new
-`lscNear`/`plaqueOpen` gotcha below. Queued work lives in `BACKLOG.md`;
-pending playtests are there too.
+Gotchas from the wave-5.5 HUD session (`main.js`/`hud.js`):
+- `main.js` per-frame nature-hint block: wildlife (`animals.nearby`, set in
+  the per-frame step loop, `SPOT_R` 24) beats crop (`fieldAt`); both
+  suppressed in FLY. The brand-resize hint is also FLY-gated.
+- `#nature-hint` / `hud.natureHint(text)` uses the interactHint
+  show/hide-by-textContent pattern.
 
 Gotchas for whoever touches the jetpack (`vehicle.js`/`shop.js`/`dog.js`/
 `audio.js`) next:
-- `hovering` is a WALK-only sub-state (`GRAV=45`, `AIRDAMP=0.25`, module
-  constants in vehicle.js) — thrust XOR gravity each frame, no stable hover
-  point by design. The ground-clamp guard is
-  `if (this.mode !== 'FLY' && !this.hovering)`; don't drop the
-  `!this.hovering` half or WALK re-pins to terrain every frame.
-- `shop.js`: `jetpack` perk gates capability at level 0 (index 0 of
-  `JET_THRUST`/`JET_ALT`/`JET_SPEED` = 0/unowned) — `applyGear` always
-  writes `jetThrust`/`jetAlt`/`jetSpeed` regardless of ownership, only
-  `jetpack: lvl>0` gates whether Space does anything airborne.
-- The flame prop and jet-whoosh audio are both keyed off **active thrust**
-  (`hovering && keys['Space']`), not merely `hovering` — falling/coasting is
-  silent and dark by design, matching the spec's "cuts the instant thrust
-  cuts." Don't loosen either gate to just `hovering`.
-- `audio.jetTarget` is computed at the top of `update()`, before the
-  `!ctx || muted` early return — same pattern as `heliTarget`/
-  `datacenterTarget` — so it's always correct even pre-AudioContext-init;
+- `hovering` is a WALK-only sub-state (`GRAV=45`, `AIRDAMP=0.25`) — thrust
+  XOR gravity, no stable hover point by design. The ground-clamp guard is
+  `if (this.mode !== 'FLY' && !this.hovering)`; don't drop the second half.
+- `shop.js`: `applyGear` always writes `jetThrust`/`jetAlt`/`jetSpeed`;
+  only `jetpack: lvl>0` gates whether Space does anything airborne.
+- Flame prop + jet whoosh key off **active thrust** (`hovering &&
+  keys['Space']`), not merely `hovering` — don't loosen either gate.
+- `audio.jetTarget` is computed before the `!ctx || muted` early return;
   verify reads this field, never the ramping AudioParam.
-- `player.onThrust` fires exactly once per liftoff (edge-triggered on the
-  `!this.hovering` guard), not every frame it's held. A verify check that
-  spies on it must restore the real callback afterward or later checks in
-  the same suite lose the real `main.js` wiring.
-- Any verify check that leaves the player airborne or in a non-DRIVE mode
-  must restore DRIVE at its end — the horn/Lacy checks depend on ambient
-  DRIVE mode; `jetpack.mjs` follows this throughout.
+- `player.onThrust` edge-fires once per liftoff; a check that spies on it
+  must restore the real callback. Any check leaving the player airborne or
+  non-DRIVE must restore DRIVE at its end.
 
 Gotchas for whoever touches `brands.js` next:
-- Each spawned site's hero/props are split across TWO parents: the scalable
-  `building` sub-group (holds staticMesh/signPanel/props, carries
-  `.scale.setScalar(SCALE)`) and `group` itself (billboards only, at Bucky's).
-  If you add a new prop, decide which one it belongs in — anything that
-  should shrink/grow with the store goes in `building`; anything that must
-  stay grounded on its OWN terrain sample independent of store size (like the
-  approach billboards) stays a direct `group` child with its own `.scale`.
-- The foundation skirt's authored depth is `Math.min(8, relief + 0.4) / SCALE`
-  — cap the TRUE relief FIRST, THEN divide by SCALE, deliberately
-  counter-scaled so its WORLD-space reach stays constant regardless of brand
-  size (a shrunk building's shrunk skirt would otherwise float off sloped
-  real terrain; El Paso's H-E-Buddy lot, ~1.8u relief, is the worst real case
-  and is what the verify check exercises, now at the 0.1x floor). Dividing
-  BEFORE capping (`Math.min(8, relief / SCALE)`) shipped once and undershot
-  the needed depth at small scale — the cap must see the real relief, not the
-  already-shrunk one. Range is 0.1–1.25 (Bruno 2026-07-12, widened from the
-  original 0.5–1.25 same day).
-- `footAt`'s footprint half-extents and `PAD_TOP` are also scaled by the same
-  module-level `SCALE`, so the walkable pad always matches the rendered slab.
-  `SCALE` is read live (not cached) — the footprint site caches
-  (`buckyFootprints()` etc.) only cache the scale-INDEPENDENT geometry
-  (`padY`/`heading`/`x`/`z`), never the scale factor itself.
-- `brands.lscNear(pos, range)` triggers off each LSC site's **sign** world
-  position (`signAt`, stashed on the live record at spawn from heading +
-  `SCALE`), NOT `site.at` (the pad center) — the sign's local anchor is
-  `hypot(11, 26.1) ≈ 28.3` units from center, just past a naive `range=28`
-  query on the table. `main.js`'s `plaqueOpen` is shared with
-  `gameplay.landmarkNear` behind one `plaqueNear()` lookup — don't add a
-  second independent "which plaque is open" state var if a third plaque
-  source shows up later; extend `plaqueNear` instead.
+- Hero/props split across `building` sub-group (scales with `SCALE`) vs
+  `group` (billboards, own terrain-sampled scale) — new props must pick the
+  right parent.
+- Foundation skirt depth: cap the TRUE relief FIRST, then divide by SCALE
+  (`Math.min(8, relief + 0.4) / SCALE`). Scale range 0.1–1.25.
+- `footAt` scales half-extents/`PAD_TOP` by live `SCALE`; footprint caches
+  only hold scale-independent geometry.
+- `brands.lscNear` triggers off each LSC site's **sign** world position
+  (`signAt`), not `site.at`; `plaqueOpen` in main.js is shared via one
+  `plaqueNear()` lookup — extend it, don't add a second state var.
 
 Gotchas for whoever touches `hud.js` next:
-- The road shield is a CSS-3D chrome card: `this.shield` (constructor) is the
-  `#road-shield-wrap` div (position/`.centered`/per-frame transform),
-  `this.shieldCanvas` is the inner `<canvas id="road-shield">` (2D face
-  raster). Don't conflate the two — `drawShield` draws on `shieldCanvas`,
-  `animateShield` transforms `shield`.
-- `drawShield`'s raster is cached on a `ref+night` key (`_shieldKey`, bumping
-  `_shieldRaster` only on a real redraw) — don't add per-frame canvas work
-  there; motion is a pure CSS transform via `animateShield`, called once per
-  render frame from `main.js`, ungated by `__skipRender`.
-- Road shields only parse clean "PREFIX ###" refs (`parseShield`) — messy
-  municipal names like "Southwest Loop 410" intentionally fall through to the
-  plain text line; don't try to make the regex swallow those.
-- `#hud-speed`/`#hud-mode` offsets (index.html) are rem-based on purpose so
-  their gap scales with UI-scale text growth — if either block grows taller,
-  bump the other's `bottom` in rem too, and rerun the "never overlaps" hud
-  check before shipping.
+- Road shield: `this.shield` (wrap div, transformed per frame by
+  `animateShield`) vs `this.shieldCanvas` (2D face raster, drawn by
+  `drawShield`, cached on `ref+night`). Don't add per-frame canvas work.
+- `parseShield` only swallows clean "PREFIX ###" refs; messy municipal
+  names fall through to the text line on purpose.
+- `#hud-speed`/`#hud-mode` offsets are rem-based; if either block grows,
+  bump the other's `bottom` in rem and rerun the hud overlap check.
 
 ---
 

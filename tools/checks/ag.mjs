@@ -148,11 +148,12 @@ export default async function ag(t) {
 
   await t.check('new species are registered with facts (log-ready, additive)', async () => {
     const res = await t.ev(`(() => {
-      const missing = ['horse', 'goat', 'sheep', 'bison', 'angus'].filter((k) => !g.SPECIES[k] || !g.SPECIES[k].fact);
+      const missing = ['horse', 'goat', 'sheep', 'bison', 'angus', 'santagertrudis', 'axisdeer', 'blackbuck']
+        .filter((k) => !g.SPECIES[k] || !g.SPECIES[k].fact);
       return { missing, count: Object.keys(g.SPECIES).length };
     })()`);
     t.ok(res.missing.length === 0, `species missing or factless: ${res.missing}`);
-    t.ok(res.count === 20, `SPECIES_COUNT drifted: ${res.count}`);
+    t.ok(res.count === 23, `SPECIES_COUNT drifted: ${res.count}`); // 20 + the wave-5 ranch trio
   });
 
   await t.check('censusTable: Parker horses thick, Sutton goats+sheep, Dallam bare', async () => {
@@ -389,15 +390,24 @@ export default async function ag(t) {
       g.player.setMode('WALK');
       g.player.pos.set(n.g.position.x + 2.5, 0, n.g.position.z);
       g.npcs.activeNPC = null;
+      // Cy sits ~23 units from Kingsville, permanently inside its townsfolk
+      // spawn radius — and townsfolk WALK, so whether one shadows Cy inside
+      // the talk radius is ambient real-loop drift, not seeded state. Waiting
+      // it out re-raced every time frame throughput dropped (wave 4.5 crops,
+      // then the wave-5 King compound in the same chunks). Drive to the state
+      // instead: displace any non-Cy NPC out of talk range (home too, so the
+      // walk cycle can't bring it straight back; Kingsville's city-proximity
+      // despawn resets everything once the suite moves on).
+      for (const o of g.npcs.all()) {
+        if (o === n) continue;
+        const d2 = (o.g.position.x - g.player.pos.x) ** 2 + (o.g.position.z - g.player.pos.z) ** 2;
+        if (d2 < 36) {
+          o.g.position.x += 40;
+          if (o.homeX !== undefined) o.homeX += 40;
+        }
+      }
     })()`);
-    // Cy sits ~23 units from Kingsville — inside its townsfolk spawn radius,
-    // and the King-arch check two steps up also parks near Kingsville. Poll
-    // for the real condition (Cy actually nearest) instead of a fixed wait —
-    // a fixed 0.3s guess raced again once the wave-5.5 HUD readout added its
-    // own per-frame cost on top of wave 4.5's denser crop geometry, so any
-    // spawn/despawn hysteresis left over from the earlier position must be
-    // let to genuinely settle, however many frames that takes.
-    await t.until(`g.npcs.npcNear(g.player.pos)?.name === 'Cy'`, 5000);
+    await t.until(`g.npcs.npcNear(g.player.pos)?.name === 'Cy'`, 5000); // spawn settling only now
     const r = await t.ev(`(async () => {
       const { POOLS: P } = await import('/src/npcs.js');
       const n = g.npcs.named.find((x) => x.name === 'Cy');
@@ -511,6 +521,109 @@ export default async function ag(t) {
     t.ok(max > 100, `cotton row instance count didn't raise vs the pre-wave 84 max: ${max}`);
   });
 
+  // ---- wave 5: ranch HQ compounds behind the gate arches ----
+
+  await t.check('ranch HQ sites: all four resolve lawful, set back off their arch, 3 pens', async () => {
+    const r = await t.ev(`[0, 1, 2, 3].map((i) => {
+      const s = g.ranchHQSite(i);
+      if (!s) return { i, err: true };
+      const road = g.nearestRoad(s.x, s.z, 12);
+      return { name: s.name, d: Math.hypot(s.x - s.ax, s.z - s.az),
+        tx: g.inTexas(s.x, s.z), apt: g.airportClear(s.x, s.z), brand: g.brandNear(s.x, s.z, 30),
+        road: road ? road.dist : 99, pens: s.pens.length };
+    })`);
+    for (const s of r) {
+      t.ok(!s.err, `site ${s.i} unresolved after every seeded try`);
+      if (s.err) continue;
+      t.ok(s.d > 30 && s.d < 45, `${s.name} ${s.d.toFixed(1)} units from its arch (want 32–42)`);
+      t.ok(s.tx && s.apt && !s.brand, `${s.name} unlawful: tx=${s.tx} apt=${s.apt} brand=${!!s.brand}`);
+      t.ok(s.road >= 10, `${s.name} only ${s.road.toFixed(1)} units off a road`);
+      t.ok(s.pens === 3, `${s.name} has ${s.pens} pens`);
+    }
+  });
+
+  // one drive-by per ranch: collect scenery + herd facts, assert below
+  const hqSites = await t.ev(`[0, 1, 2, 3].map((i) => g.ranchHQSite(i))`);
+  const hqObs = [];
+  for (const s of hqSites) {
+    await t.tp(s.x + 14, s.z + 14); // parked-truck distance off the yard
+    await t.wait(0.8);
+    hqObs.push(await t.ev(`(() => {
+      const s = ${JSON.stringify(s)};
+      const props = {}, badY = [];
+      let hq = null, pumps = 0;
+      for (const gr of g.scenery.live.values()) {
+        for (const c of gr.children) if (c.userData.kind === 'ranchhq') hq = c;
+        if (!hq) continue;
+        pumps = gr.userData.animated.filter((a) => a.kind === 'pumpjack').length;
+        break;
+      }
+      if (hq) for (const c of hq.children) {
+        props[c.userData.prop] = (props[c.userData.prop] ?? 0) + 1;
+        const dy = Math.abs(c.position.y - g.hAt(c.position.x, c.position.z));
+        if (dy > 0.01) badY.push(c.userData.prop + ':' + dy.toFixed(3));
+      }
+      const herds = {};
+      for (const { animals } of g.animals.live.values())
+        for (const a of animals)
+          if (Math.hypot(a.homeX - s.x, a.homeZ - s.z) < 32) {
+            herds[a.species] = (herds[a.species] ?? 0) + 1;
+            if (a.species === 'axisdeer' && !window.__axis) window.__axis = a;
+          }
+      let penned = 0; // 6666: horses homed inside the corrals themselves
+      if (s.sig === 'foursixes')
+        for (const { animals } of g.animals.live.values())
+          for (const a of animals)
+            if (a.species === 'horse' && s.pens.some((p) => Math.hypot(a.homeX - p.x, a.homeZ - p.z) < 2.5)) penned++;
+      return { sig: s.sig, found: !!hq, props, badY, pumps, herds, penned };
+    })()`));
+  }
+
+  await t.check('compound kit at every ranch: house, water tower, barns, 3 pens, grounded at hAt', async () => {
+    for (const o of hqObs) {
+      t.ok(o.found, `${o.sig}: no ranchhq scenery group in live chunks`);
+      if (!o.found) continue;
+      t.ok(o.props.hqhouse === 1 && o.props.watertower === 1,
+        `${o.sig}: house/tower wrong: ${JSON.stringify(o.props)}`);
+      t.ok((o.props.barn ?? 0) + (o.props.horsebarn ?? 0) >= 2, `${o.sig}: fewer than 2 barns`);
+      t.ok(o.props.pen === 3, `${o.sig}: ${o.props.pen} pens built, want 3`);
+      t.ok(o.badY.length === 0, `${o.sig}: props off the terrain: ${o.badY}`);
+    }
+  });
+
+  await t.check('per-ranch signatures: King 3rd barn, 6666 horse barns + penned horses, Waggoner nodding jacks', async () => {
+    const by = Object.fromEntries(hqObs.map((o) => [o.sig, o]));
+    t.ok(by.king.props.barn >= 3, `King barns: ${by.king.props.barn}, want ≥3 (the scale read)`);
+    t.ok(by.foursixes.props.horsebarn === 2 && !by.foursixes.props.barn,
+      `6666 barns wrong: ${JSON.stringify(by.foursixes.props)}`);
+    t.ok(by.foursixes.penned >= 4, `6666: only ${by.foursixes.penned} horses homed in the corrals`);
+    t.ok(by.waggoner.pumps >= 2, `Waggoner: ${by.waggoner.pumps} animated pumpjacks in the compound chunk`);
+    t.ok(!by.king.pumps && !by.yo.pumps, 'pumpjacks leaked outside Waggoner');
+  });
+
+  await t.check('signature herds: King runs cherry-red, Y.O. runs exotic', async () => {
+    const by = Object.fromEntries(hqObs.map((o) => [o.sig, o]));
+    t.ok((by.king.herds.santagertrudis ?? 0) >= 8, `King Santa Gertrudis thin: ${JSON.stringify(by.king.herds)}`);
+    t.ok((by.foursixes.herds.horse ?? 0) >= 6, `6666 horses thin: ${JSON.stringify(by.foursixes.herds)}`);
+    t.ok((by.waggoner.herds.angus ?? 0) + (by.waggoner.herds.longhorn ?? 0) >= 6,
+      `Waggoner cattle thin: ${JSON.stringify(by.waggoner.herds)}`);
+    t.ok((by.yo.herds.axisdeer ?? 0) >= 4 && (by.yo.herds.blackbuck ?? 0) >= 3,
+      `Y.O. exotics thin: ${JSON.stringify(by.yo.herds)}`);
+  });
+
+  await t.check('scared axis deer RUNS AWAY (distance grows — charging-deer lesson)', async () => {
+    // Y.O. was visited last, so its chunks (and window.__axis) are still live
+    const a = await t.ev(`window.__axis && { x: window.__axis.g.position.x, z: window.__axis.g.position.z }`);
+    t.ok(a, 'no live axis deer stashed at Y.O.');
+    await t.tp(a.x + 3, a.z, 'WALK');
+    await t.ev(`g.animals.scare(${a.x}, ${a.z}, 30)`);
+    const d = await t.sample(
+      `Math.hypot(window.__axis.g.position.x - ${a.x}, window.__axis.g.position.z - ${a.z})`,
+      8, 300);
+    t.ok(d[7] > d[0] + 1.5, `axis deer didn't gain ground: ${d[0].toFixed(1)} → ${d[7].toFixed(1)}`);
+    await t.tp(a.x, a.z, 'DRIVE');
+  });
+
   if (process.env.SHOT) { // aerial field/pivot composition read — judgment only, never pass/fail
     const y = await t.ev(`g.hAt(${haleX}, ${haleZ}) + 55`);
     await t.tp(haleX, haleZ, 'FLY', y);
@@ -521,6 +634,11 @@ export default async function ag(t) {
     await t.ev(`g.player.heading = 0`);
     await t.wait(0.5);
     await t.shot('ag-king-arch');
+    const hq0 = await t.ev(`g.ranchHQSite(0)`); // King compound silhouette (wave-5 budgeted shot)
+    await t.tp(hq0.x, hq0.z + 18, 'WALK');
+    await t.ev(`g.player.heading = 0`);
+    await t.wait(0.5);
+    await t.shot('ag-king-hq');
   }
 
   await t.check('fieldAt: hits the known Hale field at its frozen centroid', async () => {

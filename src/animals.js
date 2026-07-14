@@ -5,7 +5,7 @@
 // critter log with a fact. Region boxes mirror world.js scenery — keep in sync.
 import * as THREE from 'three';
 import { seededRand, inTexas, nearestRoad, hAt, waterAt, agAt } from './geo.js';
-import { farmsteadAt, feedlotAt } from './world.js';
+import { farmsteadAt, feedlotAt, ranchHQAt } from './world.js';
 import { ATMOS } from './sky.js';
 
 const CHUNK = 260, VIEW_CHUNKS = 2; // tighter ring than scenery — animals are simulated
@@ -53,6 +53,12 @@ export const SPECIES = {
     fact: 'The State Bison Herd, saved by Charles Goodnight in 1878, roams Caprock Canyons.' },
   angus: { name: 'Black Angus', speed: 3, fleeR: 0, behavior: 'graze', bob: false, leash: 2.2,
     fact: 'More cattle feed in the Panhandle than people live in it — Hereford is the Beef Capital of the World.' },
+  santagertrudis: { name: 'Santa Gertrudis', speed: 3, fleeR: 0, behavior: 'graze', bob: false,
+    fact: 'Bred on King Ranch — the first American cattle breed, cherry-red and built for Texas heat.' },
+  axisdeer: { name: 'Axis Deer', speed: 15, fleeR: 15, behavior: 'flee', bob: true,
+    fact: 'Spotted for life — Y.O. Ranch pioneered Texas exotics with chital from India in the 1950s.' },
+  blackbuck: { name: 'Blackbuck', speed: 19, fleeR: 16, behavior: 'flee', bob: true,
+    fact: 'An Indian antelope with corkscrew horns — more live on Texas ranches than in much of its native range.' },
   bat: { name: 'Mexican Free-tailed Bat', event: true,
     fact: 'Austin hosts the largest urban bat colony on Earth.' },
 };
@@ -100,11 +106,13 @@ function censusTable(x, z) {
 // are in chunk-mid space: 200 always reaches the nearest midpoint (max gap
 // √2·130 ≈ 184); King's real footprint is a region, not a point, so it gets
 // a wider ring. Rows ride censusTable so regionTable stays byte-identical.
+// wave-5 rows are APPENDED to each arch's list — they draw after the wave-4
+// rows in the chunk stream, so pre-wave-5 placements keep their exact draws
 const RANCH_ARCHES = [
-  { x: 1538.2, z: 3870.1, r: 300, rows: [['longhorn', 4, 8, 1, 0.7], ['horse', 2, 5, 1, 0.5]] },                        // King Ranch (27.5236 −97.8880)
+  { x: 1538.2, z: 3870.1, r: 300, rows: [['longhorn', 4, 8, 1, 0.7], ['horse', 2, 5, 1, 0.5], ['santagertrudis', 4, 8, 1, 0.6]] },  // King Ranch (27.5236 −97.8880)
   { x: -781.1, z: -2917.3, r: 200, rows: [['horse', 3, 6, 1, 0.7], ['angus', 3, 6, 1, 0.45]] },                         // Four Sixes (33.6206 −100.3186)
   { x: 209.9, z: -3261.7, r: 200, rows: [['angus', 4, 8, 1, 0.6], ['horse', 2, 4, 1, 0.5]] },                           // Waggoner (33.9300 −99.2800)
-  { x: -119.3, z: 1025.3, r: 200, rows: [['goat', 4, 8, 1, 0.6], ['sheep', 4, 8, 1, 0.5], ['deer', 2, 4, 1, 0.5]] },    // Y.O. (30.0790 −99.6250)
+  { x: -119.3, z: 1025.3, r: 200, rows: [['goat', 4, 8, 1, 0.6], ['sheep', 4, 8, 1, 0.5], ['deer', 2, 4, 1, 0.5], ['axisdeer', 3, 6, 1, 0.5], ['blackbuck', 2, 4, 1, 0.45]] },    // Y.O. (30.0790 −99.6250)
 ];
 
 // the Texas State Bison Herd — one curated site, Caprock Canyons SP
@@ -376,6 +384,29 @@ export class AnimalSystem {
     if (cx === BISON_SITE.cx && cz === BISON_SITE.cz)
       home(seededRand('bisonherd'), 'bison', BISON_SITE.x, BISON_SITE.z, 6, 12);
 
+    // wave-5 ranch HQ compounds — signature herds at the same ranchHQAt site
+    // scenery dresses; own stream, drawn after everything above
+    const hq = ranchHQAt(cx, cz);
+    if (hq) {
+      const qr = seededRand('hqherd' + key);
+      const SIG = { // [species, head, spread, 'pen' homes one bunch per corral]
+        king: [['santagertrudis', 8, 7], ['santagertrudis', 6, 7], ['horse', 2, 3]],
+        foursixes: [['horse', 2, 3, 'pen'], ['horse', 5, 8], ['angus', 3, 6]],
+        waggoner: [['angus', 6, 7], ['longhorn', 4, 6]],
+        yo: [['axisdeer', 5, 8], ['blackbuck', 4, 7]],
+      };
+      for (const [sp, n, spread, where] of SIG[hq.sig]) {
+        if (where === 'pen') { for (const p of hq.pens) home(qr, sp, p.x, p.z, n, spread); continue; }
+        for (let tries = 0; tries < 4; tries++) { // pasture off the buildings, off the road
+          const ang = qr() * Math.PI * 2, d = 16 + qr() * 10;
+          const hx = hq.x + Math.cos(ang) * d, hz = hq.z + Math.sin(ang) * d;
+          if (!inTexas(hx, hz) || nearestRoad(hx, hz, 6)) continue;
+          home(qr, sp, hx, hz, n, spread);
+          break;
+        }
+      }
+    }
+
     this.scene.add(group);
     this.live.set(key, { group, animals });
   }
@@ -600,6 +631,44 @@ function mkAnimal(species, rand) {
       box(g, 0.3, 0.3, 0.42, 0, 1.0, -0.85, hide);
       if (rand() < 0.25) box(g, 0.26, 0.18, 0.16, 0, 1.02, -1.02, mat(0xe8e0d4)); // the odd baldy face
       quadLegs([[-0.24, -0.5], [0.24, -0.5], [-0.24, 0.5], [0.24, 0.5]], 0.12, 0.5, hide);
+      break;
+    }
+    case 'santagertrudis': {
+      const hide = mat(0x7a2e1e);                             // the cherry-red breed color
+      box(g, 0.72, 0.62, 1.4, 0, 0.8, 0, hide);
+      box(g, 0.3, 0.3, 0.44, 0, 1.02, -0.88, hide);
+      box(g, 0.26, 0.16, 0.3, 0, 0.55, -0.9, mat(0x6a2818));  // the Brahman dewlap
+      quadLegs([[-0.24, -0.5], [0.24, -0.5], [-0.24, 0.5], [0.24, 0.5]], 0.12, 0.5, hide);
+      break;
+    }
+    case 'axisdeer': {
+      const rust = mat(0xb5713a);                             // brighter rusty coat than a whitetail
+      box(g, 0.5, 0.5, 1.1, 0, 0.75, 0, rust);
+      box(g, 0.22, 0.5, 0.25, 0, 1.15, -0.55, rust);
+      box(g, 0.26, 0.24, 0.4, 0, 1.45, -0.65, rust);
+      const spot = mat(0xf5f0e0);
+      for (const [sx, sy, sz] of [[-0.26, 0.85, -0.3], [0.26, 0.8, 0.1], [-0.26, 0.7, 0.35], [0.26, 0.92, -0.15]])
+        box(g, 0.05, 0.05, 0.05, sx, sy, sz, spot);           // the lifelong spots
+      if (rand() < 0.5) {                                     // tall lyre antlers
+        const bone = mat(0xd8cbb0);
+        box(g, 0.06, 0.55, 0.06, -0.12, 1.85, -0.6, bone);
+        box(g, 0.06, 0.55, 0.06, 0.12, 1.85, -0.6, bone);
+      }
+      quadLegs([[-0.16, -0.4], [0.16, -0.4], [-0.16, 0.4], [0.16, 0.4]], 0.09, 0.55, rust);
+      break;
+    }
+    case 'blackbuck': {
+      const dark = mat(0x2e2a26), white = mat(0xf0ead8);
+      box(g, 0.4, 0.42, 0.9, 0, 0.62, 0, dark);               // near-black back
+      box(g, 0.38, 0.18, 0.88, 0, 0.42, 0, white);            // white belly
+      box(g, 0.18, 0.4, 0.2, 0, 0.95, -0.45, dark);           // neck
+      box(g, 0.2, 0.2, 0.32, 0, 1.2, -0.52, dark);            // head
+      box(g, 0.1, 0.08, 0.1, 0, 1.18, -0.68, white);          // white muzzle
+      const horn = mat(0x1e1a16);
+      const h1 = box(g, 0.05, 0.6, 0.05, -0.08, 1.55, -0.45, horn);
+      const h2 = box(g, 0.05, 0.6, 0.05, 0.08, 1.55, -0.45, horn);
+      h1.rotation.z = 0.12; h2.rotation.z = -0.12;            // the corkscrew V
+      quadLegs([[-0.13, -0.32], [0.13, -0.32], [-0.13, 0.32], [0.13, 0.32]], 0.07, 0.42, white);
       break;
     }
   }
