@@ -1,27 +1,44 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Agriculture track (`AGRICULTURE_SPEC.md`), wave 1 of 4
-  — census data bake (`tools/build-ag.mjs` → `data/agriculture.json`) +
-  `agAt(x,z)` accessor in geo.js + `tools/checks/ag.mjs`. Spec written
-  2026-07-13; no code has shipped yet.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — pure
-  table plumbing (parse/join/emit + one accessor), no content/register
-  work. Flag it if the running model differs.
-- **Budget**: code + checks, no shots, grep-first.
-- **Then**: rewrite this block for wave 2 (crops + farmsteads, Fable 5).
+- **This session**: Agriculture track (`AGRICULTURE_SPEC.md`), wave 2 of 4
+  — crops (decal field patches + sparse instanced rows + center-pivot
+  circles) and farmsteads (`farmsteadAt` seeded chunk sites: barn, house,
+  stock tank, corral, windmill, silos, chickens) in ScenerySystem. Wave 1
+  (census bake + `agAt`) shipped 2026-07-13, commit (pending).
+- **Recommended setup**: model **Fable 5**, effort **high** — content +
+  spatial composition (prop kits, decal placement, the `chapelAt`-pattern
+  chunk function). Flag it if the running model differs.
+- **Budget**: code + checks, **one `t.shot`** allowed for the aerial
+  field/pivot read (visual-judgment exception — everything else stays
+  numeric), grep-first.
+- **Then**: rewrite this block for wave 3 (livestock species + feedlots +
+  bison, Fable 5).
 
 Gotchas carried over:
-- Bake input: `~/claude-area/devel/tx-inputs/tx_county_census2022.txt.gz`
-  (tab-delim; cols 10 SHORT_DESC / 11 DOMAIN_DESC / 22 COUNTY_NAME /
-  38 VALUE; filter DOMAIN_DESC=="TOTAL"; VALUE has commas, `(D)`/`(Z)`→0).
-- Join census UPPERCASE names to `data/counties.json` mixed-case names
-  (normalize case+spaces; "DE WITT"↔"DeWitt") — **assert 254/254**.
-- Verified SHORT_DESCs + top-county truth values are listed in the
-  spec's Data section — use them as check fixtures; grep the extract
-  for pecans/sugarcane labels before hardcoding the measure list.
-- County area for densities: shoelace over projected counties.json
-  rings at bake time — no new geo input.
+- `agAt(x,z)` (geo.js) → county record `{cattle, horses, goats, sheep,
+  onFeed, irrAcres, crops:{cotton,rice,sorghum,corn,wheat,hay,peanuts,
+  citrus,pecans,sugarcane}, areaKm2, dominantCrop}`, or `null` outside
+  Texas. `dominantCrop` is **statewide-share**, not raw county acreage
+  (confirmed against real data: raw-max gives hay/cotton/wheat/corn as
+  "dominant" in 240/254 counties and citrus/peanuts/sugarcane win
+  nowhere — the whole point of this field is the geographically
+  distinctive crop, so it's each crop's acreage as a share of ITS
+  statewide total, with a 50-acre floor to kill noise). Consume
+  `dominantCrop` for the crop-type/color pick; don't recompute a
+  different dominance rule downstream.
+- Sample `agAt` at chunk center (26-unit ScenerySystem chunks vs
+  county-sized polygons) — straddle error is invisible per the spec.
+- `farmsteadAt(cx,cz)` is a new pure seeded chunk function in world.js,
+  the `chapelAt` pattern (own seed stream, e.g. `farm:x,z`) — gate odds
+  on `agAt`, respect `airportClear` + brand footprints + the ≥5-unit
+  road-clear rule like chapels. animals.js will read the same function
+  in wave 3 for herd placement — don't couple spawn logic across modules.
+- Crop decals: drape to `hAt`, raise enough to dodge the z-fight gotcha
+  (river-ribbon precedent — coplanar giant surfaces need vertical
+  separation). Pivot circles only where `irrAcres > 0`.
+- Chicken animation (static scatter vs `userData.animated` peck) is this
+  wave's call — whichever reads better at walk height for near-zero cost.
 
 The Jetpack track (`JETPACK_SPEC.md`, 2 waves —
 physics/shop, then feel) shipped 2026-07-13 and is folded into `ROADMAP.md`;

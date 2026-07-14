@@ -8,6 +8,7 @@ export const GEO = {
   rivers: [],    // [{name, pts:[[x,z],...]}]
   lakes: [],     // [{name, pts:[[x,z],...]}] closed polygons
   bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
+  ag: {},        // county name -> {cattle, horses, goats, sheep, onFeed, irrAcres, crops, areaKm2, dominantCrop}
 };
 
 export async function loadGeo(onStatus) {
@@ -31,6 +32,7 @@ export async function loadGeo(onStatus) {
   } catch { ELEV.data = null; }
   onStatus?.('Drawing county lines…');
   GEO.counties = await get('counties.json').catch(() => []);
+  GEO.ag = await get('agriculture.json').catch(() => ({}));
   for (const c of GEO.counties) {
     // bbox per county for cheap point-in-county prefiltering
     let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
@@ -197,6 +199,12 @@ export function countyAt(x, z) {
     if (inRings(x, z, c.rings)) { lastCounty = c; return c.name; }
   }
   return null;
+}
+
+// USDA census record for the county at (x,z), or null outside Texas
+export function agAt(x, z) {
+  const name = countyAt(x, z);
+  return name ? (GEO.ag[name] || null) : null;
 }
 
 export function nearestCity(x, z) {
