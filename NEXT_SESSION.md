@@ -1,49 +1,49 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Agriculture track (`AGRICULTURE_SPEC.md`), wave 4 of 4
-  — named-ranch gate arches as `gameplay.js` landmarks (kind `rancharch`:
-  King ~27.52 −97.88, Four Sixes ~33.62 −100.32, Waggoner ~33.84 −99.12,
-  YO ~30.13 −99.55 — confirm coords in-wave), herd-odds boost near each
-  arch (King bigger radius + extra props), 4–6 bespoke ag NPCs with
-  weather-leaning dialog, polish. Wave 3 (livestock: horse/goat/sheep/
-  bison/angus species, census rows, farm herds, `feedlotAt` + pens)
-  shipped 2026-07-13.
-- **Recommended setup**: model **Fable 5**, effort **high** —
-  content/register wave (plaque copy + dialog pools). Flag it if the
-  running model differs.
-- **Budget**: code + checks, **one `t.shot`** (arch silhouette), grep-first.
-- **Then**: decide optional wave 5 (ranch compounds) by driving up to an
-  arch at wave-4 end — if it dies, this wave folds the whole track into
-  one `ROADMAP.md` entry and DELETES this briefing block; if it runs,
-  rewrite this block for wave 5 instead.
+- **This session**: Agriculture track (`AGRICULTURE_SPEC.md`), wave 4.5
+  — crop visual upgrade, zero placement changes: furrow striping via
+  vertex colors on every field decal, row coverage → ~100% with bigger
+  elements, rice levees + water sheen, hay windrows + guaranteed bales,
+  denser orchards, pivot watered-wedge polish. Full scope in the spec's
+  "Wave 4.5" section. Wave 4 (ranch arches, herd boost, 5 ag NPCs)
+  shipped 2026-07-13, commit ea9f55a.
+- **Recommended setup**: model **Sonnet 5**, effort **high** —
+  geometry/instancing plumbing wave, no content/register work. Flag it
+  if the running model differs.
+- **Budget**: code + checks, **one `t.shot`** (farmland composition
+  read), grep-first.
+- **Then**: the deferred wave-5 gate — Bruno drives up to a ranch arch
+  and decides optional wave 5 (ranch compounds, pre-designed in the
+  spec). If it dies, THIS wave folds the whole track into one
+  `ROADMAP.md` entry and DELETES this briefing block; if it runs,
+  rewrite this block for wave 5.
 
-Gotchas carried over (wave 4 must know):
-- Arches join the LANDMARKS table via `LL()` — collect + plaque come free
-  (`plaqueNear` in main.js is the single "which plaque is open" lookup;
-  never add a second state var). Verify at parked-truck distance + ugly
-  approach headings (compass/plaque lesson).
-- Herd boost: animals.js `spawn()` already appends census rows via
-  `censusTable(x,z)` — boost by adding an arch-proximity term there (or
-  extra rows), NOT by touching `regionTable` (its draws must stay
-  byte-identical for existing wild placements). W4 check: boosted odds
-  measurably beat a control point.
-- Ag NPC dialog: npcs.js assembles at interact time from the `getContext`
-  callback (weather/night/progress) — the rain-leaning lines must surface
-  under `t.setWeather('rain')` and assert on DOM text (existing npcs
-  idiom). NPCs sit on road shoulders via `roadShoulder()`.
-- `feedlotAt(cx,cz)` (world.js, on `__game`) → `{x, z, rot, pens:[{x,z}],
-  key}` or null; onFeed-density ≥30 gate = exactly the top 9 counties.
-  `farmsteadAt` → `{x, z, rot, silos, key}`. Both pure seeded; animals.js
-  READS them for herds — never respawn or duplicate.
-- New species facts ship in SPECIES (20 total incl. bat); bison herd is
-  hardcoded at `BISON_SITE` (−1488.5, −3796, chunk −6,−15 — Caprock
-  Canyons). Angus have `leash: 2.2` (penned); `move()` honors
-  `spec.leash ?? 45`.
-- Chickens are scenery props (animate-loop kind `'chicken'`), NOT
-  animals.js agents — don't migrate them.
-- King Ranch (27.52 N) is deep South Texas brush country — regionTable's
-  south box already runs longhorn-heavy; the boost radius rides on top.
+Gotchas carried over (wave 4.5 must know):
+- **The `'crops'+key` stream must stay byte-identical** — same draw
+  count per iteration (note `rowRoll` is drawn every loop precisely so
+  placement can't shift; keep that). All new randomness from a fresh
+  `'crops2'+key` stream. W4.5 check hardcodes a known chunk's first
+  field coords to prove nothing moved.
+- Field decals y-stagger via `deck` (0.12 base raise + 0.015 steps) to
+  dodge the giant-coplanar-surface z-fight — levee/windrow overlays
+  join that stagger or ride as vertex colors on the same mesh; never
+  add a new coplanar quad at the same height.
+- Materials come from world.js `matCache` (`lamb(hex)`) and are shared —
+  `disposeGroup` disposes geometry only, so cached materials survive
+  chunk churn. A `vertexColors` material needs its own cache key; don't
+  mutate the shared plain-color entries.
+- `CROP_STYLE` is keyed by `agAt().dominantCrop` sampled at chunk
+  center — consumed as-is, never re-derived. Rice deliberately has no
+  pivots (levee flooding); keep that gate.
+- `mkCropRows` builds one InstancedMesh per patch with per-chunk
+  geometry (safe to dispose); the instance cap is the perf knob —
+  raise it, don't remove it.
+- Pivot arms are static meshes today; if animating, register per-chunk
+  in `group.userData.animated` (pumpjack idiom in `ScenerySystem`).
+- Existing ag checks in `tools/checks/ag.mjs` (25) assert field decals
+  exist within ε of `hAt` and placement legality — they must keep
+  passing untouched; new W4.5 checks extend the same suite.
 
 The Jetpack track (`JETPACK_SPEC.md`, 2 waves —
 physics/shop, then feel) shipped 2026-07-13 and is folded into `ROADMAP.md`;

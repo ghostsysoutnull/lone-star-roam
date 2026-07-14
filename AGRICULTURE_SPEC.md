@@ -34,7 +34,10 @@ Four layers, all keyed off one baked per-county dataset:
   farmstead sites; distinct feedlot props in the top on-feed counties.
 - **Crops rendering**: ground decals (aerial read) + sparse instanced
   3D rows near ground + center-pivot circles. Full-3D-only and
-  decal-only were considered and dropped.
+  decal-only were considered and dropped. *Revised 2026-07-13 after
+  wave 4: the shipped read is too flat (bare quads for most fields;
+  rice/hay pure decal) — wave 4.5 upgrades the visuals without moving
+  a single field (see below).*
 - **Named ranches**: gate-arch landmark plaques + locally boosted herds;
   King Ranch alone gets extra dressing (its real footprint is ~35×50
   units — a region, not a point). Bespoke compounds dropped from the
@@ -151,10 +154,42 @@ Each wave = one session: code + verify checks.
 | **2** | Crops (decals + pivots + instanced rows) + farmsteads (`farmsteadAt`, props, chickens) + checks | **Fable 5, high** — content + spatial composition | code + checks, **one `t.shot`** for the aerial field/pivot read (visual-judgment exception), grep-first |
 | **3** | Livestock: horses/goats/sheep species + census-scaled tables + farmstead herds + feedlots (`feedlotAt`, pens, dense cattle) + bison site + log facts + checks | **Fable 5, high** — species content + behavior reuse | code + checks, no shots, grep-first |
 | **4** | Named-ranch gate arches (4 landmarks, real coords + plaque facts) + herd boost + King Ranch dressing + **4–6 bespoke ag NPCs** (weather-leaning dialog) + polish + ROADMAP fold-in | **Fable 5, high** — content/register (plaque copy + dialog pools) | code + checks, one `t.shot` (arch silhouette), grep-first |
+| **4.5** | Crop visual upgrade: furrow striping, full row coverage, rice levees, hay windrows, orchard densify — zero placement changes | **Sonnet 5, high** — geometry/instancing plumbing, no content/register work | code + checks, one `t.shot` (farmland read), grep-first |
 
-The track's last wave (4, or 5 if it runs) deletes the `## Session
+The track's last wave (4.5, or 5 if it runs) deletes the `## Session
 briefing` block and folds the track into one `ROADMAP.md` entry; this
 spec stays as history.
+
+### Wave 4.5 — crop visual upgrade (added 2026-07-13)
+
+Wave-2 fields shipped below the game's prop bar: most fields are bare
+flat quads (`rowRoll < 0.45` gate), rice and hay have `row: null` (pure
+decal), and row elements are sub-pixel at drive distance. The fix is
+visual only — **no field, pivot, or farmstead moves**:
+
+- **Furrow striping** on every field decal via vertex colors:
+  alternating two-tone bands of the crop's ground color, aligned with
+  the field's existing `rot`. Fixes the aerial read (the patchwork)
+  for every field including otherwise-bare ones. Material switches to
+  `vertexColors` — needs its own `matCache` key, not a tint of the
+  shared plain-color entries.
+- **Row coverage → ~100%**, elements scaled up ~1.5–2× with a raised
+  instance cap, so standing crop registers at highway speed (cotton
+  puffs, corn/sorghum/sugarcane stalk stands, wheat tufts).
+- **Rice signature**: contour levee ridges snaking across the paddy +
+  water-sheen tone between them (flooded read, not a dark rectangle).
+- **Hay signature**: mowed windrow stripes + bales guaranteed in every
+  hay field (today they're conditional).
+- **Orchards** (citrus/pecans): denser, more regular grid, bigger
+  trees.
+- **Pivot polish**: a darker "freshly watered" wedge trailing the arm
+  angle; optionally register the arm in `userData.animated` for a slow
+  sweep (pumpjack idiom) — in-wave call.
+- **Determinism**: the existing `'crops'+key` stream must stay
+  byte-identical (draw counts unchanged); all *new* random draws come
+  from a fresh stream (`'crops2'+key`). Overlay geometry joins the
+  existing `deck` y-stagger (0.015 steps above the 0.12 raise) —
+  never a new coplanar quad.
 
 ### Optional wave 5 — ranch compounds (decision-gated)
 
@@ -204,6 +239,13 @@ pixels; hermetic — drive to state, no ambient accumulation):
   ag NPCs interact at parked-truck distance, and with `t.setWeather`
   driving a rain state their dialog pool actually surfaces the
   weather-context lines (assert on DOM text, existing npcs idiom).
+- **W4.5 — visuals as numbers + placement frozen**: a known ag chunk's
+  first field decal sits at the *same coords* as pre-wave (hardcode the
+  expected values — proves the `'crops'` stream didn't shift); field
+  patches carry vertex colors with ≥2 distinct tones; a rice chunk has
+  levee geometry, a hay chunk has bales in every field; row-element
+  instance counts up vs the old cap. One `t.shot` for the composition
+  judgment only.
 
 ## What doesn't change
 
