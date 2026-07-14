@@ -1,8 +1,9 @@
-# Backlog — queued behind the aviation track
+# Backlog — queued work
 
-Everything here is on hold until the `AVIATION.md` waves ship (decided
-2026-07-11). NEXT_SESSION.md stays aviation-only; when the track ends, pull
-the next item from here back into it.
+Queued behind whatever track is active (currently Agriculture,
+`AGRICULTURE_SPEC.md`); when a track ends, pull the next item from here
+into `NEXT_SESSION.md`. Direction-level ideas that aren't actionable yet
+live in `FUTURE.md`.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
 
