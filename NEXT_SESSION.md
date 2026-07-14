@@ -1,44 +1,48 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Agriculture track (`AGRICULTURE_SPEC.md`), wave 2 of 4
-  — crops (decal field patches + sparse instanced rows + center-pivot
-  circles) and farmsteads (`farmsteadAt` seeded chunk sites: barn, house,
-  stock tank, corral, windmill, silos, chickens) in ScenerySystem. Wave 1
-  (census bake + `agAt`) shipped 2026-07-13, commit (pending).
-- **Recommended setup**: model **Fable 5**, effort **high** — content +
-  spatial composition (prop kits, decal placement, the `chapelAt`-pattern
-  chunk function). Flag it if the running model differs.
-- **Budget**: code + checks, **one `t.shot`** allowed for the aerial
-  field/pivot read (visual-judgment exception — everything else stays
-  numeric), grep-first.
-- **Then**: rewrite this block for wave 3 (livestock species + feedlots +
-  bison, Fable 5).
+- **This session**: Agriculture track (`AGRICULTURE_SPEC.md`), wave 3 of 4
+  — livestock: horses/goats/sheep as animals.js species with census-scaled
+  regional odds, herds clustered at `farmsteadAt` sites, `feedlotAt` +
+  pens + dense cattle in the top on-feed counties, bison at Caprock
+  Canyons, critter-log facts. Wave 2 (crops + farmsteads) shipped
+  2026-07-13.
+- **Recommended setup**: model **Fable 5**, effort **high** — species
+  content + behavior reuse. Flag it if the running model differs.
+- **Budget**: code + checks, **no shots**, grep-first.
+- **Then**: rewrite this block for wave 4 (named-ranch arches + ag NPCs,
+  Fable 5) — that wave (or optional 5) folds the track into ROADMAP.md.
 
-Gotchas carried over:
-- `agAt(x,z)` (geo.js) → county record `{cattle, horses, goats, sheep,
-  onFeed, irrAcres, crops:{cotton,rice,sorghum,corn,wheat,hay,peanuts,
-  citrus,pecans,sugarcane}, areaKm2, dominantCrop}`, or `null` outside
-  Texas. `dominantCrop` is **statewide-share**, not raw county acreage
-  (confirmed against real data: raw-max gives hay/cotton/wheat/corn as
-  "dominant" in 240/254 counties and citrus/peanuts/sugarcane win
-  nowhere — the whole point of this field is the geographically
-  distinctive crop, so it's each crop's acreage as a share of ITS
-  statewide total, with a 50-acre floor to kill noise). Consume
-  `dominantCrop` for the crop-type/color pick; don't recompute a
-  different dominance rule downstream.
-- Sample `agAt` at chunk center (26-unit ScenerySystem chunks vs
-  county-sized polygons) — straddle error is invisible per the spec.
-- `farmsteadAt(cx,cz)` is a new pure seeded chunk function in world.js,
-  the `chapelAt` pattern (own seed stream, e.g. `farm:x,z`) — gate odds
-  on `agAt`, respect `airportClear` + brand footprints + the ≥5-unit
-  road-clear rule like chapels. animals.js will read the same function
-  in wave 3 for herd placement — don't couple spawn logic across modules.
-- Crop decals: drape to `hAt`, raise enough to dodge the z-fight gotcha
-  (river-ribbon precedent — coplanar giant surfaces need vertical
-  separation). Pivot circles only where `irrAcres > 0`.
-- Chicken animation (static scatter vs `userData.animated` peck) is this
-  wave's call — whichever reads better at walk height for near-zero cost.
+Gotchas carried over (wave 3 must know):
+- `agAt(x,z)` (geo.js) → `{cattle, horses, goats, sheep, onFeed,
+  irrAcres, crops:{…}, areaKm2, dominantCrop}` or null outside Texas.
+  `dominantCrop` is statewide-share (never recompute dominance); sample
+  at chunk center. ScenerySystem chunks are **260 units** (an earlier
+  briefing said 26 — typo).
+- `farmsteadAt(cx,cz)` (world.js, exported + on `__game`) →
+  `{x, z, rot, silos, key}` or null. Pure seeded (`farm${cx},${cz}`
+  stream), odds `min(0.35, herd/80 + crop/160)` from census density.
+  animals.js should READ this for herd clustering — never respawn or
+  duplicate its logic. Site frame: local −z faces the anchor road.
+- `feedlotAt` (this wave, new) follows the same pattern with its own
+  stream; gate on `onFeed` so roughly the top ~10 counties qualify
+  (Deaf Smith 364k, Castro, Hartley, Hansford, Parmer). Needs the same
+  legality gauntlet (road ≥5 / airportClear / brandNear(30) / city /
+  chapel+farm standoffs).
+- Flee heading: away = `atan2(-dx,-dz)`, d = animal − player — assert
+  distance-over-time INCREASES on scare (charging-deer lesson).
+- Bison site ~34.41 N −101.06 W (Caprock Canyons SP) — confirm coords
+  in-wave; log via existing `spotSpecies` (additive save key, safe).
+- Chickens are scenery props (animate-loop kind `'chicken'`), NOT
+  animals.js agents — don't migrate them.
+- Wave 2 flavor call to preserve: pivot circles are skipped in
+  rice-dominant counties (levee flooding, not pivots).
+- Verify-harness precedent from this session: when a check must assert a
+  SPECIFIC flight/agent's identity while ambient scheduled traffic runs,
+  spy on the tx/emit call and collect lines (restore via
+  `delete g.<sys>.<method>`), never race for a shared `lastTx`-style
+  field (aviation A2 was fixed this way after a scheduled AUS departure
+  overwrote the forced flight's narration).
 
 The Jetpack track (`JETPACK_SPEC.md`, 2 waves —
 physics/shop, then feel) shipped 2026-07-13 and is folded into `ROADMAP.md`;

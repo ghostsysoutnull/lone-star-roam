@@ -1,9 +1,10 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, nearestRoad, nearestCity, hAt, outsideAt, ELEV } from './geo.js';
+import { GEO, seededRand, inTexas, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt } from './geo.js';
 import { ATMOS } from './sky.js';
 import { cityRadius } from './cities.js';
 import { airportClear } from './airports.js';
+import { brandNear } from './brands.js';
 
 export function buildWorld(scene) {
   buildGround(scene);
@@ -295,6 +296,127 @@ export function chapelSitesNear(px, pz, range = 2) {
   return out;
 }
 
+// --- Agriculture: census-painted working land (crops + farmsteads) ---
+// Ground styles per county-dominant crop (agAt's statewide-share pick —
+// consumed as-is, never re-derived). `row` drives the near-ground instanced
+// read: cotton puffs, grain stalks, wheat tufts, orchard rows.
+const CROP_STYLE = {
+  cotton:    { ground: 0x9fa878, row: { kind: 'puff', color: 0xeae6da } },
+  rice:      { ground: 0x41704d, row: null }, // flooded paddies read flat and dark
+  sorghum:   { ground: 0xa5673c, row: { kind: 'stalk', color: 0x8f5530, h: 0.6 } },
+  corn:      { ground: 0x5e7f3d, row: { kind: 'stalk', color: 0x4c7433, h: 0.85 } },
+  wheat:     { ground: 0xc7a44e, row: { kind: 'tuft', color: 0xd6b258 } },
+  hay:       { ground: 0x99a057, row: null }, // gets extra bales instead
+  peanuts:   { ground: 0x6e7f48, row: { kind: 'tuft', color: 0x53703a } },
+  citrus:    { ground: 0x8a7a55, row: { kind: 'tree', color: 0x2f6b36 } },
+  pecans:    { ground: 0x857550, row: { kind: 'tree', color: 0x49682f } },
+  sugarcane: { ground: 0x4f8a3e, row: { kind: 'stalk', color: 0x55a041, h: 1.15 } },
+};
+const PIVOT_GREEN = 0x4f7c37; // the classic irrigated circle, whatever the crop
+
+// Shared cached materials for ag content (disposeGroup only disposes geometry,
+// so cache hits are safe across chunk churn).
+const matCache = new Map();
+function lamb(hex) {
+  let m = matCache.get(hex);
+  if (!m) matCache.set(hex, (m = new THREE.MeshLambertMaterial({ color: hex, flatShading: true })));
+  return m;
+}
+
+// A field decal: subdivided quad vertex-draped to hAt and raised off the
+// terrain (rivers sit at +0.07 — fields ride above both). `round` pulls
+// outside-the-rim grid points onto the rim, so one drape serves pivots too.
+function mkFieldPatch(fx, fz, w, d, rot, color, round, raise) {
+  const segX = Math.max(2, Math.ceil(w / 3)), segZ = Math.max(2, Math.ceil(d / 3));
+  const pos = [], idx = [];
+  const cr = Math.cos(rot), sr = Math.sin(rot);
+  for (let j = 0; j <= segZ; j++)
+    for (let i = 0; i <= segX; i++) {
+      let lx = (i / segX - 0.5) * w, lz = (j / segZ - 0.5) * d;
+      if (round) {
+        const r = Math.hypot(lx / (w / 2), lz / (d / 2));
+        if (r > 1) { lx /= r; lz /= r; }
+      }
+      const x = fx + lx * cr + lz * sr, z = fz - lx * sr + lz * cr;
+      pos.push(x, hAt(x, z) + raise, z);
+    }
+  for (let j = 0; j < segZ; j++)
+    for (let i = 0; i < segX; i++) {
+      const a = j * (segX + 1) + i;
+      idx.push(a, a + segX + 1, a + 1, a + 1, a + segX + 1, a + segX + 2);
+    }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, lamb(color));
+}
+
+// Near-ground crop rows: one InstancedMesh per patch (geometry is per-chunk,
+// so disposeGroup stays safe). Element style comes from CROP_STYLE.row.
+function mkCropRows(rand, fx, fz, w, d, rot, row) {
+  const spacing = row.kind === 'tree' ? 2.4 : 1.4, step = row.kind === 'tree' ? 2.4 : 1.1;
+  const rows = Math.max(1, Math.floor(d / spacing) - 1);
+  const per = Math.max(2, Math.floor(w / step) - 1);
+  const count = Math.min(240, rows * per);
+  let geo, y0;
+  if (row.kind === 'puff') { geo = new THREE.IcosahedronGeometry(0.09, 0); y0 = 0.14; }
+  else if (row.kind === 'tuft') { geo = new THREE.ConeGeometry(0.1, 0.34, 4); y0 = 0.17; }
+  else if (row.kind === 'tree') { geo = new THREE.IcosahedronGeometry(0.42, 0); y0 = 0.38; }
+  else { geo = new THREE.BoxGeometry(0.07, row.h, 0.07); y0 = row.h / 2; }
+  const inst = new THREE.InstancedMesh(geo, lamb(row.color), count);
+  const m4 = new THREE.Matrix4();
+  const cr = Math.cos(rot), sr = Math.sin(rot);
+  let n = 0;
+  for (let r = 0; r < rows && n < count; r++) {
+    const lz = ((r + 1) / (rows + 1) - 0.5) * d;
+    for (let i = 0; i < per && n < count; i++) {
+      const lx = ((i + 1) / (per + 1) - 0.5) * w + (rand() - 0.5) * 0.2;
+      const x = fx + lx * cr + lz * sr, z = fz - lx * sr + lz * cr;
+      const s = 0.8 + rand() * 0.45;
+      m4.makeScale(s, s, s).setPosition(x, hAt(x, z) + y0 * s, z);
+      inst.setMatrixAt(n++, m4);
+    }
+  }
+  inst.count = n;
+  return inst;
+}
+
+// A working farmstead for ag-country chunks — the chapelAt pattern: a pure
+// function of the chunk key on its own seed stream, so animals.js (wave 3)
+// can cluster herds at the same sites without any cross-module spawn coupling.
+// Odds come straight from the county census, so the Panhandle runs thick with
+// them and the Trans-Pecos sits nearly empty — no hand-tuned region boxes.
+export function farmsteadAt(cx, cz) {
+  const midX = cx * CHUNK + CHUNK / 2, midZ = cz * CHUNK + CHUNK / 2;
+  const ag = agAt(midX, midZ);
+  if (!ag) return null;
+  const herd = (ag.cattle + 2 * ag.horses + ag.goats + ag.sheep) / ag.areaKm2; // head/km²
+  const crop = Object.values(ag.crops).reduce((a, b) => a + b, 0) / ag.areaKm2; // acres/km²
+  const odds = Math.min(0.35, herd / 80 + crop / 160);
+  const rand = seededRand(`farm${cx},${cz}`);
+  if (rand() >= odds) return null;
+  for (let i = 0; i < 4; i++) { // a few tries for a lawful spot
+    const sx = cx * CHUNK + rand() * CHUNK, sz = cz * CHUNK + rand() * CHUNK;
+    const road = nearestRoad(sx, sz, 25);
+    if (!road || road.dist < 0.5) continue;
+    const away = 8 + rand() * 3; // gate up by the road, buildings set back
+    const x = road.x + ((sx - road.x) / road.dist) * away;
+    const z = road.z + ((sz - road.z) / road.dist) * away;
+    if (!inTexas(x, z) || !airportClear(x, z) || brandNear(x, z, 30)) continue;
+    const near = nearestRoad(x, z, 6); // a second road may pass closer than the anchor
+    if (near && near.dist < 5) continue;
+    const { city, dist } = nearestCity(x, z);
+    if (city && dist < cityRadius(city.pop) + 20) continue;
+    const ch = chapelAt(cx, cz); // don't crowd the chunk's chapel plot
+    if (ch && Math.hypot(ch.x - x, ch.z - z) < 15) continue;
+    const rot = Math.atan2(-(road.x - x), -(road.z - z)); // house faces its road
+    const silos = crop > 10 ? 1 + ((rand() * 3) | 0) : 0; // grain country gets silos
+    return { x, z, rot, silos, key: `${cx},${cz}` };
+  }
+  return null;
+}
+
 class ScenerySystem {
   constructor(scene) {
     this.scene = scene;
@@ -317,10 +439,11 @@ class ScenerySystem {
     }
     for (const k of want) if (!this.live.has(k)) this.spawn(k);
 
-    // animate pumpjacks (nodding) and windmills (spinning)
+    // animate pumpjacks (nodding), windmills (spinning), chickens (pecking)
     this.t += dt;
     for (const a of this.animated) {
       if (a.kind === 'pumpjack') a.obj.rotation.x = Math.sin(this.t * 1.4 + a.phase) * 0.22; // beam nods across its x pivot
+      else if (a.kind === 'chicken') a.obj.rotation.x = -Math.max(0, Math.sin(this.t * 2.6 + a.phase)) * 0.5; // beak-to-dirt peck bursts
       else a.obj.rotation.z += dt * (1.6 + a.phase * 0.1) * ATMOS.wind; // windmills spin up when weather turns
     }
   }
@@ -391,6 +514,90 @@ class ScenerySystem {
       const oak = mkLiveOak(rand); // a shade tree between them
       oak.position.set((site.x + site.cemX) / 2, hAt(site.x, site.z), (site.z + site.cemZ) / 2 + 4);
       group.add(chapel, cem, oak);
+    }
+
+    // census-painted working land: crop decals + pivots + the odd farmstead.
+    // Own seed streams — the pre-ag scenery stream above stays untouched, so
+    // the existing world is byte-identical. agAt sampled at chunk center
+    // (county polygons dwarf 260-unit chunks; straddle error is invisible).
+    const ag = agAt(midX, midZ);
+    if (ag) {
+      const crand = seededRand('crops' + key);
+      const cropAcres = Object.values(ag.crops).reduce((a, b) => a + b, 0);
+      const style = CROP_STYLE[ag.dominantCrop];
+      const fields = style ? Math.min(8, (cropAcres / ag.areaKm2 / 6) | 0) : 0;
+      // rice country floods levee paddies, not pivots — the dark decals do the read
+      const pivots = ag.dominantCrop === 'rice' ? 0 : Math.min(4, (ag.irrAcres / ag.areaKm2 / 7) | 0);
+      let deck = 0; // tiny y stagger — two overlapping coplanar decals would z-fight
+      for (let i = 0; i < fields; i++) {
+        const fx = baseX + crand() * CHUNK, fz = baseZ + crand() * CHUNK;
+        const w = 9 + crand() * 9, d = 7 + crand() * 7, rot = crand() * Math.PI;
+        const rowRoll = crand(); // drawn every iteration — placement failures can't shift the stream
+        const clear = Math.hypot(w, d) / 2 + 2;
+        if (!inTexas(fx, fz) || !airportClear(fx, fz)) continue;
+        if (nearestRoad(fx, fz, clear)) continue; // fields never swallow a road
+        const { city, dist } = nearestCity(fx, fz);
+        if (city && dist < cityRadius(city.pop) + clear) continue;
+        const patch = mkFieldPatch(fx, fz, w, d, rot, style.ground, false, 0.12 + deck++ * 0.015);
+        patch.userData.crop = ag.dominantCrop;
+        group.add(patch);
+        if (style.row && rowRoll < 0.45) group.add(mkCropRows(crand, fx, fz, w * 0.9, d * 0.9, rot, style.row));
+        else if (ag.dominantCrop === 'hay')
+          for (let k = 0, kn = 2 + ((rowRoll * 3) | 0); k < kn; k++) {
+            const bale = mkHayBale(crand);
+            const bx = fx + (crand() - 0.5) * w * 0.7, bz = fz + (crand() - 0.5) * d * 0.7;
+            bale.position.set(bx, hAt(bx, bz), bz);
+            group.add(bale);
+          }
+      }
+      for (let i = 0; i < pivots; i++) {
+        const fx = baseX + crand() * CHUNK, fz = baseZ + crand() * CHUNK;
+        const r = 2 + crand() * 2, armRot = crand() * Math.PI * 2; // 4–8 unit circles ≈ real pivots
+        if (!inTexas(fx, fz) || !airportClear(fx, fz)) continue;
+        if (nearestRoad(fx, fz, r + 2)) continue;
+        const { city, dist } = nearestCity(fx, fz);
+        if (city && dist < cityRadius(city.pop) + r + 2) continue;
+        const disc = mkFieldPatch(fx, fz, r * 2, r * 2, 0, PIVOT_GREEN, true, 0.12 + deck++ * 0.015);
+        disc.userData.pivot = true;
+        const armG = new THREE.CylinderGeometry(0.05, 0.05, r * 0.94, 4);
+        armG.rotateX(Math.PI / 2).translate(0, 0, -r * 0.47); // spans hub to rim
+        const arm = new THREE.Mesh(armG, lamb(0xc4c8cc));
+        arm.position.set(fx, hAt(fx, fz) + 0.35, fz);
+        arm.rotation.y = armRot;
+        group.add(disc, arm);
+      }
+
+      const farm = farmsteadAt(cx, cz);
+      if (farm) {
+        const fr = seededRand('farmprops' + key);
+        const fg = new THREE.Group();
+        fg.userData.kind = 'farmstead';
+        const cr = Math.cos(farm.rot), sr = Math.sin(farm.rot);
+        const at = (obj, lx, lz, ry = 0) => { // site frame: -z faces the road
+          const x = farm.x + lx * cr + lz * sr, z = farm.z - lx * sr + lz * cr;
+          obj.position.set(x, hAt(x, z), z);
+          obj.rotation.y = farm.rot + ry;
+          fg.add(obj);
+        };
+        at(mkFarmhouse(), 2.8, 1.5);
+        at(mkBarn(), -3.2, 2.5, (fr() - 0.5) * 0.4);
+        const wm = mkWindmill(fr);
+        at(wm, 5.2, 4.2);
+        const entry = { obj: wm.userData.animate, kind: 'windmill', phase: fr() * Math.PI * 2 };
+        this.animated.push(entry);
+        group.userData.animated.push(entry);
+        at(mkStockTank(), 4.0, 4.8);
+        at(mkCorral(fr), -3.6, 7.6, fr() * 0.3);
+        for (let s = 0; s < farm.silos; s++) at(mkSilo(), -5.4 - s * 1.1, 3.6);
+        for (let c = 0, cn = 3 + ((fr() * 3) | 0); c < cn; c++) {
+          const hen = mkChicken();
+          at(hen, 0.5 + (fr() - 0.5) * 4, 3 + (fr() - 0.5) * 3, fr() * Math.PI * 2);
+          const peck = { obj: hen.userData.animate, kind: 'chicken', phase: fr() * Math.PI * 2 };
+          this.animated.push(peck);
+          group.userData.animated.push(peck);
+        }
+        group.add(fg);
+      }
     }
     this.scene.add(group);
     this.live.set(key, group);
@@ -633,6 +840,112 @@ function mkCemetery(rand) {
   const obelisk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.16, 1.1, 4), new THREE.MeshLambertMaterial({ color: 0xcac4b6, flatShading: true }));
   obelisk.position.set(1.9, 0.55, 1.6);
   g.add(obelisk);
+  return g;
+}
+
+// --- Farmstead makers (chapel-scale kit; shared cached lamb() materials) ---
+function mkBarn() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.4, 3.2), lamb(0x8f2f24));
+  body.position.y = 0.7;
+  const roofG = new THREE.CylinderGeometry(1.55, 1.55, 3.4, 3, 1); // chapel gable idiom
+  roofG.rotateX(-Math.PI / 2);
+  const roof = new THREE.Mesh(roofG, lamb(0x6b6560));
+  roof.position.y = 2.05;
+  const door = new THREE.Mesh(new THREE.BoxGeometry(1.0, 1.1, 0.08), lamb(0xf2efe6));
+  door.position.set(0, 0.55, -1.62);
+  const loft = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.45, 0.08), lamb(0xf2efe6));
+  loft.position.set(0, 1.5, -1.62);
+  g.add(body, roof, door, loft);
+  return g;
+}
+
+function mkFarmhouse() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.0, 1.7), lamb(0xf2efe6));
+  body.position.y = 0.5;
+  const roofG = new THREE.CylinderGeometry(0.85, 0.85, 1.9, 3, 1);
+  roofG.rotateX(-Math.PI / 2);
+  const roof = new THREE.Mesh(roofG, lamb(0x5a5450));
+  roof.position.y = 1.32;
+  const porch = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.06, 0.55), lamb(0x9a8a72));
+  porch.position.set(0, 0.88, -1.1);
+  g.add(body, roof, porch);
+  for (const px of [-0.45, 0.45]) {
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.85, 0.06), lamb(0xf2efe6));
+    post.position.set(px, 0.45, -1.3);
+    g.add(post);
+  }
+  return g;
+}
+
+function mkStockTank() {
+  const g = new THREE.Group();
+  const ringG = new THREE.CylinderGeometry(0.95, 0.95, 0.32, 12, 1, true);
+  const ring = new THREE.Mesh(ringG, new THREE.MeshLambertMaterial({ color: 0xb0b4ba, side: THREE.DoubleSide, flatShading: true }));
+  ring.position.y = 0.16;
+  const water = new THREE.Mesh(new THREE.CircleGeometry(0.9, 12), lamb(0x4a7d92));
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = 0.26;
+  g.add(ring, water);
+  return g;
+}
+
+function mkCorral(rand) {
+  const g = new THREE.Group();
+  const wood = lamb(0x77593a);
+  const W = 4.2;
+  const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, 0.5, 0.09), wood, 12);
+  const m4 = new THREE.Matrix4();
+  let n = 0;
+  for (let s = 0; s < 4; s++) // 3 posts per side, corners shared
+    for (let i = 0; i < 3; i++) {
+      const f = i / 3 - 0.5;
+      const [x, z] = s === 0 ? [f * W, -W / 2] : s === 1 ? [W / 2, f * W] : s === 2 ? [-f * W, W / 2] : [-W / 2, -f * W];
+      m4.makeRotationY((rand() - 0.5) * 0.15).setPosition(x, 0.25, z);
+      posts.setMatrixAt(n++, m4);
+    }
+  g.add(posts);
+  for (const y of [0.22, 0.42])
+    for (const [w, d, x, z] of [[W, 0.06, 0, -W / 2], [W, 0.06, 0, W / 2], [0.06, W, -W / 2, 0], [0.06, W, W / 2, 0]]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, d), wood);
+      rail.position.set(x, y, z);
+      g.add(rail);
+    }
+  return g;
+}
+
+function mkSilo() {
+  const g = new THREE.Group();
+  const steel = lamb(0xc4c8cc);
+  const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 2.6, 10), steel);
+  tube.position.y = 1.3;
+  const dome = new THREE.Mesh(new THREE.ConeGeometry(0.46, 0.5, 10), steel);
+  dome.position.y = 2.85;
+  g.add(tube, dome);
+  return g;
+}
+
+// A pecking hen: the bird pivots at ground level so the animated tip-forward
+// reads as a beak-to-dirt peck (kind 'chicken' in the scenery animate loop).
+function mkChicken() {
+  const g = new THREE.Group();
+  const bird = new THREE.Group();
+  const white = lamb(0xf0ede4);
+  const body = new THREE.Mesh(new THREE.IcosahedronGeometry(0.13, 0), white);
+  body.position.y = 0.16;
+  body.scale.set(1, 0.85, 1.25);
+  const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.07, 0), white);
+  head.position.set(0, 0.3, -0.14);
+  const comb = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.05, 0.06), lamb(0xb42c22));
+  comb.position.set(0, 0.36, -0.14);
+  const beak = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.06, 4), lamb(0xd08a2e));
+  beak.rotation.x = -Math.PI / 2;
+  beak.position.set(0, 0.29, -0.21);
+  bird.add(body, head, comb, beak);
+  g.add(bird);
+  g.userData.animate = bird;
+  g.userData.kind = 'chicken';
   return g;
 }
 

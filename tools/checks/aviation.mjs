@@ -963,15 +963,23 @@ export default async function aviation(t) {
       g.radio.knownPh.clear();
       const f = g.aviation.force('departure', 'AUS');
       if (!f) return { err: 'force returned null' };
+      // spy on ops transmissions: a *scheduled* AUS flight can roll during the
+      // same span and overwrite lastTx, so collect every ops line instead of
+      // racing for the last one — the assert is about THIS flight's callsign
+      const seen = [];
+      const realTx = Object.getPrototypeOf(g.radio).tx;
+      g.radio.tx = function (...a) { if (a[2] === 'ops') seen.push(a[1]); return realTx.apply(this, a); };
       const dt = 0.05;
       for (let i = 0; i < 3600 && f.st.ph !== 'roll'; i++) g.aviation.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
       g.radio.update(dt, g.player, g.aviation, g.sky); // already tuned — only narrateOps can fire here
-      const out = { err: null, cs: f.sl.cs, text: g.radio.lastTx?.text };
+      delete g.radio.tx; // restore the real prototype method
+      const out = { err: null, cs: f.sl.cs, seen };
       g.player.perks.avionics = false;
       return out;
     })()`);
     t.ok(!r.err, r.err);
-    t.ok(r.text?.includes(r.cs), `narration "${r.text}" doesn't contain the slot's own callsign "${r.cs}"`);
+    t.ok(r.seen.some((s) => s.includes(r.cs) && s.includes('cleared for takeoff')),
+      `no takeoff clearance for the slot's own callsign "${r.cs}" among: ${JSON.stringify(r.seen)}`);
     await t.ev('g.aviation.despawnAll()');
   });
 
