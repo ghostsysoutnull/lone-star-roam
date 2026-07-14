@@ -144,6 +144,153 @@ export default async function ag(t) {
     t.ok(res.hens >= 3, `expected ≥3 pecking chickens in the animate loop, got ${res.hens}`);
   });
 
+  // --- Wave 3: livestock — census species, farm herds, feedlots, bison ---
+
+  await t.check('new species are registered with facts (log-ready, additive)', async () => {
+    const res = await t.ev(`(() => {
+      const missing = ['horse', 'goat', 'sheep', 'bison', 'angus'].filter((k) => !g.SPECIES[k] || !g.SPECIES[k].fact);
+      return { missing, count: Object.keys(g.SPECIES).length };
+    })()`);
+    t.ok(res.missing.length === 0, `species missing or factless: ${res.missing}`);
+    t.ok(res.count === 20, `SPECIES_COUNT drifted: ${res.count}`);
+  });
+
+  await t.check('censusTable: Parker horses thick, Sutton goats+sheep, Dallam bare', async () => {
+    const rows = await t.ev(`(() => {
+      const at = (lat, lon) => g.animals.censusTable((lon + 99.5) * 954.23, -(lat - 31) * 1113.2);
+      return { parker: at(32.71, -97.98), sutton: at(30.57, -100.64), dallam: at(36.06, -102.52) };
+    })()`);
+    const keep = (list, sp) => (list.find((r) => r[0] === sp) ?? [])[4] ?? 0;
+    t.ok(keep(rows.parker, 'horse') >= 0.5, `Parker horse odds thin: ${keep(rows.parker, 'horse')}`);
+    t.ok(keep(rows.sutton, 'goat') >= 0.5 && keep(rows.sutton, 'sheep') >= 0.4,
+      `Sutton goat/sheep odds thin: ${JSON.stringify(rows.sutton)}`);
+    t.ok(!rows.dallam.some((r) => r[0] === 'goat' || r[0] === 'sheep'),
+      `Dallam should have no goat/sheep rows: ${JSON.stringify(rows.dallam)}`);
+  });
+
+  // scan the on-feed belt (Dallam..Swisher box) for pure-function feedlot sites
+  const lots = await t.ev(`(() => {
+    const sites = [];
+    for (let cx = -14; cx <= -6; cx++)
+      for (let cz = -24; cz <= -14; cz++) {
+        const s = g.feedlotAt(cx, cz);
+        if (s) sites.push(s);
+      }
+    return sites;
+  })()`);
+
+  await t.check('feedlotAt: sites exist in the on-feed belt, none below the gate, all lawful', async () => {
+    t.ok(lots.length >= 1, 'no feedlot sites in the whole 99-chunk Panhandle belt — odds/legality too tight');
+    const bad = await t.ev(`(() => {
+      const out = [];
+      for (const s of ${JSON.stringify(lots)}) {
+        const road = g.nearestRoad(s.x, s.z, 6);
+        if (road && road.dist < 5) out.push('road:' + s.key);
+        if (!g.airportClear(s.x, s.z)) out.push('airport:' + s.key);
+        if (g.brandNear(s.x, s.z, 30)) out.push('brand:' + s.key);
+        if (!g.inTexas(s.x, s.z)) out.push('border:' + s.key);
+        if (s.pens.length < 3) out.push('pens:' + s.key);
+      }
+      // below-gate control: Wilson county (onFeed 14.2/km², under the 30 gate)
+      for (let i = -2; i <= 2; i++)
+        for (let j = -2; j <= 2; j++) if (g.feedlotAt(4 + i, 7 + j)) out.push('gate:Wilson');
+      return out;
+    })()`);
+    t.ok(bad.length === 0, `unlawful/gate-leaking feedlot sites: ${bad}`);
+  });
+
+  await t.check('feedlot chunk: pens + mill built, dense cattle packed and PENNED over sim time', async () => {
+    const lot = lots[0];
+    t.ok(lot, 'no feedlot site to drive to');
+    await t.tp(lot.x + 8, lot.z + 8); // parked-truck distance off the pens
+    await t.wait(0.8);
+    const res = await t.ev(`(() => {
+      let lotGroups = 0;
+      for (const gr of g.scenery.live.values())
+        for (const c of gr.children) if (c.userData.kind === 'feedlot') lotGroups++;
+      const cattle = [];
+      for (const { animals } of g.animals.live.values())
+        for (const a of animals) if (a.species === 'angus') cattle.push(a);
+      window.__pen = cattle;
+      return { lotGroups, cattle: cattle.length };
+    })()`);
+    t.ok(res.lotGroups > 0, 'no feedlot scenery group in live chunks at a feedlotAt site');
+    t.ok(res.cattle >= 8, `feedlot not dense: only ${res.cattle} cattle on feed`);
+    const drift = await t.sample(
+      `Math.max(...window.__pen.map((a) => Math.hypot(a.g.position.x - a.homeX, a.g.position.z - a.homeZ)))`,
+      8, 300);
+    t.ok(Math.max(...drift) < 3.4, `cattle escaped the pen leash: max drift ${Math.max(...drift).toFixed(1)}`);
+  });
+
+  // rural Parker county (cutting-horse capital) — census horses at natural values
+  const [parkX, parkZ] = LL(32.71, -97.98);
+  await t.setDay();
+  await t.tp(parkX, parkZ);
+  await t.wait(0.8);
+
+  const horse = await t.ev(`(() => {
+    for (const { animals } of g.animals.live.values())
+      for (const a of animals)
+        if (a.species === 'horse' && a.g.visible) { window.__horse = a; return { x: a.homeX, z: a.homeZ }; }
+    return null;
+  })()`);
+
+  await t.check('horse country: census-spawned horses live in rural Parker chunks (and no stray bison)', async () => {
+    t.ok(horse, 'no horses in 25 live chunks at 5 horses/km² — census rows not spawning');
+    const bison = await t.ev(`(() => {
+      let n = 0;
+      for (const { animals } of g.animals.live.values())
+        for (const a of animals) if (a.species === 'bison') n++;
+      return n;
+    })()`);
+    t.ok(bison === 0, `${bison} bison grazing 400 km from Caprock Canyons`);
+  });
+
+  if (horse) {
+    await t.check('scared horse RUNS AWAY (distance grows — charging-deer lesson)', async () => {
+      await t.tp(horse.x + 3, horse.z, 'WALK');
+      await t.ev(`g.animals.scare(${horse.x}, ${horse.z}, 30)`);
+      const d = await t.sample(
+        `Math.hypot(window.__horse.g.position.x - ${horse.x}, window.__horse.g.position.z - ${horse.z})`,
+        8, 300);
+      t.ok(d[7] > d[0] + 1.5, `horse didn't gain ground: ${d[0].toFixed(1)} → ${d[7].toFixed(1)}`);
+      await t.tp(parkX, parkZ, 'DRIVE');
+    });
+  }
+
+  await t.check('farm herds cluster at farmsteadAt sites (read, not respawned)', async () => {
+    const res = await t.ev(`(() => {
+      let farms = 0, herded = 0;
+      for (const key of g.animals.live.keys()) {
+        const [cx, cz] = key.split(',').map(Number);
+        const site = g.farmsteadAt(cx, cz);
+        if (!site) continue;
+        farms++;
+        const near = g.animals.live.get(key).animals.filter((a) =>
+          ['longhorn', 'horse', 'goat', 'sheep'].includes(a.species) &&
+          Math.hypot(a.homeX - site.x, a.homeZ - site.z) < 20);
+        if (near.length >= 1) herded++;
+      }
+      return { farms, herded };
+    })()`);
+    t.ok(res.farms > 0, 'no farmstead sites among 25 live Parker chunks — herd check has nothing to bite');
+    t.ok(res.herded > 0, `${res.farms} farm chunks live, none with livestock homed at the site`);
+  });
+
+  await t.check('bison graze at Caprock Canyons — and only there', async () => {
+    const site = await t.ev(`g.animals.bisonSite`);
+    await t.tp(site.x + 10, site.z);
+    await t.wait(0.8);
+    const n = await t.ev(`(() => {
+      let n = 0;
+      for (const { animals } of g.animals.live.values())
+        for (const a of animals)
+          if (a.species === 'bison' && Math.hypot(a.homeX - ${site.x}, a.homeZ - ${site.z}) < 15) n++;
+      return n;
+    })()`);
+    t.ok(n >= 4, `expected a bison herd at Caprock, got ${n}`);
+  });
+
   if (process.env.SHOT) { // aerial field/pivot composition read — judgment only, never pass/fail
     const y = await t.ev(`g.hAt(${haleX}, ${haleZ}) + 55`);
     await t.tp(haleX, haleZ, 'FLY', y);

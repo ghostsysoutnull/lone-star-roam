@@ -1227,12 +1227,21 @@ export default async function aviation(t) {
       g.player.pos.set(c.x + 5, 0, c.z + 5);
       g.radio.tunedField = null; g.radio.lastTx = null; g.radio.srcPh.clear();
       g.radio.chatterT = 0;
-      let tx = null;
-      for (let i = 0; i < 40 && !tx; i++) {
+      // spy on transmissions: an ambient scheduled ops/ATIS line can fire in
+      // the same span, overwriting lastTx AND bumping chatterT past this whole
+      // window (OPS_HOLD 6 > 4 s) — collect chatter lines instead of racing
+      // for the last one, and re-clear the budget gate each tick (the A2
+      // lastTx-race lesson; the 25 s min-gap behavior has its own check)
+      const seen = [];
+      const realTx = Object.getPrototypeOf(g.radio).tx;
+      g.radio.tx = function (...a) { if (a[2] === 'chatter') seen.push({ text: a[1], ...a[3] }); return realTx.apply(this, a); };
+      for (let i = 0; i < 40 && !seen.length; i++) {
+        g.radio.chatterT = Math.min(g.radio.chatterT, 0);
         g.heli.update(dt, g.player.pos.x, g.player.pos.z, g.sky.days);
         g.radio.update(dt, g.player, g.aviation, g.sky);
-        if (g.radio.lastTx?.kind === 'chatter') tx = g.radio.lastTx;
       }
+      delete g.radio.tx; // restore the real prototype method
+      const tx = seen.find((l) => l.src === 'coastguard') ?? null;
       const tuned = g.radio.tunedField;
       g.heli.despawnAll(); g.hud.subtitleQ.length = 0;
       return { err: null, tx, tuned };

@@ -417,6 +417,47 @@ export function farmsteadAt(cx, cz) {
   return null;
 }
 
+// A commercial feedlot for the Panhandle cattle-on-feed belt — same pure
+// seeded pattern as farmsteadAt, own stream. The onFeed-density gate (≥30
+// head/km²) admits exactly the top nine on-feed counties (Deaf Smith 89.9
+// down to Dallam 36.9; next is Wilson at 14.2). Returns pen world centers so
+// ScenerySystem (fences/bunks/mill) and animals.js (dense cattle) share one
+// layout without cross-module coupling.
+export function feedlotAt(cx, cz) {
+  const midX = cx * CHUNK + CHUNK / 2, midZ = cz * CHUNK + CHUNK / 2;
+  const ag = agAt(midX, midZ);
+  if (!ag || ag.onFeed / ag.areaKm2 < 30) return null;
+  const rand = seededRand(`feedlot${cx},${cz}`);
+  if (rand() >= Math.min(0.3, ag.onFeed / ag.areaKm2 / 300)) return null;
+  for (let i = 0; i < 4; i++) {
+    const sx = cx * CHUNK + rand() * CHUNK, sz = cz * CHUNK + rand() * CHUNK;
+    const nPens = 3 + ((rand() * 3) | 0); // drawn every try — failures can't shift the stream
+    const road = nearestRoad(sx, sz, 25);
+    if (!road || road.dist < 0.5) continue;
+    const away = 12 + rand() * 4; // pens sprawl, so a deeper setback than a farmstead
+    const x = road.x + ((sx - road.x) / road.dist) * away;
+    const z = road.z + ((sz - road.z) / road.dist) * away;
+    if (!inTexas(x, z) || !airportClear(x, z) || brandNear(x, z, 30)) continue;
+    const near = nearestRoad(x, z, 6);
+    if (near && near.dist < 5) continue;
+    const { city, dist } = nearestCity(x, z);
+    if (city && dist < cityRadius(city.pop) + 20) continue;
+    const ch = chapelAt(cx, cz);
+    if (ch && Math.hypot(ch.x - x, ch.z - z) < 20) continue;
+    const farm = farmsteadAt(cx, cz); // don't crowd the chunk's farmstead either
+    if (farm && Math.hypot(farm.x - x, farm.z - z) < 25) continue;
+    const rot = Math.atan2(-(road.x - x), -(road.z - z)); // -z faces the road
+    const cr = Math.cos(rot), sr = Math.sin(rot);
+    const pens = [];
+    for (let p = 0; p < nPens; p++) { // one row of pens along local +x
+      const lx = (p - (nPens - 1) / 2) * 5.6, lz = 2.5;
+      pens.push({ x: x + lx * cr + lz * sr, z: z - lx * sr + lz * cr });
+    }
+    return { x, z, rot, pens, key: `${cx},${cz}` };
+  }
+  return null;
+}
+
 class ScenerySystem {
   constructor(scene) {
     this.scene = scene;
@@ -597,6 +638,29 @@ class ScenerySystem {
           group.userData.animated.push(peck);
         }
         group.add(fg);
+      }
+
+      // on-feed belt: the chunk's feedlot (site + pen centers from feedlotAt;
+      // animals.js packs the same pens with cattle)
+      const lot = feedlotAt(cx, cz);
+      if (lot) {
+        const lr = seededRand('feedprops' + key);
+        const lg = new THREE.Group();
+        lg.userData.kind = 'feedlot';
+        for (const p of lot.pens) {
+          const pen = mkFeedPen(lr);
+          pen.position.set(p.x, hAt(p.x, p.z), p.z);
+          pen.rotation.y = lot.rot;
+          lg.add(pen);
+        }
+        const cr = Math.cos(lot.rot), sr = Math.sin(lot.rot);
+        const millLx = -(lot.pens.length - 1) / 2 * 5.6 - 4.4; // off the row's west end
+        const mx = lot.x + millLx * cr + 3.6 * sr, mz = lot.z - millLx * sr + 3.6 * cr;
+        const mill = mkFeedMill();
+        mill.position.set(mx, hAt(mx, mz), mz);
+        mill.rotation.y = lot.rot + (lr() - 0.5) * 0.3;
+        lg.add(mill);
+        group.add(lg);
       }
     }
     this.scene.add(group);
@@ -912,6 +976,54 @@ function mkCorral(rand) {
       rail.position.set(x, y, z);
       g.add(rail);
     }
+  return g;
+}
+
+// A feedlot pen: a corral-sized steel-pipe square with a feed bunk (long low
+// trough) along the road-facing rail — the cattle side of the layout that
+// feedlotAt hands to both scenery and animals.js.
+function mkFeedPen(rand) {
+  const g = new THREE.Group();
+  const pipe = lamb(0x8a8f94);
+  const W = 5;
+  const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.08, 0.48, 0.08), pipe, 16);
+  const m4 = new THREE.Matrix4();
+  let n = 0;
+  for (let s = 0; s < 4; s++)
+    for (let i = 0; i < 4; i++) {
+      const f = i / 4 - 0.5;
+      const [x, z] = s === 0 ? [f * W, -W / 2] : s === 1 ? [W / 2, f * W] : s === 2 ? [-f * W, W / 2] : [-W / 2, -f * W];
+      m4.makeRotationY((rand() - 0.5) * 0.1).setPosition(x, 0.24, z);
+      posts.setMatrixAt(n++, m4);
+    }
+  g.add(posts);
+  for (const y of [0.2, 0.4])
+    for (const [w, d, x, z] of [[W, 0.05, 0, -W / 2], [W, 0.05, 0, W / 2], [0.05, W, -W / 2, 0], [0.05, W, W / 2, 0]]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(w, 0.045, d), pipe);
+      rail.position.set(x, y, z);
+      g.add(rail);
+    }
+  const bunk = new THREE.Mesh(new THREE.BoxGeometry(W * 0.9, 0.16, 0.4), lamb(0xb8b4a8));
+  bunk.position.set(0, 0.1, -W / 2 + 0.35);
+  g.add(bunk);
+  return g;
+}
+
+// The feed mill that anchors a lot: a tight silo trio + boxy elevator tower.
+function mkFeedMill() {
+  const g = new THREE.Group();
+  const steel = lamb(0xc4c8cc);
+  for (let i = 0; i < 3; i++) {
+    const s = mkSilo();
+    s.scale.setScalar(1.4);
+    s.position.set(i * 1.3 - 1.3, 0, 0);
+    g.add(s);
+  }
+  const tower = new THREE.Mesh(new THREE.BoxGeometry(0.7, 4.6, 0.7), steel);
+  tower.position.set(2.2, 2.3, 0.2);
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1, 0.6, 0.8), lamb(0x9aa0a6));
+  head.position.set(2.2, 4.8, 0.2);
+  g.add(tower, head);
   return g;
 }
 

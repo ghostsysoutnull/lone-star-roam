@@ -4,7 +4,8 @@
 // night and howl. First close encounter with each species goes into the
 // critter log with a fact. Region boxes mirror world.js scenery — keep in sync.
 import * as THREE from 'three';
-import { seededRand, inTexas, nearestRoad, hAt, waterAt } from './geo.js';
+import { seededRand, inTexas, nearestRoad, hAt, waterAt, agAt } from './geo.js';
+import { farmsteadAt, feedlotAt } from './world.js';
 import { ATMOS } from './sky.js';
 
 const CHUNK = 260, VIEW_CHUNKS = 2; // tighter ring than scenery — animals are simulated
@@ -41,6 +42,16 @@ export const SPECIES = {
     fact: 'The rattle is a courtesy. Heed it.' },
   pelican: { name: 'Brown Pelican', speed: 8, fleeR: 0, behavior: 'circle', bob: false, nightMax: 0.6, orbitR: 18, orbitH: 7, orbitSpd: 0.35,
     fact: 'Plunge-dives with a stretchy pouch beak.' },
+  horse: { name: 'Quarter Horse', speed: 16, fleeR: 12, behavior: 'graze', bob: false,
+    fact: 'More horses than any other state — bred to turn on a dime around cattle.' },
+  goat: { name: 'Angora Goat', speed: 7, fleeR: 8, behavior: 'graze', bob: false,
+    fact: 'Edwards Plateau goats made Texas the mohair capital of America.' },
+  sheep: { name: 'Rambouillet Sheep', speed: 6, fleeR: 8, behavior: 'graze', bob: false,
+    fact: 'Top sheep state since the 1880s — wool built San Angelo.' },
+  bison: { name: 'Bison', speed: 6, fleeR: 0, behavior: 'graze', bob: false,
+    fact: 'The State Bison Herd, saved by Charles Goodnight in 1878, roams Caprock Canyons.' },
+  angus: { name: 'Black Angus', speed: 3, fleeR: 0, behavior: 'graze', bob: false, leash: 2.2,
+    fact: 'More cattle feed in the Panhandle than people live in it — Hereford is the Beef Capital of the World.' },
   bat: { name: 'Mexican Free-tailed Bat', event: true,
     fact: 'Austin hosts the largest urban bat colony on Earth.' },
 };
@@ -64,6 +75,26 @@ function regionTable(x, z) {
   return [['deer', 2, 4, 1, 0.55], ['longhorn', 3, 7, 1, 0.55], ['armadillo', 1, 2, 1, 0.5], ['coyote', 1, 1, 1, 0.4]];
 }
 
+// census-scaled livestock rows layered onto the wild regionTable — odds come
+// straight from county head-per-km² (agAt), so horses run statewide and
+// goats/sheep light up the Edwards Plateau with no hand-tuned boxes.
+// Calibration (2022 census): horse density median 0.29/km², 90th pct 1.0;
+// goat+sheep 75th pct ≈ 2/km² (Sutton 14, Mills 23, Dallam 0).
+function censusTable(x, z) {
+  const ag = agAt(x, z);
+  if (!ag) return [];
+  const rows = [];
+  const horses = ag.horses / ag.areaKm2, goats = ag.goats / ag.areaKm2, sheep = ag.sheep / ag.areaKm2;
+  if (horses > 0.05) rows.push(['horse', 2, 4, 1, Math.min(0.5, horses * 0.55)]);
+  if (goats > 2) rows.push(['goat', 3, 7, 1, Math.min(0.55, goats / 8)]);
+  if (sheep > 2) rows.push(['sheep', 4, 8, 1, Math.min(0.55, sheep / 8)]);
+  return rows;
+}
+
+// the Texas State Bison Herd — one curated site, Caprock Canyons SP
+// (34.41 N −101.06 W through the gameplay LL projection)
+const BISON_SITE = { x: -1488.5, z: -3796, cx: -6, cz: -15 };
+
 export class AnimalSystem {
   constructor(scene, onSpotted) {
     this.scene = scene;
@@ -73,6 +104,8 @@ export class AnimalSystem {
     this.live = new Map(); // chunk key -> { group, animals: [] }
     this.t = 0;
     this.regionTable = regionTable; // exposed for verify — reads spawn odds without resampling chunks
+    this.censusTable = censusTable; // ditto for the census-scaled livestock rows
+    this.bisonSite = BISON_SITE;
   }
 
   update(dt, px, pz, py = 0) {
@@ -223,8 +256,8 @@ export class AnimalSystem {
     const nz = a.g.position.z - Math.cos(a.heading) * speed * dt;
     // stay in Texas, off roads, and near home (leash)
     if (!inTexas(nx, nz)) { a.heading += Math.PI; return; }
-    if (Math.hypot(nx - a.homeX, nz - a.homeZ) > 45) { a.heading += Math.PI / 2; return; }
     const spec = SPECIES[a.species];
+    if (Math.hypot(nx - a.homeX, nz - a.homeZ) > (spec.leash ?? 45)) { a.heading += Math.PI / 2; return; } // feedlot cattle stay penned
     if (!spec.roadSprint) { // roadrunners own the road
       const road = nearestRoad(nx, nz, 3);
       if (road && a.state !== 'flee') { a.heading += Math.PI / 2; return; } // fleeing animals may cross roads
@@ -239,7 +272,10 @@ export class AnimalSystem {
     const group = new THREE.Group();
     const animals = [];
     const baseX = cx * CHUNK, baseZ = cz * CHUNK;
-    for (const [species, lo, hi, groups, keep] of regionTable(baseX + CHUNK / 2, baseZ + CHUNK / 2)) {
+    const midX = baseX + CHUNK / 2, midZ = baseZ + CHUNK / 2;
+    // census rows draw AFTER the regional rows — existing wild placements
+    // keep their exact pre-wave-3 seed draws
+    for (const [species, lo, hi, groups, keep] of [...regionTable(midX, midZ), ...censusTable(midX, midZ)]) {
       for (let gI = 0; gI < groups; gI++) {
         if (rand() > keep) continue; // not every chunk has every species
         let hx = baseX + rand() * CHUNK, hz = baseZ + rand() * CHUNK;
@@ -266,6 +302,58 @@ export class AnimalSystem {
         }
       }
     }
+
+    // worked livestock clusters — read the same pure site functions scenery
+    // dresses (farmsteadAt/feedlotAt), never respawn or re-derive them
+    const home = (rand, species, hx, hz, n, spread = 6) => {
+      for (let i = 0; i < n; i++) {
+        const { g, legs } = mkAnimal(species, rand);
+        const ax = hx + (rand() - 0.5) * spread, az = hz + (rand() - 0.5) * spread;
+        g.position.set(ax, hAt(ax, az), az);
+        g.rotation.y = rand() * Math.PI * 2;
+        group.add(g);
+        animals.push({
+          g, legs, species, homeX: hx, homeZ: hz,
+          state: 'idle', stateT: rand() * 3, ambling: false, zigT: 0,
+          heading: rand() * Math.PI * 2, phase: rand() * Math.PI * 2,
+        });
+      }
+    };
+
+    const farm = farmsteadAt(cx, cz);
+    if (farm) {
+      const fr = seededRand('farmherd' + key);
+      const ag = agAt(farm.x, farm.z);
+      // main herd species rolled from the county's own inventory mix; horse
+      // counts are working-animal counts (tiny next to cattle inventories),
+      // so they're weighted up to read as the horse country they are
+      const mix = [['longhorn', ag.cattle], ['horse', ag.horses * 30], ['goat', ag.goats * 3], ['sheep', ag.sheep * 3]];
+      const total = mix.reduce((s, [, w]) => s + w, 0);
+      let roll = fr() * total, species = 'longhorn';
+      for (const [sp, w] of mix) { roll -= w; if (roll <= 0) { species = sp; break; } }
+      const size = species === 'horse' ? 2 + ((fr() * 3) | 0) : species === 'longhorn' ? 4 + ((fr() * 4) | 0) : 5 + ((fr() * 5) | 0);
+      for (let tries = 0; tries < 4; tries++) { // pasture off the buildings, off the road
+        const ang = fr() * Math.PI * 2, d = 12 + fr() * 6;
+        const hx = farm.x + Math.cos(ang) * d, hz = farm.z + Math.sin(ang) * d;
+        if (!inTexas(hx, hz) || nearestRoad(hx, hz, 6)) continue;
+        home(fr, species, hx, hz, size);
+        break;
+      }
+      // and a horse or two by the corral — farms read as horse places
+      const cr = Math.cos(farm.rot), sr = Math.sin(farm.rot);
+      const px = farm.x - 3.6 * cr + 10.5 * sr, pz = farm.z + 3.6 * sr + 10.5 * cr;
+      if (inTexas(px, pz) && !nearestRoad(px, pz, 6)) home(fr, 'horse', px, pz, 1 + ((fr() * 2) | 0), 3);
+    }
+
+    const lot = feedlotAt(cx, cz);
+    if (lot) {
+      const lr = seededRand('feedcattle' + key);
+      for (const p of lot.pens) home(lr, 'angus', p.x, p.z, 4 + ((lr() * 3) | 0), 3); // leash 2.2 keeps them penned
+    }
+
+    if (cx === BISON_SITE.cx && cz === BISON_SITE.cz)
+      home(seededRand('bisonherd'), 'bison', BISON_SITE.x, BISON_SITE.z, 6, 12);
+
     this.scene.add(group);
     this.live.set(key, { group, animals });
   }
@@ -436,6 +524,60 @@ function mkAnimal(species, rand) {
       box(g, 0.3, 0.03, 0.34, 1.32, 0.13, 0, mat(0x2a2622));
       box(g, 0.14, 0.14, 0.18, 0, 0.08, -0.36, white);        // head
       box(g, 0.06, 0.05, 0.34, 0, 0.02, -0.58, mat(0xd8a04a)); // the famous beak
+      break;
+    }
+    case 'horse': {
+      const coat = mat([0x6a4226, 0x4a3220, 0x2e2824, 0xb08a5a][(rand() * 4) | 0]); // chestnut/bay/black/palomino
+      box(g, 0.45, 0.5, 1.25, 0, 0.95, 0, coat);              // body
+      const neck = box(g, 0.2, 0.55, 0.28, 0, 1.35, -0.55, coat);
+      neck.rotation.x = 0.35;
+      box(g, 0.2, 0.22, 0.48, 0, 1.6, -0.72, coat);           // head
+      const dark = mat(0x2a221c);
+      box(g, 0.08, 0.45, 0.12, 0, 1.42, -0.44, dark);         // mane
+      const tail = box(g, 0.1, 0.5, 0.1, 0, 0.85, 0.66, dark);
+      tail.rotation.x = 0.25;
+      quadLegs([[-0.16, -0.45], [0.16, -0.45], [-0.16, 0.45], [0.16, 0.45]], 0.09, 0.7, coat);
+      break;
+    }
+    case 'goat': {
+      const mohair = mat(0xe4ddcc);
+      box(g, 0.3, 0.34, 0.62, 0, 0.48, 0, mohair);
+      box(g, 0.16, 0.2, 0.26, 0, 0.72, -0.36, mohair);        // head
+      const horn = mat(0x9a8a70);
+      const h1 = box(g, 0.05, 0.05, 0.2, -0.07, 0.84, -0.28, horn);
+      const h2 = box(g, 0.05, 0.05, 0.2, 0.07, 0.84, -0.28, horn);
+      h1.rotation.x = h2.rotation.x = -0.9;                   // swept back
+      box(g, 0.06, 0.12, 0.06, 0, 0.58, -0.44, mohair);       // beard
+      quadLegs([[-0.1, -0.2], [0.1, -0.2], [-0.1, 0.2], [0.1, 0.2]], 0.07, 0.3, mohair);
+      break;
+    }
+    case 'sheep': {
+      const wool = mat(0xece6d8);
+      const face = mat(0x5a5048);
+      box(g, 0.4, 0.4, 0.72, 0, 0.52, 0, wool);
+      box(g, 0.16, 0.18, 0.24, 0, 0.66, -0.44, face);
+      quadLegs([[-0.12, -0.24], [0.12, -0.24], [-0.12, 0.24], [0.12, 0.24]], 0.07, 0.3, face);
+      break;
+    }
+    case 'bison': {
+      const shag = mat(0x4a3626);
+      const dark = mat(0x352820);
+      box(g, 0.85, 0.75, 1.05, 0, 0.95, -0.25, shag);         // massive front + hump
+      box(g, 0.6, 0.55, 0.8, 0, 0.8, 0.55, dark);             // lower hindquarters
+      box(g, 0.4, 0.42, 0.45, 0, 0.72, -0.85, shag);          // low-slung head
+      box(g, 0.34, 0.2, 0.2, 0, 0.5, -0.9, dark);             // beard
+      const horn = mat(0xd8cbb0);
+      box(g, 0.24, 0.06, 0.06, -0.26, 0.95, -0.82, horn);
+      box(g, 0.24, 0.06, 0.06, 0.26, 0.95, -0.82, horn);
+      quadLegs([[-0.24, -0.5], [0.24, -0.5], [-0.22, 0.6], [0.22, 0.6]], 0.12, 0.55, dark);
+      break;
+    }
+    case 'angus': {
+      const hide = mat(rand() < 0.85 ? 0x1e1a18 : 0x2e2420);  // feedlot black, no horns
+      box(g, 0.7, 0.6, 1.35, 0, 0.78, 0, hide);
+      box(g, 0.3, 0.3, 0.42, 0, 1.0, -0.85, hide);
+      if (rand() < 0.25) box(g, 0.26, 0.18, 0.16, 0, 1.02, -1.02, mat(0xe8e0d4)); // the odd baldy face
+      quadLegs([[-0.24, -0.5], [0.24, -0.5], [-0.24, 0.5], [0.24, 0.5]], 0.12, 0.5, hide);
       break;
     }
   }
