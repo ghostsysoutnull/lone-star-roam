@@ -49,6 +49,12 @@ export const LANDMARKS = [
   { name: 'Presidio La Bahía', at: LL(28.6470, -97.3844), kind: 'presidio', fact: 'Spanish fort at Goliad, 1749. After the massacre of Fannin’s men here in 1836, many say the garrison never mustered out.' },
   { name: 'B-1 Gate Guardian, Dyess AFB', at: LL(32.4207, -99.8547), kind: 'b1', fact: 'Dyess is a B-1B Lancer base — the swing-wing bomber has called Abilene home since 1985.' },
   { name: 'Randolph AFB Taj Mahal', at: LL(29.5292, -98.2783), kind: 'randolph', fact: 'Pilots have trained under this Spanish Colonial tower since 1931 — its water tower still doubles as base ops.' },
+  // named-ranch gate arches (AGRICULTURE_SPEC wave 4) — animals.js RANCH_ARCHES
+  // boosts herd odds around these coords; keep the two files in sync
+  { name: 'King Ranch', at: LL(27.5236, -97.8880), kind: 'rancharch', fact: '825,000 acres — bigger than Rhode Island. Birthplace of American ranching and the Santa Gertrudis, the first cattle breed developed in the USA.' },
+  { name: 'Four Sixes Ranch', at: LL(33.6206, -100.3186), kind: 'rancharch', fact: 'The 6666 has run cattle and champion quarter horses out of Guthrie since 1870 — legend says Burnett won it with four sixes in a poker hand.' },
+  { name: 'Waggoner Ranch', at: LL(33.9300, -99.2800), kind: 'rancharch', fact: 'The largest US ranch inside one fence — about 510,000 acres. Drilling for water in 1902, the Waggoners hit oil instead.' },
+  { name: 'Y.O. Ranch', at: LL(30.0790, -99.6250), kind: 'rancharch', fact: 'Schreiner cattle country since 1880 — and the pioneer of Texas exotics: axis deer and blackbuck have roamed these Hill Country pastures since the 1950s.' },
 ];
 export const LANDMARK_COUNT = LANDMARKS.length;
 
@@ -226,7 +232,7 @@ export class Gameplay {
   mkLandmarks() {
     const group = new THREE.Group();
     for (const lm of LANDMARKS) {
-      const g = mkLandmarkMesh(lm.kind);
+      const g = mkLandmarkMesh(lm.kind, lm.name);
       g.position.set(lm.at[0], hAt(lm.at[0], lm.at[1]), lm.at[1]);
       // beacon: tall thin light column, dimmed if collected
       const done = this.save.landmarks.includes(lm.name);
@@ -391,7 +397,7 @@ function mkHaloTexture() {
   return new THREE.CanvasTexture(c);
 }
 
-function mkLandmarkMesh(kind) {
+function mkLandmarkMesh(kind, name) {
   const g = new THREE.Group();
   const stone = new THREE.MeshLambertMaterial({ color: 0xd8cbb0, flatShading: true });
   const add = (mesh) => (g.add(mesh), mesh);
@@ -760,6 +766,51 @@ function mkLandmarkMesh(kind) {
         const cairn = add(new THREE.Mesh(new THREE.IcosahedronGeometry(0.3, 0), new THREE.MeshLambertMaterial({ color: 0x8a8378, flatShading: true })));
         cairn.position.set(x, 0.15, z);
         cairn.scale.y = 0.6;
+      }
+      break;
+    }
+    case 'rancharch': {
+      // classic ranch entrance: stone gate posts, wrought-iron arc carrying the
+      // ranch sign, a cattle guard, and fence wings. King Ranch alone reads as
+      // a region, not a point — longer wings plus windmill + stock tank.
+      const king = name === 'King Ranch';
+      const post = new THREE.MeshLambertMaterial({ color: 0xb8a488, flatShading: true });
+      const iron = new THREE.MeshLambertMaterial({ color: 0x2c2824, flatShading: true });
+      const wood = new THREE.MeshLambertMaterial({ color: 0x6a5238, flatShading: true });
+      box(0.7, 3.0, 0.7, -2.6, 1.5, 0, post);
+      box(0.7, 3.0, 0.7, 2.6, 1.5, 0, post);
+      box(0.9, 0.25, 0.9, -2.6, 3.1, 0, post);              // post caps
+      box(0.9, 0.25, 0.9, 2.6, 3.1, 0, post);
+      const span = add(new THREE.Mesh(new THREE.TorusGeometry(2.6, 0.09, 6, 20, Math.PI), iron));
+      span.position.y = 3.1;                                 // the arc itself
+      // ranch sign: name canvas on both faces of a plate hung from the arc
+      const c = document.createElement('canvas');
+      c.width = 256; c.height = 48;
+      const cx = c.getContext('2d');
+      cx.fillStyle = '#241f18'; cx.fillRect(0, 0, 256, 48);
+      cx.fillStyle = '#e8d8a8'; cx.font = 'bold 30px Georgia';
+      cx.textAlign = 'center'; cx.textBaseline = 'middle';
+      const SIGNS = { 'King Ranch': 'KING RANCH', 'Four Sixes Ranch': '6 6 6 6', 'Waggoner Ranch': 'WAGGONER', 'Y.O. Ranch': 'Y · O' };
+      cx.fillText(SIGNS[name] ?? String(name).toUpperCase(), 128, 26);
+      const plateM = new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(c) });
+      add(new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.82, 0.08), [iron, iron, iron, iron, plateM, plateM])).position.y = 3.5;
+      for (let i = 0; i < 6; i++)                            // cattle guard between the posts
+        box(4.4, 0.05, 0.16, 0, 0.03, -0.75 + i * 0.3, iron);
+      const wing = king ? 13 : 6;                            // fence wings, both sides
+      for (const s of [-1, 1]) {
+        for (let x = 3.6; x <= 3.6 + wing; x += 1.6) box(0.14, 1.0, 0.14, s * x, 0.5, 0, wood);
+        box(wing + 0.8, 0.07, 0.08, s * (3.6 + wing / 2), 0.82, 0, wood);
+        box(wing + 0.8, 0.07, 0.08, s * (3.6 + wing / 2), 0.45, 0, wood);
+      }
+      if (king) {
+        const steel = new THREE.MeshLambertMaterial({ color: 0x9aa0a4, flatShading: true });
+        const mill = add(new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.12, 4.2, 6), steel));
+        mill.position.set(8.5, 2.1, -4);
+        const fan = add(new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.07, 12).rotateX(Math.PI / 2), steel));
+        fan.position.set(8.5, 4.2, -4.15);
+        box(0.7, 0.4, 0.06, 8.5, 4.0, -3.3, steel);          // tail vane
+        const tank = add(new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.5, 14), steel));
+        tank.position.set(10.6, 0.25, -3.4);                 // stock tank
       }
       break;
     }

@@ -291,11 +291,134 @@ export default async function ag(t) {
     t.ok(n >= 4, `expected a bison herd at Caprock, got ${n}`);
   });
 
+  // ---- wave 4: named-ranch gate arches + herd boost + ag NPCs ----
+
+  await t.check('ranch arches: four rancharch landmarks, right counties, grounded at hAt', async () => {
+    const r = await t.ev(`g.gameplay.landmarkGroup.children
+      .filter((c) => c.userData.lm?.kind === 'rancharch')
+      .map((c) => ({ name: c.userData.lm.name, x: c.position.x, z: c.position.z,
+        dy: Math.abs(c.position.y - g.hAt(c.position.x, c.position.z)),
+        county: g.countyAt(c.position.x, c.position.z) }))`);
+    t.ok(r.length === 4, `expected 4 rancharch landmarks, got ${r.length}`);
+    const want = { 'King Ranch': 'Kleberg', 'Four Sixes Ranch': 'King', 'Waggoner Ranch': 'Wilbarger', 'Y.O. Ranch': 'Kerr' };
+    for (const a of r) {
+      t.ok(a.dy < 0.01, `${a.name} floats ${a.dy.toFixed(3)} off hAt`);
+      t.ok(a.county === want[a.name], `${a.name} sits in ${a.county} county, wanted ${want[a.name]}`);
+    }
+  });
+
+  const wagg = await t.ev(`(() => {
+    const c = g.gameplay.landmarkGroup.children.find((c) => c.userData.lm?.name === 'Waggoner Ranch');
+    return { x: c.position.x, z: c.position.z };
+  })()`);
+
+  await t.check('arch collect: parked-truck distance on an ugly off-axis heading (Waggoner)', async () => {
+    await t.tp(wagg.x + 9.3, wagg.z - 11.1, 'DRIVE'); // ~14.6 units out, off both axes
+    await t.ev(`g.player.heading = 2.13`);
+    await t.wait(0.6);
+    const got = await t.ev(`g.gameplay.save.landmarks.includes('Waggoner Ranch')`);
+    t.ok(got, 'Waggoner arch did not collect at parked-truck distance');
+  });
+
+  await t.check('arch plaque: E reads the historical marker on DOM, E again closes (Waggoner — no NPC shadow)', async () => {
+    await t.tp(wagg.x + 9.3, wagg.z - 11.1, 'WALK');
+    await t.wait(0.3);
+    const hint = await t.ev('g.hud.els.interact.textContent');
+    t.ok(hint === 'E — read the historical marker', `expected the marker hint, got "${hint}"`);
+    await t.key('KeyE');
+    const dlg = await t.ev(`({
+      name: g.hud.els.dialog.querySelector('.npc-name').textContent,
+      text: g.hud.els.dialog.querySelector('.npc-text').textContent,
+      shown: g.hud.els.dialog.style.display,
+    })`);
+    t.ok(dlg.name.includes('Waggoner Ranch'), `plaque name wrong: "${dlg.name}"`);
+    t.ok(dlg.text.includes('510,000') && dlg.text.includes('oil'), `plaque fact wrong: "${dlg.text}"`);
+    t.ok(dlg.shown === 'block', 'plaque dialog not shown after E');
+    await t.key('KeyE');
+    const closed = await t.ev('g.hud.els.dialog.style.display');
+    t.ok(closed === 'none', 'second E did not close the plaque');
+    await t.tp(wagg.x + 9.3, wagg.z - 11.1, 'DRIVE');
+  });
+
+  await t.check('herd boost: censusTable adds each arch’s rows at the gate, none at a control point', async () => {
+    const r = await t.ev(`g.animals.ranchArches.map((a) => {
+      const key = (row) => row.join('|');
+      const at = new Set(g.animals.censusTable(a.x, a.z).map(key));
+      const ctrl = new Set(g.animals.censusTable(a.x - a.r - 200, a.z).map(key)); // west: inland at every arch
+      return a.rows.map((row) => ({ row: key(row), boosted: at.has(key(row)), leaked: ctrl.has(key(row)) }));
+    }).flat()`);
+    for (const { row, boosted, leaked } of r) {
+      t.ok(boosted, `arch row missing at the gate: ${row}`);
+      t.ok(!leaked, `arch row leaked to the control point: ${row}`);
+    }
+  });
+
+  await t.check('King arch: boosted herds actually spawn thick at the gate (seeded draw)', async () => {
+    const a = await t.ev(`g.animals.ranchArches[0]`);
+    await t.tp(a.x, a.z, 'DRIVE');
+    await t.wait(0.8);
+    const n = await t.ev(`(() => {
+      let n = 0;
+      for (const key of g.animals.live.keys()) {
+        const [cx, cz] = key.split(',').map(Number);
+        if ((cx * 260 + 130 - ${a.x}) ** 2 + (cz * 260 + 130 - ${a.z}) ** 2 >= ${a.r * a.r}) continue;
+        for (const an of g.animals.live.get(key).animals)
+          if (an.species === 'longhorn' || an.species === 'horse') n++;
+      }
+      return n;
+    })()`);
+    t.ok(n >= 8, `King gate country too thin: ${n} longhorn/horse homed in boosted chunks`);
+  });
+
+  await t.check('ag NPCs: five rural characters placed, flagged ag, with age/profession', async () => {
+    const r = await t.ev(`g.npcs.named.filter((n) => n.ag)
+      .map((n) => ({ name: n.name, y: n.g.position.y, lines: n.lines.length, age: n.age, prof: n.profession }))`);
+    t.ok(r.length === 5, `expected 5 ag NPCs, got ${r.length}: ${r.map((n) => n.name).join(',')}`);
+    for (const n of r) {
+      t.ok(Number.isFinite(n.y), `${n.name} has a bad ground height`);
+      t.ok(n.lines >= 6, `${n.name} has only ${n.lines} rotating lines (want ≥6)`);
+      t.ok(Number.isInteger(n.age) && n.prof, `${n.name} missing age/profession subtitle data`);
+    }
+  });
+
+  await t.check('ag NPC rain register: Cy’s opener comes from AG_OPENERS.rain and lands on DOM (parked-truck distance)', async () => {
+    await t.setDay();
+    await t.setWeather('rain');
+    const r = await t.ev(`(async () => {
+      const { POOLS: P } = await import('/src/npcs.js');
+      const n = g.npcs.named.find((x) => x.name === 'Cy');
+      g.player.setMode('WALK');
+      g.player.pos.set(n.g.position.x + 2.5, 0, n.g.position.z);
+      g.npcs.activeNPC = null;
+      if (g.npcs.npcNear(g.player.pos) !== n) return { err: 'Cy not the nearest NPC at 2.5 units' };
+      g.npcs.interact(g.player.pos);
+      const dom = g.hud.els.dialog.querySelector('.npc-text').textContent;
+      const sub = g.hud.els.dialog.querySelector('.npc-sub').textContent;
+      const opener = g.npcs.convo[0];
+      const inPool = P.AG_OPENERS.rain.includes(opener), domMatch = dom === opener;
+      const willie = g.npcs.named.find((x) => x.name === 'Willie');
+      g.npcs.activeNPC = null;
+      g.hud.dialog(null);
+      return { inPool, domMatch, opener, dom, sub, willieAg: !!willie.ag };
+    })()`);
+    t.ok(!r.err, r.err ?? 'Cy reachable');
+    t.ok(r.inPool, `opener not from AG_OPENERS.rain: "${r.opener}"`);
+    t.ok(r.domMatch, `DOM text is not the opener: "${r.dom}"`);
+    t.ok(r.sub.includes('King Ranch hand'), `subtitle missing profession: "${r.sub}"`);
+    t.ok(!r.willieAg, 'Willie got flagged ag — city characters must keep the generic openers');
+    await t.setWeather('clear');
+  });
+
   if (process.env.SHOT) { // aerial field/pivot composition read — judgment only, never pass/fail
     const y = await t.ev(`g.hAt(${haleX}, ${haleZ}) + 55`);
     await t.tp(haleX, haleZ, 'FLY', y);
     await t.wait(0.8);
     await t.shot('ag-fields-aerial');
+    const king = await t.ev(`g.animals.ranchArches[0]`);
+    await t.tp(king.x, king.z + 14, 'WALK'); // arch silhouette from the drive-up (wave-4 budgeted shot)
+    await t.ev(`g.player.heading = 0`);
+    await t.wait(0.5);
+    await t.shot('ag-king-arch');
   }
 
   await t.tp(haleX, haleZ, 'DRIVE'); // leave the suite grounded in DRIVE (ambient-mode convention)

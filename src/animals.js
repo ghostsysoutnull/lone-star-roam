@@ -88,8 +88,23 @@ function censusTable(x, z) {
   if (horses > 0.05) rows.push(['horse', 2, 4, 1, Math.min(0.5, horses * 0.55)]);
   if (goats > 2) rows.push(['goat', 3, 7, 1, Math.min(0.55, goats / 8)]);
   if (sheep > 2) rows.push(['sheep', 4, 8, 1, Math.min(0.55, sheep / 8)]);
+  for (const a of RANCH_ARCHES)
+    if ((x - a.x) ** 2 + (z - a.z) ** 2 < a.r * a.r) rows.push(...a.rows);
   return rows;
 }
+
+// named-ranch gate arches (gameplay.js LANDMARKS, kind 'rancharch') boost herd
+// odds nearby — coords are the same LL projections, keep the two files in
+// sync. censusTable is sampled at CHUNK midpoints (260-unit grid), so radii
+// are in chunk-mid space: 200 always reaches the nearest midpoint (max gap
+// √2·130 ≈ 184); King's real footprint is a region, not a point, so it gets
+// a wider ring. Rows ride censusTable so regionTable stays byte-identical.
+const RANCH_ARCHES = [
+  { x: 1538.2, z: 3870.1, r: 300, rows: [['longhorn', 4, 8, 1, 0.7], ['horse', 2, 5, 1, 0.5]] },                        // King Ranch (27.5236 −97.8880)
+  { x: -781.1, z: -2917.3, r: 200, rows: [['horse', 3, 6, 1, 0.7], ['angus', 3, 6, 1, 0.45]] },                         // Four Sixes (33.6206 −100.3186)
+  { x: 209.9, z: -3261.7, r: 200, rows: [['angus', 4, 8, 1, 0.6], ['horse', 2, 4, 1, 0.5]] },                           // Waggoner (33.9300 −99.2800)
+  { x: -119.3, z: 1025.3, r: 200, rows: [['goat', 4, 8, 1, 0.6], ['sheep', 4, 8, 1, 0.5], ['deer', 2, 4, 1, 0.5]] },    // Y.O. (30.0790 −99.6250)
+];
 
 // the Texas State Bison Herd — one curated site, Caprock Canyons SP
 // (34.41 N −101.06 W through the gameplay LL projection)
@@ -106,6 +121,7 @@ export class AnimalSystem {
     this.regionTable = regionTable; // exposed for verify — reads spawn odds without resampling chunks
     this.censusTable = censusTable; // ditto for the census-scaled livestock rows
     this.bisonSite = BISON_SITE;
+    this.ranchArches = RANCH_ARCHES; // ditto for the wave-4 arch herd boost
   }
 
   update(dt, px, pz, py = 0) {

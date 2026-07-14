@@ -72,6 +72,29 @@ const NAMED = [
     ['This island was the biggest city in Texas once, before the 1900 storm.', 'The Gulf gives and the Gulf takes, friend.', 'Steady as she goes, landlubber.',
       'The seawall’s ten miles long, and I’ve walked every foot of it cursing the wind.', 'Jean Lafitte buried treasure here, they say. Sixty years I’ve said keep digging.', 'The pier lights come on at dusk — prettiest thing this side of a green flash.', 'A ship in port is safe, but that ain’t what ships are for.'],
     'The 1900 Galveston hurricane is still the deadliest US natural disaster.', 63, 'charter boat captain'],
+  // ag characters (AGRICULTURE_SPEC wave 4): placed at real rural spots, not
+  // cities — the second field is baked game units (LL comments), and
+  // `ag: true` in the look swaps their weather openers to the farm register.
+  ['Boone', [-2764.4, -4247.3], { hat: 'stetson', hatC: 0x3a2e22, shirt: 0x7a4a2a, kerchief: 0x8a3a2a, ag: true }, // Hereford (34.8154 −102.3971), feedlot belt
+    ['Forty thousand head out there, and every one of ’em’s got an opinion at feeding time.', 'Folks smell the yards and wrinkle up. I smell a paycheck.', 'Corn goes up a nickel, my whole year changes. I watch Chicago closer than church.', 'A wet spring pen is worse than any blizzard. Give me frozen ground over mud.',
+      'We doctor cattle in weather that’d close a school.', 'Deaf Smith County feeds more people before breakfast than most states do all day.', 'You can hear the feed trucks from here at dawn. Prettiest sound there is, if you’re owed money.'],
+    'The Panhandle feedlot belt finishes a huge share of America’s beef — Deaf Smith county alone runs hundreds of thousands of head.', 61, 'feedlot operator'],
+  ['Thuy', [3241.7, 1879.5], { hat: 'wide', hatC: 0xd8c8a0, shirt: 0x4a7a5a, ag: true }, // Wharton (29.3116 −96.1027), rice prairie
+    ['Rice wants its feet wet. Everything else on this prairie can complain.', 'We flood the fields on purpose. First-timers always ask if something broke.', 'Second cutting’s the gamble — the ratoon crop. Some years it pays for Christmas.', 'The egrets work my levees harder than I do.',
+      'Papa grew rice on the Mekong. Same water, different birds.', 'Duck hunters lease the stubble come winter. The rice pays twice if you’re smart.', 'A dry June scares me more than any hurricane.'],
+    'Texas coastal-prairie rice ships worldwide — and the flooded winter stubble doubles as habitat for millions of ducks and geese.', 44, 'rice farmer'],
+  ['Greta', [238.6, 1046.4], { hat: 'bucket', hatC: 0x7a6a4a, shirt: 0x8a7a9a, glasses: true, ag: true }, // W of Kerrville (30.06 −99.25), Edwards Plateau
+    ['Angoras. The goats with the good hair — mohair, hon, and don’t call it wool.', 'A goat looks at a fence like it’s a suggestion.', 'Shearing twice a year, and they act brand-new surprised every time.', 'Cedar takes the water, goats take the cedar. That’s the whole plateau economy.',
+      'My rain gauge is the most-read publication in this county.', 'Kids in February, shorn in March — pray the northers are done by then.', 'A good livestock dog is worth three hired hands and half a husband.'],
+    'The Edwards Plateau is America’s mohair capital — Texas once grew about 90% of the US clip.', 57, 'Angora goat rancher'],
+  ['Cy', [1546, 3874], { hat: 'stetson', hatC: 0x6a2020, shirt: 0xd8d0c0, vest: 0x4a3a2a, ag: true }, // King Ranch gate (27.52 −97.89)
+    ['This gate’s just the front porch. The ranch runs clean past the horizon — all four of ’em.', 'Santa Gertrudis — the deep red ones. First breed ever made in America, made right here.', 'The Running W is on everything here. Cattle, gates, my paycheck.', 'Takes the better part of a week to ride the whole spread. I’ve done it. Once.',
+      'Wild turkeys under the mesquite, nilgai in the brush — half my job is just counting things.', 'Captain King bought this grass in 1853 with steamboat money. Smartest trade in Texas.', 'The Gulf breeze quits about ten a.m. After that it’s just you and the humidity.'],
+    'King Ranch sprawls across 825,000 acres — its Running W brand has been registered since the 1860s.', 34, 'King Ranch hand'],
+  ['Jolene', [-2051.5, -2716.2], { hair: 0xc86a30, bun: true, shirt: 0x3a5a8a, ag: true }, // Slaton gin country, S of Lubbock (33.44 −101.65)
+    ['Gin season, this whole county hums till two in the morning. I run the hum.', 'Those round module bales on the trucks? Eight thousand pounds of somebody’s whole year.', 'Hail insurance is the only lottery ticket a farmer buys twice.', 'Dryland cotton is a prayer. Pivot cotton is a mortgage. Pick your religion.',
+      'Come October the fields look like snow that pays.', 'One bale clothes two hundred people. You’re welcome, world.', 'The gin scale never lies, which makes it the most honest thing in three counties.'],
+    'The High Plains around Lubbock are the largest contiguous cotton patch on Earth.', 48, 'cotton gin manager'],
 ];
 
 // context openers — checked in order at interact time
@@ -80,6 +103,14 @@ const OPENERS = {
   rain: ['Wet enough for ya?', 'Good day for ducks, not much else.', 'Smell that? Creosote and wet caliche. Best smell there is.', 'The land drinks first. We complain second.'],
   dust: ['Cover your eyes — West Texas is relocating today.', 'This dust’ll paint your truck for free.', 'Keep your windows up till the sky turns back on.', 'That’s half of New Mexico blowing through. No charge.'],
   night: ['You’re out late, partner.', 'Fine night for it, whatever it is you’re doing.', 'Stars put on a show out here once the sun clocks out.', 'Night driving’s for coyotes and truckers. Which are you?'],
+};
+// the same weather slots in the farm register — ag characters draw from these
+// instead of OPENERS (farmers are what the weather context was born for)
+const AG_OPENERS = {
+  storm: ['There’s hail in that cloud — I can smell it. Pray it passes over the crop.', 'A storm like this can make my year or break it in ten minutes flat.', 'That sky means business. Everything I own is standing out in it.'],
+  rain: ['This rain’s worth a dollar an inch, easy.', 'Best sound in the world — rain on a thirsty field.', 'The stock tank’s catching every drop of this. Let it pour.', 'Don’t you go complaining about this rain where I can hear you.'],
+  dust: ['That’s my topsoil headed for Oklahoma.', 'Wind like this sandblasts the seedlings flat.', 'Dry year. The dirt gets restless when it’s thirsty.'],
+  night: ['Stock’s bedded down. Quietest hour on the place.', 'Coyotes get bold after dark — I sleep with one ear open.', 'I’m up before the sun anyway. Always am.'],
 };
 const PROGRESS_LINES = [
   [(c) => c.species >= 8, 'Eight critters spotted? You’re a regular naturalist!'],
@@ -263,7 +294,7 @@ const PILOT_WX = {
 };
 // verify-only surface — tools/checks/npcs.mjs imports the live module in-page
 // and asserts pool sizes/disjointness here instead of scraping source text
-export const POOLS = { NAMED, TOWNSFOLK_LINES, TOWNSFOLK_FIRST, TOWNSFOLK_SURNAMES, PROFESSIONS_TOWN, PROFESSIONS_CITY, PROFESSION_LINES, ROLE_SMALLTALK, BYSTANDER_ROLE_INFO, OPENERS, HELI_OPENERS, JOB_LINES, FORECAST_LINES, PILOT_WX };
+export const POOLS = { NAMED, TOWNSFOLK_LINES, TOWNSFOLK_FIRST, TOWNSFOLK_SURNAMES, PROFESSIONS_TOWN, PROFESSIONS_CITY, PROFESSION_LINES, ROLE_SMALLTALK, BYSTANDER_ROLE_INFO, OPENERS, AG_OPENERS, HELI_OPENERS, JOB_LINES, FORECAST_LINES, PILOT_WX };
 
 const WIND_NAMES = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
 const windName = (deg) => WIND_NAMES[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
@@ -293,19 +324,26 @@ export class NPCSystem {
 
     // named 12 — always present
     this.named = [];
-    for (const [name, cityName, look, lines, fact, age, profession] of NAMED) {
-      const c = GEO.cities.find((c) => c.name === cityName);
-      if (!c) continue;
+    for (const [name, where, look, lines, fact, age, profession] of NAMED) {
       const rand = seededRand('npc:' + name);
       const g = mkCharacter(look, rand);
-      const R = cityRadius(c.pop);
-      const a = rand() * Math.PI * 2;
-      const [px, pz] = roadShoulder(c.x + Math.cos(a) * R * 0.45, c.z + Math.sin(a) * R * 0.45, R);
+      let px, pz;
+      if (Array.isArray(where)) {
+        // rural ag characters: baked game-unit coords, shoulder of whatever
+        // road is near (roadShoulder falls back to the point itself)
+        [px, pz] = roadShoulder(where[0], where[1], 30);
+      } else {
+        const c = GEO.cities.find((c) => c.name === where);
+        if (!c) continue;
+        const R = cityRadius(c.pop);
+        const a = rand() * Math.PI * 2;
+        [px, pz] = roadShoulder(c.x + Math.cos(a) * R * 0.45, c.z + Math.sin(a) * R * 0.45, R);
+      }
       g.position.set(px, gY(px, pz), pz);
       g.rotation.y = rand() * Math.PI * 2;
       addMarker(g, look.scale || 1);
       scene.add(g);
-      this.named.push({ g, name, lines, fact, age, profession, visit: 0, baseRotY: g.rotation.y, wave: 0, townsfolk: false });
+      this.named.push({ g, name, lines, fact, age, profession, ag: !!look.ag, visit: 0, baseRotY: g.rotation.y, wave: 0, townsfolk: false });
     }
 
     // townsfolk — spawned per city by proximity
@@ -370,12 +408,13 @@ export class NPCSystem {
         prof && Math.random() < 0.45 ? pick(prof) : pick(TOWNSFOLK_LINES),
       ];
     } else {
+      const O = n.ag ? AG_OPENERS : OPENERS;
       const opener =
-        (ATMOS.weather === 'storm' && pick(OPENERS.storm)) ||
-        (ATMOS.weather === 'rain' && pick(OPENERS.rain)) ||
-        (ATMOS.weather === 'dust' && pick(OPENERS.dust)) ||
+        (ATMOS.weather === 'storm' && pick(O.storm)) ||
+        (ATMOS.weather === 'rain' && pick(O.rain)) ||
+        (ATMOS.weather === 'dust' && pick(O.dust)) ||
         heliLine ||
-        (ctx.night > 0.6 && pick(OPENERS.night)) || null;
+        (ctx.night > 0.6 && pick(O.night)) || null;
       const progress = PROGRESS_LINES.find(([test]) => test(ctx.counts) && Math.random() < 0.5);
       const pulls = []; // shared context, not per-character sets — voices untouched
       if (ctx.job && Math.random() < 0.5) pulls.push(pick(JOB_LINES)(ctx.job.to));
