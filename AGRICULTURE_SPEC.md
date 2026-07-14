@@ -42,6 +42,16 @@ Four layers, all keyed off one baked per-county dataset:
   decision-gated on a wave-4 playtest (see below).
 - **Extras**: BOTH bison (Caprock Canyons special site, log-worthy) and
   farmstead chickens (ambience prop-critters, NOT log-worthy).
+- **NPCs** (added 2026-07-13): **4–6 bespoke named ag characters** in
+  wave 4 — existing npcs.js bespoke-character pattern (roadShoulder
+  placement, context dialog), placed at real ag spots (a Panhandle
+  feedlot rancher, a Wharton rice farmer, a Kerrville-area goat
+  rancher, a hand at the King Ranch arch…). Their dialog pools lean on
+  the **weather** context — farmers are the register the weather-aware
+  dialog system was born for. NO generic ranch hands at procedural
+  farmsteads (new placement plumbing + repetition risk; townsfolk stay
+  city-creatures). Revisit only as a follow-up if shipped farmsteads
+  feel lonely.
 - **Plumbing**: per-county records joined to the repo's existing
   `data/counties.json` polygons; runtime lookup is `countyAt(x,z)` (already
   bbox-prefiltered + cached) → record. No new grid, no new inputs beyond
@@ -140,7 +150,7 @@ Each wave = one session: code + verify checks.
 | **1** | `tools/build-ag.mjs` + `data/agriculture.json` + `geo.js` `agAt` + `__game` wiring + `tools/checks/ag.mjs` | **Sonnet 5, high** — pure table plumbing, no content/register work | code + checks, **no shots**, grep-first |
 | **2** | Crops (decals + pivots + instanced rows) + farmsteads (`farmsteadAt`, props, chickens) + checks | **Fable 5, high** — content + spatial composition | code + checks, **one `t.shot`** for the aerial field/pivot read (visual-judgment exception), grep-first |
 | **3** | Livestock: horses/goats/sheep species + census-scaled tables + farmstead herds + feedlots (`feedlotAt`, pens, dense cattle) + bison site + log facts + checks | **Fable 5, high** — species content + behavior reuse | code + checks, no shots, grep-first |
-| **4** | Named-ranch gate arches (4 landmarks, real coords + plaque facts) + herd boost + King Ranch dressing + polish + ROADMAP fold-in | **Fable 5, high** — content/register (plaque copy) | code + checks, one `t.shot` (arch silhouette), grep-first |
+| **4** | Named-ranch gate arches (4 landmarks, real coords + plaque facts) + herd boost + King Ranch dressing + **4–6 bespoke ag NPCs** (weather-leaning dialog) + polish + ROADMAP fold-in | **Fable 5, high** — content/register (plaque copy + dialog pools) | code + checks, one `t.shot` (arch silhouette), grep-first |
 
 The track's last wave (4, or 5 if it runs) deletes the `## Session
 briefing` block and folds the track into one `ROADMAP.md` entry; this
@@ -190,7 +200,10 @@ pixels; hermetic — drive to state, no ambient accumulation):
   extend, don't duplicate).
 - **W4 — landmark plumbing**: arches collect + plaque at parked-truck
   distance and ugly approach headings (the compass/plaque lesson);
-  herd-boost radius measurably raises spawn odds vs a control point.
+  herd-boost radius measurably raises spawn odds vs a control point;
+  ag NPCs interact at parked-truck distance, and with `t.setWeather`
+  driving a rain state their dialog pool actually surfaces the
+  weather-context lines (assert on DOM text, existing npcs idiom).
 
 ## What doesn't change
 
