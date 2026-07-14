@@ -51,12 +51,38 @@ crops/pivots again, must know):
   future wave deliberately moves fields.
 - The pre-existing "Cy NPC rain register" check raced under wave 4.5's
   heavier per-chunk geometry (denser crop instancing slowed frame
-  throughput enough to expose a latent timing gap): it now does a real
-  `t.wait(0.3)` after teleporting next to Cy, before the synchronous
-  `npcNear()` snapshot, so the background NPC spawn/despawn hysteresis
-  (Cy sits ~23 units from Kingsville) settles first. If any other check
-  does an instant teleport + synchronous proximity/state read with no
-  wait, treat it as latently racy too.
+  throughput enough to expose a latent timing gap); a fixed
+  `t.wait(0.3)` patched it once but re-raced when the wave-5.5 HUD
+  readout (below) added its own per-frame cost. It's now a poll —
+  `t.until("g.npcs.npcNear(g.player.pos)?.name === 'Cy'", 5000)` —
+  so it can't re-race no matter how frame throughput shifts. If any
+  other check does an instant teleport + synchronous proximity/state
+  read with a *fixed* wait instead of polling the real condition,
+  treat it as latently racy too.
+
+Gotchas from the (unplanned, non-spec) wave-5.5 HUD session
+(2026-07-14, shipped ahead of the wave-5 gate decision below — see
+`git log` for commit) — whoever touches `world.js`/`animals.js`/
+`hud.js` next must know:
+- `world.js` exports `fieldAt(x,z)`, a pure query that replays the
+  exact same `'crops'+key` draw sequence and filters as the chunk
+  builder's field/pivot loop to test whether (x,z) sits inside a
+  rendered field rect or pivot circle. It must stay in lockstep with
+  that loop's draw order/count and filters — if you change field/pivot
+  placement, update `fieldAt` in the same edit, not later.
+- `AnimalSystem.nearby` (`{species, d2}` or `null`) is set inside the
+  existing per-frame `step()` loop, reusing `SPOT_R` (24 units, same
+  range as the critter log) and the same visibility gate — covers
+  every species including small critters (rattlesnake, armadillo,
+  roadrunner) for free since they share one code path. Bats are
+  excluded (separate system, own dusk-window visibility in bats.js).
+- `main.js`'s per-frame nature-hint block: wildlife (`animals.nearby`)
+  beats crop (`fieldAt`) when both are true; both suppressed in
+  `player.mode === 'FLY'`. The brand-resize hint is now also FLY-gated
+  (`brandNear` is XZ-only with no altitude check, so it used to show
+  while flying high over a distant site).
+- New `#nature-hint` DOM element/`hud.natureHint(text)` method, same
+  show/hide-by-textContent pattern as `interactHint`/`brandSizeHint`.
 
 The Jetpack track (`JETPACK_SPEC.md`, 2 waves —
 physics/shop, then feel) shipped 2026-07-13 and is folded into `ROADMAP.md`;
