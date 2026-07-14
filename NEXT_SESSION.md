@@ -1,6 +1,29 @@
 # Lone Star Roam — next session kickoff
 
-No active priority track. The Jetpack track (`JETPACK_SPEC.md`, 2 waves —
+## Session briefing
+- **This session**: Agriculture track (`AGRICULTURE_SPEC.md`), wave 1 of 4
+  — census data bake (`tools/build-ag.mjs` → `data/agriculture.json`) +
+  `agAt(x,z)` accessor in geo.js + `tools/checks/ag.mjs`. Spec written
+  2026-07-13; no code has shipped yet.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — pure
+  table plumbing (parse/join/emit + one accessor), no content/register
+  work. Flag it if the running model differs.
+- **Budget**: code + checks, no shots, grep-first.
+- **Then**: rewrite this block for wave 2 (crops + farmsteads, Fable 5).
+
+Gotchas carried over:
+- Bake input: `~/claude-area/devel/tx-inputs/tx_county_census2022.txt.gz`
+  (tab-delim; cols 10 SHORT_DESC / 11 DOMAIN_DESC / 22 COUNTY_NAME /
+  38 VALUE; filter DOMAIN_DESC=="TOTAL"; VALUE has commas, `(D)`/`(Z)`→0).
+- Join census UPPERCASE names to `data/counties.json` mixed-case names
+  (normalize case+spaces; "DE WITT"↔"DeWitt") — **assert 254/254**.
+- Verified SHORT_DESCs + top-county truth values are listed in the
+  spec's Data section — use them as check fixtures; grep the extract
+  for pecans/sugarcane labels before hardcoding the measure list.
+- County area for densities: shoelace over projected counties.json
+  rings at bake time — no new geo input.
+
+The Jetpack track (`JETPACK_SPEC.md`, 2 waves —
 physics/shop, then feel) shipped 2026-07-13 and is folded into `ROADMAP.md`;
 the spec file stays as history. The Texas Brands track (Bucky's, H-E-Buddy,
 Lone Star Compute — 3 waves) shipped 2026-07-12 and is folded into
