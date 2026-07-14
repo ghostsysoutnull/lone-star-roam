@@ -37,7 +37,9 @@ Four layers, all keyed off one baked per-county dataset:
   decal-only were considered and dropped.
 - **Named ranches**: gate-arch landmark plaques + locally boosted herds;
   King Ranch alone gets extra dressing (its real footprint is ~35×50
-  units — a region, not a point). Bespoke compounds dropped.
+  units — a region, not a point). Bespoke compounds dropped from the
+  core track — then revived (2026-07-13) as **optional wave 5**,
+  decision-gated on a wave-4 playtest (see below).
 - **Extras**: BOTH bison (Caprock Canyons special site, log-worthy) and
   farmstead chickens (ambience prop-critters, NOT log-worthy).
 - **Plumbing**: per-county records joined to the repo's existing
@@ -140,8 +142,30 @@ Each wave = one session: code + verify checks.
 | **3** | Livestock: horses/goats/sheep species + census-scaled tables + farmstead herds + feedlots (`feedlotAt`, pens, dense cattle) + bison site + log facts + checks | **Fable 5, high** — species content + behavior reuse | code + checks, no shots, grep-first |
 | **4** | Named-ranch gate arches (4 landmarks, real coords + plaque facts) + herd boost + King Ranch dressing + polish + ROADMAP fold-in | **Fable 5, high** — content/register (plaque copy) | code + checks, one `t.shot` (arch silhouette), grep-first |
 
-Last wave deletes the `## Session briefing` block and folds the track
-into one `ROADMAP.md` entry; this spec stays as history.
+The track's last wave (4, or 5 if it runs) deletes the `## Session
+briefing` block and folds the track into one `ROADMAP.md` entry; this
+spec stays as history.
+
+### Optional wave 5 — ranch compounds (decision-gated)
+
+Upgrade the four arches from marker to destination: a shared compound
+prop kit (HQ house, barns, pens, water tower — brands-track idiom:
+showpiece + heli-tier props) with a **per-ranch signature** doing the
+recognition work:
+
+- **King** — scale + Santa Gertrudis cattle (deep-red tint; the first
+  American cattle breed, developed there — the plaque fact).
+- **Four Sixes** — quarter-horse barns + horse-heavy pens.
+- **Waggoner** — pumpjacks *inside* the ranch among cattle (oil hit
+  1902; props already exist).
+- **YO** — exotic game: axis deer + blackbuck as YO-local species
+  (log-worthy or scenery-tier — decide in-wave).
+
+**Gate**: decided at wave-4 end after driving up to an arch — if
+arch + boosted herds already satisfies, this wave dies and the track
+folds at 4; if the arch feels like a door to nothing, this is
+pre-designed. Fable 5, high; code + checks, one `t.shot` (compound
+silhouette), grep-first.
 
 ## Verify plan
 
