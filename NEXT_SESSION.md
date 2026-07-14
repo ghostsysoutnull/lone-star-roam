@@ -1,23 +1,24 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: the wave-5 gate decision only — no coding session
-  yet. Wave 4.5 (crop visual upgrade: furrow striping, ~100% row
-  coverage, rice levees/water sheen, hay windrows, denser orchards,
-  pivot watered-wedge) shipped 2026-07-14. Drive up to one of the four
-  ranch gate arches (King/Four Sixes/Waggoner/Y.O.) and decide: does
-  the arch + boosted herds + wave-4.5 crop dressing already satisfy, or
-  does optional wave 5 (ranch compounds — HQ house, barns, pens, water
-  tower, per-ranch signature) still feel like a door to nothing?
-- **If it dies**: fold the whole Agriculture track into one
-  `ROADMAP.md` entry and delete this briefing block (greeting goes
-  quiet until the next spec).
-- **If it runs**: model **Fable 5**, effort **high** — content/prop-kit
-  wave. Budget: code + checks, one `t.shot` (compound silhouette),
-  grep-first. Full wave-5 design (per-ranch signature: King's Santa
-  Gertrudis, Four Sixes' quarter-horse barns, Waggoner's in-ranch
-  pumpjacks, Y.O.'s axis deer/blackbuck) is pre-designed in
+- **This session**: Agriculture wave 5 — ranch compounds at all four
+  gate arches (King/Four Sixes/Waggoner/Y.O.): shared HQ house/barns/
+  pens/water tower prop kit (brands-track idiom — showpiece + heli-tier
+  props), each with a per-ranch signature — King's Santa Gertrudis tint,
+  Four Sixes' quarter-horse barns, Waggoner's in-ranch pumpjacks, Y.O.'s
+  axis deer/blackbuck. Gate decided 2026-07-14 (Bruno drove all four
+  arches after wave 4.5 shipped) — **wave 5 runs**. The arch prop itself
+  is NOT touched (stays the existing low-poly gate); this wave adds a
+  separate nearby compound. Full design is pre-written in
   `AGRICULTURE_SPEC.md`'s "Optional wave 5" section.
+- **Recommended setup**: model **Fable 5**, effort **high** —
+  content/prop-kit wave, not structural plumbing. Flag it if the
+  running model differs.
+- **Budget**: code + checks, one `t.shot` (compound silhouette),
+  grep-first.
+- **Then**: this is the last wave of the Agriculture track — at session
+  end, fold the whole track (waves 1–5) into one `ROADMAP.md` entry and
+  delete this briefing block; `AGRICULTURE_SPEC.md` stays as history.
 
 Gotchas carried over from wave 4.5 (whoever does wave 5, or touches
 crops/pivots again, must know):
