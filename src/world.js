@@ -525,6 +525,11 @@ const RANCH_HQ = [
   { name: 'Four Sixes Ranch', ax: -781.1, az: -2917.3, sig: 'foursixes' },
   { name: 'Waggoner Ranch', ax: 209.9, az: -3261.7, sig: 'waggoner' },
   { name: 'Y.O. Ranch', ax: -119.3, az: 1025.3, sig: 'yo' },
+  // wave 5b — the historic second four (appended; indices 0–3 stay stable)
+  { name: 'JA Ranch', ax: -1717.6, az: -4252.4, sig: 'ja' },
+  { name: 'XIT Ranch', ax: -2714.7, az: -5214.2, sig: 'xit' },
+  { name: 'Matador Ranch', ax: -1278.6, az: -3328.5, sig: 'matador' },
+  { name: 'LBJ Ranch', ax: 830.2, az: 847.1, sig: 'lbj' },
 ];
 const hqSites = [];
 export function ranchHQSite(i) {
@@ -852,6 +857,9 @@ class ScenerySystem {
       }
       if (hq.sig === 'waggoner') // oil hit drilling for water in 1902 — jacks among the cattle
         for (const [lx, lz] of [[-13, 13], [12, 17]]) anim(at(mkPumpjack(hr), 'pumpjack', lx, lz, hr() * Math.PI * 2));
+      if (hq.sig === 'xit') // XIT watered 3M acres with windmills — a working row of them
+        for (const [lx, lz] of [[-14, 12], [13, 15], [-2, 18]]) anim(at(mkWindmill(hr), 'windmill', lx, lz));
+      if (hq.sig === 'lbj') at(mkFlagpole(), 'flagpole', -2.5, -2); // the Texas White House lawn
       for (let c = 0, cn = 3 + ((hr() * 3) | 0); c < cn; c++)
         anim(at(mkChicken(), 'chicken', -4.5 + (hr() - 0.5) * 4, 3.2 + (hr() - 0.5) * 3, hr() * Math.PI * 2));
       group.add(hg);
@@ -1323,6 +1331,21 @@ function mkWaterTower(sig) {
   const plate = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 0.06), [steel, steel, steel, steel, sign, sign]);
   plate.position.set(0, 5.2, -1.14);
   g.add(tank, cap, plate);
+  return g;
+}
+
+// Flagpole with the colors flying (LBJ signature — the Texas White House lawn)
+function mkFlagpole() {
+  const g = new THREE.Group();
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 3.6, 6), lamb(0xd8dce0));
+  pole.position.y = 1.8;
+  const canton = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.3, 0.03), lamb(0x24365e));
+  canton.position.set(0.17, 3.35, 0);
+  const stripes = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.28, 0.03), lamb(0xb43a34));
+  stripes.position.set(0.62, 3.34, 0);
+  const white = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.1, 0.03), lamb(0xf0ece4));
+  white.position.set(0.62, 3.33, 0.005);
+  g.add(pole, canton, stripes, white);
   return g;
 }
 

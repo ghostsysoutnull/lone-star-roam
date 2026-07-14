@@ -502,6 +502,14 @@ lives in `BACKLOG.md`.
   species, critter log now 23). `tools/checks/ag.mjs` grew to 37 checks
   (placement frozen at a live-captured baseline, distance-over-time flee
   asserts, site legality sweeps). Arch prop untouched; save additive.
+  **Wave 5b — the historic four** (07-14, same day): JA (Armstrong Co —
+  bison at the compound close the Goodnight/Caprock lore loop), XIT
+  (Channing — a working windmill row + longhorns; Capitol-trade fact),
+  Matador (Motley Co — Herefords, the new 24th log species) and LBJ
+  (Stonewall — flagpole on the Texas White House lawn, NPS Herefords, and
+  its real 6,300-ft strip as the **21st airport**, tier-3, OSM-authored
+  heading 175.3°, wired into ROUTES/ATIS/logbook). Landmarks 26 → 30;
+  ag.mjs → 38 checks; aviation/hud count asserts bumped to 21.
 
 ## Known limitations (v1)
 

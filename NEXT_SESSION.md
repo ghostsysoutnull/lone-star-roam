@@ -1,13 +1,29 @@
 # Lone Star Roam — next session kickoff
 
 No active priority track. The Agriculture track (waves 1–5, + the 4.5 crop
-visuals and 5.5 HUD follow-ons) shipped in full 2026-07-14 and is folded
-into `ROADMAP.md`; `AGRICULTURE_SPEC.md` stays as history. Queued work and
-pending playtests live in `BACKLOG.md`. A playtest of the wave-5 ranch
-compounds (drive all four arches again) is the natural next Bruno errand.
+visuals, 5.5 HUD and 5b historic-ranch follow-ons) shipped in full
+2026-07-14 and is folded into `ROADMAP.md`; `AGRICULTURE_SPEC.md` stays as
+history. Queued work and pending playtests live in `BACKLOG.md`. A playtest
+of the EIGHT ranch compounds (wave 5's four + 5b's JA/XIT/Matador/LBJ, incl.
+landing at the new LBJ strip) is the natural next Bruno errand.
 
-Gotchas from wave 5 (whoever touches the ranch compounds, `world.js`
-sites, or `animals.js` next must know):
+Gotchas from waves 5/5b (whoever touches the ranch compounds, `world.js`
+sites, `airports.js`, or `animals.js` next must know):
+- **Any new airport MUST get a `ROUTES` entry in aviation.js** — the field
+  table and route table are separate, and `daySchedule` crashes the whole
+  main loop at boot on a missing entry (found the hard way adding LBJ; the
+  crash cascades into ~56 unrelated check failures that all read as "loop
+  dead": weather stuck, cities never spawn, animals starve).
+- **Neighboring ranches can have two compounds live at once** — 6666 and
+  Matador sit ~645 units apart, inside the 780-unit chunk view radius. Any
+  check (or gameplay feature) that scans live scenery for a `ranchhq` group
+  must pick the one nearest its target site, never the first in Map order.
+- A check that stashes a live animal reference must re-grab it after any
+  teleport chain — chunks despawn and the reference points at a disposed
+  object that never moves (the axis-deer scare check does this right now).
+- LBJ's compound coexists with its own tier-3 airstrip: the site fn's
+  `airportClear` legality already handles the standoff; don't move the arch
+  (830.2, 847.1) closer to the strip center at LL(30.2518, −98.6226).
 - `ranchHQSite(i)`/`ranchHQAt(cx,cz)` (world.js) are the pure seeded site
   functions for the four compounds — arch coords are duplicated in
   gameplay.js `LANDMARKS` and animals.js `RANCH_ARCHES`; keep all three in

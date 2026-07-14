@@ -62,6 +62,7 @@ const ROUTES = {
   TRL: [['MRF', 2], ['ELP', 1], ['MAF', 1]],
   SSS: [['LBB', 2], ['ABI', 1], ['DAL', 1]],
   ARM: [['CRP', 2], ['HRL', 1], ['SAT', 1]],
+  LBJ: [['AUS', 2], ['ACT', 1], ['SAT', 1]], // ACT's fact already says Air Force One drops in when the ranch calls
 };
 
 const byId = Object.fromEntries(AIRPORTS.map((a) => [a.id, a]));

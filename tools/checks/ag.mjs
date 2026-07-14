@@ -148,12 +148,12 @@ export default async function ag(t) {
 
   await t.check('new species are registered with facts (log-ready, additive)', async () => {
     const res = await t.ev(`(() => {
-      const missing = ['horse', 'goat', 'sheep', 'bison', 'angus', 'santagertrudis', 'axisdeer', 'blackbuck']
+      const missing = ['horse', 'goat', 'sheep', 'bison', 'angus', 'santagertrudis', 'axisdeer', 'blackbuck', 'hereford']
         .filter((k) => !g.SPECIES[k] || !g.SPECIES[k].fact);
       return { missing, count: Object.keys(g.SPECIES).length };
     })()`);
     t.ok(res.missing.length === 0, `species missing or factless: ${res.missing}`);
-    t.ok(res.count === 23, `SPECIES_COUNT drifted: ${res.count}`); // 20 + the wave-5 ranch trio
+    t.ok(res.count === 24, `SPECIES_COUNT drifted: ${res.count}`); // 20 + the wave-5 trio + wave-5b hereford
   });
 
   await t.check('censusTable: Parker horses thick, Sutton goats+sheep, Dallam bare', async () => {
@@ -300,8 +300,9 @@ export default async function ag(t) {
       .map((c) => ({ name: c.userData.lm.name, x: c.position.x, z: c.position.z,
         dy: Math.abs(c.position.y - g.hAt(c.position.x, c.position.z)),
         county: g.countyAt(c.position.x, c.position.z) }))`);
-    t.ok(r.length === 4, `expected 4 rancharch landmarks, got ${r.length}`);
-    const want = { 'King Ranch': 'Kleberg', 'Four Sixes Ranch': 'King', 'Waggoner Ranch': 'Wilbarger', 'Y.O. Ranch': 'Kerr' };
+    t.ok(r.length === 8, `expected 8 rancharch landmarks, got ${r.length}`); // wave 4's four + wave 5b's historic four
+    const want = { 'King Ranch': 'Kleberg', 'Four Sixes Ranch': 'King', 'Waggoner Ranch': 'Wilbarger', 'Y.O. Ranch': 'Kerr',
+      'JA Ranch': 'Armstrong', 'XIT Ranch': 'Hartley', 'Matador Ranch': 'Motley', 'LBJ Ranch': 'Gillespie' };
     for (const a of r) {
       t.ok(a.dy < 0.01, `${a.name} floats ${a.dy.toFixed(3)} off hAt`);
       t.ok(a.county === want[a.name], `${a.name} sits in ${a.county} county, wanted ${want[a.name]}`);
@@ -523,8 +524,8 @@ export default async function ag(t) {
 
   // ---- wave 5: ranch HQ compounds behind the gate arches ----
 
-  await t.check('ranch HQ sites: all four resolve lawful, set back off their arch, 3 pens', async () => {
-    const r = await t.ev(`[0, 1, 2, 3].map((i) => {
+  await t.check('ranch HQ sites: all eight resolve lawful, set back off their arch, 3 pens', async () => {
+    const r = await t.ev(`[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
       const s = g.ranchHQSite(i);
       if (!s) return { i, err: true };
       const road = g.nearestRoad(s.x, s.z, 12);
@@ -543,7 +544,7 @@ export default async function ag(t) {
   });
 
   // one drive-by per ranch: collect scenery + herd facts, assert below
-  const hqSites = await t.ev(`[0, 1, 2, 3].map((i) => g.ranchHQSite(i))`);
+  const hqSites = await t.ev(`[0, 1, 2, 3, 4, 5, 6, 7].map((i) => g.ranchHQSite(i))`);
   const hqObs = [];
   for (const s of hqSites) {
     await t.tp(s.x + 14, s.z + 14); // parked-truck distance off the yard
@@ -551,13 +552,18 @@ export default async function ag(t) {
     hqObs.push(await t.ev(`(() => {
       const s = ${JSON.stringify(s)};
       const props = {}, badY = [];
-      let hq = null, pumps = 0;
-      for (const gr of g.scenery.live.values()) {
-        for (const c of gr.children) if (c.userData.kind === 'ranchhq') hq = c;
-        if (!hq) continue;
-        pumps = gr.userData.animated.filter((a) => a.kind === 'pumpjack').length;
-        break;
-      }
+      // neighboring ranches (6666/Matador are ~645 units apart — inside the
+      // 780-unit chunk view radius) can have two compounds live at once, so
+      // pick the ranchhq group NEAREST this site, not the first in Map order
+      let hq = null, pumps = 0, best = Infinity;
+      for (const gr of g.scenery.live.values())
+        for (const c of gr.children)
+          if (c.userData.kind === 'ranchhq' && c.children.length) {
+            const p = c.children[0].position;
+            const d = Math.hypot(p.x - s.x, p.z - s.z);
+            if (d < best) { best = d; hq = c; pumps = gr.userData.animated.filter((a) => a.kind === 'pumpjack').length; }
+          }
+      if (best > 40) hq = null; // nothing plausibly ours in view
       if (hq) for (const c of hq.children) {
         props[c.userData.prop] = (props[c.userData.prop] ?? 0) + 1;
         const dy = Math.abs(c.position.y - g.hAt(c.position.x, c.position.z));
@@ -566,10 +572,8 @@ export default async function ag(t) {
       const herds = {};
       for (const { animals } of g.animals.live.values())
         for (const a of animals)
-          if (Math.hypot(a.homeX - s.x, a.homeZ - s.z) < 32) {
+          if (Math.hypot(a.homeX - s.x, a.homeZ - s.z) < 32)
             herds[a.species] = (herds[a.species] ?? 0) + 1;
-            if (a.species === 'axisdeer' && !window.__axis) window.__axis = a;
-          }
       let penned = 0; // 6666: horses homed inside the corrals themselves
       if (s.sig === 'foursixes')
         for (const { animals } of g.animals.live.values())
@@ -601,7 +605,22 @@ export default async function ag(t) {
     t.ok(!by.king.pumps && !by.yo.pumps, 'pumpjacks leaked outside Waggoner');
   });
 
-  await t.check('signature herds: King runs cherry-red, Y.O. runs exotic', async () => {
+  await t.check('wave-5b signatures: XIT windmill row, LBJ flag + real strip, JA/Matador plain kit', async () => {
+    const by = Object.fromEntries(hqObs.map((o) => [o.sig, o]));
+    t.ok((by.xit.props.windmill ?? 0) >= 4, `XIT windmills: ${by.xit.props.windmill}, want kit 1 + row 3`);
+    t.ok((by.ja.props.windmill ?? 0) === 1 && (by.matador.props.windmill ?? 0) === 1,
+      'windmill row leaked outside XIT');
+    t.ok(by.lbj.props.flagpole === 1, `LBJ flagpole: ${by.lbj.props.flagpole}`);
+    t.ok(!by.ja.props.flagpole && !by.xit.props.flagpole, 'flagpole leaked outside LBJ');
+    const strip = await t.ev(`(() => {
+      const a = g.AIRPORTS.find((a) => a.id === 'LBJ');
+      return a && { tier: a.tier, len: a.rw[0].len, clear: g.airportClear(a.at[0], a.at[1]) };
+    })()`);
+    t.ok(strip && strip.tier === 3 && strip.len > 18, `LBJ strip wrong: ${JSON.stringify(strip)}`);
+    t.ok(strip.clear === false, 'LBJ strip footprint not excluding scenery (airportClear true at center)');
+  });
+
+  await t.check('signature herds: King cherry-red, Y.O. exotic, JA bison, XIT longhorn, Matador/LBJ Hereford', async () => {
     const by = Object.fromEntries(hqObs.map((o) => [o.sig, o]));
     t.ok((by.king.herds.santagertrudis ?? 0) >= 8, `King Santa Gertrudis thin: ${JSON.stringify(by.king.herds)}`);
     t.ok((by.foursixes.herds.horse ?? 0) >= 6, `6666 horses thin: ${JSON.stringify(by.foursixes.herds)}`);
@@ -609,12 +628,25 @@ export default async function ag(t) {
       `Waggoner cattle thin: ${JSON.stringify(by.waggoner.herds)}`);
     t.ok((by.yo.herds.axisdeer ?? 0) >= 4 && (by.yo.herds.blackbuck ?? 0) >= 3,
       `Y.O. exotics thin: ${JSON.stringify(by.yo.herds)}`);
+    t.ok((by.ja.herds.bison ?? 0) >= 4, `JA bison thin (Goodnight's herd): ${JSON.stringify(by.ja.herds)}`);
+    t.ok((by.xit.herds.longhorn ?? 0) >= 8, `XIT longhorns thin: ${JSON.stringify(by.xit.herds)}`);
+    t.ok((by.matador.herds.hereford ?? 0) >= 7, `Matador Herefords thin: ${JSON.stringify(by.matador.herds)}`);
+    t.ok((by.lbj.herds.hereford ?? 0) >= 4, `LBJ Herefords thin: ${JSON.stringify(by.lbj.herds)}`);
   });
 
   await t.check('scared axis deer RUNS AWAY (distance grows — charging-deer lesson)', async () => {
-    // Y.O. was visited last, so its chunks (and window.__axis) are still live
-    const a = await t.ev(`window.__axis && { x: window.__axis.g.position.x, z: window.__axis.g.position.z }`);
-    t.ok(a, 'no live axis deer stashed at Y.O.');
+    // drive back to Y.O. and grab a LIVE deer — a reference stashed during the
+    // drive-by loop dies when later stops despawn the Y.O. chunks
+    const yo = hqSites[3];
+    await t.tp(yo.x + 14, yo.z + 14);
+    await t.wait(0.8);
+    const a = await t.ev(`(() => {
+      for (const { animals } of g.animals.live.values())
+        for (const an of animals)
+          if (an.species === 'axisdeer' && an.g.visible) { window.__axis = an; return { x: an.g.position.x, z: an.g.position.z }; }
+      return null;
+    })()`);
+    t.ok(a, 'no live axis deer in the Y.O. chunks');
     await t.tp(a.x + 3, a.z, 'WALK');
     await t.ev(`g.animals.scare(${a.x}, ${a.z}, 30)`);
     const d = await t.sample(

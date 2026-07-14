@@ -15,11 +15,11 @@
 // system's wiring sentinel — everything else uses steppers).
 
 export default async function aviation(t) {
-  await t.check('table shape: 20 fields, 7/9/4 by tier', async () => {
+  await t.check('table shape: 21 fields, 7/9/5 by tier', async () => {
     const tiers = await t.ev(`g.AIRPORTS.map((a) => a.tier)`);
-    t.ok(tiers.length === 20, `${tiers.length} airports`);
+    t.ok(tiers.length === 21, `${tiers.length} airports`); // 20 + the LBJ Ranch strip (ag wave 5b)
     const n = (k) => tiers.filter((x) => x === k).length;
-    t.ok(n(1) === 7 && n(2) === 9 && n(3) === 4, `tiers ${n(1)}/${n(2)}/${n(3)}`);
+    t.ok(n(1) === 7 && n(2) === 9 && n(3) === 5, `tiers ${n(1)}/${n(2)}/${n(3)}`);
   });
 
   await t.check('layout is pure: two evals byte-identical, live system matches', async () => {
@@ -158,7 +158,7 @@ export default async function aviation(t) {
       }
       return n;
     })()`);
-    t.ok(hits === 20, `airport glyph found at ${hits}/20 sites on the map layer`);
+    t.ok(hits === 21, `airport glyph found at ${hits}/21 sites on the map layer`);
   });
 
   // ---- wave 2: departures ----

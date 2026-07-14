@@ -47,7 +47,7 @@ export default async function hud(t) {
       const missing = g.AIRPORTS.filter((a) => !ids.has(a.id)).map((a) => a.id);
       return { n: labels.length, missing };
     })()`);
-    t.ok(r.n === 20, `expected 20 airport labels, got ${r.n}`);
+    t.ok(r.n === 21, `expected 21 airport labels, got ${r.n}`);
     t.ok(r.missing.length === 0, `missing labels for: ${r.missing.join(', ')}`);
   });
 

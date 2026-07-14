@@ -63,6 +63,8 @@ export const AIRPORTS = [
     rw: [{ hdg: 18.4, len: 18.0, off: [0, 0] }], fact: 'The Four Sixes — won, the legend says, on four sixes in a poker hand.' },
   { id: 'ARM', name: 'Armstrong Ranch Airstrip', city: 'Armstrong', tier: 3, at: LL(26.9327, -97.7611),
     rw: [{ hdg: 121.7, len: 12.0, off: [0, 0] }], fact: 'A private strip on one of the great South Texas ranches.' },
+  { id: 'LBJ', name: 'LBJ Ranch Airstrip', city: 'Stonewall', tier: 3, at: LL(30.2518, -98.6226),
+    rw: [{ hdg: 175.3, len: 19.1, off: [0, 0] }], fact: 'The President’s strip — JetStars dropped onto 6,300 ft beside the Texas White House.' },
 ];
 
 const RW_W = [0, 3.0, 2.2, 1.4];   // runway width by tier (mini-world)

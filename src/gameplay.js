@@ -55,6 +55,11 @@ export const LANDMARKS = [
   { name: 'Four Sixes Ranch', at: LL(33.6206, -100.3186), kind: 'rancharch', fact: 'The 6666 has run cattle and champion quarter horses out of Guthrie since 1870 — legend says Burnett won it with four sixes in a poker hand.' },
   { name: 'Waggoner Ranch', at: LL(33.9300, -99.2800), kind: 'rancharch', fact: 'The largest US ranch inside one fence — about 510,000 acres. Drilling for water in 1902, the Waggoners hit oil instead.' },
   { name: 'Y.O. Ranch', at: LL(30.0790, -99.6250), kind: 'rancharch', fact: 'Schreiner cattle country since 1880 — and the pioneer of Texas exotics: axis deer and blackbuck have roamed these Hill Country pastures since the 1950s.' },
+  // historic-ranch second wave (wave 5b) — coords sync with animals.js RANCH_ARCHES + world.js RANCH_HQ
+  { name: 'JA Ranch', at: LL(34.82, -101.30), kind: 'rancharch', fact: 'Goodnight and Adair drove cattle into Palo Duro Canyon in 1876 — and the buffalo Goodnight saved here became the State Bison Herd at Caprock Canyons.' },
+  { name: 'XIT Ranch', at: LL(35.684, -102.345), kind: 'rancharch', fact: 'Three million acres traded for building the Texas Capitol — 6,000 miles of barbed wire around the biggest fenced range on Earth.' },
+  { name: 'Matador Ranch', at: LL(33.99, -100.84), kind: 'rancharch', fact: 'Founded 1879, run for decades from Dundee, Scotland — Scottish money, Texas grass, and Herefords by the tens of thousands.' },
+  { name: 'LBJ Ranch', at: LL(30.239, -98.630), kind: 'rancharch', fact: 'The Texas White House — LBJ ran the country from the Pedernales, landing on his own strip. The Park Service still runs his registered Herefords.' },
 ];
 export const LANDMARK_COUNT = LANDMARKS.length;
 
@@ -790,7 +795,8 @@ function mkLandmarkMesh(kind, name) {
       cx.fillStyle = '#241f18'; cx.fillRect(0, 0, 256, 48);
       cx.fillStyle = '#e8d8a8'; cx.font = 'bold 30px Georgia';
       cx.textAlign = 'center'; cx.textBaseline = 'middle';
-      const SIGNS = { 'King Ranch': 'KING RANCH', 'Four Sixes Ranch': '6 6 6 6', 'Waggoner Ranch': 'WAGGONER', 'Y.O. Ranch': 'Y · O' };
+      const SIGNS = { 'King Ranch': 'KING RANCH', 'Four Sixes Ranch': '6 6 6 6', 'Waggoner Ranch': 'WAGGONER', 'Y.O. Ranch': 'Y · O',
+        'JA Ranch': 'J A', 'XIT Ranch': 'XIT', 'Matador Ranch': 'MATADOR', 'LBJ Ranch': 'LBJ RANCH' };
       cx.fillText(SIGNS[name] ?? String(name).toUpperCase(), 128, 26);
       const plateM = new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(c) });
       add(new THREE.Mesh(new THREE.BoxGeometry(4.4, 0.82, 0.08), [iron, iron, iron, iron, plateM, plateM])).position.y = 3.5;

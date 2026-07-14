@@ -59,6 +59,8 @@ export const SPECIES = {
     fact: 'Spotted for life — Y.O. Ranch pioneered Texas exotics with chital from India in the 1950s.' },
   blackbuck: { name: 'Blackbuck', speed: 19, fleeR: 16, behavior: 'flee', bob: true,
     fact: 'An Indian antelope with corkscrew horns — more live on Texas ranches than in much of its native range.' },
+  hereford: { name: 'Hereford', speed: 3, fleeR: 0, behavior: 'graze', bob: false,
+    fact: 'Red coat, white face — the breed that restocked the Panhandle after the longhorn era.' },
   bat: { name: 'Mexican Free-tailed Bat', event: true,
     fact: 'Austin hosts the largest urban bat colony on Earth.' },
 };
@@ -113,6 +115,13 @@ const RANCH_ARCHES = [
   { x: -781.1, z: -2917.3, r: 200, rows: [['horse', 3, 6, 1, 0.7], ['angus', 3, 6, 1, 0.45]] },                         // Four Sixes (33.6206 −100.3186)
   { x: 209.9, z: -3261.7, r: 200, rows: [['angus', 4, 8, 1, 0.6], ['horse', 2, 4, 1, 0.5]] },                           // Waggoner (33.9300 −99.2800)
   { x: -119.3, z: 1025.3, r: 200, rows: [['goat', 4, 8, 1, 0.6], ['sheep', 4, 8, 1, 0.5], ['deer', 2, 4, 1, 0.5], ['axisdeer', 3, 6, 1, 0.5], ['blackbuck', 2, 4, 1, 0.45]] },    // Y.O. (30.0790 −99.6250)
+  // wave-5b historic-ranch arches — appended AFTER the wave-4/5 entries so
+  // existing chunks keep their exact draws (new arches only add rows in
+  // chunks that previously had none)
+  { x: -1717.6, z: -4252.4, r: 200, rows: [['longhorn', 4, 8, 1, 0.6], ['horse', 2, 4, 1, 0.5]] },                       // JA Ranch (34.82 −101.30)
+  { x: -2714.7, z: -5214.2, r: 200, rows: [['longhorn', 4, 8, 1, 0.65], ['angus', 3, 6, 1, 0.45]] },                     // XIT (35.684 −102.345)
+  { x: -1278.6, z: -3328.5, r: 200, rows: [['hereford', 4, 8, 1, 0.6], ['horse', 2, 4, 1, 0.5]] },                       // Matador (33.99 −100.84)
+  { x: 830.2, z: 847.1, r: 200, rows: [['hereford', 3, 6, 1, 0.55], ['deer', 2, 4, 1, 0.5]] },                           // LBJ (30.239 −98.630)
 ];
 
 // the Texas State Bison Herd — one curated site, Caprock Canyons SP
@@ -394,6 +403,10 @@ export class AnimalSystem {
         foursixes: [['horse', 2, 3, 'pen'], ['horse', 5, 8], ['angus', 3, 6]],
         waggoner: [['angus', 6, 7], ['longhorn', 4, 6]],
         yo: [['axisdeer', 5, 8], ['blackbuck', 4, 7]],
+        ja: [['bison', 6, 8], ['longhorn', 4, 6]],           // Goodnight's other herd
+        xit: [['longhorn', 8, 8], ['longhorn', 5, 7], ['horse', 2, 3]],
+        matador: [['hereford', 7, 7], ['hereford', 5, 6], ['horse', 2, 3]],
+        lbj: [['hereford', 5, 6], ['deer', 3, 6]],           // the NPS registered Herefords
       };
       for (const [sp, n, spread, where] of SIG[hq.sig]) {
         if (where === 'pen') { for (const p of hq.pens) home(qr, sp, p.x, p.z, n, spread); continue; }
@@ -655,6 +668,14 @@ function mkAnimal(species, rand) {
         box(g, 0.06, 0.55, 0.06, 0.12, 1.85, -0.6, bone);
       }
       quadLegs([[-0.16, -0.4], [0.16, -0.4], [-0.16, 0.4], [0.16, 0.4]], 0.09, 0.55, rust);
+      break;
+    }
+    case 'hereford': {
+      const hide = mat(0x8a4028), face = mat(0xf0ece0);       // red coat, the famous white face
+      box(g, 0.7, 0.6, 1.35, 0, 0.78, 0, hide);
+      box(g, 0.3, 0.3, 0.42, 0, 1.0, -0.85, face);
+      box(g, 0.72, 0.16, 1.0, 0, 0.52, 0, face);              // white underline
+      quadLegs([[-0.24, -0.5], [0.24, -0.5], [-0.24, 0.5], [0.24, 0.5]], 0.12, 0.5, hide);
       break;
     }
     case 'blackbuck': {
