@@ -1,49 +1,62 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Agriculture track (`AGRICULTURE_SPEC.md`), wave 4.5
-  — crop visual upgrade, zero placement changes: furrow striping via
-  vertex colors on every field decal, row coverage → ~100% with bigger
-  elements, rice levees + water sheen, hay windrows + guaranteed bales,
-  denser orchards, pivot watered-wedge polish. Full scope in the spec's
-  "Wave 4.5" section. Wave 4 (ranch arches, herd boost, 5 ag NPCs)
-  shipped 2026-07-13, commit ea9f55a.
-- **Recommended setup**: model **Sonnet 5**, effort **high** —
-  geometry/instancing plumbing wave, no content/register work. Flag it
-  if the running model differs.
-- **Budget**: code + checks, **one `t.shot`** (farmland composition
-  read), grep-first.
-- **Then**: the deferred wave-5 gate — Bruno drives up to a ranch arch
-  and decides optional wave 5 (ranch compounds, pre-designed in the
-  spec). If it dies, THIS wave folds the whole track into one
-  `ROADMAP.md` entry and DELETES this briefing block; if it runs,
-  rewrite this block for wave 5.
+- **This session**: the wave-5 gate decision only — no coding session
+  yet. Wave 4.5 (crop visual upgrade: furrow striping, ~100% row
+  coverage, rice levees/water sheen, hay windrows, denser orchards,
+  pivot watered-wedge) shipped 2026-07-14. Drive up to one of the four
+  ranch gate arches (King/Four Sixes/Waggoner/Y.O.) and decide: does
+  the arch + boosted herds + wave-4.5 crop dressing already satisfy, or
+  does optional wave 5 (ranch compounds — HQ house, barns, pens, water
+  tower, per-ranch signature) still feel like a door to nothing?
+- **If it dies**: fold the whole Agriculture track into one
+  `ROADMAP.md` entry and delete this briefing block (greeting goes
+  quiet until the next spec).
+- **If it runs**: model **Fable 5**, effort **high** — content/prop-kit
+  wave. Budget: code + checks, one `t.shot` (compound silhouette),
+  grep-first. Full wave-5 design (per-ranch signature: King's Santa
+  Gertrudis, Four Sixes' quarter-horse barns, Waggoner's in-ranch
+  pumpjacks, Y.O.'s axis deer/blackbuck) is pre-designed in
+  `AGRICULTURE_SPEC.md`'s "Optional wave 5" section.
 
-Gotchas carried over (wave 4.5 must know):
-- **The `'crops'+key` stream must stay byte-identical** — same draw
-  count per iteration (note `rowRoll` is drawn every loop precisely so
-  placement can't shift; keep that). All new randomness from a fresh
-  `'crops2'+key` stream. W4.5 check hardcodes a known chunk's first
-  field coords to prove nothing moved.
-- Field decals y-stagger via `deck` (0.12 base raise + 0.015 steps) to
-  dodge the giant-coplanar-surface z-fight — levee/windrow overlays
-  join that stagger or ride as vertex colors on the same mesh; never
-  add a new coplanar quad at the same height.
-- Materials come from world.js `matCache` (`lamb(hex)`) and are shared —
-  `disposeGroup` disposes geometry only, so cached materials survive
-  chunk churn. A `vertexColors` material needs its own cache key; don't
-  mutate the shared plain-color entries.
-- `CROP_STYLE` is keyed by `agAt().dominantCrop` sampled at chunk
-  center — consumed as-is, never re-derived. Rice deliberately has no
-  pivots (levee flooding); keep that gate.
-- `mkCropRows` builds one InstancedMesh per patch with per-chunk
-  geometry (safe to dispose); the instance cap is the perf knob —
-  raise it, don't remove it.
-- Pivot arms are static meshes today; if animating, register per-chunk
-  in `group.userData.animated` (pumpjack idiom in `ScenerySystem`).
-- Existing ag checks in `tools/checks/ag.mjs` (25) assert field decals
-  exist within ε of `hAt` and placement legality — they must keep
-  passing untouched; new W4.5 checks extend the same suite.
+Gotchas carried over from wave 4.5 (whoever does wave 5, or touches
+crops/pivots again, must know):
+- Field decals now carry an optional vertex-color `stripe` on
+  `mkFieldPatch` (own `lambVC()` material, its own `matCache` slot,
+  `'vc'` key) — furrow/windrow/levee bands computed from local `lz`
+  (pre-rotation), no RNG involved. Don't add a second vertex-color
+  material; extend `CROP_STYLE[...].stripe` or `defaultStripe()`
+  instead.
+- **Two separate seeded streams per ag chunk now**: `'crops'+key`
+  (field/pivot **placement** — fx/fz/w/d/rot/rowRoll, exactly 6
+  draws/field and 4/pivot, never touched by visual code) and
+  `'crops2'+key` (all row-instance jitter/scale + hay-bale scatter —
+  free to consume whatever it wants). Never let row/bale code read
+  from `crand` again — that's what let visual branching perturb field
+  positions before this wave.
+- Row overlays (`mkCropRows`) always render now when `style.row` exists
+  (no more 45%-chance gate); sizes are ×1.6 (`MUL` const), cap raised
+  240→420, orchard (`tree`) jitter tightened for a planted-grid look.
+- Pivot discs stay solid green; the new "freshly watered" wedge
+  (`mkPivotWedge`) is a separate static mesh sharing the `deck`
+  y-stagger — arm itself is **not** animated (in-wave scope call); if
+  wave 5 or later wants the sweep, register it in
+  `group.userData.animated` (pumpjack idiom).
+- `tools/checks/ag.mjs` grew to 30 checks; the placement-frozen check
+  hardcodes a known Hale chunk's first field centroid
+  (x≈-2147.501, z≈-3607.705) — captured live before any wave-4.5 edit,
+  confirmed byte-identical after. Don't hand-wave future placement
+  changes past this check — recapture the real baseline the same way
+  (git stash the old code, read the live centroid, hardcode it) if a
+  future wave deliberately moves fields.
+- The pre-existing "Cy NPC rain register" check raced under wave 4.5's
+  heavier per-chunk geometry (denser crop instancing slowed frame
+  throughput enough to expose a latent timing gap): it now does a real
+  `t.wait(0.3)` after teleporting next to Cy, before the synchronous
+  `npcNear()` snapshot, so the background NPC spawn/despawn hysteresis
+  (Cy sits ~23 units from Kingsville) settles first. If any other check
+  does an instant teleport + synchronous proximity/state read with no
+  wait, treat it as latently racy too.
 
 The Jetpack track (`JETPACK_SPEC.md`, 2 waves —
 physics/shop, then feel) shipped 2026-07-13 and is folded into `ROADMAP.md`;

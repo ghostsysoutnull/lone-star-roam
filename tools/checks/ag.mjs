@@ -384,13 +384,25 @@ export default async function ag(t) {
   await t.check('ag NPC rain register: Cy’s opener comes from AG_OPENERS.rain and lands on DOM (parked-truck distance)', async () => {
     await t.setDay();
     await t.setWeather('rain');
-    const r = await t.ev(`(async () => {
-      const { POOLS: P } = await import('/src/npcs.js');
+    await t.ev(`(() => {
       const n = g.npcs.named.find((x) => x.name === 'Cy');
       g.player.setMode('WALK');
       g.player.pos.set(n.g.position.x + 2.5, 0, n.g.position.z);
       g.npcs.activeNPC = null;
-      if (g.npcs.npcNear(g.player.pos) !== n) return { err: 'Cy not the nearest NPC at 2.5 units' };
+    })()`);
+    // Cy sits ~23 units from Kingsville — inside its townsfolk spawn radius,
+    // and the King-arch check two steps up also parks near Kingsville. A
+    // real wait lets npcs.update() tick at least once at Cy's position so
+    // any spawn/despawn hysteresis left over from that earlier position
+    // settles before the synchronous npcNear() snapshot below — skipping it
+    // raced under heavier chunk-build load (wave 4.5's denser crop
+    // geometry) and intermittently missed Cy.
+    await t.wait(0.3);
+    const r = await t.ev(`(async () => {
+      const { POOLS: P } = await import('/src/npcs.js');
+      const n = g.npcs.named.find((x) => x.name === 'Cy');
+      const near = g.npcs.npcNear(g.player.pos);
+      if (near !== n) return { err: 'Cy not the nearest NPC at 2.5 units' };
       g.npcs.interact(g.player.pos);
       const dom = g.hud.els.dialog.querySelector('.npc-text').textContent;
       const sub = g.hud.els.dialog.querySelector('.npc-sub').textContent;
@@ -407,6 +419,96 @@ export default async function ag(t) {
     t.ok(r.sub.includes('King Ranch hand'), `subtitle missing profession: "${r.sub}"`);
     t.ok(!r.willieAg, 'Willie got flagged ag — city characters must keep the generic openers');
     await t.setWeather('clear');
+  });
+
+  // ---- wave 4.5: crop visual upgrade — visuals as numbers, placement frozen ----
+
+  await t.tp(haleX, haleZ);
+  await t.wait(0.8);
+
+  await t.check('placement frozen: known Hale chunk\'s first field decal sits at its pre-wave-4.5 coords', async () => {
+    const res = await t.ev(`(() => {
+      const cx = Math.floor(${haleX} / 260), cz = Math.floor(${haleZ} / 260);
+      const gr = g.scenery.live.get(cx + ',' + cz);
+      if (!gr) return null;
+      const patch = gr.children.find((c) => c.userData.crop);
+      if (!patch) return null;
+      const p = patch.geometry.attributes.position.array;
+      let sx = 0, sz = 0, n = p.length / 3;
+      for (let i = 0; i < p.length; i += 3) { sx += p[i]; sz += p[i + 2]; }
+      return { x: sx / n, z: sz / n, crop: patch.userData.crop };
+    })()`);
+    t.ok(res, 'no crop field decal in the known Hale chunk (-9,-14)');
+    t.ok(res.crop === 'cotton', `Hale chunk crop drifted from cotton: ${res.crop}`);
+    t.ok(Math.abs(res.x - -2147.5011160714284) < 0.001, `field x moved: ${res.x}`);
+    t.ok(Math.abs(res.z - -3607.7045340401787) < 0.001, `field z moved: ${res.z}`);
+  });
+
+  await t.check('furrow striping: field decals carry ≥2 distinct vertex-color tones', async () => {
+    const res = await t.ev(`(() => {
+      let n = 0; const bad = [];
+      for (const gr of g.scenery.live.values())
+        gr.traverse((o) => {
+          if (!o.userData.crop) return;
+          n++;
+          const c = o.geometry.attributes.color;
+          if (!c) { bad.push(o.userData.crop + ':no-color'); return; }
+          const tones = new Set();
+          for (let i = 0; i < c.array.length; i += 3) tones.add(c.array[i] + ',' + c.array[i + 1] + ',' + c.array[i + 2]);
+          if (tones.size < 2) bad.push(o.userData.crop + ':' + tones.size + '-tone');
+        });
+      return { n, bad };
+    })()`);
+    t.ok(res.n > 0, 'no crop field decals in live Hale chunks to check striping on');
+    t.ok(res.bad.length === 0, `field decals missing 2-tone striping: ${res.bad}`);
+  });
+
+  const [whartonX, whartonZ] = LL(29.3116, -96.1027); // Wharton, TX — rice country
+  await t.check('rice signature: levee/water two-tone stripe on Wharton paddies', async () => {
+    await t.tp(whartonX, whartonZ);
+    await t.wait(0.8);
+    const res = await t.ev(`(() => {
+      const tones = new Set(); let rice = 0;
+      for (const gr of g.scenery.live.values())
+        gr.traverse((o) => {
+          if (o.userData.crop !== 'rice') return;
+          rice++;
+          const c = o.geometry.attributes.color;
+          for (let i = 0; i < c.array.length; i += 3) tones.add(c.array[i].toFixed(3) + ',' + c.array[i + 1].toFixed(3) + ',' + c.array[i + 2].toFixed(3));
+        });
+      return { rice, tones: tones.size };
+    })()`);
+    t.ok(res.rice > 0, 'no rice field decals in live Wharton chunks');
+    t.ok(res.tones >= 2, `rice paddies not two-toned: ${res.tones} distinct colors`);
+  });
+
+  const [canadianX, canadianZ] = LL(35.9128, -100.3820); // Canadian, TX — Hemphill county, dominant crop hay
+  await t.check('hay signature: windrow striping + guaranteed bales in every hay field', async () => {
+    await t.tp(canadianX, canadianZ);
+    await t.wait(0.8);
+    const res = await t.ev(`(() => {
+      const fields = []; let bales = 0;
+      for (const gr of g.scenery.live.values())
+        gr.traverse((o) => {
+          if (o.userData.crop === 'hay') fields.push(o);
+          if (o.geometry?.type === 'CylinderGeometry' && o.parent?.children.length === 1 && o.rotation.x === Math.PI / 2) bales++;
+        });
+      return { fields: fields.length, bales };
+    })()`);
+    t.ok(res.fields > 0, 'no hay field decals in live Hemphill chunks');
+    t.ok(res.bales >= res.fields * 2, `hay fields not carrying guaranteed bales: ${res.bales} bales for ${res.fields} fields`);
+  });
+
+  await t.check('row coverage: cotton row-instance count up vs the pre-wave density (was 84 max at Hale)', async () => {
+    await t.tp(haleX, haleZ);
+    await t.wait(0.8);
+    const max = await t.ev(`(() => {
+      let max = 0;
+      for (const gr of g.scenery.live.values())
+        gr.traverse((o) => { if (o.isInstancedMesh && o.geometry.type === 'IcosahedronGeometry') max = Math.max(max, o.count); });
+      return max;
+    })()`);
+    t.ok(max > 100, `cotton row instance count didn't raise vs the pre-wave 84 max: ${max}`);
   });
 
   if (process.env.SHOT) { // aerial field/pivot composition read — judgment only, never pass/fail

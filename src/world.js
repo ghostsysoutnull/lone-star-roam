@@ -299,18 +299,23 @@ export function chapelSitesNear(px, pz, range = 2) {
 // --- Agriculture: census-painted working land (crops + farmsteads) ---
 // Ground styles per county-dominant crop (agAt's statewide-share pick —
 // consumed as-is, never re-derived). `row` drives the near-ground instanced
-// read: cotton puffs, grain stalks, wheat tufts, orchard rows.
+// read: cotton puffs, grain stalks, wheat tufts, orchard rows. `stripe`
+// (light/dark furrow-band pair) is bespoke only where the signature demands
+// it (rice's levee/water read, hay's mowed windrows) — everyone else gets an
+// auto-derived tint of `ground` via defaultStripe(), no hand-authored pair.
 const CROP_STYLE = {
   cotton:    { ground: 0x9fa878, row: { kind: 'puff', color: 0xeae6da } },
-  rice:      { ground: 0x41704d, row: null }, // flooded paddies read flat and dark
-  sorghum:   { ground: 0xa5673c, row: { kind: 'stalk', color: 0x8f5530, h: 0.6 } },
-  corn:      { ground: 0x5e7f3d, row: { kind: 'stalk', color: 0x4c7433, h: 0.85 } },
+  rice:      { ground: 0x41704d, row: null, // flooded paddies read flat and dark
+    stripe: { a: 0x8a7550, b: 0x35625c, band: 2.1, snake: 1.0 } }, // tan levee ridge vs blue-green flooded sheen
+  sorghum:   { ground: 0xa5673c, row: { kind: 'stalk', color: 0x8f5530, h: 0.85 } },
+  corn:      { ground: 0x5e7f3d, row: { kind: 'stalk', color: 0x4c7433, h: 1.1 } },
   wheat:     { ground: 0xc7a44e, row: { kind: 'tuft', color: 0xd6b258 } },
-  hay:       { ground: 0x99a057, row: null }, // gets extra bales instead
+  hay:       { ground: 0x99a057, row: null, // gets extra bales instead
+    stripe: { a: 0xb9c179, b: 0x737a41, band: 2.6 } }, // broad mowed-windrow swaths
   peanuts:   { ground: 0x6e7f48, row: { kind: 'tuft', color: 0x53703a } },
   citrus:    { ground: 0x8a7a55, row: { kind: 'tree', color: 0x2f6b36 } },
   pecans:    { ground: 0x857550, row: { kind: 'tree', color: 0x49682f } },
-  sugarcane: { ground: 0x4f8a3e, row: { kind: 'stalk', color: 0x55a041, h: 1.15 } },
+  sugarcane: { ground: 0x4f8a3e, row: { kind: 'stalk', color: 0x55a041, h: 1.5 } },
 };
 const PIVOT_GREEN = 0x4f7c37; // the classic irrigated circle, whatever the crop
 
@@ -322,14 +327,36 @@ function lamb(hex) {
   if (!m) matCache.set(hex, (m = new THREE.MeshLambertMaterial({ color: hex, flatShading: true })));
   return m;
 }
+// One shared vertex-color material for every striped field decal — the
+// pigment comes entirely from the per-vertex color attribute, so unlike
+// lamb() there's nothing to key by hex; own matCache slot, never a tint of
+// the shared plain-color entries.
+function lambVC() {
+  let m = matCache.get('vc');
+  if (!m) matCache.set('vc', (m = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true })));
+  return m;
+}
+function shade(hex, f) {
+  const r = Math.min(255, ((hex >> 16) & 255) * f) | 0;
+  const g = Math.min(255, ((hex >> 8) & 255) * f) | 0;
+  const b = Math.min(255, (hex & 255) * f) | 0;
+  return (r << 16) | (g << 8) | b;
+}
+function defaultStripe(ground) {
+  return { a: shade(ground, 1.18), b: shade(ground, 0.82), band: 1.6 };
+}
 
 // A field decal: subdivided quad vertex-draped to hAt and raised off the
 // terrain (rivers sit at +0.07 — fields ride above both). `round` pulls
 // outside-the-rim grid points onto the rim, so one drape serves pivots too.
-function mkFieldPatch(fx, fz, w, d, rot, color, round, raise) {
+// `stripe` ({a, b, band, snake?}) paints alternating furrow/windrow/levee
+// bands along the local depth axis (aligned with `rot`, matching row
+// direction) via vertex colors — no extra geometry, no new randomness.
+function mkFieldPatch(fx, fz, w, d, rot, color, round, raise, stripe) {
   const segX = Math.max(2, Math.ceil(w / 3)), segZ = Math.max(2, Math.ceil(d / 3));
-  const pos = [], idx = [];
+  const pos = [], idx = [], col = [];
   const cr = Math.cos(rot), sr = Math.sin(rot);
+  const colA = stripe && new THREE.Color(stripe.a), colB = stripe && new THREE.Color(stripe.b);
   for (let j = 0; j <= segZ; j++)
     for (let i = 0; i <= segX; i++) {
       let lx = (i / segX - 0.5) * w, lz = (j / segZ - 0.5) * d;
@@ -339,6 +366,11 @@ function mkFieldPatch(fx, fz, w, d, rot, color, round, raise) {
       }
       const x = fx + lx * cr + lz * sr, z = fz - lx * sr + lz * cr;
       pos.push(x, hAt(x, z) + raise, z);
+      if (stripe) {
+        const wobble = stripe.snake ? Math.sin(lx * 0.6) * stripe.snake : 0;
+        const c = Math.floor((lz + wobble) / stripe.band) % 2 === 0 ? colA : colB;
+        col.push(c.r, c.g, c.b);
+      }
     }
   for (let j = 0; j < segZ; j++)
     for (let i = 0; i < segX; i++) {
@@ -347,23 +379,48 @@ function mkFieldPatch(fx, fz, w, d, rot, color, round, raise) {
     }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  if (stripe) g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
-  return new THREE.Mesh(g, lamb(color));
+  return new THREE.Mesh(g, stripe ? lambVC() : lamb(color));
+}
+
+// A darker "freshly watered" wedge trailing the pivot arm's angle — static
+// polish only (the arm itself stays unanimated this wave, in-wave scope
+// call). Own drape loop (CircleGeometry's local XZ, not mkFieldPatch's
+// rotated grid) since it's a sector, not a rect/round quad.
+function mkPivotWedge(fx, fz, r, armRot, raise) {
+  const span = Math.PI * 0.55;
+  const geo = new THREE.CircleGeometry(r * 0.96, 12, armRot + Math.PI - span / 2, span);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position.array;
+  for (let i = 0; i < pos.length; i += 3) {
+    const x = fx + pos[i], z = fz + pos[i + 2];
+    pos[i] = x; pos[i + 1] = hAt(x, z) + raise; pos[i + 2] = z;
+  }
+  geo.attributes.position.needsUpdate = true;
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, lamb(shade(PIVOT_GREEN, 0.6)));
 }
 
 // Near-ground crop rows: one InstancedMesh per patch (geometry is per-chunk,
 // so disposeGroup stays safe). Element style comes from CROP_STYLE.row.
+// Sizes ~1.6x over the original + a raised cap so standing crop registers at
+// highway speed; orchards (`tree`) get tight jitter so the grid reads as
+// planted, not scattered. `rand` is always the crops2 stream (see spawn()) —
+// never crops, so instance jitter/scale can't perturb field placement.
 function mkCropRows(rand, fx, fz, w, d, rot, row) {
-  const spacing = row.kind === 'tree' ? 2.4 : 1.4, step = row.kind === 'tree' ? 2.4 : 1.1;
+  const MUL = 1.6;
+  const spacing = row.kind === 'tree' ? 2.0 : 1.15, step = row.kind === 'tree' ? 2.0 : 0.9;
+  const jitter = row.kind === 'tree' ? 0.06 : 0.2;
   const rows = Math.max(1, Math.floor(d / spacing) - 1);
   const per = Math.max(2, Math.floor(w / step) - 1);
-  const count = Math.min(240, rows * per);
+  const count = Math.min(420, rows * per);
   let geo, y0;
-  if (row.kind === 'puff') { geo = new THREE.IcosahedronGeometry(0.09, 0); y0 = 0.14; }
-  else if (row.kind === 'tuft') { geo = new THREE.ConeGeometry(0.1, 0.34, 4); y0 = 0.17; }
-  else if (row.kind === 'tree') { geo = new THREE.IcosahedronGeometry(0.42, 0); y0 = 0.38; }
-  else { geo = new THREE.BoxGeometry(0.07, row.h, 0.07); y0 = row.h / 2; }
+  if (row.kind === 'puff') { geo = new THREE.IcosahedronGeometry(0.09 * MUL, 0); y0 = 0.14 * MUL; }
+  else if (row.kind === 'tuft') { geo = new THREE.ConeGeometry(0.1 * MUL, 0.34 * MUL, 4); y0 = 0.17 * MUL; }
+  else if (row.kind === 'tree') { geo = new THREE.IcosahedronGeometry(0.42 * MUL, 0); y0 = 0.38 * MUL; }
+  else { geo = new THREE.BoxGeometry(0.07 * MUL, row.h, 0.07 * MUL); y0 = row.h / 2; }
   const inst = new THREE.InstancedMesh(geo, lamb(row.color), count);
   const m4 = new THREE.Matrix4();
   const cr = Math.cos(rot), sr = Math.sin(rot);
@@ -371,7 +428,7 @@ function mkCropRows(rand, fx, fz, w, d, rot, row) {
   for (let r = 0; r < rows && n < count; r++) {
     const lz = ((r + 1) / (rows + 1) - 0.5) * d;
     for (let i = 0; i < per && n < count; i++) {
-      const lx = ((i + 1) / (per + 1) - 0.5) * w + (rand() - 0.5) * 0.2;
+      const lx = ((i + 1) / (per + 1) - 0.5) * w + (rand() - 0.5) * jitter;
       const x = fx + lx * cr + lz * sr, z = fz - lx * sr + lz * cr;
       const s = 0.8 + rand() * 0.45;
       m4.makeScale(s, s, s).setPosition(x, hAt(x, z) + y0 * s, z);
@@ -563,9 +620,11 @@ class ScenerySystem {
     // (county polygons dwarf 260-unit chunks; straddle error is invisible).
     const ag = agAt(midX, midZ);
     if (ag) {
-      const crand = seededRand('crops' + key);
+      const crand = seededRand('crops' + key); // placement only — exactly 6 draws/field, 4 draws/pivot
+      const crand2 = seededRand('crops2' + key); // all wave-4.5 visual randomness (rows, bales) — never touches crand
       const cropAcres = Object.values(ag.crops).reduce((a, b) => a + b, 0);
       const style = CROP_STYLE[ag.dominantCrop];
+      const stripe = style && (style.stripe || defaultStripe(style.ground));
       const fields = style ? Math.min(8, (cropAcres / ag.areaKm2 / 6) | 0) : 0;
       // rice country floods levee paddies, not pivots — the dark decals do the read
       const pivots = ag.dominantCrop === 'rice' ? 0 : Math.min(4, (ag.irrAcres / ag.areaKm2 / 7) | 0);
@@ -579,14 +638,14 @@ class ScenerySystem {
         if (nearestRoad(fx, fz, clear)) continue; // fields never swallow a road
         const { city, dist } = nearestCity(fx, fz);
         if (city && dist < cityRadius(city.pop) + clear) continue;
-        const patch = mkFieldPatch(fx, fz, w, d, rot, style.ground, false, 0.12 + deck++ * 0.015);
+        const patch = mkFieldPatch(fx, fz, w, d, rot, style.ground, false, 0.12 + deck++ * 0.015, stripe);
         patch.userData.crop = ag.dominantCrop;
         group.add(patch);
-        if (style.row && rowRoll < 0.45) group.add(mkCropRows(crand, fx, fz, w * 0.9, d * 0.9, rot, style.row));
+        if (style.row) group.add(mkCropRows(crand2, fx, fz, w * 0.9, d * 0.9, rot, style.row));
         else if (ag.dominantCrop === 'hay')
           for (let k = 0, kn = 2 + ((rowRoll * 3) | 0); k < kn; k++) {
-            const bale = mkHayBale(crand);
-            const bx = fx + (crand() - 0.5) * w * 0.7, bz = fz + (crand() - 0.5) * d * 0.7;
+            const bale = mkHayBale(crand2);
+            const bx = fx + (crand2() - 0.5) * w * 0.7, bz = fz + (crand2() - 0.5) * d * 0.7;
             bale.position.set(bx, hAt(bx, bz), bz);
             group.add(bale);
           }
@@ -605,7 +664,8 @@ class ScenerySystem {
         const arm = new THREE.Mesh(armG, lamb(0xc4c8cc));
         arm.position.set(fx, hAt(fx, fz) + 0.35, fz);
         arm.rotation.y = armRot;
-        group.add(disc, arm);
+        const wedge = mkPivotWedge(fx, fz, r, armRot, 0.12 + deck++ * 0.015);
+        group.add(disc, arm, wedge);
       }
 
       const farm = farmsteadAt(cx, cz);
