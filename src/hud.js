@@ -61,6 +61,7 @@ export class HUD {
       dialog: document.getElementById('dialog'),
       interact: document.getElementById('interact-hint'),
       brandSize: document.getElementById('brand-size-hint'),
+      nature: document.getElementById('nature-hint'),
       help: document.getElementById('help'),
       paused: document.getElementById('paused'),
       subtitle: document.getElementById('radio-subtitle'),
@@ -628,6 +629,12 @@ export class HUD {
 
   brandSizeHint(on) {
     this.els.brandSize.style.display = on ? 'block' : 'none';
+  }
+
+  natureHint(text) {
+    if (!text) { this.els.nature.style.display = 'none'; return; }
+    this.els.nature.textContent = text;
+    this.els.nature.style.display = 'block';
   }
 
   update(player, counts, road, water, clock, weatherIcon, stats, skyLine, county, forecast) {

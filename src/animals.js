@@ -10,6 +10,7 @@ import { ATMOS } from './sky.js';
 
 const CHUNK = 260, VIEW_CHUNKS = 2; // tighter ring than scenery — animals are simulated
 const ACTIVE_R = 150;               // only simulate within this range
+const SPOT_R = 24;                  // close-encounter range: critter log + HUD nearby readout
 
 // nightMin/nightMax gate visibility by ATMOS.night (nocturnal / diurnal species).
 // 'bat' is spawned by the dusk event in bats.js, never by region tables.
@@ -122,6 +123,7 @@ export class AnimalSystem {
     this.censusTable = censusTable; // ditto for the census-scaled livestock rows
     this.bisonSite = BISON_SITE;
     this.ranchArches = RANCH_ARCHES; // ditto for the wave-4 arch herd boost
+    this.nearby = null; // {species, d2} — nearest visible animal within NEARBY_R, for the HUD readout
   }
 
   update(dt, px, pz, py = 0) {
@@ -140,6 +142,7 @@ export class AnimalSystem {
     }
     for (const k of want) if (!this.live.has(k)) this.spawn(k);
 
+    this.nearby = null;
     const night = ATMOS.night;
     for (const { animals } of this.live.values()) {
       for (const a of animals) {
@@ -192,7 +195,10 @@ export class AnimalSystem {
     const spec = SPECIES[a.species];
 
     // critter log — close encounter at ground-ish level (no spotting from altitude)
-    if (d2 < 24 * 24 && this.py < 15) this.onSpotted?.(a.species);
+    if (d2 < SPOT_R * SPOT_R && this.py < 15) this.onSpotted?.(a.species);
+    // HUD nearby readout — same range/altitude gate, keeps the nearest if several qualify
+    if (d2 < SPOT_R * SPOT_R && this.py < 15 && (!this.nearby || d2 < this.nearby.d2))
+      this.nearby = { species: a.species, d2 };
 
     // voices: lonesome howls at night, a rattle warning underfoot, distant gobbles
     if (a.species === 'coyote' && ATMOS.night > 0.3 && d2 < 140 * 140) this.sound('howl', 22 + Math.random() * 20);

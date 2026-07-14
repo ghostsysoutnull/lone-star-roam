@@ -515,6 +515,49 @@ export function feedlotAt(cx, cz) {
   return null;
 }
 
+// Pure query: is (x,z) standing inside a rendered field/pivot decal? Replays
+// the exact same 'crops'+key draw sequence and filters as spawn() (world.js
+// field/pivot loop) — must stay in lockstep with that code or this reports
+// crops that were never actually placed (or misses ones that were).
+export function fieldAt(x, z) {
+  const cx = Math.floor(x / CHUNK), cz = Math.floor(z / CHUNK);
+  const key = `${cx},${cz}`;
+  const baseX = cx * CHUNK, baseZ = cz * CHUNK;
+  const midX = baseX + CHUNK / 2, midZ = baseZ + CHUNK / 2;
+  const ag = agAt(midX, midZ);
+  if (!ag) return null;
+  const crand = seededRand('crops' + key);
+  const style = CROP_STYLE[ag.dominantCrop];
+  const cropAcres = Object.values(ag.crops).reduce((a, b) => a + b, 0);
+  const fields = style ? Math.min(8, (cropAcres / ag.areaKm2 / 6) | 0) : 0;
+  const pivots = ag.dominantCrop === 'rice' ? 0 : Math.min(4, (ag.irrAcres / ag.areaKm2 / 7) | 0);
+  for (let i = 0; i < fields; i++) {
+    const fx = baseX + crand() * CHUNK, fz = baseZ + crand() * CHUNK;
+    const w = 9 + crand() * 9, d = 7 + crand() * 7, rot = crand() * Math.PI;
+    crand(); // rowRoll — unused here, must still consume the draw to stay in lockstep
+    const clear = Math.hypot(w, d) / 2 + 2;
+    if (!inTexas(fx, fz) || !airportClear(fx, fz)) continue;
+    if (nearestRoad(fx, fz, clear)) continue;
+    const { city, dist } = nearestCity(fx, fz);
+    if (city && dist < cityRadius(city.pop) + clear) continue;
+    const dx = x - fx, dz = z - fz;
+    const c = Math.cos(-rot), s = Math.sin(-rot);
+    const lx = dx * c - dz * s, lz = dx * s + dz * c; // into field-local frame
+    if (Math.abs(lx) <= w / 2 && Math.abs(lz) <= d / 2) return { crop: ag.dominantCrop, kind: 'field' };
+  }
+  for (let i = 0; i < pivots; i++) {
+    const fx = baseX + crand() * CHUNK, fz = baseZ + crand() * CHUNK;
+    const r = 2 + crand() * 2;
+    crand(); // armRot — unused here, must still consume the draw
+    if (!inTexas(fx, fz) || !airportClear(fx, fz)) continue;
+    if (nearestRoad(fx, fz, r + 2)) continue;
+    const { city, dist } = nearestCity(fx, fz);
+    if (city && dist < cityRadius(city.pop) + r + 2) continue;
+    if (Math.hypot(x - fx, z - fz) <= r) return { crop: ag.dominantCrop, kind: 'pivot' };
+  }
+  return null;
+}
+
 class ScenerySystem {
   constructor(scene) {
     this.scene = scene;

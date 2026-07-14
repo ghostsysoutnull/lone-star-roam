@@ -166,6 +166,13 @@ export default async function brands(t) {
     await t.ev(`g.brands.setScale(1)`); // reset for the rest of the suite
   });
 
+  await t.check('brand size hint: suppressed in FLY mode even in range', async () => {
+    await t.tp(katyAt.x + 42, katyAt.z - 17, 'FLY');
+    await t.wait(0.2);
+    t.ok(await t.ev(`g.hud.els.brandSize.style.display`) === 'none', 'brand size hint visible while flying');
+    await t.tp(katyAt.x + 42, katyAt.z - 17, 'WALK'); // back to ground for the rest of the suite
+  });
+
   await t.check('night lights: two warm lights light the nearest site at night, dark by day, at the site', async () => {
     await t.tp(katyAt.x, katyAt.z + 3);
     await t.until(`g.brands.live.has('Katy')`, 8000);

@@ -391,13 +391,13 @@ export default async function ag(t) {
       g.npcs.activeNPC = null;
     })()`);
     // Cy sits ~23 units from Kingsville — inside its townsfolk spawn radius,
-    // and the King-arch check two steps up also parks near Kingsville. A
-    // real wait lets npcs.update() tick at least once at Cy's position so
-    // any spawn/despawn hysteresis left over from that earlier position
-    // settles before the synchronous npcNear() snapshot below — skipping it
-    // raced under heavier chunk-build load (wave 4.5's denser crop
-    // geometry) and intermittently missed Cy.
-    await t.wait(0.3);
+    // and the King-arch check two steps up also parks near Kingsville. Poll
+    // for the real condition (Cy actually nearest) instead of a fixed wait —
+    // a fixed 0.3s guess raced again once the wave-5.5 HUD readout added its
+    // own per-frame cost on top of wave 4.5's denser crop geometry, so any
+    // spawn/despawn hysteresis left over from the earlier position must be
+    // let to genuinely settle, however many frames that takes.
+    await t.until(`g.npcs.npcNear(g.player.pos)?.name === 'Cy'`, 5000);
     const r = await t.ev(`(async () => {
       const { POOLS: P } = await import('/src/npcs.js');
       const n = g.npcs.named.find((x) => x.name === 'Cy');
@@ -522,6 +522,18 @@ export default async function ag(t) {
     await t.wait(0.5);
     await t.shot('ag-king-arch');
   }
+
+  await t.check('fieldAt: hits the known Hale field at its frozen centroid', async () => {
+    const res = await t.ev(`g.fieldAt(-2147.5011160714284, -3607.7045340401787)`);
+    t.ok(res, 'fieldAt missed the known Hale field centroid');
+    t.ok(res && res.crop === 'cotton' && res.kind === 'field', `wrong hit: ${JSON.stringify(res)}`);
+  });
+
+  await t.check('fieldAt: null over near-zero-crop Trans-Pecos county', async () => {
+    const [tx, tz] = LL(30.1421, -102.4088); // Sanderson, TX — Terrell county seat
+    const res = await t.ev(`g.fieldAt(${tx}, ${tz})`);
+    t.ok(res === null, `expected no field/pivot hit in Terrell county, got ${JSON.stringify(res)}`);
+  });
 
   await t.tp(haleX, haleZ, 'DRIVE'); // leave the suite grounded in DRIVE (ambient-mode convention)
 }

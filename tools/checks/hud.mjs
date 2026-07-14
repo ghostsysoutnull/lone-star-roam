@@ -339,4 +339,39 @@ export default async function hud(t) {
     t.ok((await t.ev(`g.travel.el.style.display`)) === 'none', 'Esc did not close the travel menu');
     t.ok((await t.ev('g.isPaused()')) === false, 'Esc paused instead of just closing the menu');
   });
+
+  // nature hint (crop/wildlife readout) — known Hale cotton field centroid,
+  // frozen coords shared with ag.mjs's placement-frozen check.
+  const haleFieldX = -2147.5011160714284, haleFieldZ = -3607.7045340401787;
+
+  await t.check('nature hint: shows crop name over a known field, hides on the clean I-10 stretch', async () => {
+    await t.tp(haleFieldX, haleFieldZ, 'WALK');
+    await t.wait(0.2);
+    const near = await t.ev('g.hud.els.nature.textContent');
+    t.ok(near.includes('Cotton'), `crop hint wrong at the known Hale field: "${near}"`);
+    t.ok((await t.ev('g.hud.els.nature.style.display')) === 'block', 'crop hint not visible over the field');
+    await t.tp(-2767, 334, 'WALK'); // clean I-10 stretch — no fields, no wildlife
+    await t.wait(0.2);
+    t.ok((await t.ev('g.hud.els.nature.style.display')) === 'none', 'nature hint still visible on the clean stretch');
+  });
+
+  await t.check('nature hint: suppressed in FLY mode even over a known field', async () => {
+    await t.tp(haleFieldX, haleFieldZ, 'FLY');
+    await t.wait(0.2);
+    t.ok((await t.ev('g.hud.els.nature.style.display')) === 'none', 'nature hint visible while flying over the field');
+  });
+
+  await t.check('nature hint: wildlife takes priority over crop when both are true', async () => {
+    await t.tp(haleFieldX, haleFieldZ, 'WALK');
+    await t.wait(0.2);
+    t.ok((await t.ev('g.hud.els.nature.textContent')).includes('Cotton'), 'crop hint not showing before the wildlife stub');
+    // stub a wildlife hit while standing on the field, without a real nearby animal
+    await t.ev(`(window.__origAnimalsUpdate = g.animals.update.bind(g.animals),
+      g.animals.update = () => {}, g.animals.nearby = { species: 'deer', d2: 4 })`);
+    await t.wait(0.2);
+    const txt = await t.ev('g.hud.els.nature.textContent');
+    t.ok(txt.includes('White-tailed Deer'), `wildlife didn't win priority over the crop hint: "${txt}"`);
+    await t.ev('g.animals.update = window.__origAnimalsUpdate'); // restore the real wiring
+    await t.tp(haleFieldX, haleFieldZ, 'DRIVE'); // leave the suite grounded in DRIVE
+  });
 }

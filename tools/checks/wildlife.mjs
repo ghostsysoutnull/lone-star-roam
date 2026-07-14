@@ -67,6 +67,19 @@ export default async function wildlife(t) {
     await t.until(`g.gameplay.save.species.includes('${herd.species}')`, 10000);
   });
 
+  await t.check('HUD nearby readout: populated close up, cleared far away', async () => {
+    const pos = await t.ev('({ x: window.__herd[0].g.position.x, z: window.__herd[0].g.position.z })');
+    await t.tp(pos.x + 4, pos.z, 'WALK');
+    await t.wait(0.2);
+    const near = await t.ev('g.animals.nearby && g.animals.nearby.species');
+    t.ok(near === herd.species, `nearby readout wrong up close: ${near} (want ${herd.species})`);
+    await t.tp(pos.x + 400, pos.z, 'WALK');
+    await t.wait(0.2);
+    const far = await t.ev('g.animals.nearby');
+    t.ok(far === null, `nearby readout didn't clear far away: ${JSON.stringify(far)}`);
+    await t.tp(pos.x + 4, pos.z, 'WALK'); // back in range for downstream checks
+  });
+
   await t.check('animals honor their hours (night)', async () => {
     await t.setNight();
     await t.wait(0.4);

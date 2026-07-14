@@ -1,7 +1,7 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
 import { loadGeo, GEO, nearestRoad, waterAt, countyAt, hAt, inTexas, seededRand, agAt } from './geo.js';
-import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt } from './world.js';
+import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { initDebug } from './debug.js';
 import { CitySystem } from './cities.js';
@@ -210,7 +210,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -261,7 +261,14 @@ async function boot() {
     const pNear = (npcName || skyHint) ? null : plaqueNear(player.pos, 28);
     hud.interactHint(npcName ? `talk to ${npcName}` : skyHint ? skyHint
       : pNear && pNear.name !== plaqueOpen ? pNear.hint : null);
-    hud.brandSizeHint(brandNear(player.pos.x, player.pos.z, 60));
+    hud.brandSizeHint(player.mode !== 'FLY' && brandNear(player.pos.x, player.pos.z, 60));
+    // ground-level nature readout — wildlife beats crop/pivot, both suppressed in FLY
+    if (player.mode === 'FLY') hud.natureHint(null);
+    else if (animals.nearby) hud.natureHint(`🐾 ${SPECIES[animals.nearby.species].name}`);
+    else {
+      const field = fieldAt(player.pos.x, player.pos.z);
+      hud.natureHint(field ? `🌾 ${field.crop[0].toUpperCase()}${field.crop.slice(1)}` : null);
+    }
     // walked away from an open plaque (either source): close it
     if (plaqueOpen && (!pNear || pNear.name !== plaqueOpen) && !plaqueNear(player.pos, 40)) {
       hud.dialog(null);
