@@ -1,11 +1,39 @@
 # Lone Star Roam — next session kickoff
 
-No active priority track. The Agriculture track (waves 1–5, + the 4.5 crop
-visuals, 5.5 HUD and 5b historic-ranch follow-ons) shipped in full
-2026-07-14 and is folded into `ROADMAP.md`; `AGRICULTURE_SPEC.md` stays as
-history. Queued work and pending playtests live in `BACKLOG.md`. A playtest
-of the EIGHT ranch compounds (wave 5's four + 5b's JA/XIT/Matador/LBJ, incl.
-landing at the new LBJ strip) is the natural next Bruno errand.
+## Session briefing
+- **This session**: the Shoulder & the Shelf (`SHOULDER_SHELF_SPEC.md`),
+  wave 1 of 6 — "the ground stops ending": DEM rebake on a wider grid,
+  Padre rings restored into `inTexas`, new `inWorld` bounds (20-mi land
+  shoulder / 70-mi shelf), soft wall relocated with per-edge messages,
+  band terrain + big-map margin, out-of-state HUD line (state +
+  parish/county, toast-only), through-highway stubs refetched. Spec locked
+  2026-07-14 (design conversation same day).
+- **Recommended setup**: model **Sonnet 5**, effort **high** — structural/
+  pipeline wave, no register writing. Flag it if the running model differs.
+- **Budget**: pipeline rebakes + boundary code + checks; no shots;
+  grep-first; ≤2 full-file reads; Overpass via GET (POST 406s here).
+  Frozen-baseline checks: in-Texas scenery/rose byte-determinism,
+  `inTexas` semantics unchanged, county counter silent outside, soft wall
+  measured at all four edges + offshore.
+- **Then**: rewrite this block for wave 2 (Padre & the coast road,
+  Fable 5).
+
+Gotchas for wave 1 specifically:
+- `ELEV` grid constants are duplicated (`tools/build-elevation.mjs` ↔
+  geo.js) and the projection is duplicated (`tools/build-data.mjs` `proj`
+  ↔ `LL()` in gameplay.js/maritime.js/travel.js) — change all sites or none.
+- `build-data.mjs` needs its inputs re-supplied (not in repo) to rebuild
+  `border.json` with Padre's rings — ask Bruno for `us-states.json` or
+  refetch Census 500k.
+- Padre joining `inTexas` legitimately creates NEW scenery/animal chunks
+  on the island (chunk-keyed streams — existing chunks stay byte-identical;
+  the W1 baseline check proves it). Do not "fix" that by gating the island
+  out.
+- Agriculture/chapel/farmstead/brand generators stay `inTexas`-gated by
+  law (spec Laws) — the shoulder gets none of them.
+
+Playtest still owed (pre-track): the EIGHT ranch compounds (wave 5's four
++ 5b's JA/XIT/Matador/LBJ, incl. landing at the new LBJ strip).
 
 Gotchas from waves 5/5b (whoever touches the ranch compounds, `world.js`
 sites, `airports.js`, or `animals.js` next must know):
