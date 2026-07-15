@@ -369,6 +369,36 @@ export function inWorld(x, z) {
   return nearestDist(x, z, GEO.border) <= (zone === 'coast' ? SHELF_U : SHOULDER_U);
 }
 
+// The Tidelands line: Texas uniquely kept 3 marine leagues (10.36 mi) of Gulf
+// when it joined the Union — state water reaches 166.7u offshore, then the
+// federal shelf. Distance is to the nearest Texas COAST — the coastal border
+// stretch plus the island rings (off Padre the line runs 166.7u from the
+// island beach, not the Laguna Madre mainland). Shared by inStateWater, the
+// gulf's blue-water vertex band (world.js) and the big-map dashed line (hud.js).
+export const TIDELANDS_U = 166.7;
+let coastSegs = null; // lazy: GEO data isn't loaded when the module evals
+export function coastDist(x, z) {
+  if (!coastSegs) {
+    coastSegs = [];
+    const B = GEO.border, zones = GEO.borderZones ?? [];
+    for (let i = 0, j = B.length - 1; i < B.length; j = i++)
+      if (zones[i] === 'coast' && zones[j] === 'coast') coastSegs.push([B[j], B[i]]);
+    for (const ring of GEO.islands)
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) coastSegs.push([ring[j], ring[i]]);
+  }
+  let best = Infinity;
+  for (const [a, b] of coastSegs) {
+    const p = closestOnSeg(x, z, a, b);
+    const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
+    if (d < best) best = d;
+  }
+  return Math.sqrt(best);
+}
+export function inStateWater(x, z) {
+  if (inTexas(x, z)) return false;
+  return classify(x, z) === 'coast' && coastDist(x, z) <= TIDELANDS_U;
+}
+
 // What kind of out-of-Texas point this is — 'land'/'coast'/'mexico'.
 export function borderZoneAt(x, z) {
   return classify(x, z);

@@ -2,6 +2,7 @@
 // on coastal lanes, shrimp boats off Padre, oil platforms offshore.
 import * as THREE from 'three';
 import { hAt } from './geo.js';
+import { ATMOS } from './sky.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const SEA = -2.1; // gulf water plane is at -2.5; hulls sit slightly proud
@@ -21,11 +22,36 @@ const LANE = [
   LL(28.8, -95.5), LL(29.2, -94.8), LL(29.4, -94.2), LL(29.55, -93.7),
 ];
 
+// Tidelands buoy — ON the line (coastDist ≈ 166.7u, converged against
+// border + island rings offline), off the Bolivar Roads entrance channel
+const BUOY_AT = [4762.2, 1851.5];
+// the real 64.1-mi platform off Matagorda — the Far Rig, alone past the blue line
+const FAR_RIG = LL(28.0, -95.0);
+
 export class MaritimeSystem {
   constructor(scene) {
+    // emissive glow materials (rig flares, work lights, buoy lamp) — opacity
+    // driven by ATMOS.night in update; fog:false so the horizon skyline
+    // survives scene fog (sky.js owns all real lights, these are just glow)
+    const mkGlow = (color) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, fog: false, blending: THREE.AdditiveBlending, depthWrite: false });
+    this.rigGlow = mkGlow(0xffa848);
+    this.workGlow = mkGlow(0xfff0c0);
     this.buildPorts(scene);
     this.buildPlatforms(scene);
     this.ships = this.buildShips(scene);
+    this.buoy = this.buildBuoy(scene);
+    // shelf plaques — readable brass, NOT landmarks (the counters stay sacred);
+    // main.js's unified plaqueNear consults this list as its third source
+    this.plaques = [
+      {
+        name: 'Tidelands Buoy', at: BUOY_AT, hint: 'read the channel buoy', sub: 'Three marine leagues',
+        text: 'A republic drives a hard bargain. When Texas traded its flag for a star in 1845, it kept what no other Gulf state was given: three marine leagues of open sea — 10.36 miles of water, bed, and everything beneath it. You are floating on the line. Landward of this buoy, Texas. Seaward, the federal shelf and the deep blue.',
+      },
+      {
+        name: 'The Far Rig', at: FAR_RIG, hint: 'read the brass plate', sub: '64.1 miles out',
+        text: 'The farthest platform off this coast — sixty-four miles from the sand, long past the blue line, alone. Crews rotate out by helicopter, two weeks at a stretch. At night her flare is the only thing on the whole horizon that stays put, and the shrimpers steer home by her like a lit porch.',
+      },
+    ];
     // lane cumulative lengths
     this.cum = [0];
     for (let i = 1; i < LANE.length; i++) {
@@ -88,32 +114,73 @@ export class MaritimeSystem {
   }
 
   buildPlatforms(scene) {
-    // offshore oil platforms, roughly along the real OCS fields
+    // offshore oil platforms, roughly along the real OCS fields; the last
+    // entry is the Far Rig (64.1 mi) — bigger everything, helipad, twin flare
     const spots = [
       LL(28.9, -94.7), LL(28.4, -95.3), LL(29.3, -93.9), LL(27.9, -96.3),
-      LL(28.0, -95.0), LL(29.0, -93.6), LL(27.2, -96.9),
+      FAR_RIG, LL(29.0, -93.6), LL(27.2, -96.9),
     ];
     const steel = new THREE.MeshLambertMaterial({ color: 0xb0a020, flatShading: true });
     const dark = new THREE.MeshLambertMaterial({ color: 0x4a4a52, flatShading: true });
+    this.platforms = [];
     for (const [x, z] of spots) {
+      const far = x === FAR_RIG[0] && z === FAR_RIG[1];
       const g = new THREE.Group();
+      const s = far ? 1.5 : 1; // Far Rig reads bigger from the water
       for (const [lx, lz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) {
-        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.35, 6, 6), dark);
-        leg.position.set(lx, SEA + 2, lz);
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.3 * s, 0.35 * s, 6, 6), dark);
+        leg.position.set(lx * s, SEA + 2, lz * s);
         g.add(leg);
       }
-      const deck = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.7, 6.5), steel);
+      const deck = new THREE.Mesh(new THREE.BoxGeometry(6.5 * s, 0.7, 6.5 * s), steel);
       deck.position.y = SEA + 5;
       const mod = new THREE.Mesh(new THREE.BoxGeometry(3, 1.8, 2.4), dark);
-      mod.position.set(-1, SEA + 6.3, -1);
-      const derrick = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.7, 5, 4), steel);
-      derrick.position.set(1.8, SEA + 7.8, 1.5);
-      const flare = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff8830 }));
-      flare.position.set(1.8, SEA + 10.4, 1.5);
-      g.add(deck, mod, derrick, flare);
+      mod.position.set(-1 * s, SEA + 6.3, -1 * s);
+      const derrick = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.7, 5 * s, 4), steel);
+      derrick.position.set(1.8 * s, SEA + 5.35 + 2.5 * s, 1.5 * s);
+      const flare = new THREE.Mesh(new THREE.SphereGeometry(0.3 * s, 6, 5), new THREE.MeshBasicMaterial({ color: 0xff8830 }));
+      flare.position.set(1.8 * s, SEA + 5.35 + 5 * s + 0.4, 1.5 * s);
+      // night glow around the flare tip — from Malaquite the horizon gets a skyline
+      const glow = new THREE.Mesh(new THREE.SphereGeometry(far ? 2.4 : 1.5, 8, 6), this.rigGlow);
+      glow.position.copy(flare.position);
+      g.add(deck, mod, derrick, flare, glow);
+      if (far) {
+        // second crew module + helipad on the seaward corner
+        const mod2 = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.6, 2.2), new THREE.MeshLambertMaterial({ color: 0xd8d0c0, flatShading: true }));
+        mod2.position.set(-2.2, SEA + 6.7, 2.4);
+        const pad = new THREE.Mesh(new THREE.CylinderGeometry(2.3, 2.3, 0.25, 8), dark);
+        pad.position.set(3.6, SEA + 6.2, -3.4);
+        const padLight = new THREE.Mesh(new THREE.SphereGeometry(0.9, 6, 5), this.workGlow);
+        padLight.position.set(3.6, SEA + 6.8, -3.4);
+        g.add(mod2, pad, padLight);
+      }
       g.position.set(x, 0, z);
+      g.userData.far = far;
       scene.add(g);
+      this.platforms.push(g);
     }
+  }
+
+  buildBuoy(scene) {
+    // red nun buoy bobbing on the Tidelands line itself
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.65, 1.6, 8), new THREE.MeshLambertMaterial({ color: 0xc23b30, flatShading: true }));
+    body.position.y = SEA + 0.7;
+    const cage = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.16, 1.3, 5), new THREE.MeshLambertMaterial({ color: 0x4a4a52, flatShading: true }));
+    cage.position.y = SEA + 2.1;
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.45, 6, 5), this.workGlow);
+    lamp.position.y = SEA + 2.9;
+    g.add(body, cage, lamp);
+    g.position.set(BUOY_AT[0], 0, BUOY_AT[1]);
+    scene.add(g);
+    return g;
+  }
+
+  // shelf plaques (buoy + Far Rig) for main.js's unified plaque lookup
+  plaqueNear(pos, range) {
+    for (const p of this.plaques)
+      if (Math.hypot(pos.x - p.at[0], pos.z - p.at[1]) < range) return p;
+    return null;
   }
 
   buildShips(scene) {
@@ -153,7 +220,12 @@ export class MaritimeSystem {
       const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 4), new THREE.MeshLambertMaterial({ color: 0x6a5a3a }));
       boom.position.set(0, SEA + 1.6, 0.6);
       boom.rotation.z = 0.7;
-      g.add(hull, cabin, boom);
+      // night work-lights — shrimpers fish after dark, decks lit up
+      const l1 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 5), this.workGlow);
+      l1.position.set(0.8, SEA + 2.4, 1.2);
+      const l2 = new THREE.Mesh(new THREE.SphereGeometry(0.24, 6, 5), this.workGlow);
+      l2.position.set(0, SEA + 1.5, -0.5);
+      g.add(hull, cabin, boom, l1, l2);
       return g;
     };
 
@@ -174,6 +246,12 @@ export class MaritimeSystem {
   }
 
   update(dt, t) {
+    // night gate for every glow (rig flares, work lights, buoy lamp)
+    this.rigGlow.opacity = ATMOS.night;
+    this.workGlow.opacity = ATMOS.night;
+    // the buoy bobs on the line
+    this.buoy.position.y = Math.sin(t * 0.8) * 0.12;
+    this.buoy.rotation.z = Math.sin(t * 0.55) * 0.06;
     for (const s of this.ships) {
       if (s.lane) {
         s.s += s.speed * s.dir * dt;

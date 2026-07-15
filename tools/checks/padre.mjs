@@ -105,7 +105,7 @@ export default async function padre(t) {
       legendCount: Object.keys(g.LEGENDS).length,
     })`);
     t.ok(res.critters === String(res.species), `critter total ${res.critters} !== SPECIES table ${res.species}`);
-    t.ok(res.species === 26, `species table is ${res.species}, expected 26 (25 + W4's dolphin)`);
+    t.ok(res.species === 28, `species table is ${res.species}, expected 28 (26 + W5's spoonbill + crane)`);
     t.ok(res.legends === String(res.legendCount), `legend total ${res.legends} !== LEGENDS table ${res.legendCount}`);
   });
 

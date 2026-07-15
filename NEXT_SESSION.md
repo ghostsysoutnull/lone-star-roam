@@ -2,23 +2,62 @@
 
 ## Session briefing
 - **This session**: the Shoulder & the Shelf (`SHOULDER_SHELF_SPEC.md`),
-  wave 5 of 7 — "The Shelf" (content). Tidelands dashed line on the big
-  map + buoy plaque ("A republic drives a hard bargain…"); blue-water
-  band beyond it; rig night presence (emissive flares, night-gated —
-  from Malaquite the horizon has a skyline); the **Far Rig** (the real
-  64.1-mi platform, upgraded prop + plaque, alone past the blue line);
-  the **1554 treasure light** legend off the Mansfield Cut — new-moon
-  nights only, inside state water (the ghost stays in Texas), drifts
-  away, gone by dawn (legends +1, 2→3); shrimp fleet night work-lights;
-  **roseate spoonbill** + **whooping crane** at Aransas (species +2,
-  26→28; crane fact mentions wintering, birds present year-round — no
-  seasons yet). W4 (Ferries & the working water) shipped 2026-07-15,
-  commit `3ce3365`.
+  wave 6a of 7 — "The Shoulder east" (content) + the crossing ceremony.
+  The Neutral Ground: cypress/moss flora rows, frogs-over-crickets
+  ambience, crawfish ponds off the rice prairie, Vinton fireworks barns,
+  Neutral Ground plaque. Texarkana: State Line Ave, the two-state federal
+  building, the straddle spot. **WinBig World Casino** parody at the Red
+  River (exterior + lot only; the Texas plates are the joke). **Black
+  bear** in the Sabine pines (species +1, 28→29, rare, flees).
+  Beyond-band glow + control-city signs east (Lake Charles, New Orleans,
+  Natchitoches). Ceremony ships with 6a: granite WELCOME TO TEXAS —
+  DRIVE FRIENDLY monuments + bluebonnet beds at the major crossings,
+  muted leaving toast ("You're leaving Texas. It'll be here."), warm
+  return chime + occasional "Miss us?", state-stamp Passport wiring, and
+  the 7 **Corner Stones** → `save.passport.stones`. W5 (The Shelf)
+  shipped 2026-07-15, commit `TBD`.
 - **Recommended setup**: model **Fable 5**, effort **high** — content/
-  register wave (plaque copy, legend flavor, bird facts), per the
-  spec's model table. Flag it if the running model differs.
+  register wave (vignettes, plaque copy, ceremony), per the spec's model
+  table. Flag it if the running model differs.
 - **Budget**: code + checks, no shots, grep-first.
-- **Then**: rewrite this block for wave 6a (The Shoulder east, Fable 5).
+- **Then**: rewrite this block for wave 6b (The Shoulder west, Fable 5;
+  6b rewrites for W7).
+
+Gotchas from W5 (whoever touches the Gulf, the map layers, legends,
+species counts, or offshore anything next must know):
+- **New seed streams** (never reuse/rename): `treasure-drift` (light
+  jitter), `aransasflock` (Blackjack Peninsula birds).
+- **Table-size checks after W5**: species **28** (`ag.mjs`, `padre.mjs`)
+  — W6a's bear bumps both to 29; legends **3** and `shelf.mjs` hardcodes
+  the '3' in its treasure check (same class as the species literals —
+  a 4th legend must bump it).
+- **`coastDist(x,z)` (geo.js) is the ONE coastal distance field** —
+  coastal border stretch + island rings, shared by `inStateWater`, the
+  gulf's vertex-colored blue-water band (world.js `buildWater`) and the
+  big-map dashed Tidelands contour (hud.js). Off Padre the line runs
+  166.7u from the *island* beach, not the Laguna Madre mainland — any
+  new offshore consumer uses `coastDist`, never distance-to-`GEO.border`.
+- **The map contour is marching squares, not offset border vertices** —
+  the coast polygon wanders through bays (Galveston), so normal-offset
+  points come out unordered garbage; the field contour needs no ordering.
+  Big map only (minimap Law); segment midpoints on `hud.tidelands`.
+- **Gulf plane is ONE vertex-colored mesh now** (`name: 'gulf'`) — never
+  add a second near-coplanar water plane (z-fight); recolor via the
+  vertex loop. THREE.Color stores linear-sRGB: teal 0x2e6f9e reads
+  ~0.158 green in the attribute, not 0.435 — checks compare linear.
+- **Maritime plaques are NOT landmarks** (counters sacred — landmark
+  table stays 38): `maritime.plaques` + `plaqueNear` is the third branch
+  in main.js's unified lookup. New offshore brass = append to that list.
+- **Night glows**: `maritime.rigGlow`/`workGlow` are shared materials,
+  `fog: false` (horizon skyline dies without it), opacity = ATMOS.night
+  each update — reuse them, don't mint per-prop glow mats.
+- **Treasure light gate matches sky.js's New Moon label** —
+  `round(days % 8) === 4`, driven by `sky.days`. It recedes via
+  `haunts.tPos` but only onto points passing `inStateWater`; `T_*` knobs
+  at the top of haunts.js.
+- **Aviation flaked at `-j4` this session** (A3 medical dedup — clean
+  standalone). The old "clean at -j4" note is dead: any aviation FAIL in
+  a parallel run gets one standalone rerun before investigation.
 
 Gotchas from W4 (whoever touches ferries, the Gulf, species/landmark
 counts, or vehicle.js's per-mode physics next must know):
@@ -117,13 +156,14 @@ Carried over (evergreen until the track closes):
   the band arrays into them) — rose indices and the 132/254 counters
   depend on them. Band data lives in `GEO.bandHighways`/`GEO.bandCities`.
 - **Table-size checks to bump on any addition**: 27 airports / 7-15-5 by
-  tier / 22 gate signs (`aviation.mjs`, `hud.mjs`), species 26
-  (`ag.mjs`, `padre.mjs`), landmarks 38 (`padre.mjs`).
+  tier / 22 gate signs (`aviation.mjs`, `hud.mjs`), species 28
+  (`ag.mjs`, `padre.mjs`), landmarks 38 (`padre.mjs`), legends 3
+  (`shelf.mjs`).
 - **`save.passport`** is additive `{stamps, towns, landings, stones}`;
   `stones` stays empty until W6. State stamps gate on `inWorld`.
-- **Aviation.mjs flakes under heavy `-j`** (real-loop-timing checks;
-  confirmed again this session at `-j6`, clean standalone and at
-  `-j4`) — rerun lower before assuming a regression.
+- **Aviation.mjs flakes under any parallel `-j`** (real-loop-timing
+  checks; W5 saw it at `-j4`, clean standalone) — one standalone rerun
+  before assuming a regression.
 - Agriculture/chapel/farmstead/brand generators stay `inTexas`-gated by
   law; the shoulder gets none of them. Padre being `inTexas` means it
   legitimately gets scenery/animal chunks — do not gate the island out.
@@ -164,7 +204,9 @@ Gotchas from W1 still standing (geo/map plumbing):
 
 Playtest still owed (pre-track): the EIGHT ranch compounds (wave 5's
 four + 5b's JA/XIT/Matador/LBJ, incl. landing at the new LBJ strip) —
-and now Padre: causeway arrival, beach drive, dawn turtle release.
+and now Padre: causeway arrival, beach drive, dawn turtle release — and
+the Shelf: the rig skyline from Malaquite at night, the buoy + Far Rig
+plaques, the treasure light on a new-moon night, the Aransas birds.
 
 Gotchas from waves 5/5b (ranch compounds, `world.js` sites,
 `airports.js`, `animals.js`):

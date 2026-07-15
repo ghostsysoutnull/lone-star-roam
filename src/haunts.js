@@ -6,7 +6,7 @@
 // a haunted graveyard stays haunted all night and every player sees the same
 // night the same way). The nearest chapel also tolls its bell at midnight.
 import * as THREE from 'three';
-import { seededRand, hAt } from './geo.js';
+import { seededRand, hAt, inStateWater } from './geo.js';
 import { ATMOS } from './sky.js';
 import { chapelSitesNear } from './world.js';
 
@@ -17,6 +17,7 @@ export const EROCK = LL(30.5064, -98.8198); // Enchanted Rock — the landmark's
 export const LEGENDS = {
   wisps: { name: 'Cemetery Lights', fact: 'Ghost candles, the old folks called them — pale lights drifting over lonely Texas graves. They dim if you walk out to look.' },
   ghostfires: { name: 'Ghost Fires of Enchanted Rock', fact: 'The Tonkawa saw spirit fires flicker on the dome at night — and heard the granite groan as it cooled in the dark. It still does both.' },
+  treasure: { name: 'The 1554 Treasure Light', fact: 'Three Spanish treasure ships broke up off Padre Island in 1554, and the salvage crews never got it all. On new-moon nights a gold light rides the swell off the Mansfield Cut — always inside Texas water, always a little farther out than you are, gone by first light.' },
 };
 export const LEGEND_COUNT = Object.keys(LEGENDS).length;
 
@@ -28,6 +29,15 @@ const FADE_NEAR = 10, FADE_FULL = 25; // approach fade: gone by 10, full past 25
 const WATCH_R = 45, WATCH_T = 2.5;    // watch this close, this long → legend
 const FIRE_SEE = 400, FIRE_LOG = 130; // ghost-fire draw / sighting radii
 const BELL_R = 160;                   // hear the midnight bell this far out
+
+// the 1554 treasure light — off the Mansfield Cut, coastDist ≈ 99u (state
+// water; the Tidelands line is 166.7). Verified against border+islands offline.
+const TREASURE_AT = [2227.9, 4942.6];
+const T_SEE = 420;   // draw radius
+const T_FLEE = 60;   // starts receding when the player presses this close
+const T_SPEED = 6;   // recede pace — a patient boat, never a chase
+const T_LOG = 80;    // watch from inside this (for WATCH_T) → the log
+const T_RESET = 600; // player this far gone → the light slips home
 
 export class HauntSystem {
   constructor(scene, onLegend, onBell) {
@@ -61,6 +71,16 @@ export class HauntSystem {
     this.fires.visible = false;
     this.fires.frustumCulled = false;
     scene.add(this.fires);
+
+    // the 1554 treasure light: one gold glow over the water, new-moon nights
+    this.tMat = new THREE.MeshBasicMaterial({ color: 0xffd890, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    this.treasure = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), this.tMat);
+    this.treasure.visible = false;
+    scene.add(this.treasure);
+    this.tPos = new THREE.Vector3(TREASURE_AT[0], -1.2, TREASURE_AT[1]);
+    this.tWatch = 0;
+    const tr = seededRand('treasure-drift');
+    this.tJit = [tr() * Math.PI * 2, tr() * Math.PI * 2];
 
     this.m4 = new THREE.Matrix4();
     this.p = new THREE.Vector3();
@@ -151,5 +171,35 @@ export class HauntSystem {
       this.fireMat.opacity = 0.85 * nightRamp * fade;
       if (this.fireMat.opacity > 0.15 && fd < FIRE_LOG) this.onLegend?.('ghostfires');
     } else this.fireMat.opacity = 0;
+
+    // --- the 1554 treasure light (new-moon nights, off the Mansfield Cut) ---
+    // gate matches sky.js's 'New Moon' label exactly: round((days%8)) === 4
+    const newMoon = Math.abs(((days % 8) + 8) % 8 - 4) < 0.5;
+    const td = Math.hypot(this.tPos.x - px, this.tPos.z - pz);
+    const tOn = (newMoon || this.force) && nightRamp > 0 && td < T_SEE;
+    this.treasure.visible = tOn;
+    if (tOn) {
+      // recede from a pursuer — the ghost stays in Texas water, always
+      if (td < T_FLEE && td > 0.01) {
+        const nx = this.tPos.x + ((this.tPos.x - px) / td) * T_SPEED * dt;
+        const nz = this.tPos.z + ((this.tPos.z - pz) / td) * T_SPEED * dt;
+        if (inStateWater(nx, nz)) { this.tPos.x = nx; this.tPos.z = nz; }
+      }
+      this.treasure.position.set(
+        this.tPos.x + Math.sin(this.t * 0.5 + this.tJit[1]) * 0.6,
+        -1.2 + Math.sin(this.t * 0.9 + this.tJit[0]) * 0.25, // riding the swell
+        this.tPos.z
+      );
+      this.treasure.scale.setScalar(1 + 0.3 * Math.sin(this.t * 3.1 + this.tJit[0]));
+      const fade = Math.min(1, Math.max(0, (td - 12) / 18)); // gone by 12, full past 30
+      this.tMat.opacity = 0.9 * nightRamp * fade;
+      if (this.tMat.opacity > 0.15 && td < T_LOG) {
+        this.tWatch += dt;
+        if (this.tWatch > WATCH_T) this.onLegend?.('treasure');
+      }
+    } else {
+      this.tMat.opacity = 0;
+      if (td > T_RESET) { this.tPos.set(TREASURE_AT[0], -1.2, TREASURE_AT[1]); this.tWatch = 0; }
+    }
   }
 }

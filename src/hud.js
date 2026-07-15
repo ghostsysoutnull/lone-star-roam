@@ -1,6 +1,6 @@
 // HUD: minimap + fullscreen map (border/highways pre-rendered once), text readouts, toasts, dialog.
 import { Vector3 } from 'three';
-import { GEO, nearestCity, SHOULDER_U, SHELF_U } from './geo.js';
+import { GEO, nearestCity, inTexas, borderZoneAt, SHOULDER_U, SHELF_U, TIDELANDS_U, coastDist } from './geo.js';
 import { AIRPORTS, fieldNear } from './airports.js';
 import { ATMOS } from './sky.js';
 
@@ -151,6 +151,53 @@ export class HUD {
       ctx.closePath();
       ctx.fillStyle = '#20261c'; ctx.fill();
       ctx.strokeStyle = '#c8b878'; ctx.lineWidth = 1; ctx.stroke();
+    }
+    // Tidelands line — big map only (the minimap Law). Marching squares on
+    // the coastDist field (border-vertex normal offsets fail here: the coast
+    // polygon wanders through bays, so offset points come out unordered).
+    // Cell-local contour segments need no global ordering; skipping alternate
+    // 80u bands gives the dashes. Two-level refinement keeps boot cheap.
+    // Drawn-segment midpoints stay on `this.tidelands` for the verify suite.
+    if (isWide && GEO.borderZones?.length) {
+      this.tidelands = [];
+      ctx.save();
+      ctx.strokeStyle = '#5a86a8'; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
+      const FINE = 20, COARSE = 160, X0 = 1400, X1 = 5800, Z0 = 900, Z1 = 6000;
+      const f = (x, z) => coastDist(x, z) - TIDELANDS_U;
+      ctx.beginPath();
+      for (let cx = X0; cx < X1; cx += COARSE) {
+        for (let cz = Z0; cz < Z1; cz += COARSE) {
+          // contour can only cross a coarse cell if a corner is within reach
+          const near = [[cx, cz], [cx + COARSE, cz], [cx, cz + COARSE], [cx + COARSE, cz + COARSE]]
+            .some(([x, z]) => Math.abs(f(x, z)) <= COARSE * 1.45);
+          if (!near) continue;
+          for (let x = cx; x < cx + COARSE; x += FINE) {
+            for (let z = cz; z < cz + COARSE; z += FINE) {
+              const v = [f(x, z), f(x + FINE, z), f(x + FINE, z + FINE), f(x, z + FINE)];
+              // edge crossings, linearly interpolated (corner order: ccw from NW)
+              const E = [[x, z, x + FINE, z, v[0], v[1]], [x + FINE, z, x + FINE, z + FINE, v[1], v[2]],
+                [x + FINE, z + FINE, x, z + FINE, v[2], v[3]], [x, z + FINE, x, z, v[3], v[0]]];
+              const hits = [];
+              for (const [ax, az, bx, bz, fa, fb] of E) {
+                if (fa < 0 === fb < 0) continue;
+                const t = fa / (fa - fb);
+                hits.push([ax + (bx - ax) * t, az + (bz - az) * t]);
+              }
+              if (hits.length < 2) continue;
+              const mx = (hits[0][0] + hits[1][0]) / 2, mz = (hits[0][1] + hits[1][1]) / 2;
+              // keep the offshore contour only — the same field has a twin
+              // 166.7u INLAND, and arcs into Mexico water past Boca Chica
+              if (inTexas(mx, mz) || borderZoneAt(mx, mz) !== 'coast') continue;
+              this.tidelands.push([mx, mz]);
+              if (((Math.floor(x / 80) + Math.floor(z / 80)) & 1) === 0) continue; // the dash gaps
+              const [p1x, p1z] = T(hits[0][0], hits[0][1]), [p2x, p2z] = T(hits[1][0], hits[1][1]);
+              ctx.moveTo(p1x, p1z); ctx.lineTo(p2x, p2z);
+            }
+          }
+        }
+      }
+      ctx.stroke();
+      ctx.restore();
     }
     // county lines beneath everything
     ctx.strokeStyle = '#3d4438';

@@ -61,6 +61,10 @@ export const SPECIES = {
     fact: 'An Indian antelope with corkscrew horns — more live on Texas ranches than in much of its native range.' },
   hereford: { name: 'Hereford', speed: 3, fleeR: 0, behavior: 'graze', bob: false,
     fact: 'Red coat, white face — the breed that restocked the Panhandle after the longhorn era.' },
+  spoonbill: { name: 'Roseate Spoonbill', speed: 7, fleeR: 8, behavior: 'graze', bob: false, nightMax: 0.6,
+    fact: 'Not a flamingo — the pink comes from the same shrimp diet. Sweeps that spoon of a bill through the shallows like a metal detector.' },
+  crane: { name: 'Whooping Crane', speed: 8, fleeR: 14, behavior: 'graze', bob: false, nightMax: 0.6,
+    fact: 'The tallest bird in America, and nearly lost — the whole wild flock winters at Aransas, and every one of them gets counted.' },
   bat: { name: 'Mexican Free-tailed Bat', event: true,
     fact: 'Austin hosts the largest urban bat colony on Earth.' },
   kempsridley: { name: 'Kemp’s Ridley Sea Turtle', event: true, // turtles.js dawn release at Malaquite
@@ -132,6 +136,10 @@ const RANCH_ARCHES = [
 // (34.41 N −101.06 W through the gameplay LL projection)
 const BISON_SITE = { x: -1488.5, z: -3796, cx: -6, cz: -15 };
 
+// Aransas NWR, Blackjack Peninsula (28.26 N −96.83 W) — the wintering
+// whooping cranes and their pink neighbors; one curated site, bison pattern
+const ARANSAS_SITE = { x: 2547.7, z: 3050.2, cx: 9, cz: 11 };
+
 export class AnimalSystem {
   constructor(scene, onSpotted) {
     this.scene = scene;
@@ -143,6 +151,7 @@ export class AnimalSystem {
     this.regionTable = regionTable; // exposed for verify — reads spawn odds without resampling chunks
     this.censusTable = censusTable; // ditto for the census-scaled livestock rows
     this.bisonSite = BISON_SITE;
+    this.aransasSite = ARANSAS_SITE;
     this.ranchArches = RANCH_ARCHES; // ditto for the wave-4 arch herd boost
     this.nearby = null; // {species, d2} — nearest visible animal within NEARBY_R, for the HUD readout
   }
@@ -397,6 +406,12 @@ export class AnimalSystem {
     if (cx === BISON_SITE.cx && cz === BISON_SITE.cz)
       home(seededRand('bisonherd'), 'bison', BISON_SITE.x, BISON_SITE.z, 6, 12);
 
+    if (cx === ARANSAS_SITE.cx && cz === ARANSAS_SITE.cz) {
+      const ar = seededRand('aransasflock');
+      home(ar, 'spoonbill', ARANSAS_SITE.x - 6, ARANSAS_SITE.z + 10, 4, 7);
+      home(ar, 'crane', ARANSAS_SITE.x + 14, ARANSAS_SITE.z - 8, 3, 9);
+    }
+
     // wave-5 ranch HQ compounds — signature herds at the same ranchHQAt site
     // scenery dresses; own stream, drawn after everything above
     const hq = ranchHQAt(cx, cz);
@@ -594,6 +609,34 @@ function mkAnimal(species, rand) {
       box(g, 0.3, 0.03, 0.34, 1.32, 0.13, 0, mat(0x2a2622));
       box(g, 0.14, 0.14, 0.18, 0, 0.08, -0.36, white);        // head
       box(g, 0.06, 0.05, 0.34, 0, 0.02, -0.58, mat(0xd8a04a)); // the famous beak
+      break;
+    }
+    case 'spoonbill': {
+      const pink = mat(0xe89aa8);
+      const pale = mat(0xf0e8e0);
+      const bill = mat(0x8a8a80);
+      box(g, 0.26, 0.24, 0.5, 0, 0.62, 0, pink);              // body
+      box(g, 0.28, 0.05, 0.34, 0, 0.75, 0.04, mat(0xd06a80)); // folded wings, deeper pink
+      box(g, 0.07, 0.32, 0.07, 0, 0.88, -0.24, pale);         // neck
+      box(g, 0.09, 0.09, 0.13, 0, 1.05, -0.29, pale);         // head
+      box(g, 0.05, 0.03, 0.28, 0, 1.02, -0.48, bill);         // the bill...
+      box(g, 0.1, 0.04, 0.1, 0, 1.02, -0.64, bill);           // ...and the spoon
+      box(g, 0.035, 0.5, 0.035, -0.07, 0.25, 0.04, mat(0xc05a60)); // stilt legs
+      box(g, 0.035, 0.5, 0.035, 0.07, 0.25, 0.04, mat(0xc05a60));
+      break;
+    }
+    case 'crane': {
+      const white = mat(0xf2efe8);
+      const dark = mat(0x2a2622);
+      box(g, 0.3, 0.3, 0.6, 0, 0.95, 0, white);               // body
+      box(g, 0.26, 0.06, 0.3, 0, 1.1, 0.24, mat(0x1e1c1a));   // black primaries at the tail
+      const neck = box(g, 0.08, 0.55, 0.08, 0, 1.35, -0.28, white);
+      neck.rotation.x = 0.18;
+      box(g, 0.1, 0.1, 0.16, 0, 1.64, -0.38, white);          // head
+      box(g, 0.08, 0.04, 0.07, 0, 1.7, -0.36, mat(0xb03028)); // the red crown
+      box(g, 0.04, 0.04, 0.22, 0, 1.62, -0.53, mat(0x3a352e)); // spear of a bill
+      box(g, 0.04, 0.85, 0.04, -0.09, 0.45, 0.04, dark);      // long legs
+      box(g, 0.04, 0.85, 0.04, 0.09, 0.45, 0.04, dark);
       break;
     }
     case 'horse': {

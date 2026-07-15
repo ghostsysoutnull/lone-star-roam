@@ -1,6 +1,6 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt } from './geo.js';
+import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, TIDELANDS_U, coastDist } from './geo.js';
 import { ATMOS } from './sky.js';
 import { cityRadius } from './cities.js';
 import { airportClear } from './airports.js';
@@ -25,15 +25,31 @@ function buildGround(scene) {
   outside.position.y = -5; // well below ground — near-coplanar giant planes z-fight at this world scale
   scene.add(outside);
 
-  // Gulf of Mexico — big water plane hugging the SE coast
+  // Gulf of Mexico — big water plane hugging the SE coast. Vertex-colored on
+  // the ONE mesh: state water (inside the 166.7u Tidelands line) keeps the
+  // old teal, the federal shelf beyond blends to deep blue — a second
+  // near-coplanar giant plane would z-fight at this world scale.
+  const gulfGeom = new THREE.PlaneGeometry(14000, 9000, 140, 90);
   const gulf = new THREE.Mesh(
-    new THREE.PlaneGeometry(14000, 9000),
-    new THREE.MeshLambertMaterial({ color: 0x2e6f9e })
+    gulfGeom,
+    new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true })
   );
   gulf.rotation.x = -Math.PI / 2;
   gulf.rotation.z = -0.62; // align with coastline (runs SW–NE)
   // centered offshore of the real coast; between outside plane and ground
   gulf.position.set(6500, -2.5, 5800);
+  gulf.name = 'gulf';
+  gulf.updateMatrixWorld();
+  // one boot-time pass over ~13k verts against geo.js's shared coast field
+  const stateWater = new THREE.Color(0x2e6f9e), blueWater = new THREE.Color(0x1c4a74);
+  const gp = gulfGeom.attributes.position, gc = new Float32Array(gp.count * 3);
+  const gv = new THREE.Vector3(), col = new THREE.Color();
+  for (let i = 0; i < gp.count; i++) {
+    gv.fromBufferAttribute(gp, i).applyMatrix4(gulf.matrixWorld);
+    col.copy(stateWater).lerp(blueWater, Math.max(0, Math.min(1, (coastDist(gv.x, gv.z) - TIDELANDS_U) / 30)));
+    gc[i * 3] = col.r; gc[i * 3 + 1] = col.g; gc[i * 3 + 2] = col.b;
+  }
+  gulfGeom.setAttribute('color', new THREE.BufferAttribute(gc, 3));
   scene.add(gulf);
 
   buildTerrain(scene);
