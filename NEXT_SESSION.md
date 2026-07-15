@@ -15,7 +15,7 @@
   muted leaving toast ("You're leaving Texas. It'll be here."), warm
   return chime + occasional "Miss us?", state-stamp Passport wiring, and
   the 7 **Corner Stones** → `save.passport.stones`. W5 (The Shelf)
-  shipped 2026-07-15, commit `TBD`.
+  shipped 2026-07-15, commit `38be76f`.
 - **Recommended setup**: model **Fable 5**, effort **high** — content/
   register wave (vignettes, plaque copy, ceremony), per the spec's model
   table. Flag it if the running model differs.
