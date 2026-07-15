@@ -12,7 +12,7 @@
   band-charter manifest flavor; radio winks (the GA pilot deviating
   around Roswell "no reason, just — no reason"; Coast Guard shelf
   lines; Barksdale heavies); plaque copy pass. W6b (The Shoulder west)
-  shipped 2026-07-15, commit `W6B_HASH`.
+  shipped 2026-07-15, commit `796c092`.
 - **Recommended setup**: model **Fable 5**, effort **high** —
   pool-writing/register wave (dialog, job flavor, radio copy), per the
   spec's model table. Flag it if the running model differs.
