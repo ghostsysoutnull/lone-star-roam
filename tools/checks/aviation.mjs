@@ -1085,13 +1085,16 @@ export default async function aviation(t) {
 
   await t.check('A3: chatterLine is deterministic, fully filled, and context-gated', async () => {
     const r = await t.ev(`(() => {
+      // nm/shelf (W7 located tokens) are present here so the west/offshore lines
+      // are eligible and get their tokens filled like every other pool
       const ctx = { cs: 'TEXAN 12', dest: 'Lubbock', origin: 'Dallas', airline: 'texan',
-        wx: 'clear skies', city: 'Abilene', field: 'Dallas Love Field', fc: 'a thunderstorm', tod: 'afternoon' };
+        wx: 'clear skies', city: 'Abilene', field: 'Dallas Love Field', fc: 'a thunderstorm', tod: 'afternoon',
+        nm: 'New Mexico', shelf: 'the shelf' };
       const a = g.chatterLine('jet', 'enroute', ctx, 'jet:enroute:5:TEXAN 12');
       const b = g.chatterLine('jet', 'enroute', ctx, 'jet:enroute:5:TEXAN 12');
       const unfilled = [];
       let destSeen = 0;
-      for (const kind of ['medical', 'news', 'coastguard', 'army', 'jet', 'ga', 'military'])
+      for (const kind of ['medical', 'news', 'coastguard', 'army', 'jet', 'ga', 'military', 'b52'])
         for (const ev of ['lift', 'enroute', 'padDown', 'padLift', 'touchdown', 'hover', 'playerRef'])
           for (let s = 0; s < 12; s++) {
             const l = g.chatterLine(kind, ev, ctx, kind + ':' + ev + ':' + s);
@@ -1111,6 +1114,123 @@ export default async function aviation(t) {
     t.ok(r.unfilled.length === 0, `unfilled tokens in: ${r.unfilled.join(', ')}`);
     t.ok(r.destSeen > 0, 'no line ever used the real destination city');
     t.ok(r.gated, 'a jet line referenced a destination with none in context');
+  });
+
+  // W7 — the located winks. chatter.js is factual-by-construction: a template is
+  // eligible only when every token it uses is live, so ctxFor's `nm`/`shelf`
+  // tokens ARE the location gate. Without them the Roswell line plays over
+  // Houston and the shelf lines play inshore where there isn't a rig in sight.
+  await t.check('W7: the Roswell and shelf winks only go live where they are true', async () => {
+    const r = await t.ev(`(() => {
+      const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100, -(lat - 31) * 111320 / 100];
+      const at = ([x, z]) => g.radio.ctxFor({ cs: 'TEST 1', x, y: 30, z }, g.sky);
+      const elp = LL(31.8, -106.4);      // El Paso — New Mexico is genuinely next door
+      const hou = LL(29.76, -95.37);     // Houston — nowhere near it
+      const mid = LL(31.94, -102.2);     // Midland — west, but 88u outside NM_NEAR
+      const rig = LL(27.4, -95.5);       // deep Gulf, well past the Tidelands line
+      const bay = LL(29.3, -94.77);      // just off Galveston, inside state water
+      return {
+        elpNm: at(elp).nm ?? null, houNm: at(hou).nm ?? null, midNm: at(mid).nm ?? null,
+        rigShelf: at(rig).shelf ?? null, bayShelf: at(bay).shelf ?? null, elpShelf: at(elp).shelf ?? null,
+        rigDist: g.coastDist(rig[0], rig[1]), bayDist: g.coastDist(bay[0], bay[1]), tide: g.TIDELANDS_U,
+      };
+    })()`);
+    t.ok(r.elpNm === 'New Mexico', `nm token dead over El Paso — the Roswell wink can never fire (got ${r.elpNm})`);
+    t.ok(r.houNm === null, `nm token live over Houston — the Roswell wink would play in east Texas (got ${r.houNm})`);
+    t.ok(r.midNm === null, `nm token live over Midland, ~880u from the line — NM_NEAR is too loose (got ${r.midNm})`);
+    // guard the fixture itself: if these points drifted to the wrong side of the
+    // Tidelands line the shelf assertions below would pass for the wrong reason
+    t.ok(r.rigDist > r.tide, `deep-Gulf fixture is inside state water (${r.rigDist.toFixed(1)} ≤ ${r.tide})`);
+    t.ok(r.bayDist < r.tide, `inshore fixture is outside state water (${r.bayDist.toFixed(1)} ≥ ${r.tide})`);
+    t.ok(r.rigShelf === 'the shelf', `shelf token dead out past the Tidelands line (got ${r.rigShelf})`);
+    t.ok(r.bayShelf === null, `shelf token live inshore off Galveston — the rig lines would play in the bay (got ${r.bayShelf})`);
+    t.ok(r.elpShelf === null, `shelf token live over El Paso, 600 miles from salt water (got ${r.elpShelf})`);
+  });
+
+  // The heavy was silent by design (no callsign ⇒ radio.js drops it from the
+  // source list). W7 gives it a voice — and its OWN kind, because the `military`
+  // pool is NASA's clipped procedural register and a Barksdale crew is not that.
+  await t.check('W7: the Barksdale heavy reaches the scanner in its own register', async () => {
+    const r = await t.ev(`(async () => {
+      const { VOICES, POOLS } = await import('/src/chatter.js');
+      const b52 = g.military.candidates.find((c) => c.kind === 'b52');
+      const line = g.chatterLine('b52', 'enroute', { cs: 'Buff 2-1', city: 'Abilene' }, 'b52:enroute:3');
+      const nasa = g.chatterLine('military', 'enroute', { cs: 'NASA 9-0-1' }, 'military:enroute:3');
+      return {
+        cs: b52?.cs ?? null,
+        voiceRow: !!VOICES.b52, voice: line?.voice ?? null, text: line?.text ?? null,
+        deeper: VOICES.b52 && VOICES.military ? VOICES.b52.p < VOICES.military.p : false,
+        poolN: POOLS.b52?.enroute?.length ?? 0,
+        sharesNasaPool: !!line && !!nasa && line.text === nasa.text,
+        lowlevelSilent: (g.military.candidates.find((c) => c.kind === 'lowlevel') ?? {}).cs ?? null,
+      };
+    })()`);
+    t.ok(r.cs === 'Buff 2-1', `the b52 has no callsign — radio.js filters it out of the scanner entirely (got ${r.cs})`);
+    t.ok(r.voiceRow, 'VOICES.b52 missing — main.js would hand audio.radio an undefined voice');
+    t.ok(r.voice === 'b52', `b52 line carries voice "${r.voice}"`);
+    t.ok(r.deeper, 'the heavy does not sound deeper than NASA — VOICES.b52.p should undercut military.p');
+    t.ok(r.poolN >= 4, `${r.poolN} b52 lines (want ≥4, or it repeats itself on one pass)`);
+    t.ok(!r.sharesNasaPool, 'the b52 is drawing NASA lines — the kind split in radio.js is not wired');
+    t.ok(r.text && !/[{}]/.test(r.text), `unfilled token in the b52 line: ${r.text}`);
+    // the low-level pair stays out of the scanner: silent by design, not an oversight
+    t.ok(r.lowlevelSilent === null, 'the low-level pair grew a callsign — it is meant to stay off the radio');
+  });
+
+  // ...and the sentinel: everything above calls chatterLine directly, which
+  // proves the pools and says nothing about whether radio.js ever emits one.
+  // The heavy was mute for two waves precisely because of a wiring detail, so
+  // fly a real pass past the player and listen.
+  await t.check('W7: a real B-52 pass puts the heavy on the scanner (wiring sentinel)', async () => {
+    const r = await t.ev(`(() => {
+      g.heli.despawnAll(); g.aviation.despawnAll(); g.military.despawnAll();
+      g.player.setMode('DRIVE');
+      // on the real Cannon→Barksdale corridor: rollB52 lays the pass straight
+      // through wherever the player is standing
+      g.player.pos.set(-1200, 0, -1400);
+      g.radio.tunedField = null; g.radio.lastTx = null; g.radio.srcPh.clear();
+      g.radio.chatterT = 0;
+      const dt = 0.1;
+      const step = () => { g.military.update(dt, g.player.pos.x, g.player.pos.z, g.aviation);
+        g.radio.update(dt, g.player, g.aviation, g.sky); };
+      if (!g.military.force('b52', g.aviation, g.player.pos.x, g.player.pos.z)) return { err: 'force failed' };
+      let saw = null, sourced = false;
+      for (let i = 0; i < 400 && !saw; i++) {
+        step();
+        if (g.radio.sources.some((s) => s.kind === 'b52')) sourced = true;
+        if (g.radio.lastTx?.kind === 'chatter' && g.radio.lastTx.text.includes('Buff 2-1')) saw = g.radio.lastTx;
+        g.radio.chatterT = 0; // hold the budget open; we're testing reachability, not cadence
+      }
+      g.military.despawnAll();
+      return { sourced, text: saw?.text ?? null, voice: saw?.voice ?? null };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.sourced, 'a flying B-52 never entered radio.sources — the callsign filter still drops it');
+    t.ok(r.text, 'a B-52 flew a full pass past the player and never said a word on the scanner');
+    t.ok(r.voice === 'b52', `the heavy transmitted in voice "${r.voice}" — expected its own register`);
+  });
+
+  // W7 — the shelf lines' other half. The token gate proves they can't fire in
+  // the wrong place; it says nothing about whether they can fire at ALL. The
+  // Coast Guard rides maritime's hand-laid coastal lane, so if that lane never
+  // crosses the Tidelands line the lines are dead content and every other check
+  // still greens. Measure the real lane.
+  await t.check('W7: the Coast Guard patrol actually reaches the shelf (reachability)', async () => {
+    const r = await t.ev(`(() => {
+      let maxD = 0, sAt = 0, past = 0, n = 600;
+      // walk the whole lane, not a sample near the player
+      for (let i = 0; i < n; i++) {
+        const s = (i / n) * 20000;
+        const [lx, lz] = g.maritime.laneAt(s);
+        const d = g.coastDist(lx, lz);
+        if (d > g.TIDELANDS_U) past++;
+        if (d > maxD) { maxD = d; sAt = s; }
+      }
+      return { maxD, sAt, pastFrac: past / n, tide: g.TIDELANDS_U };
+    })()`);
+    t.ok(r.maxD > r.tide,
+      `the coastal lane never leaves state water (max ${r.maxD.toFixed(1)}u vs Tidelands ${r.tide}) — the shelf chatter lines can never fire`);
+    t.ok(r.pastFrac > 0.02,
+      `only ${(r.pastFrac * 100).toFixed(1)}% of the lane is past the Tidelands line — the shelf lines would be vanishingly rare`);
   });
 
   await t.check('A3: medical lift edge chatters once (structured tx, voice, budget holds after)', async () => {

@@ -193,7 +193,7 @@ export class TravelMenu {
       .map((o, i) => {
         const label = o.kind === 'charter' ? o.manifest : o.cargo;
         return `<button data-i="${i}" ${j ? 'disabled' : ''}>${o.icon} <b>${label}</b> — ${o.from} → ${o.to}<br>
-        <small style="opacity:.75">${o.km} km · $${o.pay}${o.rush ? ' · 🔥 RUSH (tight clock, +40% pay)' : ''}</small></button>`;
+        <small style="opacity:.75">${o.km} km · $${o.pay}${o.rush ? ' · 🔥 RUSH (tight clock, +40% pay)' : ''}</small>${o.note ? `<br><small style="opacity:.55;font-style:italic">${o.note}</small>` : ''}</button>`;
       })
       .join('');
     this.el.querySelector('.poi-list').innerHTML = html;

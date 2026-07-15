@@ -4,8 +4,8 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 132 city stars, 14 landmarks, 300 roses, 12 NPCs, persistent progress.
 
 No active priority track (aviation shipped in full 2026-07-12; Brands,
-Jetpack, and Agriculture followed and are folded in below). Queued work
-lives in `BACKLOG.md`.
+Jetpack, Agriculture, and the Shoulder & the Shelf followed and are folded
+in below). Queued work lives in `BACKLOG.md`.
 
 - [x] ~~Aviation wave 1 — Fields~~ — done 2026-07-11: 20 real airports
   (7 hubs / 9 regional / 4 strips incl. Terlingua's dirt strip and the 6666 +
@@ -510,6 +510,39 @@ lives in `BACKLOG.md`.
   its real 6,300-ft strip as the **21st airport**, tier-3, OSM-authored
   heading 175.3°, wired into ROUTES/ATIS/logbook). Landmarks 26 → 30;
   ag.mjs → 38 checks; aviation/hud count asserts bumped to 21.
+
+- [x] ~~The Shoulder and the Shelf~~ — done 2026-07-15 (7 waves / 8 sessions,
+  `SHOULDER_SHELF_SPEC.md` kept as history): the world stopped ending at the
+  state line. Texas is still the only place that counts — the 132 cities, 254
+  counties, landmarks, brands, chapels, farmsteads and haunts all stay
+  `inTexas`-gated by law — but a 25-mi **shoulder** of real neighbor geography
+  now wraps the land border and a 70-mi **shelf** reaches out past the last
+  real platform, and you can drive, fly and sail into both.
+  **W1 — the ground**: `inWorld`/`classify`/`borderZoneAt` (point-in-neighbor-
+  state-polygon first, nearest-zone only for open water), a widened DEM bake,
+  and two separate map layers (the minimap stays Texas-only by law; the big map
+  widens). **W2 — the band**: real Census band cities + arterial-only OSM roads
+  (`GEO.bandCities`/`bandHighways`, never merged into the sacred arrays), 6 band
+  airfields incl. the Cannon/Barksdale flavor pair, silver stars.
+  **W3 — Padre**: the island rendered at last (fine sand grid, `onIsland`/
+  `beachAt`, wet-sand drive cap), the Queen Isabella Causeway, SPI as scenery,
+  and the Malaquite dawn hatchling release. **W4 — the crossings**: Bolivar and
+  Port Aransas ferries you actually ride (`player.aboardFerry`, arm/disarm dock
+  gate), dolphins on every wake. **W5 — the shelf**: rig skyline, the Tidelands
+  contour off one shared `coastDist` field, Aransas whooping cranes, and a
+  new-moon treasure light. **W6a/W6b — the shoulder**: the WELCOME TO TEXAS
+  ceremony at all 12 real crossings, 7 surveyed **Corner Stones**, and the
+  hand-built vignettes — Texarkana's two-state post office, the Neutral Ground,
+  WinBig World Casino, Texola's wall, Glenrio's two-faced motel sign, Texhoma's
+  painted line, Anthony's leap-year banner, and the Carlsbad doorstep (zero cave
+  content — that door stays locked for the caves track). **W7 — people and the
+  board**: the Turtle Lady at SPI (13th bespoke NPC, homage register), rotating
+  lines across six characters, Passport-aware progress lines, a job board that
+  names the outside in flavor while every endpoint stays a real Texas city,
+  charters that cross to the band fields, and the located radio winks.
+  Progress from all of it lands in **`save.passport`** `{stamps, towns,
+  landings, stones}` — its own HUD row, never folded into the Texas tallies.
+  Species 24 → 29, landmarks → 38, legends → 3.
 
 ## Known limitations (v1)
 

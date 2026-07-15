@@ -22,7 +22,7 @@
 // get the sign and the scenery, not the stamp). A blocked runway forces a
 // go-around at ANY field with traffic
 // (physical safety, not a radio behavior) regardless of tower or tier.
-import { hAt, nearestCity, nearestRoad, seededRand } from './geo.js';
+import { hAt, nearestCity, nearestRoad, seededRand, neighborDist, coastDist, borderZoneAt, inTexas, TIDELANDS_U } from './geo.js';
 import { AIRPORTS, runwayInUse, rwyLabel, windFrom, onRunway, TD_AGL, TD_SPD } from './airports.js';
 import { ATMOS } from './sky.js';
 import { chatterLine, HELI_ID } from './chatter.js';
@@ -35,6 +35,10 @@ export const UNICOM = AIRPORTS.filter((a) => a.tier === 2 && !a.military);
 
 const RANGE = 250;         // FLY reception ring around a towered field, no perk
 const UNICOM_RANGE = 120;  // CTAF is a shorter-range, quieter frequency
+// W7: how close New Mexico must be for the `nm` token to go live. 50 km — tight
+// enough that only genuinely far-west traffic (El Paso and up the line) can
+// mention routing around Roswell; Midland, 88u further out, never qualifies.
+const NM_NEAR = 500;
 const CLEAR_DEG = 20;      // alignment cone for "cleared to land"
 // A3 chatter: the scanner's direct-range window — line-of-sight VHF to any
 // airborne source, tuned field or not (the only way the coast guard, nowhere
@@ -57,6 +61,10 @@ const ROLL_OK = {
   medical: ['out', 'return'], news: ['orbit'], coastguard: ['patrol', 'hover'],
   army: ['circuit'], jet: ['climb', 'cruise', 'descend'], ga: ['climb', 'cruise', 'descend'],
   military: ['enroute'],
+  // W7: a new chatter kind needs a row HERE as well as a pool and a voice —
+  // without one it enters sources, fills a line on demand, and is never once
+  // picked as a candidate. Silent, and nothing fails.
+  b52: ['enroute'],
 };
 
 const windKt = () => Math.round(3 + Math.max(0, ATMOS.wind - 1) * 11);
@@ -238,7 +246,7 @@ export class TowerRadio {
       if (!c.flying || !c.cs) continue; // the low-level pair has no callsign and stays silent, realistically
       const d = Math.hypot(c.x - px, c.z - pz);
       if (d > DIRECT) continue;
-      out.push({ kind: 'military', cs: c.cs, x: c.x, y: c.y, z: c.z, d, ph: 'enroute', air: true, key: 'M' + c.kind });
+      out.push({ kind: c.kind === 'b52' ? 'b52' : 'military', cs: c.cs, x: c.x, y: c.y, z: c.z, d, ph: 'enroute', air: true, key: 'M' + c.kind });
     }
     out.sort((a, b) => a.d - b.d);
     this.sources = out;
@@ -258,6 +266,14 @@ export class TowerRadio {
     };
     if (s.dest) { ctx.dest = idCity(s.dest); ctx.origin = idCity(s.from); }
     if (s.fieldId) ctx.field = AIRPORTS.find((a) => a.id === s.fieldId)?.name ?? null;
+    // W7 located winks. The engine gates a template on its tokens being live, so
+    // these ARE the location gate: `nm` only where New Mexico is next door (a
+    // Roswell deviation is a far-west thing to be doing), `shelf` only past the
+    // Tidelands line, out where the platforms stand. Without them the lines
+    // would fire over Houston as readily as El Paso.
+    if (neighborDist('NM', s.x, s.z) < NM_NEAR) ctx.nm = 'New Mexico';
+    if (!inTexas(s.x, s.z) && borderZoneAt(s.x, s.z) === 'coast' && coastDist(s.x, s.z) > TIDELANDS_U)
+      ctx.shelf = 'the shelf';
     return ctx;
   }
 

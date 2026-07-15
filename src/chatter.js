@@ -21,6 +21,7 @@ export const VOICES = {
   jet: { p: 1.0, r: 1.0 },
   ga: { p: 1.08, r: 0.9 },         // easygoing
   military: { p: 0.92, r: 1.2 },   // NASA: procedural, unhurried-but-crisp
+  b52: { p: 0.74, r: 0.72 },       // the heavy: deep, slow, in no hurry whatsoever
   tower: { p: 1.0, r: 1.1 },       // the existing controller register
 };
 
@@ -39,7 +40,7 @@ export const HELI_ID = {
 // schedule slot, city names), field (pad-stop airport name), wx (current
 // weather name), fc (forecast name, only while one is live), tod
 // (morning/afternoon/evening), cs (the source's callsign)
-const POOLS = {
+export const POOLS = {
   medical: {
     lift: [
       { t: 'Dispatch, {cs}, lifting {city}, three souls, two hours fuel.' },
@@ -83,6 +84,11 @@ const POOLS = {
       { t: '{cs}, marking the leg down the coast, sea state is easy.' },
       { t: '{cs}, on the search leg, {wx} over the gulf.' },
       { t: '{cs} — nothing out here but shrimp boats and sunburn.', funny: true },
+      // W7 shelf lines — {shelf} goes live only past the Tidelands line, so
+      // these can't play inshore where there isn't a platform in sight
+      { t: '{cs}, out over {shelf} past the last of the platforms. Long way from anywhere.' },
+      { t: '{cs}, working {shelf} — all quiet among the rigs.' },
+      { t: '{cs} — out on {shelf}, the nearest hospital is a helicopter. That’d be me.', funny: true },
     ],
     hover: [
       { t: '{cs}, coming to a hover, checking a vessel below.' },
@@ -124,6 +130,18 @@ const POOLS = {
       { t: '{cs}, with you out of altitude, inbound Ellington.' },
     ],
   },
+  // W7 — the Barksdale heavy, on the real Cannon→Barksdale bearing (military.js).
+  // Own kind so it never borrows NASA's clipped procedural register: eight
+  // engines, nothing to prove, and a crew with hours to fill.
+  b52: {
+    enroute: [
+      { t: '{cs}, level. Eight engines, all of ’em turning.' },
+      { t: 'Barksdale, {cs}. Feet dry, {city} off the left.' },
+      { t: '{cs}, fuel state good. Nothing but Texas for a good while yet.' },
+      { t: '{cs}. Steady as she goes. We’ll get there when we get there.' },
+      { t: '{cs} — this airframe is older than the crew’s fathers. Flies better than most of ’em, too.', funny: true },
+    ],
+  },
   ga: {
     enroute: [
       { t: 'Anybody readin’ — {cs}, over {city}, pretty as a picture.' },
@@ -131,6 +149,10 @@ const POOLS = {
       { t: '{cs}, headed over to {dest} for the hundred-dollar hamburger.', funny: true },
       { t: '{cs}, student pilot aboard, doin’ our best out here.', funny: true },
       { t: '{cs}, droppin’ into {dest} ’fore the café closes.' },
+      // W7 — {nm} gates these to the far west (radio.js NM_NEAR), which is the
+      // only place either line is true
+      { t: '{cs}, out over {nm} shortly — and we’ll be goin’ around Roswell. No reason. Just — no reason.', funny: true },
+      { t: '{cs}, {nm} line off the left wing. Prettiest nothing you ever saw.' },
     ],
   },
 };

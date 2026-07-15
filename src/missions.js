@@ -11,7 +11,12 @@ import { AIRPORTS, onRunway, TD_AGL, TD_SPD } from './airports.js';
 
 const CHARTER_LIVERY = 0xe8a33d; // air-taxi accent, swapped in over the wings' stock color
 
-// Texas-flavored cargo; `from` lists preferred origins (must be real GEO city names)
+// Texas-flavored cargo; `from` lists preferred origins and `to` preferred
+// destinations — BOTH must be real GEO city names (settled call 2: the board
+// points home, and an unresolvable name would orphan the job). `note` is the
+// flavor line: Shoulder & Shelf W7 names the world across the line HERE and
+// only here, so the endpoints stay Texan while the cargo remembers where it
+// came from. Neither field is required; an absent `to` takes any city in band.
 const CARGO = [
   { name: 'Smoked brisket', icon: '🍖', from: ['Llano', 'Austin', 'Temple'] },
   { name: 'Cowboy boots', icon: '👢', from: ['El Paso', 'Fort Worth'] },
@@ -27,8 +32,22 @@ const CARGO = [
   { name: 'Pecan sacks', icon: '🥧', from: ['Waco', 'Brownwood'] },
   { name: 'Hay bales', icon: '🌾' },
   { name: 'Watermelons', icon: '🍉' },
-  { name: 'Fireworks', icon: '🎆' },
   { name: 'Bluebonnet honey', icon: '🍯' },
+  // W7 — the board learns the Shoulder. Fireworks gained an origin this wave:
+  // the Vinton stands are ten minutes over the Sabine precisely because Texas
+  // cities won't sell them, so the cargo has a real home now.
+  { name: 'Fireworks', icon: '🎆', from: ['Orange', 'Beaumont'],
+    note: 'Bought at the Vinton stands, ten minutes over the Sabine — Texas towns won’t sell ’em. Drive it carefully.' },
+  { name: 'Live crawfish', icon: '🦞', from: ['Orange', 'Beaumont', 'Port Arthur'],
+    note: 'Sacked live out of the basin across the line. Keep the tarp damp — they ride angry.' },
+  { name: 'Hatch chile', icon: '🌶', from: ['El Paso'],
+    note: 'Roast season up the valley in Hatch. The whole trailer smells like September, and H-E-Buddy wanted it yesterday.' },
+  { name: 'Turtle patrol volunteers', icon: '🐢', from: ['Houston', 'San Antonio', 'Austin'], to: ['Corpus Christi'],
+    note: 'Dawn shift for the Malaquite nest walk. They have to be standing on the sand before first light.' },
+  { name: 'Ferry gearbox', icon: '⚙️', from: ['Houston', 'Beaumont'], to: ['Galveston'],
+    note: 'The Bolivar boat is running on one engine until this reaches the landing.' },
+  { name: 'Far Rig crew change', icon: '👷', from: ['Houston', 'Beaumont'], to: ['Port Arthur'],
+    note: 'Fourteen days out on the Far Rig. The crew boat leaves Sabine Pass on schedule, with them aboard or without.' },
 ];
 
 // Charter manifests; `tier` restricts eligible origin airports (1/2 hubs vs
@@ -53,8 +72,23 @@ const REAL_ROUTES = [
   { a: 'DAL', b: 'HOU', manifest: 'Love–Hobby shuttle passengers', icon: '💼' },
   { a: 'DFW', b: 'LBB', manifest: 'Panhandle-bound passengers', icon: '💼' },
   { a: 'DFW', b: 'AMA', manifest: 'Panhandle-bound passengers', icon: '💼' },
+  // W7 — the charters cross (settled call 2: airport-id resolution, Passport
+  // stamp on the band landing). Curated because each pair is a real economic
+  // tie the line runs straight through, not a procedural coincidence: the
+  // Permian straddles the NM line, Shreveport's casinos were built for Texans,
+  // Lubbock and Clovis share the Llano Estacado, and Texarkana's fair is
+  // literally the Four States Fair. Band fields only — the military pair
+  // (Cannon/Barksdale) stays flavor-only and takes no cargo.
+  { a: 'MAF', b: 'HOB', manifest: 'Permian roughnecks, shift change', icon: '⛽' },
+  { a: 'DAL', b: 'SHV', manifest: 'Casino-bound weekenders', icon: '🎰' },
+  { a: 'LBB', b: 'CVN', manifest: 'Cotton buyers, Llano Estacado circuit', icon: '🌾' },
+  { a: 'DFW', b: 'TXK', manifest: 'Four States Fair livestock judges', icon: '🐄' },
 ];
 const CHARTER_BANDS = [[300, 1200], [1200, 3200], [3200, 8500], [300, 8500]];
+
+// the npcs.js POOLS idiom — the board's content tables, exposed so the checks
+// can assert every city/airport name resolves instead of trusting the spelling
+export const POOLS = { CARGO, MANIFEST, REAL_ROUTES };
 
 const fmt = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 
@@ -122,17 +156,22 @@ export class MissionSystem {
             .sort((a, b) => Math.hypot(a.x - this.player.pos.x, a.z - this.player.pos.z) - Math.hypot(b.x - this.player.pos.x, b.z - this.player.pos.z))
             .slice(0, 15);
         const from = pool[Math.floor(Math.random() * pool.length)];
-        const dests = GEO.cities.filter((c) => {
+        const inBand = (list) => list.filter((c) => {
           const d = Math.hypot(c.x - from.x, c.z - from.z);
           return c !== from && d >= lo && d <= hi;
         });
+        // A cargo that names its destination KEEPS it — falling back to a random
+        // city would leave the note talking about the Malaquite nest walk on a
+        // Houston→Beaumont run. Out of band ⇒ retry with another cargo (the loop
+        // re-rolls), never break the fiction. Only preference-less cargo roams.
+        const dests = inBand(cargo.to ? cargo.to.map((n) => this.city(n)).filter(Boolean) : GEO.cities);
         if (!dests.length) continue;
         const to = dests[Math.floor(Math.random() * dests.length)];
         if (offers.some((o) => o.from === from.name && o.to === to.name)) continue;
         const dist = Math.hypot(to.x - from.x, to.z - from.z);
         const rush = Math.random() < 0.25;
         offers.push({
-          cargo: cargo.name, icon: cargo.icon, from: from.name, to: to.name,
+          cargo: cargo.name, icon: cargo.icon, note: cargo.note ?? null, from: from.name, to: to.name,
           km: Math.round(dist * 0.1), rush,
           pay: Math.round((50 + dist * 0.1 * 1.2 * (rush ? 1.4 : 1)) / 5) * 5,
           // tuned for driving: ~20% slack over a motorway pace, tighter on rush jobs

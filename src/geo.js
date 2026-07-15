@@ -418,6 +418,18 @@ export function borderZoneAt(x, z) {
   return classify(x, z);
 }
 
+// Distance from a point to a neighbor state's ring ('LA'/'AR'/'OK'/'NM'), 0
+// inside it, Infinity if that ring isn't loaded. W7's chatter engine gates its
+// west-only lines on this: a template is factual by construction, so a line
+// about routing around Roswell may only become eligible where New Mexico is
+// genuinely next door — measured off the real ring, never a longitude guess
+// (the 103°W line only bounds Texas north of 32°N; El Paso sits far west of it).
+export function neighborDist(key, x, z) {
+  const ring = GEO.neighborStates?.[key];
+  if (!ring) return Infinity;
+  return inPoly(x, z, ring) ? 0 : nearestDist(x, z, ring);
+}
+
 // Deterministic RNG seeded by string — used for procedural cities/scatter
 export function seededRand(seedStr) {
   let h = 2166136261;

@@ -88,6 +88,34 @@ Haunted Texas wave 3: San Antonio ghost tracks push (~29.34 N,
 town churches in `cities.js` (reuse `mkChapel`), USS Lexington "Blue Ghost"
 landmark with night glow, painted-church landmark (St. Mary's High Hill).
 
+## Pending human playtests — the Shoulder & the Shelf (track closed 2026-07-15)
+
+Owed since the ranch compounds; the track shipped headless-verified, so this
+is the whole of its human judgment in one list. Nothing here is a known bug.
+
+- **The eight ranch compounds** (waves 5/5b): the original four plus JA, XIT,
+  Matador and LBJ — including landing at the new LBJ strip.
+- **Padre** (W3): the causeway arrival, the beach drive, a dawn turtle release
+  at Malaquite.
+- **The Shelf** (W5): the rig skyline from Malaquite at night, the buoy and Far
+  Rig plaques, the treasure light on a new-moon night, the Aransas birds.
+- **The Shoulder east** (W6a): the I-10 crossing both ways (monument, leaving
+  murmur, homecoming chime), a Vinton dusk (frogs, fireworks barns, Neutral
+  Ground marker), the Texarkana straddle, the WinBig lot read from I-35, one
+  Corner Stone hunt, a bear in the Sabine pines.
+- **The Shoulder west** (W6b): the Texola wall read, the Glenrio sign from both
+  directions of I-40, the Texhoma painted line, Anthony's banner, and the
+  Carlsbad doorstep climb to the turnaround.
+- **W7's people and board**: the Turtle Lady at SPI, a Passport progress line
+  after a few crossings, the job-board notes (do they read as flavor or as
+  instructions?), and the located radio winks. The B-52 and the shelf lines have
+  reachability sentinels, so those are proven live — judge the *register*, not
+  whether they fire. **The Roswell wink is the one unproven piece**: it needs a
+  GA slot routed within `NM_NEAR` (500u) of the New Mexico ring, and GA traffic
+  rides schedule slots with no `force()` hook, so it has no sentinel. If a west
+  Texas flight never gets close enough, that line is dead content and the gate
+  needs loosening — listen for it near El Paso.
+
 ## Pending human playtests (pre-aviation features)
 
 - **Reworked UFO encounter** (debug 🛸 button starts it instantly): the

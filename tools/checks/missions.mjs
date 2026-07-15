@@ -182,4 +182,64 @@ export default async function missions(t) {
     const expected = Math.round((pay * 0.5) / 5) * 5;
     t.ok(paid === expected, `paid $${paid}, expected $${expected}`);
   });
+
+  // W7 — every name on the board must resolve. An unresolvable `from` silently
+  // falls back to the nearest-15 cities (the cargo just loses its origin); an
+  // unresolvable `to` drops the row out of circulation entirely and NOTHING
+  // fails. Both are invisible in play, so assert the tables directly.
+  await t.check('every city and airport named in the board tables resolves', async () => {
+    const r = await t.ev(`(async () => {
+      const { POOLS } = await import('/src/missions.js');
+      const ids = new Set(g.AIRPORTS.map((a) => a.id));
+      const badFrom = [], badTo = [], badRoute = [], milRoute = [];
+      for (const c of POOLS.CARGO) {
+        for (const n of c.from ?? []) if (!g.missions.city(n)) badFrom.push(c.name + ':' + n);
+        for (const n of c.to ?? []) if (!g.missions.city(n)) badTo.push(c.name + ':' + n);
+      }
+      for (const r of POOLS.REAL_ROUTES) for (const id of [r.a, r.b]) {
+        if (!ids.has(id)) badRoute.push(r.manifest + ':' + id);
+        else if (g.AIRPORTS.find((a) => a.id === id).military) milRoute.push(r.manifest + ':' + id);
+      }
+      return { badFrom, badTo, badRoute, milRoute,
+        noted: POOLS.CARGO.filter((c) => c.note).length,
+        toPref: POOLS.CARGO.filter((c) => c.to).length };
+    })()`);
+    t.ok(r.badFrom.length === 0, `CARGO origins not in GEO.cities: ${r.badFrom.join(' ')}`);
+    t.ok(r.badTo.length === 0, `CARGO destinations not in GEO.cities: ${r.badTo.join(' ')}`);
+    t.ok(r.badRoute.length === 0, `REAL_ROUTES ids not in AIRPORTS: ${r.badRoute.join(' ')}`);
+    t.ok(r.milRoute.length === 0, `REAL_ROUTES routes cargo to a military field: ${r.milRoute.join(' ')}`);
+    t.ok(r.noted >= 6, `${r.noted} cargo rows carry a note (want ≥6)`);
+    t.ok(r.toPref >= 3, `${r.toPref} cargo rows name a destination (want ≥3)`);
+  });
+
+  // The whole point of the `to` preference: a cargo that names its destination
+  // KEEPS it. Falling back to a random city would leave the note talking about
+  // the Malaquite nest walk on a Houston→Beaumont run — flavor that contradicts
+  // the job it's printed on. Regenerate a lot of boards and assert it never slips.
+  await t.check('a cargo that names its destination never ships anywhere else', async () => {
+    const r = await t.ev(`(async () => {
+      const { POOLS } = await import('/src/missions.js');
+      const pref = new Map(POOLS.CARGO.filter((c) => c.to).map((c) => [c.name, c.to]));
+      const noteOf = new Map(POOLS.CARGO.map((c) => [c.name, c.note ?? null]));
+      const violations = [], noteMismatch = [];
+      let seen = 0, prefSeen = 0;
+      for (let i = 0; i < 400; i++) {
+        for (const o of g.missions.genGroundOffers()) {
+          seen++;
+          if (o.note !== noteOf.get(o.cargo)) noteMismatch.push(o.cargo);
+          if (!pref.has(o.cargo)) continue;
+          prefSeen++;
+          if (!pref.get(o.cargo).includes(o.to)) violations.push(o.cargo + '→' + o.to);
+          if (o.from === o.to) violations.push(o.cargo + ' from==to');
+        }
+      }
+      return { violations: [...new Set(violations)], noteMismatch: [...new Set(noteMismatch)], seen, prefSeen };
+    })()`);
+    t.ok(r.seen > 1000, `only ${r.seen} offers generated — the board is not filling`);
+    // if the preference silently killed those rows they'd never appear at all,
+    // and a zero-violation pass would be meaningless
+    t.ok(r.prefSeen > 20, `destination-preferenced cargo appeared ${r.prefSeen} times in ${r.seen} offers — the rows are being dropped, not honored`);
+    t.ok(r.violations.length === 0, `cargo delivered off its named destination: ${r.violations.slice(0, 5).join(' ')}`);
+    t.ok(r.noteMismatch.length === 0, `offer note doesn't match its cargo row: ${r.noteMismatch.slice(0, 5).join(' ')}`);
+  });
 }

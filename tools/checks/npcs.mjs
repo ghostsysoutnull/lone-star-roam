@@ -217,4 +217,60 @@ export default async function npcs(t) {
     for (const [role, k] of Object.entries(r.roles))
       t.ok(k >= 2, `${role}: ${k} distinct professions across fields (want ≥2)`);
   });
+
+  // W7 — SPI is scenery, never a 133rd city, so the Turtle Lady takes the ag
+  // characters' coord form. A hand-placed coastal coordinate is exactly the
+  // thing that reads fine and lands in the Laguna Madre (the W4 ferry-terminal
+  // lesson), so assert the island underfoot rather than trusting the numbers.
+  await t.check('the Turtle Lady stands on Padre itself, not in the bay beside it', async () => {
+    const r = await t.ev(`(async () => {
+      const { POOLS } = await import('/src/npcs.js');
+      const row = POOLS.NAMED.find((n) => n[0] === 'The Turtle Lady');
+      if (!row) return { missing: true };
+      const [x, z] = row[1];
+      return {
+        coordForm: Array.isArray(row[1]), x, z,
+        island: g.onIsland(x, z), texas: g.inTexas(x, z),
+        lines: row[3].length, age: row[5], profession: row[6],
+        live: g.npcs.named.some((n) => n.name === 'The Turtle Lady'),
+      };
+    })()`);
+    t.ok(!r.missing, 'the Turtle Lady is not in the NAMED table');
+    t.ok(r.coordForm, 'the Turtle Lady resolves by city name — SPI is not a GEO city (settled call 6)');
+    t.ok(r.island, `the Turtle Lady is off the island at ${r.x},${r.z} — onIsland false (bay or open water)`);
+    t.ok(r.texas, `the Turtle Lady is outside Texas at ${r.x},${r.z}`);
+    t.ok(r.lines >= 7, `the Turtle Lady carries ${r.lines} lines (want ≥7)`);
+    t.ok(r.age > 0 && !!r.profession, `no age/profession — npcSub would render no subtitle: ${r.age}/${r.profession}`);
+  });
+
+  // The Passport rows lead PROGRESS_LINES on purpose: find() takes the first
+  // match that also wins a coin flip, so behind the five always-eligible Texas
+  // rows a passport-carrying player would reach them ~1 talk in 32. Assert the
+  // ordering behaviorally — a pool edit that appends them would pass a mere
+  // "the lines exist" check while burying them in play.
+  await t.check('Passport progress lines gate on leaving Texas and outrank the Texas tallies', async () => {
+    const r = await t.ev(`(async () => {
+      const { POOLS } = await import('/src/npcs.js');
+      const P = POOLS.PROGRESS_LINES;
+      const zero = { species: 0, cities: 0, landmarks: 0, roses: 0, airports: 0,
+        passportStones: 0, passportStamps: 0, passportLandings: 0, passportTowns: 0 };
+      // a maxed-out Texas player who has ALSO been across the line
+      const both = { species: 99, cities: 99, landmarks: 99, roses: 99, airports: 99,
+        passportStones: 9, passportStamps: 9, passportLandings: 9, passportTowns: 9 };
+      const idx = (c) => P.findIndex(([test]) => test(c));
+      return {
+        homebody: P.filter(([test]) => test(zero)).length,
+        firstWithBoth: idx(both),
+        firstPassportOnly: idx({ ...zero, passportStones: 3 }),
+        texasIdx: idx({ ...zero, species: 8 }),
+        keys: P.map(([, line]) => line.slice(0, 24)),
+      };
+    })()`);
+    t.ok(r.homebody === 0, `${r.homebody} progress lines fire for a player with nothing logged`);
+    t.ok(r.firstPassportOnly >= 0, 'three Corner Stones fires no progress line');
+    t.ok(r.firstWithBoth === r.firstPassportOnly,
+      `a passport-carrying player hits "${r.keys[r.firstWithBoth]}" first — the Passport rows must lead, or find() buries them`);
+    t.ok(r.firstPassportOnly < r.texasIdx,
+      `Passport row at ${r.firstPassportOnly} sits behind the Texas row at ${r.texasIdx}`);
+  });
 }

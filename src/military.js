@@ -93,7 +93,10 @@ export class MilitaryAirSystem {
         runT: 60 + Math.random() * 60, flying: false, active: false, t: 0, x: 0, y: 0, z: 0, heading: 0 },
       { kind: 'lowlevel', tint: 0x8a8f96,
         rollT: 90 + Math.random() * 90, flying: false, active: false, t: 0, x: 0, y: 0, z: 0, heading: 0 },
-      { kind: 'b52', tint: 0x4a4d42,
+      // W7: the heavy gets a callsign, so radio.js's direct-range window lets it
+      // onto the scanner. Its own chatter kind — the `military` pool is NASA's
+      // procedural register and a Barksdale crew does not sound like that.
+      { kind: 'b52', tint: 0x4a4d42, cs: 'Buff 2-1',
         rollT: 140 + Math.random() * 160, flying: false, active: false, t: 0, x: 0, y: 0, z: 0, heading: 0 },
     ];
     this.t = 0;

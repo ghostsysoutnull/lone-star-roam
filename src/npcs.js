@@ -46,7 +46,7 @@ const NAMED = [
     'The Stockyards run a longhorn cattle drive every single day.', 45, 'cattle drover'],
   ['Marisol', 'El Paso', { dress: 0xd8a832, hair: 0x201810 },
     ['You made it all the way out west!', 'We’re closer to Los Angeles than to Houston out here.', 'Watch the star on the mountain light up tonight.',
-      'Two countries, three states, one sunset. Best corner of the map.', 'The Franklin Mountains keep this town in line. Somebody has to.', 'We make the best chile relleno in Texas. Fight me, Houston.', 'It’s a desert, sí, but it blooms if you know where to look.'],
+      'Two countries, three states, one sunset. Best corner of the map.', 'The Franklin Mountains keep this town in line. Somebody has to.', 'We make the best chile relleno in Texas. Fight me, Houston.', 'It’s a desert, sí, but it blooms if you know where to look.', 'Sunland Park’s racetrack is in New Mexico. The parking lot has opinions about that.', 'Las Cruces is forty-five minutes up the road and a whole other state. I buy my chile there. Nobody needs to know.'],
     'El Paso sits in Mountain Time — the rest of Texas is Central.', 33, 'shop owner'],
   ['Dusty', 'Amarillo', { hat: 'stetson', hatC: 0x8a7050, shirt: 0xb09a70, kerchief: 0xaa4a2a },
     ['Panhandle wind’ll knock your hat off.', 'Spray-paint a Cadillac while you’re here — everyone does.', 'Flat? Sure. But you can see tomorrow from here.',
@@ -54,7 +54,7 @@ const NAMED = [
     'Amarillo means "yellow" in Spanish, for the local soil.', 50, 'ranch hand'],
   ['Gully', 'Corpus Christi', { hat: 'bucket', hatC: 0x4a6a4a, shirt: 0x3a6a8a, prop: 'rod' },
     ['Sparkling city by the sea!', 'Redfish are running today, I can feel it.', 'Watch for shrimp boats off Padre Island.',
-      'The Lexington’s parked in the bay — a whole aircraft carrier, just sittin’ there.', 'Wind never quits here. Kitesurfers love it. My hat don’t.', 'Cast off the jetty at dawn and you’ll believe in something.', 'Salt air fixes most things. The rest, tacos.'],
+      'The Lexington’s parked in the bay — a whole aircraft carrier, just sittin’ there.', 'Wind never quits here. Kitesurfers love it. My hat don’t.', 'Cast off the jetty at dawn and you’ll believe in something.', 'Salt air fixes most things. The rest, tacos.', 'Get to Malaquite some summer dawn — they let the little ridleys run for the water. I’ve watched grown men come apart over it.', 'Look out at the Gulf after dark. Them rig lights sit on the horizon like a town that floated off and kept going.'],
     'Selena, the Queen of Tejano, called Corpus home.', 47, 'fishing guide'],
   ['Peggy Sue', 'Lubbock', { dress: 0x3a9a9a, hair: 0xd8b860, glasses: true },
     ['Buddy Holly grew up right here.', 'That’ll be the day, sugar!', 'Stick around for the world’s flattest sunset.',
@@ -62,7 +62,7 @@ const NAMED = [
     'Lubbock is the world’s largest cottonseed processing region.', 26, 'radio DJ'],
   ['Chuy', 'Laredo', { hat: 'wide', hatC: 0xd8c8a0, shirt: 0xf0ead8 },
     ['Bienvenido to the border!', 'I-35 starts right here and runs clear to Minnesota.', 'Two countries, one street. That’s Laredo.',
-      'Trucks line up for miles at the bridge. Half of what America buys rolls past my window.', 'A hundred and five in the shade, and we call it a dry heat like that helps.', 'George Washington’s birthday? Biggest party of the year here. Since 1898.', 'On this street you’ll hear four languages before lunch.'],
+      'Trucks line up for miles at the bridge. Half of what America buys rolls past my window.', 'A hundred and five in the shade, and we call it a dry heat like that helps.', 'George Washington’s birthday? Biggest party of the year here. Since 1898.', 'On this street you’ll hear four languages before lunch.', 'There’s a line painted across the middle of that bridge. Half my paperwork exists because of that line.', 'The river doesn’t care which side it’s on. It just keeps going. Everybody else does the arguing.'],
     'Laredo has flown seven flags — one more than the rest of Texas.', 52, 'customs broker'],
   ['Quill', 'Marfa', { hat: 'beret', hatC: 0x1a1a1a, shirt: 0x1a1a1a, prop: 'brush' },
     ['Artists, antelope, and lights nobody can explain.', 'The desert is the canvas. I just sign it.', 'Stick around till dark. You’ll see.',
@@ -70,18 +70,25 @@ const NAMED = [
     'Marfa’s mystery lights have been reported since 1883.', 39, 'painter'],
   ['Cap’n Sal', 'Galveston', { hat: 'captain', hatC: 0xf0f0f0, coat: 0x24365a, beard: 0xd8d8d8 },
     ['This island was the biggest city in Texas once, before the 1900 storm.', 'The Gulf gives and the Gulf takes, friend.', 'Steady as she goes, landlubber.',
-      'The seawall’s ten miles long, and I’ve walked every foot of it cursing the wind.', 'Jean Lafitte buried treasure here, they say. Sixty years I’ve said keep digging.', 'The pier lights come on at dusk — prettiest thing this side of a green flash.', 'A ship in port is safe, but that ain’t what ships are for.'],
+      'The seawall’s ten miles long, and I’ve walked every foot of it cursing the wind.', 'Jean Lafitte buried treasure here, they say. Sixty years I’ve said keep digging.', 'The pier lights come on at dusk — prettiest thing this side of a green flash.', 'A ship in port is safe, but that ain’t what ships are for.', 'The Bolivar ferry’s free and it’s the finest boat ride in Texas. Don’t go telling folks I said free.', 'That wreck out in the channel is the Selma. They built her hull out of concrete in 1919 and she floated. For a while.', 'Dolphins work the ferry wake like it’s a paying job. Suppose to them it is.'],
     'The 1900 Galveston hurricane is still the deadliest US natural disaster.', 63, 'charter boat captain'],
+  // Shoulder & Shelf W7: SPI is scenery, never a 133rd city (settled call 6) —
+  // so she takes the coord form like the ag characters. Homage register: the
+  // *first* Turtle Lady was real and is gone; this one inherited the title.
+  ['The Turtle Lady', [2224, 5418], { hat: 'wide', hatC: 0xe8e0c8, shirt: 0x3a8a7a, glasses: true }, // SPI, N of the condo strip (26.133 −97.172)
+    ['Every one of these hatchlings knows the way home. My job’s just the traffic.', 'Kemp’s ridley. Smallest sea turtle there is, and the most stubborn. I like that in a neighbor.', 'The first Turtle Lady started this in her own back yard, with a kiddie pool and no permission. I just keep the title warm.', 'We walk the beach at dawn looking for tracks. I’ve had forty years of dawns on this island.',
+      'A nest goes back in the sand right where she laid it, if we can manage it. She picked the spot. She knows.', 'Don’t you go driving the wet sand in nesting season. That’s all I’ll say about that.', 'They come back to the beach they hatched on. Twenty years later, from the middle of the ocean. Nobody can tell me how.', 'Folks ask if I ever tire of it. Son, they’ve been doing this a hundred million years. I’ve had forty.'],
+    'South Padre’s sea turtle rescue began in a private back yard in the 1970s — the original Turtle Lady nursed injured ridleys in a kiddie pool.', 71, 'sea turtle volunteer'],
   // ag characters (AGRICULTURE_SPEC wave 4): placed at real rural spots, not
   // cities — the second field is baked game units (LL comments), and
   // `ag: true` in the look swaps their weather openers to the farm register.
   ['Boone', [-2764.4, -4247.3], { hat: 'stetson', hatC: 0x3a2e22, shirt: 0x7a4a2a, kerchief: 0x8a3a2a, ag: true }, // Hereford (34.8154 −102.3971), feedlot belt
     ['Forty thousand head out there, and every one of ’em’s got an opinion at feeding time.', 'Folks smell the yards and wrinkle up. I smell a paycheck.', 'Corn goes up a nickel, my whole year changes. I watch Chicago closer than church.', 'A wet spring pen is worse than any blizzard. Give me frozen ground over mud.',
-      'We doctor cattle in weather that’d close a school.', 'Deaf Smith County feeds more people before breakfast than most states do all day.', 'You can hear the feed trucks from here at dawn. Prettiest sound there is, if you’re owed money.'],
+      'We doctor cattle in weather that’d close a school.', 'Deaf Smith County feeds more people before breakfast than most states do all day.', 'You can hear the feed trucks from here at dawn. Prettiest sound there is, if you’re owed money.', 'Some days the wind hands it right back. That’s New Mexico’s topsoil in my yard, and it’s welcome to stay.'],
     'The Panhandle feedlot belt finishes a huge share of America’s beef — Deaf Smith county alone runs hundreds of thousands of head.', 61, 'feedlot operator'],
   ['Thuy', [3241.7, 1879.5], { hat: 'wide', hatC: 0xd8c8a0, shirt: 0x4a7a5a, ag: true }, // Wharton (29.3116 −96.1027), rice prairie
     ['Rice wants its feet wet. Everything else on this prairie can complain.', 'We flood the fields on purpose. First-timers always ask if something broke.', 'Second cutting’s the gamble — the ratoon crop. Some years it pays for Christmas.', 'The egrets work my levees harder than I do.',
-      'Papa grew rice on the Mekong. Same water, different birds.', 'Duck hunters lease the stubble come winter. The rice pays twice if you’re smart.', 'A dry June scares me more than any hurricane.'],
+      'Papa grew rice on the Mekong. Same water, different birds.', 'Duck hunters lease the stubble come winter. The rice pays twice if you’re smart.', 'A dry June scares me more than any hurricane.', 'Rice comes off, we flood it right back and grow crawfish in the same mud. The field works two jobs. Same as me.', 'Crawfish and rice, turn and turn about. Louisiana taught us that. We don’t say so too loud around here.'],
     'Texas coastal-prairie rice ships worldwide — and the flooded winter stubble doubles as habitat for millions of ducks and geese.', 44, 'rice farmer'],
   ['Greta', [238.6, 1046.4], { hat: 'bucket', hatC: 0x7a6a4a, shirt: 0x8a7a9a, glasses: true, ag: true }, // W of Kerrville (30.06 −99.25), Edwards Plateau
     ['Angoras. The goats with the good hair — mohair, hon, and don’t call it wool.', 'A goat looks at a fence like it’s a suggestion.', 'Shearing twice a year, and they act brand-new surprised every time.', 'Cedar takes the water, goats take the cedar. That’s the whole plateau economy.',
@@ -112,7 +119,15 @@ const AG_OPENERS = {
   dust: ['That’s my topsoil headed for Oklahoma.', 'Wind like this sandblasts the seedlings flat.', 'Dry year. The dirt gets restless when it’s thirsty.'],
   night: ['Stock’s bedded down. Quietest hour on the place.', 'Coyotes get bold after dark — I sleep with one ear open.', 'I’m up before the sun anyway. Always am.'],
 };
+// find() takes the FIRST match that also wins a coin flip, so order is
+// priority. The Passport rows lead: they gate on having actually left Texas
+// (rarer than any Texas tally), and behind five always-eligible Texas rows a
+// passport-carrying player would reach them about one talk in thirty-two.
 const PROGRESS_LINES = [
+  [(c) => c.passportStones >= 3, 'Corner Stones? Somebody’s out hunting survey markers for sport. Takes all kinds. I like your kind.'],
+  [(c) => c.passportStamps >= 2, 'Two states stamped in that passport of yours. Texas’ll take you back. It always does.'],
+  [(c) => c.passportLandings >= 2, 'Landed out of state, did you? Hope you kept the receipt.'],
+  [(c) => c.passportTowns >= 3, 'You’ve been rolling through them little towns across the line. Nothing wrong with a look — long as you come home.'],
   [(c) => c.species >= 8, 'Eight critters spotted? You’re a regular naturalist!'],
   [(c) => c.cities >= 50, 'Fifty towns and counting — you’ve seen more of Texas than most Texans.'],
   [(c) => c.landmarks >= 10, 'Heard you’ve been collecting landmarks. The big hydrant too?'],
@@ -294,7 +309,7 @@ const PILOT_WX = {
 };
 // verify-only surface — tools/checks/npcs.mjs imports the live module in-page
 // and asserts pool sizes/disjointness here instead of scraping source text
-export const POOLS = { NAMED, TOWNSFOLK_LINES, TOWNSFOLK_FIRST, TOWNSFOLK_SURNAMES, PROFESSIONS_TOWN, PROFESSIONS_CITY, PROFESSION_LINES, ROLE_SMALLTALK, BYSTANDER_ROLE_INFO, OPENERS, AG_OPENERS, HELI_OPENERS, JOB_LINES, FORECAST_LINES, PILOT_WX };
+export const POOLS = { NAMED, TOWNSFOLK_LINES, TOWNSFOLK_FIRST, TOWNSFOLK_SURNAMES, PROFESSIONS_TOWN, PROFESSIONS_CITY, PROFESSION_LINES, ROLE_SMALLTALK, BYSTANDER_ROLE_INFO, OPENERS, AG_OPENERS, HELI_OPENERS, JOB_LINES, FORECAST_LINES, PILOT_WX, PROGRESS_LINES };
 
 const WIND_NAMES = ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'];
 const windName = (deg) => WIND_NAMES[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
