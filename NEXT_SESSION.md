@@ -13,7 +13,7 @@
   **roseate spoonbill** + **whooping crane** at Aransas (species +2,
   26→28; crane fact mentions wintering, birds present year-round — no
   seasons yet). W4 (Ferries & the working water) shipped 2026-07-15,
-  commit `TBD` (fill in next session).
+  commit `3ce3365`.
 - **Recommended setup**: model **Fable 5**, effort **high** — content/
   register wave (plaque copy, legend flavor, bird facts), per the
   spec's model table. Flag it if the running model differs.
