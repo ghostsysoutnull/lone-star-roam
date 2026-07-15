@@ -356,4 +356,29 @@ export default async function band(t) {
     t.ok(res.near, 'no band arterial found near Shreveport (25mi through-route bake missing/misplaced)');
     t.ok(!res.street, 'a "street" tier band road exists — band roads should be arterials only (no metro-street bake this wave)');
   });
+
+  // The bake once projected before simplifying, applying a DEGREE tolerance in
+  // game units (~1000x too tight) — band roads shipped at 2.2 u/pt against
+  // Texas's 34.6, so they read visibly denser and rougher the moment you crossed
+  // the line. Nothing failed; it took an eyes-on playtest to spot. Guard the
+  // ratio, not a point count, so a legitimate rebake can move the roads freely.
+  await t.check('band roads are simplified to the same degree-tolerance as Texas roads', async () => {
+    const res = await t.ev(`(() => {
+      const lenOf = (p) => { let L = 0; for (let i = 1; i < p.length; i++) L += Math.hypot(p[i][0] - p[i-1][0], p[i][1] - p[i-1][1]); return L; };
+      const dens = (hw, ty) => {
+        const s = hw.filter((h) => h.type === ty);
+        const pts = s.reduce((a, h) => a + h.pts.length, 0);
+        return pts ? s.reduce((a, h) => a + lenOf(h.pts), 0) / pts : 0;
+      };
+      const out = {};
+      for (const ty of ['motorway', 'trunk', 'primary']) out[ty] = { tx: dens(g.GEO.highways, ty), band: dens(g.GEO.bandHighways, ty) };
+      return out;
+    })()`);
+    for (const [ty, d] of Object.entries(res)) {
+      // band stubs are straighter than Texas's urban stretches, so they simplify
+      // sparser (higher u/pt) — only a DENSER band road indicates the unit bug.
+      t.ok(d.band > d.tx * 0.5,
+        `band ${ty} carries a vertex every ${d.band.toFixed(1)}u vs Texas's ${d.tx.toFixed(1)}u — far denser, so the bake is simplifying in game units against a degree tolerance again (tools/build-band-roads.mjs: simplify BEFORE proj)`);
+    }
+  });
 }

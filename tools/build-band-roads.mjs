@@ -6,8 +6,30 @@
 // to that array's length reshuffles every rose (not just new ones) — band
 // roads must never be merged in.
 // Usage: node tools/build-band-roads.mjs <la.json> <ar.json> <ok.json> <nm.json>
-// Inputs: Overpass `way["highway"~"motorway|trunk|primary"]["ref"~"^(<routes>)($|;)"](bbox);out geom;`
-//   fetched via the maps.mail.ru mirror (overpass-api.de 406s here even on GET).
+//   Argument ORDER IS LOAD-BEARING: chaining is greedy over file order, so a
+//   different order re-splits the polylines.
+//
+// Inputs — the exact queries, recorded 2026-07-15 after the originals were lost
+// (the first bake left only a `<routes>`/`(bbox)` template behind, so the data
+// could not be regenerated). Overpass POST 406s from here — always GET:
+//
+//   REFS='I 10|I 20|I 30|I 35|I 40|US 62|US 71|US 84|US 87|US 180|US 287'
+//   curl -sG <endpoint> --data-urlencode \
+//     "data=[out:json][timeout:280];way[\"highway\"~\"motorway|trunk|primary\"]
+//      [\"ref\"~\"^($REFS)($|;)\"](<bbox>);out geom;"
+//
+//   la  28.8,-94.4,33.2,-91.8     ar  32.8,-94.9,36.7,-92.3
+//   ok  33.3,-103.3,37.2,-94.2    nm  31.1,-107.3,37.2,-102.7
+//
+// Endpoints: maps.mail.ru/osm/tools/overpass/api/interpreter handles the big
+// bboxes (la/ar/ok); it 504s on nm — overpass-api.de/api/interpreter serves that
+// one in ~2 min. Add `[date:"<iso>"]` after [out:json] for a pinned attic query;
+// both endpoints honour it (verified against 2015 data).
+//
+// The bboxes are RECONSTRUCTED, not the originals: they reproduce the 2026-07-14
+// trunk tier exactly (23 polylines, 4133u) but not motorway/primary, so the
+// road set moved slightly on the 2026-07-15 rebake. Rebaking shifts band
+// geometry — check the shoulder suite (crossing monuments read these endpoints).
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -150,19 +172,26 @@ const lenOf = (pts) => {
 const bandHighways = [];
 for (const c of chains) {
   const { tol } = TIER[c.type];
-  const projected = c.pts.map(proj);
   let run = [];
+  // TIER.tol is in DEGREES, so simplify runs on the lon/lat points and only the
+  // survivors get projected — same order as build-data.mjs. (Projecting first
+  // and simplifying in game units reads the tolerance ~1000x too tight: 0.0025
+  // deg is ~2.6 units, but 0.0025 units is 25 cm, under proj's own 10 m
+  // rounding, so nothing is dropped and every raw OSM vertex ships.)
   const flush = () => {
     if (run.length > 1) {
       const s = simplify(run, tol);
-      if (s.length > 1) bandHighways.push({ ref: c.ref, type: c.type, pts: s });
+      if (s.length > 1) bandHighways.push({ ref: c.ref, type: c.type, pts: s.map(proj) });
     }
     run = [];
   };
-  for (const [x, z] of projected) {
+  // the band is a game-unit distance, so the clip test still runs on projected
+  // coords — but `run` collects the degree points that feed simplify.
+  for (const p of c.pts) {
+    const [x, z] = proj(p);
     const d = distToBorder(x, z);
     const keep = inTx(x, z) ? d <= SEAM_MARGIN : d <= SHOULDER_U;
-    if (keep) run.push([x, z]); else flush();
+    if (keep) run.push(p); else flush();
   }
   flush();
 }
