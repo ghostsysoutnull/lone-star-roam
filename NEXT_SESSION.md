@@ -12,7 +12,7 @@
   (monuments, leave/return toasts, state stamps, all 7 Corner Stones)
   shipped WHOLE in 6a — 6b adds no ceremony machinery, only west
   vignettes. W6a (The Shoulder east + ceremony) shipped 2026-07-15,
-  commit `TBD`.
+  commit `24b8c8b`.
 - **Recommended setup**: model **Fable 5**, effort **high** — content/
   register wave (ruins, sign copy, vignettes), per the spec's model
   table. Flag it if the running model differs.
