@@ -2,21 +2,25 @@
 
 ## Session briefing
 - **This session**: the Shoulder & the Shelf (`SHOULDER_SHELF_SPEC.md`),
-  wave 1 of 6 — "the ground stops ending": DEM rebake on a wider grid,
-  Padre rings restored into `inTexas`, new `inWorld` bounds (20-mi land
-  shoulder / 70-mi shelf), soft wall relocated with per-edge messages,
-  band terrain + big-map margin, out-of-state HUD line (state +
-  parish/county, toast-only), through-highway stubs refetched. Spec locked
-  2026-07-14 (design conversation same day).
+  wave 1 of 7 — "the ground stops ending": DEM rebake on a wider grid,
+  Padre rings restored into `inTexas`, new `inWorld` bounds (**25-mi**
+  land shoulder / 70-mi shelf), soft wall relocated with per-edge
+  messages, band terrain + big-map margin, out-of-state HUD line (state +
+  parish/county, toast-only), and the amendment's band data bakes: Census
+  places clip (band cities + pops), band roads (through-stubs +
+  primaries around band cities), band airport runway authoring from OSM,
+  neighbor-state polygons. Spec locked 2026-07-14; land half re-specced
+  same day (data-driven presence amendment, D1–D4 approved).
 - **Recommended setup**: model **Sonnet 5**, effort **high** — structural/
   pipeline wave, no register writing. Flag it if the running model differs.
 - **Budget**: pipeline rebakes + boundary code + checks; no shots;
   grep-first; ≤2 full-file reads; Overpass via GET (POST 406s here).
   Frozen-baseline checks: in-Texas scenery/rose byte-determinism,
   `inTexas` semantics unchanged, county counter silent outside, soft wall
-  measured at all four edges + offshore.
-- **Then**: rewrite this block for wave 2 (Padre & the coast road,
-  Fable 5).
+  measured at all four edges + offshore, band data joined (places per
+  state > 0, parish lookup at a known LA point).
+- **Then**: rewrite this block for wave 2 (The Neighbors — band cities/
+  silver stars/townsfolk/aviation/Passport, Sonnet 5).
 
 Gotchas for wave 1 specifically:
 - `ELEV` grid constants are duplicated (`tools/build-elevation.mjs` ↔
