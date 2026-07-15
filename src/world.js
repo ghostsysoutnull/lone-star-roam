@@ -10,6 +10,7 @@ export function buildWorld(scene) {
   buildGround(scene);
   buildWater(scene);
   buildHighways(scene);
+  buildBandHighways(scene);
   if (!ELEV.data) buildMountains(scene); // decorative cones only when no real terrain
   return new ScenerySystem(scene);
 }
@@ -190,6 +191,18 @@ function buildHighways(scene) {
   const railPts = GEO.rails.map((r) => r.pts);
   buildRibbons(scene, railPts, 1.5, 0x4a4440, 0.07);
   buildRibbons(scene, railPts, 0.55, 0x8a8a90, 0.11);
+}
+
+// Band highways — the shoulder's through-route arterials, real OSM geometry,
+// same tier styling as Texas roads (Law: data-driven systems visually
+// continue the world). Own array/mesh, never GEO.highways (rose-scatter
+// determinism — see GEO.bandHighways comment in geo.js).
+function buildBandHighways(scene) {
+  const ofType = (t) => GEO.bandHighways.filter((h) => h.type === t).map((h) => h.pts);
+  buildRibbons(scene, ofType('motorway'), 3.2, 0x33333c, 0.12);
+  buildRibbons(scene, ofType('trunk'), 2.0, 0x4a4843, 0.1);
+  buildRibbons(scene, ofType('primary'), 1.5, 0x5c584e, 0.09);
+  buildRibbons(scene, ofType('motorway'), 0.25, 0xd8c860, 0.16);
 }
 
 // Rivers as blue ribbons, lakes as polygons — real geometry

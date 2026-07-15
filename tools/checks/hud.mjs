@@ -40,14 +40,14 @@ export default async function hud(t) {
     t.ok(!outside.includes('🛫') && outside.includes('📍'), `still airport-styled just outside the footprint: "${outside}"`);
   });
 
-  await t.check('A5: big-map airport code labels are real per-field data (all 20 fields)', async () => {
+  await t.check('A5: big-map airport code labels are real per-field data (all 27 fields)', async () => {
     const r = await t.ev(`(() => {
       const labels = g.hud.airportLabels();
       const ids = new Set(labels.map((l) => l.id));
       const missing = g.AIRPORTS.filter((a) => !ids.has(a.id)).map((a) => a.id);
       return { n: labels.length, missing };
     })()`);
-    t.ok(r.n === 21, `expected 21 airport labels, got ${r.n}`);
+    t.ok(r.n === 27, `expected 27 airport labels, got ${r.n}`); // 21 Texas + 6 Shoulder & Shelf W2 band
     t.ok(r.missing.length === 0, `missing labels for: ${r.missing.join(', ')}`);
   });
 

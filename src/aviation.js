@@ -63,6 +63,12 @@ const ROUTES = {
   SSS: [['LBB', 2], ['ABI', 1], ['DAL', 1]],
   ARM: [['CRP', 2], ['HRL', 1], ['SAT', 1]],
   LBJ: [['AUS', 2], ['ACT', 1], ['SAT', 1]], // ACT's fact already says Air Force One drops in when the ranch calls
+  // band civilian spokes (Shoulder & Shelf W2) — Cannon/Barksdale are
+  // military:true and skipped by daySchedule below, so they need no entry.
+  SHV: [['DFW', 3], ['IAH', 2], ['TXK', 1]],
+  TXK: [['DFW', 3], ['SHV', 1]],
+  CVN: [['AMA', 2], ['LBB', 2], ['HOB', 1]],
+  HOB: [['MAF', 2], ['LBB', 2], ['CVN', 1]],
 };
 
 const byId = Object.fromEntries(AIRPORTS.map((a) => [a.id, a]));
@@ -130,7 +136,9 @@ function mkSlot(a, day, k, u, dest, r) {
 // sorted; the day window skips the night span so after dark only tier-1
 // red-eyes fly and the night sky keeps top billing.
 export function daySchedule(day) {
-  return AIRPORTS.map((a) => {
+  // military:true fields (Cannon/Barksdale) fly no civilian schedule — the
+  // rare B-52 pair is military.js's own flavor candidate, not a ROUTES entry.
+  return AIRPORTS.filter((a) => !a.military).map((a) => {
     const routes = ROUTES[a.id];
     const total = routes.reduce((s, [, w]) => s + w, 0);
     const pick = (v) => { let x = v * total; for (const [id, w] of routes) { x -= w; if (x <= 0) return id; } return routes[0][0]; };

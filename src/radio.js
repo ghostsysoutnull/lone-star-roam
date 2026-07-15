@@ -29,7 +29,9 @@ import { chatterLine, HELI_ID } from './chatter.js';
 
 export const TOWERED = AIRPORTS.filter((a) => a.tier === 1); // the 7 hubs with a tower mesh
 export const TOWERED_COUNT = TOWERED.length;
-export const UNICOM = AIRPORTS.filter((a) => a.tier === 2);  // the 9 regional fields, self-announce only
+// military:true (Cannon/Barksdale) fly no civilian schedule (aviation.js
+// daySchedule), so they get no UNICOM chatter either — flavor-only fields.
+export const UNICOM = AIRPORTS.filter((a) => a.tier === 2 && !a.military);
 
 const RANGE = 250;         // FLY reception ring around a towered field, no perk
 const UNICOM_RANGE = 120;  // CTAF is a shorter-range, quieter frequency

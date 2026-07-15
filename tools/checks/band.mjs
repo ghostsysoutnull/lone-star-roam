@@ -196,4 +196,164 @@ export default async function band(t) {
     t.ok(res.toast === '🗺 Caddo Parish, Louisiana', `wrong/missing band-county toast: "${res.toast}"`);
     t.ok(res.after === res.before, `band parish crossing touched the Texas county tally: ${res.before} -> ${res.after}`);
   });
+
+  // --- Wave 2: The Neighbors — band cities/stars/townsfolk/aviation/Passport ---
+  const SHV = { x: 5406, z: -1638.9, pop: 177323 }; // Shreveport, LA (band-places.json)
+
+  await t.check('band city (Shreveport) renders through cities.js — building count scales with real pop', async () => {
+    await t.tp(SHV.x - 300, SHV.z);
+    await t.wait(0.5);
+    const res = await t.ev(`(() => {
+      const g2 = g.cities.live.get('band:Shreveport');
+      if (!g2) return { has: false };
+      const inst = g2.children.find((c) => c.isInstancedMesh);
+      return { has: true, band: g2.userData.band, count: inst ? inst.count : 0 };
+    })()`);
+    t.ok(res.has, 'Shreveport did not spawn in cities.live under its band: key');
+    t.ok(res.band === true, 'spawned band city group missing userData.band');
+    t.ok(res.count > 20, `Shreveport (pop ${SHV.pop}) spawned too few buildings: ${res.count}`);
+  });
+
+  await t.check('silver star present at an unvisited band city, distinct from gold Texas stars', async () => {
+    const res = await t.ev(`(() => {
+      const s = g.gameplay.bandCityStars.children.find((c) => c.userData.city === 'Shreveport');
+      const gold = g.gameplay.cityStars.children[0]?.material.color.getHex();
+      return { has: !!s, color: s?.material.color.getHex(), gold };
+    })()`);
+    t.ok(res.has, 'no silver star at unvisited Shreveport');
+    t.ok(res.color === 0xc7ccd4, `band star not silver: ${res.color?.toString(16)}`);
+    t.ok(res.gold === undefined || res.color !== res.gold, 'band star shares the gold Texas star color — Law violated');
+  });
+
+  await t.check('visiting a band city ticks the Passport, not the Texas 132 — HUD row reflects it', async () => {
+    const before = await t.ev(`({ towns: g.gameplay.save.passport.towns.length, cities: g.gameplay.save.cities.length })`);
+    await t.tp(SHV.x, SHV.z);
+    await t.wait(0.5);
+    const res = await t.ev(`({
+      towns: g.gameplay.save.passport.towns.includes('Shreveport'),
+      townsLen: g.gameplay.save.passport.towns.length,
+      citiesLen: g.gameplay.save.cities.length,
+      starGone: !g.gameplay.bandCityStars.children.find((c) => c.userData.city === 'Shreveport'),
+      hudTowns: document.getElementById('score-pass-towns').textContent,
+    })`);
+    t.ok(res.towns, 'Shreveport not recorded in save.passport.towns after visiting its center');
+    t.ok(res.starGone, 'silver star still present after the visit');
+    t.ok(res.citiesLen === before.cities, `Texas save.cities moved from a band visit: ${before.cities} -> ${res.citiesLen}`);
+    t.ok(+res.hudTowns === res.townsLen, `HUD Passport-towns row (${res.hudTowns}) doesn't match save (${res.townsLen})`);
+  });
+
+  await t.check('Passport state stamp on first crossing (direct call, W1 enterBandCounty idiom)', async () => {
+    await t.ev(`(() => { g.gameplay.save.passport.stamps = []; g.hud.toast(''); })()`);
+    await t.ev(`g.gameplay.stampState('LA', 'Louisiana')`);
+    await t.wait(0.2); // hud.update() runs on its own throttled rAF tick, not synchronously with the mutation above
+    const res = await t.ev(`({
+      stamps: g.gameplay.save.passport.stamps.slice(),
+      toast: document.getElementById('toast').textContent,
+      hud: document.getElementById('score-pass-stamps').textContent,
+    })`);
+    t.ok(res.stamps.includes('LA'), 'stampState did not record LA');
+    t.ok(res.toast.includes('Louisiana'), `wrong/missing Passport stamp toast: "${res.toast}"`);
+    t.ok(+res.hud === res.stamps.length, `HUD Passport-stamps row (${res.hud}) doesn't match save (${res.stamps.length})`);
+  });
+
+  await t.check('townsfolk spawn at a band city by pop tier, and night-gate the same as Texas towns', async () => {
+    await t.setDay();
+    await t.tp(SHV.x - 300, SHV.z);
+    await t.wait(0.6);
+    const dayRes = await t.ev(`(() => {
+      const folk = g.npcs.townByCity.get('band:Shreveport');
+      if (!folk) return { has: false };
+      return { has: true, n: folk.length, bigCity: folk[0].bigCity, visible: folk.map((f) => f.g.visible) };
+    })()`);
+    t.ok(dayRes.has, 'no townsfolk spawned at Shreveport (pop 177,323, within 500u)');
+    t.ok(dayRes.n === 3, `Shreveport (mid-size, >80k<400k) should get 3 townsfolk, got ${dayRes.n}`);
+    t.ok(dayRes.bigCity === false, 'Shreveport (177,323) misclassified as bigCity (>400k threshold)');
+    t.ok(dayRes.visible.every(Boolean), 'townsfolk not visible by day');
+    await t.setNight();
+    const nightVisible = await t.ev(`g.npcs.townByCity.get('band:Shreveport').map((f) => f.g.visible)`);
+    t.ok(nightVisible.every((v) => v === false), 'non-bigCity band townsfolk stayed visible after dark');
+    await t.setDay();
+  });
+
+  await t.check('daySchedule runs clean over the full field table — every id has ROUTES, no dangling destination', async () => {
+    const res = await t.ev(`(() => {
+      try {
+        const sched = g.daySchedule(0);
+        const ids = new Set(g.AIRPORTS.map((a) => a.id));
+        const scheduledIds = new Set(sched.map((s) => s.id));
+        const militaryIds = g.AIRPORTS.filter((a) => a.military).map((a) => a.id);
+        const bandIds = g.AIRPORTS.filter((a) => a.band && !a.military).map((a) => a.id);
+        const dangling = sched.flatMap((s) => s.slots.map((sl) => sl.dest)).filter((d) => !ids.has(d));
+        return {
+          ok: true, n: sched.length, total: g.AIRPORTS.length,
+          militaryExcluded: militaryIds.every((id) => !scheduledIds.has(id)),
+          bandIncluded: bandIds.every((id) => scheduledIds.has(id)),
+          dangling,
+        };
+      } catch (e) { return { ok: false, err: String(e) }; }
+    })()`);
+    t.ok(res.ok, `daySchedule threw: ${res.err}`);
+    t.ok(res.n === res.total - 2, `daySchedule should schedule every field but the 2 military ones: ${res.n} of ${res.total}`);
+    t.ok(res.militaryExcluded, 'a military field (Cannon/Barksdale) appeared in the civilian schedule');
+    t.ok(res.bandIncluded, 'a civilian band field (SHV/TXK/CVN/HOB) is missing from the schedule');
+    t.ok(res.dangling.length === 0, `ROUTES destination(s) not in AIRPORTS: ${res.dangling}`);
+  });
+
+  await t.check('military fields (Cannon/Barksdale) are tagged and excluded from charter offers', async () => {
+    const res = await t.ev(`(() => {
+      const cvs = g.AIRPORTS.find((a) => a.id === 'CVS'), bad = g.AIRPORTS.find((a) => a.id === 'BAD');
+      const offers = g.missions.genCharterOffers();
+      const bad2 = offers.filter((o) => o.fromId === 'CVS' || o.toId === 'CVS' || o.fromId === 'BAD' || o.toId === 'BAD');
+      return { cvsMil: cvs?.military, badMil: bad?.military, cvsBand: cvs?.band, badBand: bad?.band, leaked: bad2.length };
+    })()`);
+    t.ok(res.cvsMil === true && res.badMil === true, 'Cannon/Barksdale missing military:true');
+    t.ok(res.cvsBand === true && res.badBand === true, 'Cannon/Barksdale missing band:true');
+    t.ok(res.leaked === 0, `${res.leaked} charter offer(s) reference a military field`);
+  });
+
+  await t.check('Cannon-Barksdale B-52 pair: forceable, closes distance along the real corridor, then lands quiet', async () => {
+    const r = await t.ev(`(() => {
+      g.military.despawnAll(); g.aviation.despawnAll();
+      const cannon = { x: -3647.0, z: -3764.7 };
+      const ok = g.military.force('b52', g.aviation, cannon.x, cannon.z);
+      if (!ok) return { err: 'force failed' };
+      const c = g.military.candidates.find((x) => x.kind === 'b52');
+      const d0 = Math.hypot(c.x1 - c.x0, c.z1 - c.z0);
+      for (let i = 0; i < 300; i++) g.military.update(0.05, cannon.x, cannon.z, g.aviation); // 15s — 760u leg / 62u/s ≈ 12.3s
+      return { err: null, d0, stillFlying: c.flying, x1: c.x1, z1: c.z1 };
+    })()`);
+    t.ok(!r.err, r.err);
+    t.ok(r.d0 > 700 && r.d0 < 800, `b52 leg length off (expected ~760u): ${r.d0}`);
+    t.ok(!r.stillFlying, 'B-52 pair never finished its pass — it should complete and go quiet');
+    await t.ev('g.military.despawnAll()');
+  });
+
+  await t.check('TX↔band charter full cycle: DFW to Shreveport Regional, Passport landing stamp', async () => {
+    await t.ev(`(() => { g.gameplay.save.passport.landings = []; })()`);
+    await t.ev("g.missions.force('DFW', 'SHV')");
+    t.ok((await t.ev('g.missions.job.kind')) === 'charter', 'force(DFW, SHV) did not create a charter job');
+    const rwDFW = await t.ev(`(() => { const a = g.AIRPORTS.find((x) => x.id === 'DFW'); return { cx: a.rws[0].cx, cz: a.rws[0].cz }; })()`);
+    const hDFW = await t.ev(`g.hAt(${rwDFW.cx}, ${rwDFW.cz})`);
+    await t.tp(rwDFW.cx, rwDFW.cz, 'FLY', hDFW + 1);
+    await t.until("g.missions.job && g.missions.job.phase === 'haul'", 8000);
+    const rwSHV = await t.ev(`(() => { const a = g.AIRPORTS.find((x) => x.id === 'SHV'); return { cx: a.rws[0].cx, cz: a.rws[0].cz }; })()`);
+    const hSHV = await t.ev(`g.hAt(${rwSHV.cx}, ${rwSHV.cz})`);
+    const bank0 = await t.ev('g.gameplay.save.bank');
+    await t.tp(rwSHV.cx, rwSHV.cz, 'FLY', hSHV + 1);
+    await t.until('!g.missions.job', 8000);
+    const res = await t.ev(`({ paid: g.gameplay.save.bank - ${bank0}, landings: g.gameplay.save.passport.landings.slice() })`);
+    t.ok(res.paid > 0, `TX-to-band charter delivery paid nothing: ${res.paid}`);
+    t.ok(res.landings.includes('SHV'), `Passport landings missing SHV: ${JSON.stringify(res.landings)}`);
+  });
+
+  await t.check('band highways render as their own layer, separate from GEO.highways (rose-scatter safety)', async () => {
+    const res = await t.ev(`(() => {
+      const near = g.nearestBandRoad(${SHV.x}, ${SHV.z}, 300);
+      const street = g.nearestBandRoad(${SHV.x}, ${SHV.z}, 300, (ty) => ty === 'street');
+      return { n: g.GEO.bandHighways.length, near: !!near, street: !!street };
+    })()`);
+    t.ok(res.n > 0, 'GEO.bandHighways is empty — the through-route arterials never got baked/loaded');
+    t.ok(res.near, 'no band arterial found near Shreveport (25mi through-route bake missing/misplaced)');
+    t.ok(!res.street, 'a "street" tier band road exists — band roads should be arterials only (no metro-street bake this wave)');
+  });
 }

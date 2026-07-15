@@ -15,11 +15,11 @@
 // system's wiring sentinel — everything else uses steppers).
 
 export default async function aviation(t) {
-  await t.check('table shape: 21 fields, 7/9/5 by tier', async () => {
+  await t.check('table shape: 27 fields, 7/15/5 by tier (21 Texas + 6 Shoulder & Shelf W2 band)', async () => {
     const tiers = await t.ev(`g.AIRPORTS.map((a) => a.tier)`);
-    t.ok(tiers.length === 21, `${tiers.length} airports`); // 20 + the LBJ Ranch strip (ag wave 5b)
+    t.ok(tiers.length === 27, `${tiers.length} airports`); // 21 Texas + SHV/TXK/CVN/HOB/CVS/BAD
     const n = (k) => tiers.filter((x) => x === k).length;
-    t.ok(n(1) === 7 && n(2) === 9 && n(3) === 5, `tiers ${n(1)}/${n(2)}/${n(3)}`);
+    t.ok(n(1) === 7 && n(2) === 15 && n(3) === 5, `tiers ${n(1)}/${n(2)}/${n(3)}`);
   });
 
   await t.check('layout is pure: two evals byte-identical, live system matches', async () => {
@@ -158,7 +158,7 @@ export default async function aviation(t) {
       }
       return n;
     })()`);
-    t.ok(hits === 21, `airport glyph found at ${hits}/21 sites on the map layer`);
+    t.ok(hits === 27, `airport glyph found at ${hits}/27 sites on the map layer`); // 21 Texas + 6 band (mapLayer is the wide layer)
   });
 
   // ---- wave 2: departures ----
@@ -1054,7 +1054,7 @@ export default async function aviation(t) {
       }).map((s) => s.id);
       return { n: info.length, missing, dup, wrongTier, farFromGate };
     })()`);
-    t.ok(r.n === 16, `expected 16 gate signs, got ${r.n}`);
+    t.ok(r.n === 22, `expected 22 gate signs, got ${r.n}`); // 16 Texas tier-1/2 + 6 band tier-2 (incl. Cannon/Barksdale)
     t.ok(r.missing.length === 0, `missing signs for: ${r.missing.join(', ')}`);
     t.ok(!r.dup, 'duplicate sign entries');
     t.ok(r.wrongTier.length === 0, `tier-3 field got a sign: ${r.wrongTier.join(', ')}`);

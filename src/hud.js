@@ -56,6 +56,9 @@ export class HUD {
       counties: document.getElementById('score-counties'),
       airports: document.getElementById('score-airports'),
       bank: document.getElementById('score-bank'),
+      passStamps: document.getElementById('score-pass-stamps'),
+      passTowns: document.getElementById('score-pass-towns'),
+      passLandings: document.getElementById('score-pass-landings'),
       job: document.getElementById('hud-job'),
       toast: document.getElementById('toast'),
       dialog: document.getElementById('dialog'),
@@ -174,9 +177,21 @@ export class HUD {
       h.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
       ctx.stroke();
     }
-    // airfields under the city dots — ✈ small for ranch strips
+    // band arterials — wide layer only (Law: minimap layer stays untouched), faded vs Texas roads
+    if (isWide) {
+      ctx.globalAlpha = 0.6;
+      for (const h of GEO.bandHighways ?? []) {
+        [ctx.strokeStyle, ctx.lineWidth] = roadStyle[h.type];
+        ctx.beginPath();
+        h.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    // airfields under the city dots — ✈ small for ranch strips; band fields wide-layer only
     ctx.fillStyle = '#8fc4f0'; ctx.textAlign = 'center';
     for (const apt of AIRPORTS) {
+      if (apt.band && !isWide) continue;
       ctx.font = `${apt.tier === 3 ? 10 : 14}px system-ui`;
       const [px, pz] = T(apt.at[0], apt.at[1]);
       ctx.fillText('✈', px, pz + 4);
@@ -188,11 +203,28 @@ export class HUD {
       const r = Math.max(1.2, Math.sqrt(city.pop) / 500);
       ctx.beginPath(); ctx.arc(px, pz, r, 0, Math.PI * 2); ctx.fill();
     }
+    // band city stars — silver, wide layer only (Law: gold is Texas, silver is abroad)
+    if (isWide) {
+      ctx.fillStyle = '#c7ccd4';
+      for (const city of GEO.bandCities ?? []) {
+        const [px, pz] = T(city.x, city.z);
+        const r = Math.max(1.0, Math.sqrt(city.pop) / 500);
+        ctx.beginPath(); ctx.arc(px, pz, r, 0, Math.PI * 2); ctx.fill();
+      }
+    }
     ctx.font = '17px system-ui'; ctx.fillStyle = '#fff';
     for (const city of GEO.cities) {
       if (city.pop < 190000) continue;
       const [px, pz] = T(city.x, city.z);
       ctx.fillText(city.name, px + 7, pz + 4);
+    }
+    if (isWide) {
+      ctx.font = '15px system-ui'; ctx.fillStyle = '#b8bcc4';
+      for (const city of GEO.bandCities ?? []) {
+        if (city.pop < 60000) continue;
+        const [px, pz] = T(city.x, city.z);
+        ctx.fillText(city.name, px + 6, pz + 4);
+      }
     }
     return { canvas: c, T, sc };
   }
@@ -694,6 +726,9 @@ export class HUD {
     this.els.counties.textContent = counts.counties;
     this.els.airports.textContent = counts.airports ?? 0;
     this.els.bank.textContent = (counts.bank ?? 0).toLocaleString();
+    this.els.passStamps.textContent = counts.passportStamps ?? 0;
+    this.els.passTowns.textContent = counts.passportTowns ?? 0;
+    this.els.passLandings.textContent = counts.passportLandings ?? 0;
     // active delivery line (set by main from missions.hudInfo)
     this.els.job.textContent = this.mission?.text ?? '';
     this.els.job.style.color = this.mission?.late ? '#ff7a66' : this.mission?.urgent ? '#ffb04a' : '#ffd35c';

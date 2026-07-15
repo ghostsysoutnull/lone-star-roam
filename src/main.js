@@ -1,6 +1,6 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
-import { loadGeo, GEO, nearestRoad, waterAt, countyAt, neighborCountyAt, hAt, inTexas, inWorld, borderZoneAt, outsideAt, seededRand, agAt } from './geo.js';
+import { loadGeo, GEO, nearestRoad, nearestBandRoad, waterAt, countyAt, neighborCountyAt, hAt, inTexas, inWorld, borderZoneAt, outsideAt, seededRand, agAt } from './geo.js';
 
 const NEIGHBOR_STATE_NAME = { LA: 'Louisiana', AR: 'Arkansas', OK: 'Oklahoma', NM: 'New Mexico' };
 import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt } from './world.js';
@@ -213,7 +213,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, inWorld, borderZoneAt, outsideAt, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, inTexas, inWorld, borderZoneAt, outsideAt, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -285,6 +285,11 @@ async function boot() {
       if (!county) {
         const nc = neighborCountyAt(player.pos.x, player.pos.z);
         gameplay.enterBandCounty(nc ? `${nc.name}, ${NEIGHBOR_STATE_NAME[nc.state]}` : null, hudTick);
+        // inWorld-gated: a point past the shoulder is the soft wall's territory,
+        // not a place you can linger — no Passport stamp (and no toast race
+        // against the wall's own push-back message) for a spot you're being
+        // actively rejected from.
+        if (nc && inWorld(player.pos.x, player.pos.z)) gameplay.stampState(nc.state, NEIGHBOR_STATE_NAME[nc.state]);
       }
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
       hud.mission = missions.hudInfo(player.pos);

@@ -77,12 +77,18 @@ export class Gameplay {
     this.save.gear ??= {};     // shop purchase levels by item id (shop.js)
     this.save.legends ??= [];  // haunts witnessed (haunts.js LEGENDS keys)
     this.save.airports ??= []; // logbook: towered fields actually landed at (radio.js)
+    // Passport: the shoulder's own progress container — NEVER folds into the
+    // Texas tallies above (Law). stamps = neighbor states first-crossed,
+    // towns = band cities visited (silver stars), landings = band airports
+    // landed at, stones = Corner Stones (W6's job — reserved empty here).
+    this.save.passport ??= { stamps: [], towns: [], landings: [], stones: [] };
     this.saveTimer = 0;
     this.countyNow = null;
     this.countyToastT = 0;
     this.onToast = null;
 
     this.cityStars = this.mkCityStars();
+    this.bandCityStars = this.mkBandCityStars();
     this.roseSystem = this.mkRoses();
     this.landmarkGroup = this.mkLandmarks();
     this.t = 0;
@@ -94,6 +100,8 @@ export class Gameplay {
       roses: this.save.roses.length, species: this.save.species.length,
       counties: this.save.counties.length, bank: this.save.bank,
       legends: this.save.legends.length, airports: this.save.airports.length,
+      passportStamps: this.save.passport.stamps.length, passportTowns: this.save.passport.towns.length,
+      passportLandings: this.save.passport.landings.length,
     };
   }
 
@@ -121,6 +129,24 @@ export class Gameplay {
     if (this.bandCountyToastT > 0) return;
     this.bandCountyToastT = 6;
     this.onToast?.(`🗺 ${label}`);
+  }
+
+  // First crossing into a neighbor state — Passport stamp (Law: never a Texas tally).
+  stampState(state, label) {
+    if (!state || this.save.passport.stamps.includes(state)) return;
+    this.save.passport.stamps.push(state);
+    this.persist();
+    this.onToast?.(`🛂 Passport stamped: ${label} (${this.save.passport.stamps.length}/4)`);
+    this.onCollect?.('passport');
+  }
+
+  // Charter landing at a band airport — Passport stamp (missions.js finishJob).
+  stampLanding(id, name) {
+    if (this.save.passport.landings.includes(id)) return;
+    this.save.passport.landings.push(id);
+    this.persist();
+    this.onToast?.(`🛂 Passport: landed at ${name} (${this.save.passport.landings.length})`);
+    this.onCollect?.('passport');
   }
 
   ufoSighting() {
@@ -195,6 +221,28 @@ export class Gameplay {
       star.userData.baseY = star.position.y;
       const halo = new THREE.Sprite(new THREE.SpriteMaterial({
         map: haloTex, color: 0xffd35c, transparent: true, opacity: 0.5, depthWrite: false,
+      }));
+      halo.scale.set(9, 9, 1);
+      star.add(halo);
+      group.add(star);
+    }
+    this.scene.add(group);
+    return group;
+  }
+
+  // --- Band city stars: silver, not gold (Law: at a glance distinct from Texas) ---
+  mkBandCityStars() {
+    const group = new THREE.Group();
+    const haloTex = mkHaloTexture();
+    const SILVER = 0xc7ccd4;
+    for (const c of GEO.bandCities) {
+      if (this.save.passport.towns.includes(c.name)) continue;
+      const star = mkStarMesh(2.2, SILVER);
+      star.position.set(c.x, hAt(c.x, c.z) + 14 + cityRadius(c.pop) * 0.15, c.z);
+      star.userData.city = c.name;
+      star.userData.baseY = star.position.y;
+      const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+        map: haloTex, color: SILVER, transparent: true, opacity: 0.5, depthWrite: false,
       }));
       halo.scale.set(9, 9, 1);
       star.add(halo);
@@ -332,8 +380,12 @@ export class Gameplay {
       this.roseSystem.instanceMatrix.needsUpdate = true;
       this.roseGlow.instanceMatrix.needsUpdate = true;
     }
-    // stars spin and bob
+    // stars spin and bob (gold Texas + silver band, same motion)
     for (const s of this.cityStars.children) {
+      s.rotation.y = this.t * 1.2;
+      s.position.y = s.userData.baseY + Math.sin(this.t * 1.4 + s.userData.baseY) * 0.8;
+    }
+    for (const s of this.bandCityStars.children) {
       s.rotation.y = this.t * 1.2;
       s.position.y = s.userData.baseY + Math.sin(this.t * 1.4 + s.userData.baseY) * 0.8;
     }
@@ -359,6 +411,23 @@ export class Gameplay {
         this.onToast?.(`⭐ ${city.name} visited! (${this.save.cities.length}/132)`);
         this.onCollect?.('city');
         this.burst(pos.x, pos.y + 1.5, pos.z);
+      }
+      // band city visit — Passport town tick, never the 132 (Law)
+      if (GEO.bandCities.length) {
+        let bc = null, bd = Infinity;
+        for (const c of GEO.bandCities) {
+          const d = (c.x - pos.x) ** 2 + (c.z - pos.z) ** 2;
+          if (d < bd) { bd = d; bc = c; }
+        }
+        if (bc && Math.sqrt(bd) < Math.max(6, cityRadius(bc.pop) * 0.5) && !this.save.passport.towns.includes(bc.name)) {
+          this.save.passport.towns.push(bc.name);
+          this.persist();
+          const star = this.bandCityStars.children.find((s) => s.userData.city === bc.name);
+          if (star) this.bandCityStars.remove(star);
+          this.onToast?.(`🛂 ${bc.name} — Passport stamped (${this.save.passport.towns.length}/${GEO.bandCities.length})`);
+          this.onCollect?.('passport');
+          this.burst(pos.x, pos.y + 1.5, pos.z);
+        }
       }
     }
 

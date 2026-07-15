@@ -2,40 +2,104 @@
 
 ## Session briefing
 - **This session**: the Shoulder & the Shelf (`SHOULDER_SHELF_SPEC.md`),
-  wave 2 of 7 — "The Neighbors": band cities live through the existing
-  city machinery on fresh additive seed streams (buildings scaled by real
-  pop from `data/band-places.json`, partial edge-cities render whatever
-  falls inside); silver stars (world prop + map, gold-vs-silver Law);
-  Passport save/HUD (`save.passport`: state stamps, band towns, Corner
-  Stones land in W6, away landings); townsfolk from existing pools by
-  pop (named NPCs stay Texan); band fields join AIRPORTS + ROUTES + the
-  schedule (spokes at SHV/TXK/CVN/HOB — **band roads/airport runway data
-  were NOT baked in W1**, see gotchas); Cannon + Barksdale military
-  flavor pairs; charter offers may draw TX↔band pairs. W1 (ground/bounds/
-  data pipeline) shipped 2026-07-14, commit `c44661b`.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — still
-  structural (city/save/aviation-table plumbing), no register writing yet
-  (that's W7). Flag it if the running model differs.
-- **Budget**: code + checks, no shots, grep-first. Checks: band city
-  renders + silver star + Passport town tick; Texas counters byte-still
-  after a full band visit; no travel-menu entry / fast-travel lock;
-  townsfolk spawn + night gate at a band city; `daySchedule` runs clean
-  over the full field table (ROUTES-completeness — the LBJ-crash class of
-  bug); a TX↔band charter full cycle + Passport landing stamp.
-- **Then**: rewrite this block for wave 3 (Padre & the coast road,
-  content, Fable 5).
+  wave 3 of 7 — "Padre and the coast road" (content). The island as real,
+  drivable land: beach-as-road along the seaward edge (drive cap ≈
+  road-tier on wet sand, posted on driftwood), dunes/sea oats scenery
+  rows, Laguna Madre between island and mainland; Queen Isabella Causeway
+  (arrival ceremony, not a collectible); SPI mini-town (hand-flagged
+  towers, scenery not a city — the 132 stays sacred); Port Isabel
+  Lighthouse **landmark** (+1); Malaquite dawn turtle release (seeded
+  mornings; watching logs the **Kemp's ridley**, species +1); Mansfield
+  Cut jetties; travel entry "Gulf Coast — Padre Island" arrives on the
+  sand in DRIVE. `GEO.islands`/`inTexas` already include Padre (W1); this
+  wave draws it — world.js terrain rasterization and hud.js's map layer
+  don't render the island yet (W1 gotcha, still open — see below). W2
+  (band cities/stars/Passport/aviation) shipped 2026-07-14, commit
+  `<fill in after commit>`.
+- **Recommended setup**: model **Fable 5**, effort **high** — content/
+  register wave (beach town flavor, turtle-release seeded mornings,
+  causeway ceremony copy), per the spec's model table. Flag it if the
+  running model differs.
+- **Budget**: code + checks, no shots, grep-first.
+- **Then**: rewrite this block for wave 4 (Ferries & the working water,
+  machinery, Sonnet 5).
 
-Gotchas from W1 (whoever touches band cities/aviation/the map next must know):
-- **Band roads and band airport runway geometry were never baked** — W1's
-  budget ran out on places+population (Bruno: "do it right") and the
-  runtime core (inWorld/soft wall/terrain/map/HUD), all of which W1's own
-  checks require; roads/airports are pure W2 inputs with no W1 check
-  depending on them, so they were explicitly slipped. **W2 needs to bake
-  them first**: Overpass GET refetch for through-stubs (I-10 E/W, I-20,
-  I-30, I-35, I-40, US-287/87/84/62-180/71) + primaries around band
-  cities, and `aeroway=runway` geometry for SHV/TXK/CVN/HOB + Cannon/
-  Barksdale + curated tier-3 strips (406s on POST here — GET only,
-  `maps.mail.ru/osm/tools/overpass` mirror for big bboxes).
+Gotchas from W2 (whoever touches band cities/aviation/military/the map next must know):
+- **`GEO.bandHighways`/`GEO.bandCities` are separate arrays from
+  `GEO.highways`/`GEO.cities` — never merge them.** Confirmed the hard way:
+  `mkRoses` (gameplay.js) draws `hws[floor(rand()*hws.length)]` against
+  `GEO.highways.filter(motorway|trunk)` — changing that array's *length*,
+  even by appending, reshuffles every one of the 300 rose spots (not just
+  new ones), breaking saved rose indices. Same logic protects the 132/254
+  Texas counts from `GEO.bandCities` (hardcoded `/132` in three places:
+  `index.html:130,190`, `gameplay.js`'s visit toast).
+- **Band roads baked, but arterials only** — `tools/build-band-roads.mjs`
+  (new, separate from `build-band.mjs`) processed an Overpass fetch (GET via
+  the `maps.mail.ru` mirror; `overpass-api.de` 406s even on GET from this
+  environment) of the named through-routes (I-10/20/30/35/40, US-287/87/
+  84/62/180/71) into `data/band-highways.json`, clipped to the 402u
+  shoulder with a 3-unit inside-Texas seam overlap so it visually meets
+  `highways.json` at the border. **No metro-street tier was baked for any
+  band city** — `cities.js`'s `hasRealStreets` check now also probes
+  `nearestBandRoad(..., t => t==='street')` but it's always false today
+  (band data has no `'street'`-type ways), so every band city falls back
+  to the procedural grid. This matches how most of the 132 Texas cities
+  already work (`add-metro-streets.mjs` is opt-in/incremental) — not a gap
+  to rush, just a future polish pass if a specific band metro (Shreveport,
+  Las Cruces) wants real streets.
+- **Silver vs gold stars, world + map**: `gameplay.js`'s `mkBandCityStars()`
+  mirrors `mkCityStars()` exactly (same `mkStarMesh` from vehicle.js, color
+  `0xc7ccd4`) and ticks `save.passport.towns` instead of `save.cities` on
+  visit. `hud.js`'s `renderMapLayer` draws band dots/labels only when
+  `isWide` (the widened big-map layer) — the Law-protected minimap stays
+  Texas-only and never sees them.
+- **`save.passport`** (additive key, `gameplay.js`): `{stamps, towns,
+  landings, stones}`. `stones` is a reserved empty array — Corner Stones
+  are W6's job, don't populate it early. State stamps
+  (`gameplay.stampState`) are called from `main.js`'s hudTick block
+  **gated on `inWorld(x,z)`** — a point past the soft wall shouldn't earn a
+  Passport stamp, and gating it there also avoids a real toast race against
+  the wall's own push-back message (band.mjs's pre-existing soft-wall check
+  broke without this gate — two systems racing to write the same `#toast`
+  div on the same hudTick).
+- **`military: true` is the pattern for flavor-only fields**: Cannon AFB
+  (`CVS`) and Barksdale AFB (`BAD`) are real `AIRPORTS` entries (baked
+  runway geometry, get gate signs/beacons like any tier-2 field) but are
+  filtered out of `aviation.js`'s `daySchedule` (would otherwise crash —
+  no `ROUTES` entry needed for a `military:true` field), `radio.js`'s
+  `UNICOM` export (no ATIS/chatter), and `missions.js`'s `genCharterOffers`
+  pool (no cargo jobs out of an air base). The B-52 pair itself is a THIRD
+  `military.js` candidate (`kind: 'b52'`), same `nasa`/`lowlevel` idiom —
+  a local segment along the real Cannon↔Barksdale bearing (`CORRIDOR`),
+  not the full ~9,450-unit corridor (would take minutes to transit and
+  never plausibly render as one continuous sighting).
+- **All new AIRPORTS entries also carry `band: true`** (the 4 civilian
+  fields AND the 2 military ones) — this is the cheap tag `missions.js`
+  uses to fire the Passport landing stamp on charter delivery
+  (`toField?.band`) and `hud.js` uses to gate the minimap-vs-bigmap ✈ glyph,
+  instead of a geometry (`inTexas`) check at every call site.
+- **New seed-stream prefixes this wave** (never reuse/rename): `bandcity:`
+  (cities.js building draw), `bandfolk:`/`bandage:` (npcs.js townsfolk).
+  `cities.js`/`npcs.js` key their `live`/`townByCity` maps as `'band:'+name`
+  for band entries — same `prefix:name` idiom brands.js already uses
+  (`heb:Houston`, `lsc:Abilene`), so no collision risk with the Texas
+  roster (which never has named NPCs in the band by Law anyway).
+- **Table-size checks now hardcode 27 airports / 7-15-5 by tier / 22 gate
+  signs** (`tools/checks/aviation.mjs`, `hud.mjs`) — any future field
+  addition (W6's curated tier-3 GA strips, still unbaked/descoped this
+  wave) must bump these again, the same class of maintenance the LBJ strip
+  already required once.
+
+Gotchas from W1 (whoever touches Padre/the map/band data next must know):
+- **Padre is legally Texas (`GEO.islands`/`inTexas`) but still visually
+  absent** — W1 only made `inTexas`/gameplay legality true there; neither
+  `world.js`'s terrain rasterization nor `hud.js`'s map layer draws the
+  island yet. **That's W3's job**, not a regression to chase.
+- Band roads (through-route arterials) and 6 band airport fields (SHV/TXK/
+  CVN/HOB/Cannon/Barksdale) **are now baked** — see the W2 gotchas above.
+  Still NOT baked: metro-street tier for any band city, and W6's curated
+  tier-3 GA strips (deliberately descoped this wave, no check depends on
+  them).
 - **`data/band-places.json`** (177 rows: LA 39, AR 15, OK 104, NM 19) has
   `{name, state, pop, x, z}`, sorted by pop desc — built by
   `tools/build-band.mjs` from Census cartographic boundary + Population

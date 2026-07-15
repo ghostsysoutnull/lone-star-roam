@@ -20,6 +20,20 @@ const LOW_SPD = 78;        // u/s — visibly faster than a scheduled jet's 60 c
 const LOW_ALT = 16;        // AGL on the low-level pass
 const WEST_TEXAS_X = -2200; // Trans-Pecos gate — mirrors animals.js regionTable's desert box
 
+// Shoulder & Shelf W2 — Cannon AFB / Barksdale AFB flavor pair (Dyess's
+// counterpart per the spec: "military flavor, not schedule" — these fly no
+// aviation.js ROUTES entry, just an occasional clear-day sighting near
+// either base). Real Cannon->Barksdale bearing, so a triggered pass is a
+// local segment of the actual corridor, not a random heading.
+const CANNON = LL(34.3819, -103.3221), BARKSDALE = LL(32.5019, -93.6624);
+const B52_SPD = 62;        // u/s cruise — close to a scheduled jet's 60
+const B52_ALT = 95;        // AGL — high cruise, not a low pass
+const B52_MAT_R = 600;     // materialize near either base
+const CORRIDOR = (() => {
+  const dx = BARKSDALE[0] - CANNON[0], dz = BARKSDALE[1] - CANNON[1], len = Math.hypot(dx, dz);
+  return { ux: dx / len, uz: dz / len };
+})();
+
 function advanceNasa(c, dt) {
   if (!c.flying) return;
   c.t += dt;
@@ -40,6 +54,18 @@ function advanceLowlevel(c, dt) {
   c.x = c.x0 + dx * f;
   c.z = c.z0 + dz * f;
   c.y = hAt(c.x, c.z) + LOW_ALT;
+  c.heading = Math.atan2(-dx, -dz);
+  if (f >= 1) c.flying = false;
+}
+
+function advanceB52(c, dt) {
+  if (!c.flying) return;
+  c.t += dt;
+  const dx = c.x1 - c.x0, dz = c.z1 - c.z0, len = Math.hypot(dx, dz);
+  const f = Math.min(1, (c.t * B52_SPD) / Math.max(len, 0.01));
+  c.x = c.x0 + dx * f;
+  c.z = c.z0 + dz * f;
+  c.y = hAt(c.x, c.z) + B52_ALT;
   c.heading = Math.atan2(-dx, -dz);
   if (f >= 1) c.flying = false;
 }
@@ -67,6 +93,8 @@ export class MilitaryAirSystem {
         runT: 60 + Math.random() * 60, flying: false, active: false, t: 0, x: 0, y: 0, z: 0, heading: 0 },
       { kind: 'lowlevel', tint: 0x8a8f96,
         rollT: 90 + Math.random() * 90, flying: false, active: false, t: 0, x: 0, y: 0, z: 0, heading: 0 },
+      { kind: 'b52', tint: 0x4a4d42,
+        rollT: 140 + Math.random() * 160, flying: false, active: false, t: 0, x: 0, y: 0, z: 0, heading: 0 },
     ];
     this.t = 0;
     this.simT = 0; // accumulates in the real loop — wiring sentinel
@@ -96,6 +124,8 @@ export class MilitaryAirSystem {
     if (kind === 'nasa') {
       const a = Math.random() * Math.PI * 2;
       c.x0 = ELLINGTON[0] + Math.cos(a) * 280; c.z0 = ELLINGTON[1] + Math.sin(a) * 280;
+    } else if (kind === 'b52') {
+      this.rollB52(c, px ?? CANNON[0], pz ?? CANNON[1]);
     } else {
       this.rollLowlevel(c, px ?? WEST_TEXAS_X - 100, pz ?? 300);
     }
@@ -116,6 +146,16 @@ export class MilitaryAirSystem {
     const a = Math.random() * Math.PI * 2;
     c.x0 = px + Math.cos(a) * 380; c.z0 = pz + Math.sin(a) * 380;
     c.x1 = px - Math.cos(a) * 380; c.z1 = pz - Math.sin(a) * 380;
+  }
+
+  // a local segment along the real Cannon->Barksdale bearing, centered on
+  // whichever base is nearest px/pz — direction (which base is "from") is random
+  rollB52(c, px, pz) {
+    const { ux, uz } = CORRIDOR;
+    const fwd = Math.random() < 0.5;
+    const dx = fwd ? ux : -ux, dz = fwd ? uz : -uz;
+    c.x0 = px - dx * 380; c.z0 = pz - dz * 380;
+    c.x1 = px + dx * 380; c.z1 = pz + dz * 380;
   }
 
   update(dt, px, pz, aviation) {
@@ -155,6 +195,24 @@ export class MilitaryAirSystem {
         }
       }
     } else { advanceLowlevel(low, dt); low.active = true; }
+
+    const b52 = this.candidates[2];
+    const dCannon = Math.hypot(CANNON[0] - px, CANNON[1] - pz), dBarksdale = Math.hypot(BARKSDALE[0] - px, BARKSDALE[1] - pz);
+    const nearBase = Math.min(dCannon, dBarksdale) < B52_MAT_R;
+    if (!b52.flying) {
+      b52.active = false;
+      const clearDay = ATMOS.night < 0.35 && ATMOS.weather === 'clear';
+      if (nearBase && clearDay) {
+        b52.rollT -= dt;
+        if (b52.rollT <= 0) {
+          b52.rollT = 140 + Math.random() * 200;
+          if (!anyFlying && Math.random() < 0.4 && budgetOk()) {
+            b52.flying = true; b52.t = 0;
+            this.rollB52(b52, dCannon < dBarksdale ? CANNON[0] : BARKSDALE[0], dCannon < dBarksdale ? CANNON[1] : BARKSDALE[1]);
+          }
+        }
+      }
+    } else { advanceB52(b52, dt); b52.active = true; }
 
     this.render();
   }

@@ -9,6 +9,11 @@ export const GEO = {
   neighborCounties: [], // [{state, name, ring, bbox}] LA parishes + AR/OK/NM counties
   highways: [],  // [{ref, type, pts:[[x,z],...]}]
   cities: [],    // [{name, x, z, pop}]
+  bandHighways: [], // [{ref, type, pts:[[x,z],...]}] shoulder through-route arterials — NEVER merge into
+                     // `highways`: mkRoses draws `hws[floor(rand()*hws.length)]`, so any length change
+                     // to GEO.highways reshuffles every rose, not just new ones (W2 landmine).
+  bandCities: [],   // [{name, state, x, z, pop}] band-of-neighbor-states places — NEVER merge into
+                     // `cities`: the 132 Texas count is hardcoded in index.html/gameplay.js.
   rivers: [],    // [{name, pts:[[x,z],...]}]
   lakes: [],     // [{name, pts:[[x,z],...]}] closed polygons
   bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
@@ -33,8 +38,10 @@ export async function loadGeo(onStatus) {
   }
   onStatus?.('Loading highways…');
   GEO.highways = await get('highways.json');
+  GEO.bandHighways = await get('band-highways.json').catch(() => []);
   onStatus?.('Loading cities…');
   GEO.cities = await get('cities.json');
+  GEO.bandCities = await get('band-places.json').catch(() => []);
   onStatus?.('Loading rivers…');
   GEO.rivers = await get('rivers.json').catch(() => []);
   GEO.lakes = await get('lakes.json').catch(() => []);
@@ -67,6 +74,7 @@ export async function loadGeo(onStatus) {
   };
 
   buildRoadIndex();
+  buildBandRoadIndex();
   buildRiverIndex();
   return GEO;
 }
@@ -139,6 +147,45 @@ export function nearestRoad(x, z, radius = 300, typeFilter = null) {
             x: p[0], z: p[1], ref: s.hw.ref, type: s.hw.type, dist: Math.sqrt(d),
             tx: (s.b[0] - s.a[0]) / sl, tz: (s.b[1] - s.a[1]) / sl, // unit tangent (roadrunners sprint along it)
           };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+// Separate spatial grid over band-highway segments (own index, own function —
+// GEO.bandHighways must never share GEO.highways/nearestRoad's index, same
+// reason it's a separate array: nothing about band roads may perturb any
+// Texas-side draw or lookup).
+const bandRoadGrid = new Map();
+function buildBandRoadIndex() {
+  for (const h of GEO.bandHighways) {
+    for (let i = 1; i < h.pts.length; i++) {
+      const seg = { a: h.pts[i - 1], b: h.pts[i], hw: h };
+      const midX = (seg.a[0] + seg.b[0]) / 2, midZ = (seg.a[1] + seg.b[1]) / 2;
+      const k = cellKey(midX, midZ);
+      if (!bandRoadGrid.has(k)) bandRoadGrid.set(k, []);
+      bandRoadGrid.get(k).push(seg);
+    }
+  }
+}
+
+export function nearestBandRoad(x, z, radius = 300, typeFilter = null) {
+  let best = null, bestD = radius * radius;
+  const r = Math.ceil(radius / CELL);
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  for (let i = -r; i <= r; i++) {
+    for (let j = -r; j <= r; j++) {
+      const segs = bandRoadGrid.get(`${cx + i},${cz + j}`);
+      if (!segs) continue;
+      for (const s of segs) {
+        if (typeFilter && !typeFilter(s.hw.type)) continue;
+        const p = closestOnSeg(x, z, s.a, s.b);
+        const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = { x: p[0], z: p[1], ref: s.hw.ref, type: s.hw.type, dist: Math.sqrt(d) };
         }
       }
     }

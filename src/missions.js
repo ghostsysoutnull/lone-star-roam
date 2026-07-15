@@ -162,9 +162,11 @@ export class MissionSystem {
           manifest = r.manifest; icon = r.icon;
         } else {
           const m = MANIFEST[Math.floor(Math.random() * MANIFEST.length)];
-          const pool = m.tier ? AIRPORTS.filter((a) => m.tier.includes(a.tier)) : AIRPORTS;
+          // military:true fields (Cannon/Barksdale) fly flavor only — no charter cargo
+          const pool = (m.tier ? AIRPORTS.filter((a) => m.tier.includes(a.tier)) : AIRPORTS).filter((a) => !a.military);
           from = pool[Math.floor(Math.random() * pool.length)];
           const dests = AIRPORTS.filter((a) => {
+            if (a.military) return false;
             const d = Math.hypot(a.at[0] - from.at[0], a.at[1] - from.at[1]);
             return a !== from && d >= lo && d <= hi;
           });
@@ -307,6 +309,8 @@ export class MissionSystem {
     if (j.kind === 'charter') {
       const payout = Math.round((j.pay * rig * (late ? 0.5 : 1)) / 5) * 5;
       this.setLivery(false);
+      const toField = AIRPORTS.find((a) => a.id === j.toId);
+      if (toField?.band) this.gp.stampLanding(toField.id, toField.name);
       this.finishJob(payout, `💵 ${j.manifest} delivered to ${j.to}! +$${payout}${late ? ' (late — half pay)' : ''}`);
       return;
     }

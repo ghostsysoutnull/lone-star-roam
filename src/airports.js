@@ -65,6 +65,28 @@ export const AIRPORTS = [
     rw: [{ hdg: 121.7, len: 12.0, off: [0, 0] }], fact: 'A private strip on one of the great South Texas ranches.' },
   { id: 'LBJ', name: 'LBJ Ranch Airstrip', city: 'Stonewall', tier: 3, at: LL(30.2518, -98.6226),
     rw: [{ hdg: 175.3, len: 19.1, off: [0, 0] }], fact: 'The President’s strip — JetStars dropped onto 6,300 ft beside the Texas White House.' },
+  // Shoulder & Shelf W2 — band civilian spokes, real headings/lengths from
+  // OSM aeroway=runway geometry, band:true so radio.js/hud.js/missions.js can
+  // tell them apart from the Texas 21 (Passport landing stamp, wide-map-only
+  // icon, no towered logbook entry).
+  { id: 'SHV', name: 'Shreveport Regional', city: 'Shreveport', tier: 2, band: true, at: LL(32.4466, -93.8256),
+    rw: [{ hdg: 142.8, len: 25.7, off: [-1.1, 2.1] }, { hdg: 60.8, len: 21.5, off: [0.3, -2.3] }],
+    fact: 'Louisiana’s gateway on I-20, one county line from Texas.' },
+  { id: 'TXK', name: 'Texarkana Regional', city: 'Texarkana', tier: 2, band: true, at: LL(33.4537, -93.9911),
+    rw: [{ hdg: 44.8, len: 20.4, off: [-2.5, 1.1] }, { hdg: 135.1, len: 16.1, off: [3.3, -1.5] }],
+    fact: 'The twin city’s own airport sits on the Arkansas side of the line.' },
+  { id: 'CVN', name: 'Clovis Municipal', city: 'Clovis', tier: 2, band: true, at: LL(34.4252, -103.0794),
+    rw: [{ hdg: 45.5, len: 22.4, off: [3.5, -4.2] }, { hdg: 130.6, len: 17.8, off: [1.0, -1.5] }],
+    fact: 'Llano Estacado dryland cotton on one side of the fence, Cannon’s jets on the other.' },
+  { id: 'HOB', name: 'Lea County Regional', city: 'Hobbs', tier: 2, band: true, at: LL(32.6875, -103.2172),
+    rw: [{ hdg: 45.0, len: 22.8, off: [-0.1, 1.8] }, { hdg: 135.2, len: 18.5, off: [2.6, -0.6] }],
+    fact: 'The Permian Basin’s New Mexico twin to Midland-Odessa — oil-patch traffic all day.' },
+  { id: 'CVS', name: 'Cannon AFB', city: 'Clovis', tier: 2, band: true, military: true, at: LL(34.3819, -103.3221),
+    rw: [{ hdg: 135.2, len: 25.4, off: [-2.3, 4.0] }, { hdg: 44.8, len: 31.1, off: [1.8, -5.0] }],
+    fact: 'Home to Air Force Special Operations Command’s 27th Special Operations Wing.' },
+  { id: 'BAD', name: 'Barksdale AFB', city: 'Bossier City', tier: 2, band: true, military: true, at: LL(32.5019, -93.6624),
+    rw: [{ hdg: 151.5, len: 36.0, off: [-0.2, 0.0] }],
+    fact: 'Eighth Air Force headquarters — B-52s have flown from here since the Cold War, Dyess’s counterpart to the east.' },
 ];
 
 const RW_W = [0, 3.0, 2.2, 1.4];   // runway width by tier (mini-world)

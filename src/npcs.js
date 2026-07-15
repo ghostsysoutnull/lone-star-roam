@@ -437,19 +437,9 @@ export class NPCSystem {
     this.t += dt;
     const night = ATMOS.night > 0.6;
 
-    // townsfolk spawn/despawn by city proximity
-    for (const c of GEO.cities) {
-      const d = Math.hypot(c.x - pos.x, c.z - pos.z);
-      const has = this.townByCity.has(c.name);
-      if (d < 500 && !has) this.spawnTownsfolk(c);
-      else if (d > 650 && has) {
-        for (const f of this.townByCity.get(c.name)) {
-          this.scene.remove(f.g);
-          f.g.traverse((o) => o.geometry?.dispose());
-        }
-        this.townByCity.delete(c.name);
-      }
-    }
+    // townsfolk spawn/despawn by city proximity (Texas + band, own key namespace)
+    this._streamFolk(pos, GEO.cities, false);
+    this._streamFolk(pos, GEO.bandCities, true);
 
     // bystanders spawn/despawn by airport-gate proximity (same hysteresis)
     for (const a of GATE_FIELDS) {
@@ -533,8 +523,28 @@ export class NPCSystem {
     return hint;
   }
 
-  spawnTownsfolk(city) {
-    const rand = seededRand('folk:' + city.name);
+  // Shared proximity streaming for GEO.cities and GEO.bandCities — band
+  // entries live under a `'band:'+name` townByCity key (no named NPCs, so no
+  // collision risk with the Texas roster; separate namespace kept anyway for
+  // consistency with cities.js's own city/band key split).
+  _streamFolk(pos, list, band) {
+    for (const c of list) {
+      const key = band ? 'band:' + c.name : c.name;
+      const d = Math.hypot(c.x - pos.x, c.z - pos.z);
+      const has = this.townByCity.has(key);
+      if (d < 500 && !has) this.spawnTownsfolk(c, band);
+      else if (d > 650 && has) {
+        for (const f of this.townByCity.get(key)) {
+          this.scene.remove(f.g);
+          f.g.traverse((o) => o.geometry?.dispose());
+        }
+        this.townByCity.delete(key);
+      }
+    }
+  }
+
+  spawnTownsfolk(city, band = false) {
+    const rand = seededRand((band ? 'bandfolk:' : 'folk:') + city.name);
     const n = city.pop > 400000 ? 5 : city.pop > 80000 ? 3 : 2;
     const R = cityRadius(city.pop);
     // same 400,000 "big city" threshold as cities.js:52 — mirrored here
@@ -550,7 +560,7 @@ export class NPCSystem {
       this.scene.add(g);
       // independent stream (keyed by index, not drawn from `rand`) so adding
       // age/profession/surname never shifts the shared stream's later look/position draws
-      const ar = seededRand('age:' + city.name + ':' + i);
+      const ar = seededRand((band ? 'bandage:' : 'age:') + city.name + ':' + i);
       const pool = bigCity ? PROFESSIONS_CITY : PROFESSIONS_TOWN;
       const age = 20 + ((ar() * 55) | 0), profession = pool[(ar() * pool.length) | 0];
       folk.push({
@@ -560,7 +570,7 @@ export class NPCSystem {
         dir: 0, wave: 0, phase: rand() * 6.28, baseRotY: g.rotation.y,
       });
     }
-    this.townByCity.set(city.name, folk);
+    this.townByCity.set(band ? 'band:' + city.name : city.name, folk);
   }
 
   spawnBystanders(a) {

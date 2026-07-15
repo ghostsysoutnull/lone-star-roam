@@ -1,7 +1,7 @@
 // Procedural cities: street grids + skylines scaled by real population,
 // spawned/despawned by distance. Deterministic per city name.
 import * as THREE from 'three';
-import { GEO, seededRand, nearestRoad, hAt } from './geo.js';
+import { GEO, seededRand, nearestRoad, nearestBandRoad, hAt } from './geo.js';
 import { airportClear } from './airports.js';
 
 const SPAWN_DIST = 600;
@@ -31,28 +31,42 @@ export class CitySystem {
   }
 
   update(px, pz) {
-    for (const c of GEO.cities) {
+    this._stream(px, pz, GEO.cities, false);
+    this._stream(px, pz, GEO.bandCities, true);
+  }
+
+  // Shared proximity streaming for GEO.cities and GEO.bandCities — separate
+  // arrays (Law: the 132 Texas count never merges with the band), so band
+  // entries live under a `'band:'+name` key to avoid any name collision.
+  _stream(px, pz, list, band) {
+    for (const c of list) {
+      const key = band ? 'band:' + c.name : c.name;
       const d = Math.hypot(c.x - px, c.z - pz);
-      const has = this.live.has(c.name);
-      if (d < SPAWN_DIST && !has) this.spawn(c);
+      const has = this.live.has(key);
+      if (d < SPAWN_DIST && !has) this.spawn(c, band);
       else if (d > SPAWN_DIST * 1.25 && has) {
-        const g = this.live.get(c.name);
+        const g = this.live.get(key);
         this.scene.remove(g);
         g.traverse((o) => { if (o.geometry && o.geometry !== this.boxGeo) o.geometry.dispose(); });
-        this.live.delete(c.name);
+        this.live.delete(key);
       }
     }
   }
 
-  spawn(city) {
-    const rand = seededRand('city:' + city.name);
+  spawn(city, band = false) {
+    const rand = seededRand((band ? 'bandcity:' : 'city:') + city.name);
     const group = new THREE.Group();
+    group.userData.band = band;
     const R = cityRadius(city.pop);
     const padY = hAt(city.x, city.z); // terrain is pad-flattened here by the pipeline
     const big = city.pop > 400000, mid = city.pop > 80000;
 
     // Metros with real OSM arterials ('street' tier) skip the fake grid entirely
-    const hasRealStreets = !!nearestRoad(city.x, city.z, 15, (t) => t === 'street');
+    // (band roads carry no 'street' tier today — arterials only — so this is
+    // always false for band cities until a future metro-street bake for one)
+    const hasRealStreets = !!(band
+      ? nearestBandRoad(city.x, city.z, 15, (t) => t === 'street')
+      : nearestRoad(city.x, city.z, 15, (t) => t === 'street'));
 
     // Street grid — dark quads on the ground, slight random rotation per city
     const rot = rand() * Math.PI * 0.5;
@@ -122,7 +136,7 @@ export class CitySystem {
     group.add(mkLabel(city.name, city.x, padY + maxH + 6, city.z, big ? 1.6 : 1));
 
     this.scene.add(group);
-    this.live.set(city.name, group);
+    this.live.set((band ? 'band:' : '') + city.name, group);
   }
 }
 
