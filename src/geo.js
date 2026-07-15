@@ -343,8 +343,12 @@ function nearestDist(x, z, poly) {
 // which border stretch is nearest (near El Paso the closest Texas border
 // segment is the Rio Grande even for points deep in New Mexico, e.g. Las
 // Cruces — a nearest-segment classifier would wrongly call that 'mexico').
-// 'land' = inside a US neighbor state polygon, 'coast' = Gulf (nearest border
-// stretch is coastal), 'mexico' = everything else (fail-safe: no dilation).
+// 'land' = inside a US neighbor state polygon, OR open water whose nearest
+// border stretch is a US-neighbor line (the Sabine mouth — shoulder water,
+// not Mexico); 'coast' = Gulf (nearest border stretch is coastal, or Gulf
+// water north of the Rio Grande mouth's due-east maritime boundary);
+// 'mexico' = everything else (fail-safe: no dilation).
+let rgMouth = null; // the Rio Grande mouth: east-most 'mexico'-labeled border vertex
 function classify(x, z) {
   if (GEO.neighborStates && Object.values(GEO.neighborStates).some((ring) => inPoly(x, z, ring))) return 'land';
   let bestD = Infinity, bestI = 0;
@@ -354,7 +358,17 @@ function classify(x, z) {
     const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
     if (d < bestD) { bestD = d; bestI = i; }
   }
-  return GEO.borderZones[bestI] === 'coast' ? 'coast' : 'mexico';
+  const lab = GEO.borderZones[bestI];
+  if (lab === 'coast') return 'coast';
+  if (lab === 'land') return 'land';
+  if (!rgMouth) {
+    rgMouth = [-Infinity, 0];
+    for (let i = 0; i < poly.length; i++)
+      if (GEO.borderZones[i] === 'mexico' && poly[i][0] > rgMouth[0]) rgMouth = poly[i];
+  }
+  // the US–Mexico maritime boundary runs due east from the river mouth: Gulf
+  // water north of that line is shelf; south/west of it Mexico stays out
+  return x > rgMouth[0] && z < rgMouth[1] ? 'coast' : 'mexico';
 }
 
 // Shoulder & Shelf: the roamable world, distinct from `inTexas` (Law #1 — the

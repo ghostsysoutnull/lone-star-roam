@@ -49,6 +49,17 @@ pools next must know):
 - The shop suite's Lacy-yip check flaked once under `-j6` this session
   (real-loop timing class, clean standalone) — same policy as aviation:
   one standalone rerun before investigating.
+- **`classify()` (geo.js) got the tx-urgent ocean fix** (same session,
+  post-wave): open water nearest a US-neighbor border stretch is now
+  'land' (25mi shoulder — the Sabine mouth), and Gulf water east of the
+  Rio Grande mouth vertex + north of its latitude is 'coast' (70mi
+  shelf; Mexico stays out SW of that due-east line, `rgMouth` derived
+  from the border-zones labels). `shelf.mjs` asserts all the wedges;
+  the wide map's EAST edge is now `+SHELF_U` (the coast runs SW–NE).
+- **Score-row DOM reads must `until()` the DOM, not race it** — the
+  score spans ride the 12 Hz HUD tick; the Corner Stones check lost
+  that race once W6b's heavier boot shifted timing. Any check reading
+  a score span right after a save-poll needs the same bounded wait.
 
 Gotchas from W6a (whoever touches shoulder.js, the ceremony, species
 counts, or the line next must know):

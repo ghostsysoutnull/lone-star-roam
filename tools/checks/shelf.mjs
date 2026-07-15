@@ -161,4 +161,34 @@ export default async function shelf(t) {
     t.ok(facts.c.includes('winters at Aransas'), `crane fact must mention wintering: "${facts.c}"`);
     t.ok(facts.s.length > 20, 'spoonbill fact missing');
   });
+
+  await t.check('the shelf reaches the wall: no Mexico misread off Sabine or Padre (tx-urgent 2026-07-15)', async () => {
+    const res = await t.ev(`(() => {
+      const rig = g.maritime.plaques.find((p) => p.name === 'The Far Rig').at;
+      const zi = (x, z) => ({ zone: g.borderZoneAt(x, z), inW: g.inWorld(x, z) });
+      return {
+        sabine300: zi(5650, 1600),   // ~290u SE of the Sabine mouth (5401,1458) — open Gulf off the LA corner
+        sabine700: zi(6055, 1955),   // past the 402u shoulder of the land stretch
+        bocaEast: zi(2280, 5595),    // just off the Boca Chica beach, north of the mouth line
+        padreEast: zi(2500, 5300),   // open Gulf east of the island
+        mexWater: zi(2100, 5750),    // SW of the mouth, south of the boundary — Mexico
+        mexLand: zi(1500, 6000),     // Tamaulipas proper
+        galvShelf: zi(5263, 2670),   // ~1100u SE of Galveston — inside the 1127u shelf
+        galvPast: zi(5404, 2811),    // ~1300u — one horizon past it
+        rig: zi(rig[0], rig[1]),
+      };
+    })()`);
+    t.ok(res.sabine300.zone === 'land' && res.sabine300.inW,
+      `Sabine-mouth water must be shoulder, not Mexico: ${JSON.stringify(res.sabine300)}`);
+    t.ok(!res.sabine700.inW, 'the land-stretch shoulder still ends at 402u');
+    t.ok(res.bocaEast.zone === 'coast' && res.bocaEast.inW,
+      `Boca Chica doorstep water misread: ${JSON.stringify(res.bocaEast)}`);
+    t.ok(res.padreEast.zone === 'coast' && res.padreEast.inW,
+      `Gulf east of Padre misread: ${JSON.stringify(res.padreEast)}`);
+    t.ok(res.mexWater.zone === 'mexico' && !res.mexWater.inW, 'Mexico water south of the boundary must stay out');
+    t.ok(res.mexLand.zone === 'mexico' && !res.mexLand.inW, 'Tamaulipas must stay out');
+    t.ok(res.galvShelf.zone === 'coast' && res.galvShelf.inW, `Galveston shelf clipped: ${JSON.stringify(res.galvShelf)}`);
+    t.ok(!res.galvPast.inW, 'the shelf still ends at 1127u');
+    t.ok(res.rig.zone === 'coast' && res.rig.inW, `the Far Rig must be reachable: ${JSON.stringify(res.rig)}`);
+  });
 }

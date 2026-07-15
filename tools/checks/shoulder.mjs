@@ -98,6 +98,8 @@ export default async function shoulder(t) {
     const ne = await t.ev(`g.shoulder.stones.find((s) => s.key === 'ne')`);
     await t.tp(ne.x + 6, ne.z + 4);
     await t.until(`g.gameplay.save.passport.stones.includes('ne')`, 4000);
+    // the score row rides the 12 Hz HUD tick — sync on the DOM, don't race it
+    await t.until(`document.getElementById('score-pass-stones').textContent === '1'`, 3000);
     const after = await t.ev(`({
       n: g.gameplay.save.passport.stones.length,
       dom: document.getElementById('score-pass-stones').textContent,

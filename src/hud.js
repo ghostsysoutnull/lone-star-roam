@@ -90,8 +90,8 @@ export class HUD {
     const mini = this.renderMapLayer(1400, 1320, GEO.bounds);
     this.miniLayer = mini.canvas; this.miniT = mini.T; this.miniSc = mini.sc;
     const wide = this.renderMapLayer(1400, 1320, {
-      minX: GEO.bounds.minX - SHOULDER_U, maxX: GEO.bounds.maxX + SHOULDER_U,
-      minZ: GEO.bounds.minZ - SHOULDER_U, maxZ: GEO.bounds.maxZ + SHELF_U, // south = Gulf shelf
+      minX: GEO.bounds.minX - SHOULDER_U, maxX: GEO.bounds.maxX + SHELF_U, // east = Gulf shelf too —
+      minZ: GEO.bounds.minZ - SHOULDER_U, maxZ: GEO.bounds.maxZ + SHELF_U, // the coast runs SW–NE
     });
     this.mapLayer = wide.canvas; this.mapT = wide.T; this.mapSc = wide.sc;
     this.zoomLevels = [1.4, 2.4, 4.5];
