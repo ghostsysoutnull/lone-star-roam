@@ -11,8 +11,7 @@
   Galveston; bell buoys on the channel (bell synth exists in audio.js).
   Checks: crossing position-over-time, aboard-parenting, dolphin
   proximity + log, return trip, fast-travel/job interaction while
-  aboard. W3 (Padre & the coast road) shipped 2026-07-15, commit <fill
-  in after commit>.
+  aboard. W3 (Padre & the coast road) shipped 2026-07-15, commit `5eec9f4`.
 - **Recommended setup**: model **Sonnet 5**, effort **high** — machinery
   wave (deck parenting, crossing state machine, physics interactions),
   per the spec's model table. Flag it if the running model differs.
