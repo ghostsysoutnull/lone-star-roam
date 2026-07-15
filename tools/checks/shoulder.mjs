@@ -1,10 +1,13 @@
-// Shoulder & Shelf, wave 6a — The Shoulder east + the crossing ceremony:
+// Shoulder & Shelf, waves 6a+6b — The Shoulder east + ceremony + west:
 // data-derived WELCOME TO TEXAS monuments at every real road crossing, the
 // leaving murmur / homecoming chime, the seven Corner Stones (Passport
 // stones), the Neutral Ground vignettes off I-10 (cypress, crawfish ponds,
 // fireworks barns, plaque, frogs-over-crickets), Texarkana's straddle, the
 // WinBig lot full of Texas plates, black bear in the Sabine pines (species
-// 29), and the beyond-band glow east.
+// 29), the beyond-band glows (E: Lake Charles/Natchitoches, W: Lawton/
+// Alamogordo), and the 6b west vignettes: Texola ruins, Glenrio's two-faced
+// motel sign, the Texhoma elevators, Anthony's leap-year banner, and the
+// Carlsbad doorstep (park road + entrance sign, ZERO cave content).
 //
 // Ceremony transition checks run FIRST: they depend on the boot state of
 // main.js's lastSide machine ('tx', spawn in Austin) before other checks
@@ -142,7 +145,7 @@ export default async function shoulder(t) {
     t.ok(res.cypress > 20, `cypress row too thin: ${res.cypress} trees`);
     t.ok(res.cypressTexas === 0, `${res.cypressTexas} cypresses sampled on the Texas bank (ScenerySystem's side)`);
     t.ok(res.ponds === 3, `crawfish ponds: ${res.ponds}`);
-    t.ok(res.signs === 2, `control-city signs: ${res.signs} (Lake Charles/New Orleans + Natchitoches)`);
+    t.ok(res.signs === 4, `control-city signs: ${res.signs} (E: Lake Charles/NO + Natchitoches; W: Tucumcari/Abq + Deming/Tucson)`);
   });
 
   await t.check('frogs-over-crickets: swamp factor feeds the night mix out there only', async () => {
@@ -197,7 +200,7 @@ export default async function shoulder(t) {
     t.ok(plaque.text.includes('Texas, Texas, Texas'), 'marquee copy lost the plates gag');
   });
 
-  await t.check('beyond-band glow east: dark by day, lit at night, fog-proof', async () => {
+  await t.check('beyond-band glow east + west: dark by day, lit at night, fog-proof', async () => {
     await t.setDay();
     await t.until('g.shoulder.glowMat.opacity < 0.05', 4000); // rides the real loop
     const day = await t.ev('g.shoulder.glowMat.opacity');
@@ -207,7 +210,7 @@ export default async function shoulder(t) {
     const night = await t.ev('({ o: g.shoulder.glowMat.opacity, fog: g.shoulder.glowMat.fog, n: g.shoulder.glows.length })');
     t.ok(night.o > 0.1, `glow dark at night: ${night.o}`);
     t.ok(night.fog === false, 'glow must ignore scene fog (rigGlow law)');
-    t.ok(night.n === 2, `expected Lake Charles + Natchitoches glows, got ${night.n}`);
+    t.ok(night.n === 4, `expected Lake Charles + Natchitoches + Lawton + Alamogordo glows, got ${night.n}`);
     await t.setDay(); // leave the sky as found
   });
 
@@ -251,5 +254,122 @@ export default async function shoulder(t) {
     })()`);
     t.ok(d1 > d0 + 3, `bear not fleeing a parked truck: ${d0?.toFixed(1)} → ${d1?.toFixed(1)}u`);
     await t.until(`g.gameplay.save.species.includes('blackbear')`, 6000);
+  });
+
+  await t.check('Texola: pop. 42 — roofless shells hold the line, the wall gets the last word', async () => {
+    const res = await t.ev(`({
+      walls: g.shoulder.texolaWalls,
+      at: g.shoulder.texolaAt,
+      inTx: g.inTexas(g.shoulder.texolaAt[0], g.shoulder.texolaAt[1]),
+      clear: g.shoulderClear(g.shoulder.texolaAt[0], g.shoulder.texolaAt[1] - 6),
+      plaques: g.shoulder.plaques.length,
+    })`);
+    t.ok(res.walls >= 18, `ruin walls too few: ${res.walls}`);
+    t.ok(!res.inTx, 'Texola stands in Oklahoma, not Texas');
+    t.ok(!res.clear, 'shoulderClear must reject the Texola ruins footprint');
+    t.ok(res.plaques === 15, `expected 15 shoulder plaques after the west five, got ${res.plaques}`);
+    // park at the wall like a person — natural distance, off-axis
+    await t.tp(res.at[0] + 5, res.at[1] + 4);
+    await t.until(`g.hud.els.interact.textContent.includes('wall')`, 4000);
+    await t.key('KeyE');
+    const dlg = await t.ev(`g.hud.els.dialog.querySelector('.npc-text').textContent`);
+    t.ok(dlg.includes('must be the place'), `Texola copy lost the last word: "${dlg.slice(0, 60)}…"`);
+    await t.key('KeyE');
+  });
+
+  await t.check('Glenrio: one sign, two truths — FIRST greets the arrival, LAST waves goodbye', async () => {
+    const res = await t.ev(`(() => {
+      const s = g.shoulder.glenrioSign;
+      return {
+        faces: s.children.filter((c) => c.userData.reads).map((c) => ({ reads: c.userData.reads, yaw: c.rotation.y })),
+        at: g.shoulder.glenrioAt,
+        inTx: g.inTexas(s.position.x, s.position.z),
+        nmSide: g.inTexas(s.position.x - 15, s.position.z),
+      };
+    })()`);
+    t.ok(res.faces.length === 2, `sign faces: ${res.faces.length}`);
+    const first = res.faces.find((f) => f.reads.startsWith('FIRST'));
+    const last = res.faces.find((f) => f.reads.startsWith('LAST'));
+    t.ok(first && Math.abs(first.yaw + Math.PI / 2) < 0.01, 'FIRST face must look west at the arriving driver');
+    t.ok(last && Math.abs(last.yaw - Math.PI / 2) < 0.01, 'LAST face must look east at the leaving driver');
+    t.ok(res.inTx, 'the motel sign stands in Texas');
+    t.ok(!res.nmSide, '15u west of the sign must already be New Mexico — Glenrio hugs the line');
+    await t.tp(res.at[0] + 6, res.at[1] + 4); // parked by the office, off-axis
+    await t.until(`g.hud.els.interact.textContent.includes('motel sign')`, 4000);
+    await t.key('KeyE');
+    const dlg = await t.ev(`g.hud.els.dialog.querySelector('.npc-text').textContent`);
+    t.ok(dlg.includes('FIRST') && dlg.includes('LAST') && dlg.includes('1973'),
+      `Glenrio copy drifted: "${dlg.slice(0, 60)}…"`);
+    await t.key('KeyE');
+  });
+
+  await t.check('Texhoma & Anthony: elevators take both states, the banner sags over the line', async () => {
+    const res = await t.ev(`(() => {
+      const tx = g.shoulder.texhomaAt, an = g.shoulder.anthonyAt;
+      const b = g.shoulder.anthonyBanner[0];
+      const pos = b.geometry.attributes.position;
+      let midY = Infinity, endY = -Infinity;
+      for (let i = 0; i < pos.count; i++) {
+        if (Math.abs(pos.getX(i)) < 0.2) midY = Math.min(midY, pos.getY(i));
+        if (Math.abs(pos.getX(i)) > 2.4) endY = Math.max(endY, pos.getY(i));
+      }
+      return {
+        silos: g.shoulder.texhomaSilos,
+        silosOK: !g.inTexas(tx[0], tx[1] - 5),
+        texSouth: g.inTexas(tx[0], tx[1] + 3) && g.inTexas(an[0], an[1] + 3),
+        okNorth: !g.inTexas(tx[0], tx[1] - 3) && !g.inTexas(an[0], an[1] - 3),
+        clearTx: g.shoulderClear(tx[0], tx[1] - 5),
+        clearAn: g.shoulderClear(an[0], an[1]),
+        banners: g.shoulder.anthonyBanner.length,
+        sag: endY - midY,
+        clearance: b.position.y - g.hAt(an[0], an[1]),
+        texPlq: g.shoulder.plaqueNear({ x: tx[0] + 4, z: tx[1] + 3 }, 28)?.name,
+        anPlq: g.shoulder.plaqueNear({ x: an[0] + 4, z: an[1] - 3 }, 28)?.name,
+        leapCopy: g.shoulder.plaques.find((p) => p.name === 'Anthony')?.text.includes('February 29'),
+        schoolCopy: g.shoulder.plaques.find((p) => p.name === 'Texhoma')?.text.includes('school district'),
+      };
+    })()`);
+    t.ok(res.silos === 9, `Texhoma silos: ${res.silos}`);
+    t.ok(res.silosOK, 'the elevators stand on the Oklahoma side');
+    t.ok(res.texSouth && res.okNorth, 'both vignettes must straddle their surveyed parallels');
+    t.ok(!res.clearTx && !res.clearAn, 'shoulderClear must reject both footprints');
+    t.ok(res.banners === 2, `banner needs a front face per direction: ${res.banners}`);
+    t.ok(res.sag > 0.2, `the banner must sag on its catenary: ${res.sag?.toFixed(3)}`);
+    t.ok(res.clearance > 3.2, `banner clearance over Main St: ${res.clearance?.toFixed(2)}u`);
+    t.ok(res.texPlq === 'Texhoma' && res.anPlq === 'Anthony',
+      `plaques not readable at parked distance: ${res.texPlq} / ${res.anPlq}`);
+    t.ok(res.leapCopy && res.schoolCopy, 'plaque copy lost February 29 or the school district');
+  });
+
+  await t.check('the Carlsbad doorstep: the road climbs away from US 62, the door stays shut', async () => {
+    const res = await t.ev(`(() => {
+      const legs = g.shoulder.parkRoad;
+      const top = g.shoulder.doorstepTop, at = g.shoulder.doorstepAt;
+      const lp = legs[4].geometry.attributes.position; // world-space verts — a mid-switchback point
+      let cave = 0;
+      g.shoulder.group.traverse((o) => { if (/cave/i.test(o.name)) cave++; });
+      return {
+        legs: legs.length,
+        climb: g.hAt(top[0], top[1]) - g.hAt(at[0], at[1]),
+        midRoad: g.nearestRoad(lp.getX(0), lp.getZ(0), 30),
+        clear: g.shoulderClear(at[0] + 9, at[1] + 3),
+        cave,
+        inTx: g.inTexas(at[0], at[1]),
+        sign: !!g.shoulder.doorstepSign,
+      };
+    })()`);
+    t.ok(res.legs === 7, `switchback legs: ${res.legs}`);
+    t.ok(res.climb > 0.4, `the park road must climb the reef: ${res.climb?.toFixed(2)}u`);
+    t.ok(!res.midRoad, `mid-switchback point sits on the road grid (causeway law): ${JSON.stringify(res.midRoad)}`);
+    t.ok(!res.clear, 'shoulderClear must reject the Whites City strip');
+    t.ok(res.cave === 0, 'ZERO cave content — the caves track inherits a place, not a promise');
+    t.ok(!res.inTx, 'Whites City is New Mexico');
+    t.ok(res.sign, 'the entrance sign is missing');
+    // the plaque at the sign, parked
+    const at = await t.ev('g.shoulder.doorstepAt');
+    await t.tp(at[0] + 4, at[1] + 4);
+    await t.until(`g.hud.els.interact.textContent.includes('park sign')`, 4000);
+    const plq = await t.ev(`g.shoulder.plaqueNear(g.player.pos, 28)?.name`);
+    t.ok(plq === 'The Carlsbad Doorstep', `doorstep plaque not readable: ${plq}`);
   });
 }

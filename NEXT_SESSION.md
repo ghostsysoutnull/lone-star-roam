@@ -2,24 +2,53 @@
 
 ## Session briefing
 - **This session**: the Shoulder & the Shelf (`SHOULDER_SHELF_SPEC.md`),
-  wave 6b of 7 — "The Shoulder west" (content). Texola ruins; Glenrio
-  with the two-faced FIRST/LAST IN TEXAS motel sign; Texhoma line
-  vignette; Anthony's leap-year banner; the **Carlsbad doorstep**
-  (settled call #9 — park road switchbacks + entrance sign at Whites
-  City, ZERO cave content; the caves track inherits a place, not a
-  promise); beyond-band glow + control-city signs west (Lawton,
-  Alamogordo; Roswell stays a radio wink). The crossing ceremony
-  (monuments, leave/return toasts, state stamps, all 7 Corner Stones)
-  shipped WHOLE in 6a — 6b adds no ceremony machinery, only west
-  vignettes. W6a (The Shoulder east + ceremony) shipped 2026-07-15,
-  commit `24b8c8b`.
-- **Recommended setup**: model **Fable 5**, effort **high** — content/
-  register wave (ruins, sign copy, vignettes), per the spec's model
-  table. Flag it if the running model differs.
-- **Budget**: code + checks, no shots, grep-first.
-- **Then**: rewrite this block for W7 (People & the board, Fable 5 —
-  the track's LAST wave: its session end deletes this block and folds
-  the whole track into one ROADMAP.md entry).
+  wave 7 of 7 — "People & the board" (content, closes the track). The
+  **Turtle Lady**, 13th named NPC at SPI (homage register); new rotating
+  lines for Cap'n Sal, Gully, Chuy, Marisol, Boone, Thuy;
+  Passport-aware progress lines; ~6 new jobs — **endpoints stay Texas
+  cities, flavor text names the outside** (crawfish "they ride angry",
+  Vinton fireworks "carefully", Hatch chile to H-E-Buddy, turtle-patrol
+  volunteers by dawn, ferry gearbox to Bolivar, Far Rig crew change);
+  band-charter manifest flavor; radio winks (the GA pilot deviating
+  around Roswell "no reason, just — no reason"; Coast Guard shelf
+  lines; Barksdale heavies); plaque copy pass. W6b (The Shoulder west)
+  shipped 2026-07-15, commit `W6B_HASH`.
+- **Recommended setup**: model **Fable 5**, effort **high** —
+  pool-writing/register wave (dialog, job flavor, radio copy), per the
+  spec's model table. Flag it if the running model differs.
+- **Budget**: pool-writing + checks, no shots, grep-first.
+- **Then**: this is the track's LAST wave — its session end DELETES
+  this briefing block, folds the whole Shoulder & Shelf track into one
+  ROADMAP.md entry (spec file stays as history), and prunes this file's
+  accumulated per-wave gotchas down to what survives the track.
+
+Gotchas from W6b (whoever touches shoulder.js, plaques, jobs, or NPC
+pools next must know):
+- **New seed stream**: `texola` (ruin wall jitter) — never reuse/rename.
+- **Table-size checks after W6b**: shoulder plaques **15**, control
+  signs **4** (E: Lake Charles/NO + Natchitoches, W: Tucumcari/Abq +
+  Deming/Tucson), glows **4** (+ Lawton, Alamogordo) — all hardcoded in
+  `shoulder.mjs`. W7's plaque copy pass edits *text*, not counts; a new
+  plaque bumps 15.
+- **Glenrio and Whites City are NOT in `GEO.bandCities`** (both
+  unincorporated — the W2 Census clip never had them; the spec's
+  "Whites City renders as a band town in W2" didn't happen). Both are
+  hand-built shoulder vignettes. Don't resolve them by city name
+  anywhere (jobs resolve against `GEO.cities` and would orphan).
+- **Lawton/Alamogordo have glows but no control signs** — US 54 and
+  I-44 aren't in the arterial bake, so there's no stub to hang a sign
+  on; the west signs ride the I-40 and I-10 stubs instead. A W7 radio
+  wink naming Lawton/Alamogordo is fine; a road sign is not buildable
+  without a re-bake (don't).
+- **The park road + Anthony's Main St + the Texhoma line are decks,
+  not roads** (causeway precedent) — `nearestRoad` is null on them,
+  traffic never drives them; the doorstep suite asserts this.
+- **`ribbon(x0,z0,x1,z1,w,mat,seg)`** (shoulder.js) is the
+  arbitrary-bearing drapedPlane — reuse it for any future draped strip;
+  don't add a third drape helper.
+- The shop suite's Lacy-yip check flaked once under `-j6` this session
+  (real-loop timing class, clean standalone) — same policy as aviation:
+  one standalone rerun before investigating.
 
 Gotchas from W6a (whoever touches shoulder.js, the ceremony, species
 counts, or the line next must know):
@@ -199,7 +228,8 @@ Carried over (evergreen until the track closes):
 - **Table-size checks to bump on any addition**: 27 airports / 7-15-5 by
   tier / 22 gate signs (`aviation.mjs`, `hud.mjs`), species 29
   (`ag.mjs`, `padre.mjs`), landmarks 38 (`padre.mjs`), legends 3
-  (`shelf.mjs`), stones 7 + monuments 10–15 (`shoulder.mjs`).
+  (`shelf.mjs`), stones 7 + monuments 10–15 + plaques 15 + signs 4 +
+  glows 4 (`shoulder.mjs`).
 - **`save.passport`** is additive `{stamps, towns, landings, stones}` —
   all four live as of W6a. State stamps gate on `inWorld`.
 - **Aviation.mjs flakes under any parallel `-j`** (real-loop-timing
@@ -251,7 +281,10 @@ plaques, the treasure light on a new-moon night, the Aransas birds —
 and the Shoulder east: the I-10 crossing both ways (monument, leaving
 murmur, homecoming chime), a Vinton dusk (frogs, fireworks barns,
 Neutral Ground marker), the Texarkana straddle, the WinBig lot read
-from I-35, one Corner Stone hunt, a bear in the Sabine pines.
+from I-35, one Corner Stone hunt, a bear in the Sabine pines — and the
+Shoulder west: the Texola wall read, the Glenrio sign from both
+directions of I-40, the Texhoma painted line, Anthony's banner, and
+the Carlsbad doorstep climb to the turnaround.
 
 Gotchas from waves 5/5b (ranch compounds, `world.js` sites,
 `airports.js`, `animals.js`):

@@ -1,7 +1,9 @@
-// The Shoulder east + the crossing ceremony (SHOULDER_SHELF_SPEC.md W6a):
-// the state line as a place. Neutral Ground swamp vignettes off I-10, the
-// Texarkana straddle, the WinBig lot full of Texas plates, granite welcome
-// monuments at every derived road crossing, and the seven Corner Stones.
+// The Shoulder (SHOULDER_SHELF_SPEC.md W6a east + W6b west): the state line
+// as a place. East: Neutral Ground swamp vignettes off I-10, the Texarkana
+// straddle, the WinBig lot full of Texas plates, granite welcome monuments
+// at every derived road crossing, and the seven Corner Stones. West: the
+// Texola ruins, Glenrio's two-faced motel sign, the Texhoma elevators,
+// Anthony's leap-year banner, and the Carlsbad doorstep (zero cave content).
 // Everything is static, built once at boot (airports.js idiom) from
 // GEO.border + GEO.bandHighways — no streaming, no per-frame geometry.
 import * as THREE from 'three';
@@ -21,10 +23,19 @@ function lamb(hex) {
 const [, FED_Z] = LL(33.4183, -94.0429);    // Texarkana's two-state federal building
 const AVE_X = LL(33.42, -94.0433)[0];       // State Line Ave rides the 94°02.6'W line
 const CASINO = LL(33.756, -97.128);         // WinBig World — three minutes past the Red
-const GLOWS = [                             // beyond-band horizon glow, east (night-gated)
+const GLOWS = [                             // beyond-band horizon glow (night-gated); east 6a, west 6b
   { name: 'Lake Charles', at: LL(30.226, -93.217) },
   { name: 'Natchitoches', at: LL(31.76, -93.086) },
+  { name: 'Lawton', at: LL(34.6036, -98.3959) },      // rides I-44, not in the arterial bake — glow only
+  { name: 'Alamogordo', at: LL(32.8995, -105.9603) }, // rides US 54, same story
 ];
+
+// --- 6b fixed sites, the west line (real coordinates) ---
+const TEXOLA = LL(35.2211, -99.9925);   // OK side of the 100th meridian, on old 66
+const GLENRIO = LL(35.1786, -103.0345); // the Texas side of the line; the motel IS the town
+const TEXHOMA = LL(36.5, -101.7855);    // z IS the line — the town straddles 36.5°N
+const ANTHONY = LL(32.0, -106.6014);    // z IS the line — Main St crosses 32°N here
+const WHITES = LL(32.1751, -104.3794);  // Whites City — the Carlsbad doorstep
 
 // The seven Corner Stones — real survey points, snapped onto the nearest
 // border-polygon vertex at build time so each stone provably sits ON the line.
@@ -53,6 +64,11 @@ const STONES = [
 const CLEAR_BOXES = [
   [AVE_X - 6, AVE_X + 6, FED_Z - 8, FED_Z + 82],        // fed building + avenue deck
   [CASINO[0] - 12, CASINO[0] + 42, CASINO[1] - 22, CASINO[1] + 22], // casino + lot
+  [TEXOLA[0] - 12, TEXOLA[0] + 12, TEXOLA[1] - 8, TEXOLA[1] + 13],   // Texola ruins
+  [GLENRIO[0] - 20, GLENRIO[0] + 20, GLENRIO[1] - 4, GLENRIO[1] + 8], // Glenrio ghost strip
+  [TEXHOMA[0] - 16, TEXHOMA[0] + 16, TEXHOMA[1] - 9, TEXHOMA[1] + 4], // Texhoma elevators + line
+  [ANTHONY[0] - 7, ANTHONY[0] + 7, ANTHONY[1] - 11, ANTHONY[1] + 11], // Anthony banner + Main St
+  [WHITES[0] - 16, WHITES[0] + 13, WHITES[1] - 14, WHITES[1] + 14],   // Whites City strip + road mouth
 ];
 export function shoulderClear(x, z) {
   for (const [x0, x1, z0, z1] of CLEAR_BOXES)
@@ -146,6 +162,24 @@ function drapedPlane(cx, cz, w, len, y0, mat, seg = 12) {
   return new THREE.Mesh(geo, mat);
 }
 
+// hAt-draped ribbon between two world points — drapedPlane is axis-aligned;
+// switchback legs and painted lines need arbitrary bearings
+function ribbon(x0, z0, x1, z1, w, mat, seg = 10) {
+  const len = Math.hypot(x1 - x0, z1 - z0) || 1;
+  const dx = (x1 - x0) / len, dz = (z1 - z0) / len;
+  const geo = new THREE.PlaneGeometry(w, len, 1, seg);
+  geo.rotateX(-Math.PI / 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const a = pos.getZ(i) + len / 2, c = pos.getX(i);
+    const wx = x0 + dx * a - dz * c, wz = z0 + dz * a + dx * c;
+    pos.setX(i, wx); pos.setZ(i, wz);
+    pos.setY(i, hAt(wx, wz) + 0.07);
+  }
+  geo.computeVertexNormals();
+  return new THREE.Mesh(geo, mat);
+}
+
 function mkTex(w, h, draw) {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
@@ -207,6 +241,7 @@ export class ShoulderSystem {
     this.buildNeutralGround(g);
     this.buildTexarkana(g);
     this.casino = this.buildCasino(g);
+    this.buildWest(g);
     this.buildGlows(g);
     scene.add(g);
     this.group = g;
@@ -219,6 +254,16 @@ export class ShoulderSystem {
       { icon: '🎰', name: 'WinBig World Casino', at: [CASINO[0] + 14, CASINO[1] + 14], hint: 'read the marquee', sub: 'WORLD’S BIGGEST — FREE PARKING',
         text: 'The sign says WORLD’S BIGGEST and for once a sign is being modest: the floor is measured in acres and the lot in time zones. Read the plates on your way in — Texas, Texas, Texas, Texas. Oklahoma built it three minutes past the river for a reason, and y’all keep proving the reason.' },
       ...this.stones.map((s) => ({ icon: '🪨', name: `Corner Stone — ${s.label}`, at: [s.x, s.z], hint: 'read the survey cap', sub: s.sub, text: s.text })),
+      { icon: '🪦', name: 'Texola', at: this.texolaAt, hint: 'read the wall', sub: 'Population 42 and holding',
+        text: 'Surveyed into Texas twice and Oklahoma three times — the 100th meridian kept wandering underfoot, and folks here went to bed in one state and woke up in the other without moving. Route 66 kept Texola alive; the interstate let it go. The bar wall got the last word, and it’s still right: there’s no other place like this place anywhere near this place. So this must be the place.' },
+      { icon: '🛏️', name: 'Glenrio', at: this.glenrioAt, hint: 'read the motel sign', sub: 'FIRST IN TEXAS — LAST IN TEXAS',
+        text: 'One sign, two faces, both honest: FIRST MOTEL IN TEXAS if you’re arriving, LAST MOTEL IN TEXAS if you’re leaving. The gas pumps stood on the Texas side because New Mexico taxed fuel harder; the bar never got built because this end of Texas was dry. When I-40 opened in 1973 the town emptied in a season — but nobody took the sign down, so Glenrio still says hello and goodbye all day to people doing eighty.' },
+      { icon: '🌾', name: 'Texhoma', at: this.texhomaAt, hint: 'read the painted line', sub: 'One town, two states',
+        text: 'The name does the math: TEXas plus oklaHOMA. The line runs straight down the middle of town, and Texhoma decided not to care — one water tower, one elevator row, and the only school district in America that ignores a state line: grade school in Oklahoma, high school in Texas, every kid graduates by crossing a border their parents stopped noticing. The wheat never noticed it at all.' },
+      { icon: '🎂', name: 'Anthony', at: this.anthonyAt, hint: 'read the banner', sub: 'Leap Year Capital of the World',
+        text: 'In 1988 a leap-day baby named Mary Ann Brown decided her town should throw the birthday party the calendar kept stealing, and both legislatures — Texas and New Mexico, in rare agreement — proclaimed it. Every February 29, people born on the day come from all over the world to blow out candles on the correct date at last, half the party in each state. Three years out of four, the banner just hangs here. Waiting is most of the job.' },
+      { icon: '🚪', name: 'The Carlsbad Doorstep', at: this.doorstepAt, hint: 'read the park sign', sub: 'Carlsbad Caverns National Park',
+        text: 'The road switchbacks up the old reef — this whole ridge was the floor of a sea once, and the sea left its rooms behind. Seven hundred and fifty feet under that ridge is one of the great caves of the world; at dusk the swallows pour out of its mouth like smoke running backwards. The door is up there. It isn’t open yet. Some places you don’t rush.' },
     ];
   }
 
@@ -535,6 +580,315 @@ export class ShoulderSystem {
     c.userData.kind = 'winbig';
     g.add(c);
     return c;
+  }
+
+  // --- 6b: the west line (curvier kit — 8–14 segment turnings, sagged cloth) ---
+  buildWest(g) {
+    this.buildTexola(g);
+    this.buildGlenrio(g);
+    this.buildTexhoma(g);
+    this.buildAnthony(g);
+    this.buildDoorstep(g);
+    // control cities west: the interstates keep going past the band edge.
+    // Lawton and Alamogordo ride I-44 / US 54 — not in the arterial bake —
+    // so the spec's named pair get glows; signs go on the stubs that exist.
+    for (const [pick, lines] of [
+      [(c) => c.ref === 'I 40' && c.x < -3000, [['Tucumcari', '16'], ['Albuquerque', '191']]],
+      [(c) => c.ref === 'I 10' && c.x < 0, [['Deming', '52'], ['Tucson', '267']]],
+    ]) {
+      const stub = this.crossings.find(pick);
+      if (!stub) continue;
+      const L = stubLength(stub.poly);
+      const a = along(stub.poly, stub.fromStart, Math.max(4, L - 8));
+      this.buildControlSign(g, { x: a.x - a.tz * 7, z: a.z + a.tx * 7, tx: a.tx, tz: a.tz }, controlSignTex(lines));
+    }
+  }
+
+  // Texola, Oklahoma — population 42 and holding. Route 66 kept it alive,
+  // I-40 let it go; the shells hold the line's east end and the bar wall
+  // gets the last word.
+  buildTexola(g) {
+    const cx = TEXOLA[0], cz = TEXOLA[1] + 2; // I-40 runs ~7u north — stay off its 4u bubble
+    const grp = new THREE.Group();
+    grp.userData.kind = 'texola';
+    const adobe = lamb(0xb3a48a), stone = lamb(0x8f8478), rust = lamb(0x8a4a38);
+    const rand = seededRand('texola'); // new stream — never rename
+    this.texolaWalls = 0;
+    const shell = (sx, sz, w, d, yaw) => {
+      const s = new THREE.Group();
+      s.position.set(sx, hAt(sx, sz), sz);
+      s.rotation.y = yaw;
+      const sides = [[0, -d / 2, w, 0, true], [0, d / 2, w, 0, false], [-w / 2, 0, d, Math.PI / 2, false], [w / 2, 0, d, Math.PI / 2, false]];
+      for (const [ox, oz, len, wy, door] of sides) {
+        const segs = 2 + Math.floor(rand() * 2);
+        for (let i = 0; i < segs; i++) {
+          const h = 0.7 + rand() * 1.5; // draw first — the doorway must not skip a draw
+          if (door && i === Math.floor(segs / 2)) continue;
+          const segLen = len / segs;
+          const wall = new THREE.Mesh(new THREE.BoxGeometry(segLen * 0.94, h, 0.22), adobe);
+          const off = -len / 2 + segLen * (i + 0.5);
+          wall.position.set(ox + Math.cos(wy) * off, h / 2, oz + Math.sin(wy) * off);
+          wall.rotation.y = wy;
+          s.add(wall);
+          this.texolaWalls++;
+        }
+      }
+      grp.add(s);
+    };
+    shell(cx - 6, cz + 1, 5, 3.4, 0.12);
+    shell(cx + 7, cz + 3, 4, 3, -0.2);
+    shell(cx + 1, cz + 6, 3.4, 2.8, 0.05);
+    // the territorial jail — one room, walls two feet thick, still standing
+    const jail = new THREE.Group();
+    jail.position.set(cx - 2, hAt(cx - 2, cz - 2), cz - 2);
+    const jbody = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.5, 1.5), stone);
+    jbody.position.y = 0.75; jail.add(jbody);
+    const jroof = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.14, 1.7), lamb(0x6a6258));
+    jroof.position.y = 1.57; jail.add(jroof);
+    for (const bx of [-0.22, 0, 0.22]) {
+      const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), lamb(0x3a3a40));
+      bar.position.set(bx, 1.0, 0.76); jail.add(bar);
+    }
+    grp.add(jail);
+    // the Magnolia station: a rusted pump under a leaning canopy
+    const mag = new THREE.Group();
+    mag.position.set(cx + 3.5, hAt(cx + 3.5, cz - 1), cz - 1);
+    mag.rotation.z = 0.05; // years of wind
+    const pump = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.95, 10), rust);
+    pump.position.y = 0.48; mag.add(pump);
+    const globe = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), lamb(0xe8dfc4));
+    globe.position.y = 1.1; mag.add(globe);
+    for (const px of [-1.2, 1.2]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 2.2, 10), rust);
+      post.position.set(px, 1.1, 0.8); mag.add(post);
+    }
+    const cRoof = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.1, 2.2), lamb(0x9a8a6a));
+    cRoof.position.set(0, 2.22, 0.8); cRoof.rotation.z = 0.04; mag.add(cRoof);
+    grp.add(mag);
+    // the wall with the last word, facing the road to the north
+    const wordTex = mkTex(512, 256, (ctx) => {
+      ctx.fillStyle = '#ddd6c2'; ctx.fillRect(0, 0, 512, 256);
+      ctx.fillStyle = '#2e2c28'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 33px Georgia';
+      ["THERE'S NO OTHER PLACE", 'LIKE THIS PLACE', 'ANYWHERE NEAR THIS PLACE', 'SO THIS MUST BE', 'THE PLACE'].forEach((ln, i) => ctx.fillText(ln, 256, 46 + i * 42));
+    });
+    const word = new THREE.Mesh(new THREE.BoxGeometry(4.4, 2.2, 0.24),
+      [adobe, adobe, adobe, adobe, adobe, new THREE.MeshLambertMaterial({ map: wordTex })]);
+    word.position.set(cx - 1, hAt(cx - 1, cz + 9) + 1.1, cz + 9);
+    grp.add(word);
+    g.add(grp);
+    this.texolaAt = [cx - 1, cz + 9]; // the plaque reads at the wall
+  }
+
+  // Glenrio — the ghost town ON the line; one sign, two faces, both honest.
+  // Gas stood on the Texas side (New Mexico taxed fuel harder); the bar never
+  // got built (this end of Texas was dry). I-40 opened 1973; everyone left.
+  buildGlenrio(g) {
+    const [cx, cz] = GLENRIO;
+    const grp = new THREE.Group();
+    grp.userData.kind = 'glenrio';
+    const stucco = lamb(0xcfc6b0), dark = lamb(0x1c1c20);
+    // old 66 through town, south of and parallel to I-40
+    grp.add(ribbon(cx - 18, cz + 5, cx + 18, cz + 5, 2.4, lamb(0x565250), 16));
+    // the motel: office + room row; the diner shell; every doorway dark
+    const bld = (bx, bz, w, h, d) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stucco);
+      m.position.set(bx, hAt(bx, bz) + h / 2, bz);
+      grp.add(m);
+    };
+    bld(cx + 2, cz + 0.8, 3, 2.3, 2.6);   // the office
+    bld(cx + 8.5, cz + 0.8, 9, 1.9, 2.4); // the room row
+    bld(cx - 5, cz + 0.8, 2.8, 1.9, 2.2); // the diner
+    for (const dx of [5.2, 6.8, 8.4, 10, 11.6, -5]) {
+      const door = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 1.1), dark);
+      door.position.set(cx + dx, hAt(cx + dx, cz + 2.05) + 0.6, cz + 2.05);
+      grp.add(door);
+    }
+    // THE sign: a rusted pylon with a face for each direction of travel.
+    // +x is east — the west face greets you FIRST, the east face waves LAST.
+    const sx = cx - 1, sz = cz + 3.6;
+    const sign = new THREE.Group();
+    sign.position.set(sx, hAt(sx, sz), sz);
+    sign.userData.kind = 'glenriosign';
+    const pylon = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.2, 6.8, 12), lamb(0x7a6a58));
+    pylon.position.y = 3.4; sign.add(pylon);
+    const faceTex = (word) => mkTex(288, 448, (ctx) => {
+      ctx.fillStyle = '#efe7d2'; ctx.fillRect(0, 0, 288, 448);
+      ctx.strokeStyle = '#8a4a38'; ctx.lineWidth = 12; ctx.strokeRect(10, 10, 268, 428);
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#a03028'; ctx.font = 'bold 72px Georgia'; ctx.fillText(word, 144, 92);
+      ctx.fillStyle = '#2e3a56'; ctx.font = 'bold 66px Georgia'; ctx.fillText('MOTEL', 144, 218);
+      ctx.fillStyle = '#2e2c28'; ctx.font = 'bold 44px Georgia'; ctx.fillText('IN TEXAS', 144, 330);
+      ctx.font = '30px Georgia'; ctx.fillText('VACANCY', 144, 398);
+    });
+    for (const [word, yaw] of [['FIRST', -Math.PI / 2], ['LAST', Math.PI / 2]]) {
+      const b = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 2.8), new THREE.MeshLambertMaterial({ map: faceTex(word) }));
+      b.position.set(yaw < 0 ? -0.18 : 0.18, 5.2, 0);
+      b.rotation.y = yaw;
+      b.userData.reads = `${word} MOTEL IN TEXAS`;
+      sign.add(b);
+    }
+    grp.add(sign);
+    this.glenrioSign = sign;
+    g.add(grp);
+    this.glenrioAt = [sx, sz];
+  }
+
+  // Texhoma — the name does the math. One elevator row, one painted line,
+  // one school district that ignores the border.
+  buildTexhoma(g) {
+    const [cx, cz] = TEXHOMA;
+    const grp = new THREE.Group();
+    grp.userData.kind = 'texhoma';
+    const concrete = lamb(0xd6d1c6);
+    // the painted line, dead on 36.5°N through the townsite
+    grp.add(ribbon(cx - 15, cz, cx + 15, cz, 0.35, lamb(0xe9e6da), 20));
+    // the elevators on the Oklahoma side, by where the rails ran
+    const silos = new THREE.Group();
+    const ex = cx + 2, ez = cz - 5;
+    silos.position.set(ex, hAt(ex, ez), ez);
+    this.texhomaSilos = 0;
+    for (let i = 0; i < 6; i++) {
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 7, 14), concrete);
+      s.position.set(-4 + i * 1.6, 3.5, 0);
+      silos.add(s); this.texhomaSilos++;
+    }
+    for (let i = 0; i < 3; i++) {
+      const s = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 4.4, 14), concrete);
+      s.position.set(-2.4 + i * 1.6, 2.2, -1.9);
+      silos.add(s); this.texhomaSilos++;
+    }
+    const nameTex = mkTex(512, 128, (ctx) => {
+      ctx.fillStyle = '#c8c3b8'; ctx.fillRect(0, 0, 512, 128);
+      ctx.fillStyle = '#3a3a40'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 72px system-ui, sans-serif'; ctx.fillText('TEXHOMA', 256, 64);
+    });
+    const head = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2, 1.8),
+      [concrete, concrete, concrete, concrete, new THREE.MeshLambertMaterial({ map: nameTex }), concrete]);
+    head.position.set(0, 8, 0); // headhouse; the name reads from the Texas side
+    silos.add(head);
+    grp.add(silos);
+    g.add(grp);
+    this.texhomaAt = [ex, cz]; // the plaque reads at the line, below the name
+  }
+
+  // Anthony — Leap Year Capital of the World (both legislatures agreed).
+  // The banner hangs over Main St ON the line and waits; waiting is most
+  // of the job.
+  buildAnthony(g) {
+    const [cx, cz] = ANTHONY;
+    const grp = new THREE.Group();
+    grp.userData.kind = 'anthony';
+    // Main St crossing the line (causeway precedent — a deck, not a road)
+    grp.add(ribbon(cx, cz - 9, cx, cz + 9, 2.8, lamb(0x3a3a3e), 12));
+    for (const px of [-2.6, 2.6]) {
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 4.6, 10), lamb(0xb8b4ac));
+      pole.position.set(cx + px, hAt(cx + px, cz) + 2.3, cz);
+      grp.add(pole);
+    }
+    const tex = mkTex(1024, 128, (ctx) => {
+      ctx.fillStyle = '#c8332e'; ctx.fillRect(0, 0, 1024, 128);
+      ctx.strokeStyle = '#f7f3e8'; ctx.lineWidth = 6; ctx.setLineDash([22, 14]); ctx.strokeRect(10, 10, 1004, 108);
+      ctx.fillStyle = '#f7f3e8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 50px Georgia';
+      ctx.fillText('★ ANTHONY — LEAP YEAR CAPITAL OF THE WORLD ★', 512, 64);
+    });
+    this.anthonyBanner = [];
+    const bh = hAt(cx, cz) + 4.05;
+    for (const yaw of [0, Math.PI]) { // a front face for each direction of travel
+      const geo = new THREE.PlaneGeometry(5.2, 0.8, 16, 1);
+      const pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const t = pos.getX(i) / 2.6;
+        pos.setY(i, pos.getY(i) - 0.3 * (1 - t * t)); // the sag
+      }
+      geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ map: tex }));
+      m.position.set(cx, bh, cz + (yaw === 0 ? 0.02 : -0.02));
+      m.rotation.y = yaw;
+      this.anthonyBanner.push(m);
+      grp.add(m);
+    }
+    g.add(grp);
+    this.anthonyAt = [cx, cz];
+  }
+
+  // The Carlsbad doorstep (settled call #9): Whites City off US 62, the park
+  // road switchbacking up the old reef, and the entrance sign. ZERO cave
+  // content — the caves track inherits a place, not a promise.
+  buildDoorstep(g) {
+    const [cx, cz] = WHITES;
+    const grp = new THREE.Group();
+    grp.userData.kind = 'doorstep';
+    // anchor on the real US 62 stub (Neutral Ground idiom) — the strip sits
+    // east of the road, the park road climbs away west
+    const us62 = this.crossings.find((c) => c.ref === 'US 62' && c.x < -4000);
+    let rd = { x: cx, z: cz, tx: 0, tz: -1 };
+    if (us62) rd = along(us62.poly, us62.fromStart, this.arcNearest(us62, { x: cx, z: cz }));
+    const s = -rd.tz >= 0 ? 1 : -1; // lateral direction with an east (+x) component
+    const lat = (d) => ({ x: rd.x - rd.tz * d * s, z: rd.z + rd.tx * d * s });
+    const E = lat(7); // strip anchor, east of the road
+    const strip = new THREE.Group();
+    strip.position.set(E.x, hAt(E.x, E.z), E.z);
+    strip.rotation.y = Math.atan2(rd.tx, rd.tz); // long axis parallel to US 62
+    const white = lamb(0xf2ecdc), red = lamb(0x9a3c30), stone = lamb(0x8a7a64);
+    const bld = (ox, oz, w, h, d) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), white);
+      m.position.set(ox, h / 2, oz);
+      const cap = new THREE.Mesh(new THREE.BoxGeometry(w + 0.3, 0.22, d + 0.3), red);
+      cap.position.set(ox, h + 0.11, oz);
+      strip.add(m, cap);
+    };
+    bld(0, -4, 3.4, 2.4, 2.8); // the gift shop (everything cavern-shaped)
+    bld(0.4, 2.5, 2.6, 2, 7);  // the motor court, long side on the road
+    // WHITES CITY — the sign taller than everything it advertises
+    const wcTex = mkTex(384, 256, (ctx) => {
+      ctx.fillStyle = '#f2ecdc'; ctx.fillRect(0, 0, 384, 256);
+      ctx.strokeStyle = '#9a3c30'; ctx.lineWidth = 10; ctx.strokeRect(8, 8, 368, 240);
+      ctx.fillStyle = '#9a3c30'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 64px Georgia'; ctx.fillText('WHITES', 192, 84);
+      ctx.fillText('CITY', 192, 160);
+      ctx.fillStyle = '#2e2c28'; ctx.font = '26px Georgia'; ctx.fillText('GAS · CURIOS · BEDS', 192, 222);
+    });
+    const wcPole = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 5.2, 12), lamb(0x8a8580));
+    wcPole.position.set(-0.6, 2.6, -7.2); strip.add(wcPole);
+    const wcBoard = new THREE.Mesh(new THREE.BoxGeometry(2.6, 1.8, 0.14), new THREE.MeshLambertMaterial({ map: wcTex }));
+    wcBoard.position.set(-0.6, 4.6, -7.2); strip.add(wcBoard);
+    grp.add(strip);
+    // the park road: hand-laid switchback legs climbing west into the reef
+    const M = lat(-5); // the mouth, west of the road
+    const W = [[0, 0], [-10, -2], [-16, 5], [-27, 2], [-33, 10], [-45, 7], [-51, 14], [-61, 11]];
+    const road = lamb(0x565250);
+    this.parkRoad = [];
+    for (let i = 1; i < W.length; i++) {
+      const leg = ribbon(M.x + W[i - 1][0], M.z + W[i - 1][1], M.x + W[i][0], M.z + W[i][1], 1.5, road, 10);
+      this.parkRoad.push(leg);
+      grp.add(leg);
+    }
+    const top = [M.x + W[W.length - 1][0], M.z + W[W.length - 1][1]];
+    grp.add(drapedPlane(top[0], top[1], 7, 7, 0.06, lamb(0x4e4a48), 6)); // the turnaround
+    this.doorstepTop = top;
+    // the entrance sign at the mouth: two stone piers, one timber board
+    const sign = new THREE.Group();
+    sign.position.set(M.x - 2, hAt(M.x - 2, M.z - 3), M.z - 3);
+    sign.rotation.y = Math.atan2(E.x - (M.x - 2), E.z - (M.z - 3)); // face the highway
+    for (const px of [-2, 2]) {
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(0.55, 1.5, 0.55), stone);
+      pier.position.set(px, 0.75, 0); sign.add(pier);
+    }
+    const npsTex = mkTex(512, 160, (ctx) => {
+      ctx.fillStyle = '#4a3a26'; ctx.fillRect(0, 0, 512, 160);
+      ctx.strokeStyle = '#d8cfae'; ctx.lineWidth = 5; ctx.strokeRect(7, 7, 498, 146);
+      ctx.fillStyle = '#e8dfc0'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold 50px Georgia'; ctx.fillText('CARLSBAD CAVERNS', 256, 58);
+      ctx.font = 'bold 38px Georgia'; ctx.fillText('NATIONAL PARK', 256, 116);
+    });
+    const board = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.2, 0.16), new THREE.MeshLambertMaterial({ map: npsTex }));
+    board.position.y = 1.45; sign.add(board);
+    grp.add(sign);
+    this.doorstepSign = sign;
+    g.add(grp);
+    this.doorstepAt = [M.x - 2, M.z - 3];
   }
 
   buildGlows(g) {
