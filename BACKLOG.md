@@ -37,12 +37,41 @@ already shipped as `54b3511` — these are the remaining items)
   reads sunken at some banks; wants a look at the offsets, plus water
   ambience (river/lakeshore loop in audio.js) and a cheap surface effect
   (ripple/sparkle).
-- **Band land readability**: no roads connect band cities to the grid
-  (known W2 limitation — arterials only; connecting stubs is polish, needs
-  a re-bake), Bruno's "no elevation?" impression (the band DOES use the
-  real DEM — check whether the flat `cOut` 0.75 tint is washing out relief
-  cues), and "are the land colors accurate?" — a color-ramp pass on
-  out-of-Texas cells in `buildTerrain`.
+- **The band is always desert** (`world.js:220`, diagnosed 2026-07-15 —
+  confirms this entry's earlier guess): `if (out) c.lerp(cOut, 0.75)` drags
+  every out-of-Texas cell 75% to one tan (`0xb8a888`), flattening BOTH the
+  height ramp and the regional tints — so Louisiana swamp, Arkansas pine and
+  NM desert all read as sand. Also answers Bruno's "no elevation?" impression:
+  the band does use the real DEM, the tan wash is erasing the relief cues.
+  The `cPine` tint (line 219) already isn't Texas-gated and would green the
+  east band — the 0.75 wash erases it. **Not a bug — a decision that outlived
+  its context**: `cOut` landed with the original DEM commit (`1dd0ac3`) when
+  outside Texas was unreachable backdrop, deliberately muted to keep the eye
+  on Texas; W6a/W6b made that ground drivable and nobody revisited it. Fix is
+  small (retune the lerp; consider per-neighbor tints) but it's a visual
+  judgment — wants Fable 5 + screenshots ON, and Bruno's eye.
+- **Band roads: the concurrency defect** (diagnosed 2026-07-15) — distinct
+  from the known "arterials only" scope limit below. A route is only matched
+  when it's listed FIRST: the bake's Overpass regex is `^(<routes>)($|;)` and
+  the script then takes `(ref).split(';')[0]`. OSM tags concurrencies as
+  `US 60;US 84`, so **every** US 84 way from Clovis to Farwell (216 ways:
+  `US 60;US 84`, `US 60;US 70;US 84`, `US 70;US 84`) is invisible to both —
+  US 84's closest approach in the baked data is 305u, it never reaches Texas.
+  That's why Clovis sits 145u from the line unroaded. Predates the
+  2026-07-15 rebake (old data has the same gap; the rebake reproduced the
+  idiom faithfully). **Only US 84 was checked — assume other routes are hit.**
+  Fix: match the ref anywhere (`(^|;)(<routes>)($|;)`) AND pick the *matching*
+  ref, not `[0]`; re-fetch all four states (queries/endpoints/bboxes are now
+  recorded in `tools/build-band-roads.mjs`'s header), rebake, re-verify the
+  shoulder suite (crossing monuments read band endpoints). Shifts the road set
+  again — land it on its own, not stacked on another band change.
+- **Band scope call (decide BEFORE the concurrency fix codes)**: 147 of 177
+  band cities have no road within 25u, and the concurrency fix won't change
+  that — only 11 through-routes were ever queried (I-10/20/30/35/40, US
+  62/71/84/87/180/287). That's the W2 design: Texas's highways continuing
+  across the line, not the road network *of* the neighbors. Connecting the
+  band towns is a scope expansion (more refs? a real network fetch?), not a
+  bug fix — needs Bruno's call on how far the shoulder is meant to go.
 - **Brand buildings positioning review** (Bucky's / H-E-Buddy / Lone Star
   Compute): review all sites' placement against roads/downtowns — Bruno
   flags it wholesale; ranches and chapel–cemetery pairs confirmed good.

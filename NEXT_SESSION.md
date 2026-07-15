@@ -6,6 +6,17 @@ Queued work and every owed playtest live in `BACKLOG.md` — the Shoulder & Shel
 playtest list is long and entirely unspent, so a play session is the highest-value
 next move, not more code.
 
+**Unplayed change, 2026-07-15 (`8398546`)**: band roads were rebaked — the bake
+had been applying a *degree* tolerance in game units (~1000× too tight), so they
+shipped unsimplified at 2.2 u/pt against Texas's 34.6 and read dense and rough
+the moment you crossed the line. Fixed to simplify before projecting (6830 pts →
+340). The rebake also **moved the road set** (81 → 76 polylines, +478u primary,
+−173u motorway) — full verify green and the shoulder suite says the crossing
+monuments held, but no test judges how it *looks*. **Drive the band before
+stacking another band change on it** — the concurrency fix in `BACKLOG.md` is a
+second road-set shift and must not tangle with this one. Padre/Texarkana/Clovis
+are the spots to eyeball.
+
 ---
 
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
@@ -35,6 +46,17 @@ Key facts:
 - **Never change the length of `GEO.highways`/`GEO.cities`** (or merge the band
   arrays into them) — rose indices and the 132/254 counters depend on them. Band
   data lives in `GEO.bandHighways`/`GEO.bandCities`.
+- **`band-highways.json` is rebakeable again** — inputs in
+  `tx-inputs/band-{la,ar,ok,nm}.json`, exact queries/endpoints/bboxes in
+  `tools/build-band-roads.mjs`'s header (the first bake left only a
+  `<routes>`/`(bbox)` template, so nobody could regenerate it). The bboxes are
+  **reconstructed**: they reproduce the trunk tier exactly (23 polylines,
+  4133u) but not motorway/primary. Arg order is load-bearing (chaining is
+  greedy over file order). Any rebake shifts band geometry — run the shoulder
+  suite, the crossing monuments read band endpoints.
+- **Simplification tolerances are in DEGREES** — simplify before `proj`, never
+  after (`build-data.mjs` is the reference). Reversed, 0.0025 reads as 25 cm
+  instead of ~260 m and nothing gets dropped; `band.mjs` guards the ratio now.
 - **Never change `seededRand` seed strings** — determinism is what makes bugs
   cheaply reproducible, and players' saves + spatial memory depend on it. Every
   stream ever minted is still live; add new ones, never rename.
