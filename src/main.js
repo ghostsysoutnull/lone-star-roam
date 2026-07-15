@@ -14,6 +14,8 @@ import { TurtleSystem } from './turtles.js';
 import { TrafficSystem } from './traffic.js';
 import { AnimalSystem, SPECIES, SPECIES_COUNT } from './animals.js';
 import { BatSystem } from './bats.js';
+import { FerrySystem } from './ferries.js';
+import { DolphinSystem } from './dolphins.js';
 import { SkySystem, ATMOS } from './sky.js';
 import { TravelMenu } from './travel.js';
 import { MissionSystem } from './missions.js';
@@ -70,6 +72,8 @@ async function boot() {
   const animals = new AnimalSystem(scene, (key) => gameplay.spotSpecies(key, SPECIES[key].name, SPECIES_COUNT, SPECIES[key].fact));
   const bats = new BatSystem(scene, () => gameplay.spotSpecies('bat', SPECIES.bat.name, SPECIES_COUNT, SPECIES.bat.fact));
   const turtles = new TurtleSystem(scene, () => gameplay.spotSpecies('kempsridley', SPECIES.kempsridley.name, SPECIES_COUNT, SPECIES.kempsridley.fact));
+  const ferries = new FerrySystem(scene, player);
+  const dolphins = new DolphinSystem(scene, ferries, () => gameplay.spotSpecies('dolphin', SPECIES.dolphin.name, SPECIES_COUNT, SPECIES.dolphin.fact));
   const hud = new HUD();
   // collectible totals in the score panel/help come from the real tables —
   // the old static copies (26/15/2) had quietly rotted
@@ -122,6 +126,8 @@ async function boot() {
   const haunts = new HauntSystem(scene,
     (k) => gameplay.spotLegend(k, LEGENDS[k].name, LEGEND_COUNT, LEGENDS[k].fact),
     (d) => audio.bell(d));
+  ferries.onBoard = (name) => hud.toast(`⛴️ ${name} — no schedule, no rush`);
+  ferries.onBell = (d) => audio.bell(d);
   npcs.onDialog = (d) => hud.dialog(d);
   npcs.onTalk = () => audio.chime('dialog');
   sky.onBolt = () => audio.thunder();
@@ -220,7 +226,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, turtles, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, inTexas, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, inTexas, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -236,6 +242,10 @@ async function boot() {
       if (!window.__skipRender) renderer.render(scene, camera);
       return;
     }
+    // ferries drive player.pos/heading directly while aboard — must run before
+    // player.update() so its avatar/camera stamp picks up the fresh position
+    ferries.update(dt, clock.elapsedTime);
+    dolphins.update(dt, clock.elapsedTime);
     player.update(dt);
     sky.update(dt, player.keys['KeyT'], player.pos.x, player.pos.z, player.pos.y);
     scenery.update(dt, player.pos.x, player.pos.z);

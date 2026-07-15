@@ -33,6 +33,7 @@ export const LANDMARKS = [
   { name: 'Marfa Lights', at: LL(30.2892, -103.8543), kind: 'lights', fact: 'Mysterious orbs seen over the desert since the 1880s.' },
   { name: 'Fort Worth Stockyards', at: LL(32.7893, -97.3465), kind: 'longhorn', fact: 'Twice-daily longhorn cattle drive, every day since 1999.' },
   { name: 'Galveston Pleasure Pier', at: LL(29.2854, -94.7905), kind: 'ferris', fact: 'A ferris wheel over the Gulf of Mexico.' },
+  { name: 'SS Selma', at: LL(29.3275, -94.7880), kind: 'wreck', fact: 'A WWI concrete-hulled tanker, scuttled off Pelican Island in 1922 after a collision cracked her stern — still broken-backed in the shallows.' },
   // nudged 2026-07-14 (W3): the old lon sat in open Gulf water once the island
   // became real land — now on the sand (save is by name, so nothing breaks)
   { name: 'Padre Island', at: LL(26.5940, -97.2940), kind: 'beach', fact: 'Longest undeveloped barrier island in the world.' },
@@ -994,6 +995,21 @@ function mkLandmarkMesh(kind, name) {
       const spire = add(new THREE.Mesh(new THREE.ConeGeometry(0.16, 1.1, 10), gold));
       spire.position.y = 11.6;
       g.userData.nightMats = [windowMat, gold];
+      break;
+    }
+    case 'wreck': {
+      // broken-backed concrete hull, half-swallowed by the shallows
+      const concrete = new THREE.MeshLambertMaterial({ color: 0x8a8578, flatShading: true });
+      const rust = new THREE.MeshLambertMaterial({ color: 0x6b4a3a, flatShading: true });
+      const hullA = add(new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.2, 6), concrete));
+      hullA.position.set(-1.6, 0.35, 0);
+      hullA.rotation.z = 0.18;
+      const hullB = add(new THREE.Mesh(new THREE.BoxGeometry(2.2, 1, 5), concrete));
+      hullB.position.set(2.6, 0.1, 0.6);
+      hullB.rotation.set(0.05, 0.5, -0.22); // the two halves no longer align
+      const rib = add(new THREE.Mesh(new THREE.BoxGeometry(0.15, 1.6, 0.15), rust));
+      rib.position.set(-1.2, 0.9, 1.8);
+      rib.rotation.z = -0.3;
       break;
     }
   }

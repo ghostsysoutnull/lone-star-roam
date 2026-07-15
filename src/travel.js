@@ -107,8 +107,9 @@ export class TravelMenu {
     }
     if (this.tab === 'Jobs') { this.renderJobs(); return; }
     if (this.tab === 'Shop') { this.renderShop(); return; }
-    // teleporting with cargo aboard would gut the missions — lock travel mid-haul
-    const hauling = this.missions?.job?.phase === 'haul';
+    // teleporting with cargo aboard would gut the missions — lock travel mid-haul;
+    // teleporting off a ferry mid-crossing would be worse — you'd leave the truck behind
+    const hauling = this.missions?.job?.phase === 'haul' || this.player.aboardFerry;
     const visited = new Set(this.gameplay.save.cities);
     const collected = new Set(this.gameplay.save.landmarks);
     let cityFilterEmpty = false;
@@ -163,7 +164,8 @@ export class TravelMenu {
       .map((p, i) => `<button data-i="${i}" ${p.locked || hauling ? 'disabled' : ''}>${p.star ? '⭐ ' : ''}${p.name}${p.locked ? ' 🔒' : ''}${p.meta ? `<br><small style="opacity:.7">${p.meta}</small>` : ''}</button>`)
       .join('');
     this.el.querySelector('.hint').textContent =
-      hauling ? '📦 Cargo aboard — finish (or abandon) your delivery before fast-traveling.'
+      this.player.aboardFerry ? '⛴️ Mid-crossing — fast travel again once you make land.'
+      : hauling ? '📦 Cargo aboard — finish (or abandon) your delivery before fast-traveling.'
       : cityFilterEmpty ? `No cities match "${this.citySearch.trim()}".`
       : airportFilterEmpty ? `No logged airports match "${this.airportSearch.trim()}".`
       : this.tab === 'Airports' && airportLoggedCount === 0 ? 'Your logbook is empty — tune in and land at a towered field to stamp it.'

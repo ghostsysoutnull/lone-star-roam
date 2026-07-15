@@ -162,7 +162,9 @@ export class AudioSystem {
     set(this.ufoGain.gain, ufo * 0.045, 0.3);
     const sputter = ufo > 0 && Math.random() < ufo * 0.4 ? 0.12 : 1;
 
-    if (player.mode === 'DRIVE') {
+    if (player.mode === 'DRIVE' && player.aboardFerry) {
+      set(this.engineGain.gain, 0); // engine cut for the crossing — the boat does the work
+    } else if (player.mode === 'DRIVE') {
       if (this.engOsc.type !== 'sawtooth') this.engOsc.type = 'sawtooth';
       set(this.propDepth.gain, 0, 0.15); // no prop chop in the truck
       set(this.engOsc.frequency, 42 + spd * 2.3);

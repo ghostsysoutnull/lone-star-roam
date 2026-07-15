@@ -56,6 +56,7 @@ export class Player {
     this.onThrust = null;  // jetpack liftoff hook (fires once on the ground->hovering edge)
     this.onWorldEdge = null; // soft-wall hook: (zone: 'land'|'coast') fires once on the inWorld->!inWorld edge
     this._wasInWorld = true;
+    this.aboardFerry = false; // ferries.js drives pos/heading directly while true — see vehicle.js's update() guards
     this.walkPhase = 0;
     this.steerVis = 0;
     this.prevSpeed = 0;
@@ -188,7 +189,9 @@ export class Player {
     const steer = (left ? 1 : 0) - (right ? 1 : 0);
     this.braking = false;
 
-    if (this.mode === 'DRIVE') {
+    if (this.aboardFerry) {
+      // position/heading/speed driven externally by FerrySystem this frame
+    } else if (this.mode === 'DRIVE') {
       const road = nearestRoad(this.pos.x, this.pos.z, 4);
       // top speed by road tier; offroad is slow going — except Padre's wet
       // sand, which drives like a primary road (posted 33 on the driftwood)
@@ -263,8 +266,10 @@ export class Player {
     }
 
     // Soft wall at the edge of the roamable world — Texas proper plus the
-    // shoulder (land) / shelf (Gulf); Mexico gets no dilation (settled as out)
-    const inW = inWorld(this.pos.x, this.pos.z);
+    // shoulder (land) / shelf (Gulf); Mexico gets no dilation (settled as out).
+    // Skipped aboard a ferry: channel crossings are well inside the shelf
+    // allowance anyway, but a directly-driven pos shouldn't fight the wall.
+    const inW = this.aboardFerry || inWorld(this.pos.x, this.pos.z);
     if (!inW) {
       if (this._wasInWorld) {
         const zone = borderZoneAt(this.pos.x, this.pos.z);
@@ -280,9 +285,10 @@ export class Player {
     }
     this._wasInWorld = inW;
 
-    // ground modes ride the terrain (or an airport pad's flat plateau)
+    // ground modes ride the terrain (or an airport pad's flat plateau) — aboard
+    // a ferry the deck height is FerrySystem's call, not the terrain's
     const ground = groundYAt(this.pos.x, this.pos.z) ?? hAt(this.pos.x, this.pos.z);
-    if (this.mode !== 'FLY' && !this.hovering) this.pos.y = ground;
+    if (this.mode !== 'FLY' && !this.hovering && !this.aboardFerry) this.pos.y = ground;
     this.groundY = ground;
 
     // Place avatar
@@ -291,8 +297,8 @@ export class Player {
     avatar.rotation.set(0, this.heading, 0);
     avatar.rotateZ(this.tilt || 0);
     if (this.mode === 'FLY') avatar.rotateX(THREE.MathUtils.clamp(-this.vy * 0.012, -0.35, 0.35));
-    else {
-      // pitch with the slope (sample fore/aft along heading)
+    else if (!this.aboardFerry) {
+      // pitch with the slope (sample fore/aft along heading) — flat on the ferry deck
       const fx = -Math.sin(this.heading), fz = -Math.cos(this.heading);
       const gAt = (x, z) => groundYAt(x, z) ?? hAt(x, z);
       const dh = gAt(this.pos.x + fx * 2.2, this.pos.z + fz * 2.2) - gAt(this.pos.x - fx * 2.2, this.pos.z - fz * 2.2);

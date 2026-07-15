@@ -94,7 +94,7 @@ export default async function padre(t) {
       total: document.getElementById('total-landmarks').textContent,
     })`);
     t.ok(res.got, 'lighthouse did not collect from parked distance (14u, radius 20)');
-    t.ok(res.total === '37', `landmark total in HUD is ${res.total}, expected 37 (36 + lighthouse)`);
+    t.ok(res.total === '38', `landmark total in HUD is ${res.total}, expected 38 (36 + lighthouse + W4's SS Selma)`);
   });
 
   await t.check('collectible totals in the DOM come from the live tables', async () => {
@@ -105,7 +105,7 @@ export default async function padre(t) {
       legendCount: Object.keys(g.LEGENDS).length,
     })`);
     t.ok(res.critters === String(res.species), `critter total ${res.critters} !== SPECIES table ${res.species}`);
-    t.ok(res.species === 25, `species table is ${res.species}, expected 25 (24 + Kemp's ridley)`);
+    t.ok(res.species === 26, `species table is ${res.species}, expected 26 (25 + W4's dolphin)`);
     t.ok(res.legends === String(res.legendCount), `legend total ${res.legends} !== LEGENDS table ${res.legendCount}`);
   });
 

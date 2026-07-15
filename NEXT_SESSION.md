@@ -2,22 +2,71 @@
 
 ## Session briefing
 - **This session**: the Shoulder & the Shelf (`SHOULDER_SHELF_SPEC.md`),
-  wave 4 of 7 — "Ferries & the working water" (machinery). Rideable
-  Bolivar + Port Aransas ferries: drive aboard in DRIVE, boat departs on
-  boarding (no schedule waits), ~25 s crossing, engine cut, can't skip —
-  the slow-TV verb; player/truck parented to the deck (`scene.attach`
-  precedent in dog.js); **bottlenose dolphins** bow-ride every crossing
-  (species +1, logged from the deck); SS Selma plaque wreck off
-  Galveston; bell buoys on the channel (bell synth exists in audio.js).
-  Checks: crossing position-over-time, aboard-parenting, dolphin
-  proximity + log, return trip, fast-travel/job interaction while
-  aboard. W3 (Padre & the coast road) shipped 2026-07-15, commit `5eec9f4`.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — machinery
-  wave (deck parenting, crossing state machine, physics interactions),
-  per the spec's model table. Flag it if the running model differs.
-- **Budget**: code + checks, no shots — EXCEPT one sanctioned SHOT for
-  the deck composition judgment only (spec grants it).
-- **Then**: rewrite this block for wave 5 (The Shelf, content, Fable 5).
+  wave 5 of 7 — "The Shelf" (content). Tidelands dashed line on the big
+  map + buoy plaque ("A republic drives a hard bargain…"); blue-water
+  band beyond it; rig night presence (emissive flares, night-gated —
+  from Malaquite the horizon has a skyline); the **Far Rig** (the real
+  64.1-mi platform, upgraded prop + plaque, alone past the blue line);
+  the **1554 treasure light** legend off the Mansfield Cut — new-moon
+  nights only, inside state water (the ghost stays in Texas), drifts
+  away, gone by dawn (legends +1, 2→3); shrimp fleet night work-lights;
+  **roseate spoonbill** + **whooping crane** at Aransas (species +2,
+  26→28; crane fact mentions wintering, birds present year-round — no
+  seasons yet). W4 (Ferries & the working water) shipped 2026-07-15,
+  commit `TBD` (fill in next session).
+- **Recommended setup**: model **Fable 5**, effort **high** — content/
+  register wave (plaque copy, legend flavor, bird facts), per the
+  spec's model table. Flag it if the running model differs.
+- **Budget**: code + checks, no shots, grep-first.
+- **Then**: rewrite this block for wave 6a (The Shoulder east, Fable 5).
+
+Gotchas from W4 (whoever touches ferries, the Gulf, species/landmark
+counts, or vehicle.js's per-mode physics next must know):
+- **Aboard-riding is position-driven, not scene-graph reparenting.**
+  `vehicle.js`'s `avatar.position.copy(this.pos)` runs unconditionally
+  every frame off `this.pos` (world-space) — camera/HUD/nearestRoad all
+  key off it too. True `scene.attach()` of the truck under a moving deck
+  would fight that. Instead `player.aboardFerry` (vehicle.js) gates the
+  DRIVE/FLY/WALK input branch, the soft-wall block, and the ground-clamp
+  line off; `ferries.js` drives `player.pos`/`heading` directly each
+  frame (maritime.js's `laneAt` lane-lerp pattern, not a new technique).
+  Bruno approved this substitution over the spec's literal "scene.attach
+  precedent" wording before coding — if another wave wants a player to
+  ride a moving object, follow this pattern, not dog.js's (that one
+  really does reparent, but only a rider *on* the always-position-synced
+  truck, never the truck itself).
+- **Ferry docking needs an arm/disarm gate or it ping-pongs.** The
+  instant a boat docks the player is standing exactly on the boarding
+  trigger point — a plain proximity check reboards it on the very next
+  tick, forever, with the player still parked. `ferries.js`'s `r.armed`
+  flag disarms on arrival and only re-arms once the player's measured
+  distance from that dock exceeds `BOARD_R` at least once. Any future
+  proximity-triggered vehicle takeover (this track has no more planned,
+  but flagging for the pattern) needs the same guard. `ferries.board(key)`
+  is a force-board bypass for tests/debug — it skips `armed` on purpose.
+- **Hand-placed coastal terminal pairs must be sanity-checked against
+  prop size before locking coordinates.** The real Port Aransas ferry
+  crossing is genuinely short (~870 units-equivalent); the boat hull is
+  15 units long. First-pass real-world coordinates put the docks closer
+  together than the boat itself. Fixed by nudging the mainland terminal
+  inland along FM 361 to ~82 units, Bolivar's order of magnitude — the
+  spec locks a flat ~25s crossing for every route, so route-specific
+  duration wasn't the right fix. `tools/checks/ferries.mjs` now asserts
+  the gap directly (`gap > 20`) as a regression guard; any new
+  hand-placed pair (W6's line vignettes, etc.) should get the same kind
+  of check before trusting the numbers.
+- **Table-size checks bumped this wave**: species 25→26 (dolphin) in
+  `ag.mjs` and `padre.mjs`; landmarks 37→38 (SS Selma) in `padre.mjs`
+  (the DOM totals are dynamic — only the *check's* hardcoded expectation
+  needed the bump, easy to miss since it's a different file than the one
+  you're adding content to).
+- **`ferries`/`dolphins` are exposed on `__game`** alongside the other
+  systems; `ferries.update(dt, simT)` must run *before* `player.update(dt)`
+  in main.js's loop (aboard-riding needs a fresh `player.pos` before the
+  avatar/camera stamp reads it).
+- **Untested on purpose, low risk**: the bell buoys (`ferries.js`, reuse
+  of `audio.bell` — no dedicated numeric check this wave, plain reuse of
+  an already-tested synth). Playtest note, not a blocker.
 
 Gotchas from W3 (whoever touches Padre, the map, species counts, or
 world.js placement next must know):
@@ -68,8 +117,8 @@ Carried over (evergreen until the track closes):
   the band arrays into them) — rose indices and the 132/254 counters
   depend on them. Band data lives in `GEO.bandHighways`/`GEO.bandCities`.
 - **Table-size checks to bump on any addition**: 27 airports / 7-15-5 by
-  tier / 22 gate signs (`aviation.mjs`, `hud.mjs`), species 25
-  (`ag.mjs`, `padre.mjs`), landmarks 37 (`padre.mjs`).
+  tier / 22 gate signs (`aviation.mjs`, `hud.mjs`), species 26
+  (`ag.mjs`, `padre.mjs`), landmarks 38 (`padre.mjs`).
 - **`save.passport`** is additive `{stamps, towns, landings, stones}`;
   `stones` stays empty until W6. State stamps gate on `inWorld`.
 - **Aviation.mjs flakes under heavy `-j`** (real-loop-timing checks;
