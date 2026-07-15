@@ -308,6 +308,27 @@ export function inTexas(x, z) {
   return inPoly(x, z, GEO.border) || GEO.islands.some((ring) => inPoly(x, z, ring));
 }
 
+// Padre only — for consumers that must tell island from mainland (sand mesh,
+// beach flora): near Port Isabel the island bboxes overlap the mainland shore.
+export function onIsland(x, z) {
+  return GEO.islands.some((ring) => inPoly(x, z, ring));
+}
+
+// Wet sand: within a few units of an island ring's waterline (either shore —
+// the whole strand is drivable beach; the dune belt inland of it is not).
+// vehicle.js reads this per frame in DRIVE, so the bbox gate must stay first.
+const BEACH_W = 6;
+export function beachAt(x, z) {
+  for (const ring of GEO.islands) {
+    const bb = ring.bbox ??= ring.reduce(
+      (a, [px, pz]) => ({ minX: Math.min(a.minX, px), maxX: Math.max(a.maxX, px), minZ: Math.min(a.minZ, pz), maxZ: Math.max(a.maxZ, pz) }),
+      { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    if (x < bb.minX - BEACH_W || x > bb.maxX + BEACH_W || z < bb.minZ - BEACH_W || z > bb.maxZ + BEACH_W) continue;
+    if (nearestDist(x, z, ring) < BEACH_W) return true;
+  }
+  return false;
+}
+
 function nearestDist(x, z, poly) {
   let bestD = Infinity;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {

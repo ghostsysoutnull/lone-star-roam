@@ -63,6 +63,8 @@ export const SPECIES = {
     fact: 'Red coat, white face — the breed that restocked the Panhandle after the longhorn era.' },
   bat: { name: 'Mexican Free-tailed Bat', event: true,
     fact: 'Austin hosts the largest urban bat colony on Earth.' },
+  kempsridley: { name: 'Kemp’s Ridley Sea Turtle', event: true, // turtles.js dawn release at Malaquite
+    fact: 'The world’s most endangered sea turtle — hatchlings released at Padre Island every summer dawn find their way back years later to nest.' },
 };
 export const SPECIES_COUNT = Object.keys(SPECIES).length;
 

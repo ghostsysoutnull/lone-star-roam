@@ -1,6 +1,6 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt } from './geo.js';
+import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt } from './geo.js';
 import { ATMOS } from './sky.js';
 import { cityRadius } from './cities.js';
 import { airportClear } from './airports.js';
@@ -37,9 +37,132 @@ function buildGround(scene) {
   scene.add(gulf);
 
   buildTerrain(scene);
+  buildIslands(scene);
 
   buildCountyLines(scene);
   buildBorderLine(scene);
+}
+
+// Padre's sand — a fine grid per island ring (the main terrain grid is too
+// coarse for a barrier island and dips these cells underwater). Land verts sit
+// just under hAt so wheels ride the height field; water verts drop below the
+// gulf plane, and the interpolation between them is the sloping shoreline.
+function buildIslands(scene) {
+  const CELL = 6;
+  const cDry = new THREE.Color(0xd9c79c), cWet = new THREE.Color(0xb5a07c);
+  for (const ring of GEO.islands) {
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    for (const [px, pz] of ring) {
+      minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+      minZ = Math.min(minZ, pz); maxZ = Math.max(maxZ, pz);
+    }
+    minX -= CELL; maxX += CELL; minZ -= CELL; maxZ += CELL;
+    const W = Math.ceil((maxX - minX) / CELL) + 1, H = Math.ceil((maxZ - minZ) / CELL) + 1;
+    const pos = new Float32Array(W * H * 3);
+    const col = new Float32Array(W * H * 3);
+    const c = new THREE.Color();
+    for (let j = 0; j < H; j++) {
+      for (let i = 0; i < W; i++) {
+        const x = minX + ((maxX - minX) * i) / (W - 1);
+        const z = minZ + ((maxZ - minZ) * j) / (H - 1);
+        const land = onIsland(x, z);
+        const y = land ? hAt(x, z) - 0.08 : -3.5; // just under the wheels; well above the -2.5 water
+        const k = (j * W + i) * 3;
+        pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
+        // wet sand at the waterline, dry above
+        c.lerpColors(cWet, cDry, Math.min(1, Math.max(0, (y + 1.5) / 1.6)));
+        col[k] = c.r; col[k + 1] = c.g; col[k + 2] = c.b;
+      }
+    }
+    const idx = [];
+    for (let j = 0; j < H - 1; j++) {
+      for (let i = 0; i < W - 1; i++) {
+        const a = j * W + i;
+        idx.push(a, a + W, a + 1, a + 1, a + W, a + W + 1);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setIndex(idx);
+    g.computeVertexNormals();
+    const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true }));
+    scene.add(mesh);
+    (padreSites.islands ??= []).push(mesh);
+  }
+  buildPadreSites(scene);
+}
+
+// One-time hand-flagged Padre content: the Queen Isabella Causeway, the SPI
+// mini-town (scenery, never a 133rd city), and the Mansfield Cut jetties.
+// Coordinates validated against the island rings offline — nudge with care.
+export const CAUSEWAY = { x1: 2187.5, z1: 5478.6, x2: 2227, z2: 5468 }; // Port Isabel → SPI
+export const padreSites = {}; // filled at build; __game exposes it for the verify suite
+function buildPadreSites(scene) {
+  const rand = seededRand('padresites');
+  // --- causeway: flat drivable deck just above the water, pylons, rails ---
+  const cw = new THREE.Group();
+  cw.userData.kind = 'causeway';
+  const dx = CAUSEWAY.x2 - CAUSEWAY.x1, dz = CAUSEWAY.z2 - CAUSEWAY.z1;
+  const len = Math.hypot(dx, dz), ang = Math.atan2(dx, dz);
+  const midX = (CAUSEWAY.x1 + CAUSEWAY.x2) / 2, midZ = (CAUSEWAY.z1 + CAUSEWAY.z2) / 2;
+  const deckMat = new THREE.MeshLambertMaterial({ color: 0x9a9a92 });
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(3.2, 0.22, len + 2), deckMat);
+  deck.position.set(midX, 0.02, midZ); // top ~0.13 — same wheels-in-surface tolerance as road ribbons
+  deck.rotation.y = ang;
+  cw.add(deck);
+  const railMat = new THREE.MeshLambertMaterial({ color: 0xb8bcc0 });
+  for (const side of [-1, 1]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.3, len + 2), railMat);
+    rail.position.set(midX + Math.cos(ang) * 1.55 * side, 0.28, midZ - Math.sin(ang) * 1.55 * side);
+    rail.rotation.y = ang;
+    cw.add(rail);
+  }
+  const pylonMat = new THREE.MeshLambertMaterial({ color: 0x8a8a82 });
+  const nPy = Math.floor(len / 6);
+  for (let i = 1; i < nPy; i++) {
+    const t = i / nPy;
+    const py = new THREE.Mesh(new THREE.BoxGeometry(0.6, 4.4, 1.6), pylonMat);
+    py.position.set(CAUSEWAY.x1 + dx * t, -2.2, CAUSEWAY.z1 + dz * t);
+    py.rotation.y = ang;
+    cw.add(py);
+  }
+  scene.add(cw);
+  padreSites.causeway = cw;
+
+  // --- SPI mini-town: pastel condo towers along the south spit ---
+  const spi = new THREE.Group();
+  spi.userData.kind = 'spitown';
+  const pastels = [0xf2dfc4, 0xcfe6dd, 0xefd2d8, 0xe6e2f0, 0xf4e8d0, 0xd8e8f0, 0xf0e0c8];
+  const TOWERS = [
+    [2227, 5465, 6.5], [2231, 5472, 5.2], [2229, 5480, 7.2], [2233, 5484, 4.6],
+    [2224, 5455, 5.8], [2224, 5448, 4.2], [2226, 5440, 3.6],
+  ];
+  TOWERS.forEach(([x, z, h], i) => {
+    const w = 1.6 + rand() * 0.8;
+    const tw = new THREE.Mesh(new THREE.BoxGeometry(w, h, 1.3 + rand() * 0.6), leaf(pastels[i % pastels.length]));
+    tw.position.set(x, hAt(x, z) + h / 2, z);
+    tw.rotation.y = rand() * 0.5 - 0.25;
+    tw.userData.prop = 'spitower';
+    spi.add(tw);
+  });
+  scene.add(spi);
+  padreSites.spi = spi;
+
+  // --- Mansfield Cut jetties: granite riprap flanking the real gap ---
+  const jetty = new THREE.Group();
+  jetty.userData.kind = 'jetty';
+  const rockMat = new THREE.MeshLambertMaterial({ color: 0x7a7570, flatShading: true });
+  for (const [tx, tz, dzj] of [[2091.3, 4936.5, -0.12], [2121.6, 4941.7, 0.12]]) {
+    for (let i = 0; i < 14; i++) {
+      const rock = new THREE.Mesh(new THREE.BoxGeometry(1 + rand(), 1.6 + rand(), 1 + rand()), rockMat);
+      rock.position.set(tx + i * 1.4 + (rand() - 0.5) * 0.5, -1.6 + rand() * 0.3, tz + i * dzj * 1.4 + (rand() - 0.5) * 0.5);
+      rock.rotation.set(rand() * 0.4, rand() * Math.PI, rand() * 0.4);
+      jetty.add(rock);
+    }
+  }
+  scene.add(jetty);
+  padreSites.jetty = jetty;
 }
 
 // Real elevation terrain — one displaced grid, vertex-colored by height/region
@@ -66,7 +189,10 @@ function buildTerrain(scene) {
       const m = raw & 0x7fff;
       const out = !!(raw & 0x8000);
       let y = m * 0.025;
-      if (out && m <= 2) y = -4; // offshore: dip *below* the gulf water plane (-2.5)
+      // Padre bbox: the 30-unit grid can't resolve a 10–40-unit island — hide
+      // these cells under water and let buildIslands' fine sand mesh own it
+      const padre = x > 2000 && x < 2350 && z > 3510 && z < 5500;
+      if (out && (m <= 2 || padre)) y = -4; // offshore: dip *below* the gulf water plane (-2.5)
       const k = (j * W + i) * 3;
       pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
       // color: height ramp, then region/outside tint
@@ -661,7 +787,13 @@ class ScenerySystem {
 
     // regional spawn table: [maker, count]
     const table = [];
-    if (inPermian(midX, midZ)) {
+    // Padre first: any chunk touching an island ring grows beach, not brush.
+    // Placement stays island-only (mainland slivers of mixed chunks draw
+    // nothing — a bare shore, never mesquite-on-the-beach).
+    const islandChunk = chunkOnIsland(baseX, baseZ);
+    if (islandChunk) {
+      table.push([mkDune, 6], [mkSeaOats, 8], [mkDriftwood, 3], [mkBeachSign, 1]);
+    } else if (inPermian(midX, midZ)) {
       table.push([mkPumpjack, 5], [mkYucca, 3], [mkRock, 2], [mkMesquite, 2]);
     } else if (midX < -2200) { // far west desert
       table.push([mkCactus, 4], [mkYucca, 4], [mkRock, 4], [mkMesquite, 2]);
@@ -680,6 +812,12 @@ class ScenerySystem {
     for (const [maker, count] of table) {
       for (let i = 0; i < count; i++) {
         let x = baseX + rand() * CHUNK, z = baseZ + rand() * CHUNK;
+        if (islandChunk) {
+          // the strip is a sliver of most chunks it crosses — retry onto the
+          // sand so beach density follows the island, not the overlap fraction
+          for (let tr = 0; tr < 9 && !onIsland(x, z); tr++) { x = baseX + rand() * CHUNK; z = baseZ + rand() * CHUNK; }
+          if (!onIsland(x, z)) continue;
+        }
         if (!inTexas(x, z)) continue;
         // bluebonnets grow along roads; everything else stays off them
         const road = nearestRoad(x, z, 8);
@@ -938,6 +1076,99 @@ function mkBrush(rand) {
   crown.position.y = 0.5;
   crown.scale.y = 0.7;
   g.add(crown);
+  return g;
+}
+
+// Does this scenery chunk touch a Padre ring? Sampled at center/corners/edge
+// mids — cheap, and mixed shore chunks classify as island (their mainland
+// slivers then draw nothing; see the table comment).
+// Does an island ring actually cross this chunk? Segment-bbox vs chunk-rect —
+// never point sampling (the 10–40-unit ribbon slips between coarse samples)
+// and never the whole ring bbox (ring 1's diagonal bbox spans the laguna AND
+// a long mainland strip, which must keep its brush).
+function chunkOnIsland(baseX, baseZ) {
+  const x1 = baseX - 8, x2 = baseX + CHUNK + 8, z1 = baseZ - 8, z2 = baseZ + CHUNK + 8;
+  for (const ring of GEO.islands) {
+    for (let i = 0; i < ring.length; i++) {
+      const a = ring[i], b = ring[(i + 1) % ring.length];
+      if (Math.max(a[0], b[0]) < x1 || Math.min(a[0], b[0]) > x2) continue;
+      if (Math.max(a[1], b[1]) < z1 || Math.min(a[1], b[1]) > z2) continue;
+      return true;
+    }
+  }
+  return false;
+}
+
+const sandMat = new THREE.MeshLambertMaterial({ color: 0xe0cda2, flatShading: true });
+const oatsMat = new THREE.MeshLambertMaterial({ color: 0xc9bd8a, flatShading: true });
+const driftMat = new THREE.MeshLambertMaterial({ color: 0x9c8d76, flatShading: true });
+
+function mkDune(rand) {
+  const g = new THREE.Group();
+  g.userData.kind = 'dune';
+  const n = 1 + (rand() * 2 | 0);
+  for (let i = 0; i < n; i++) {
+    const mound = new THREE.Mesh(new THREE.IcosahedronGeometry(1.4 + rand() * 1.2, 0), sandMat);
+    mound.position.set((rand() - 0.5) * 2.5, -0.4, (rand() - 0.5) * 2.5);
+    mound.scale.y = 0.28 + rand() * 0.12;
+    g.add(mound);
+  }
+  return g;
+}
+
+function mkSeaOats(rand) {
+  const g = new THREE.Group();
+  g.userData.kind = 'seaoats';
+  const n = 4 + (rand() * 4 | 0);
+  for (let i = 0; i < n; i++) {
+    const blade = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.9 + rand() * 0.5, 3), oatsMat);
+    blade.position.set((rand() - 0.5) * 1.4, 0.45, (rand() - 0.5) * 1.4);
+    blade.rotation.set((rand() - 0.5) * 0.5, rand() * Math.PI, (rand() - 0.5) * 0.5);
+    g.add(blade);
+  }
+  return g;
+}
+
+function mkDriftwood(rand) {
+  const g = new THREE.Group();
+  g.userData.kind = 'driftwood';
+  const log = new THREE.Mesh(new THREE.CylinderGeometry(0.12 + rand() * 0.08, 0.2 + rand() * 0.1, 2 + rand() * 1.5, 5), driftMat);
+  log.rotation.set(Math.PI / 2 + (rand() - 0.5) * 0.3, rand() * Math.PI, 0);
+  log.position.y = 0.18;
+  g.add(log);
+  return g;
+}
+
+// The posted beach speed limit — carved into a driftwood plank, per spec.
+// Number must match vehicle.js's wet-sand cap (33, the primary-road tier).
+let beachSignTex = null;
+function mkBeachSign(rand) {
+  if (!beachSignTex) {
+    const cv = document.createElement('canvas');
+    cv.width = 128; cv.height = 64;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#8a7a60'; cx.fillRect(0, 0, 128, 64);
+    cx.fillStyle = '#3d3428';
+    cx.font = 'bold 22px Georgia';
+    cx.textAlign = 'center';
+    cx.fillText('WET SAND', 64, 26);
+    cx.fillText('SPEED 33', 64, 52);
+    beachSignTex = new THREE.CanvasTexture(cv);
+  }
+  const g = new THREE.Group();
+  for (const px of [-0.55, 0.55]) {
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 1.2, 5), driftMat);
+    post.position.set(px, 0.6, 0);
+    post.rotation.z = (rand() - 0.5) * 0.12;
+    g.add(post);
+  }
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(1.5, 0.75, 0.08),
+    [driftMat, driftMat, driftMat, driftMat, new THREE.MeshLambertMaterial({ map: beachSignTex }), driftMat]
+  );
+  board.position.y = 1.05;
+  g.add(board);
+  g.userData.kind = 'beachsign';
   return g;
 }
 

@@ -1,15 +1,16 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
-import { loadGeo, GEO, nearestRoad, nearestBandRoad, waterAt, countyAt, neighborCountyAt, hAt, inTexas, inWorld, borderZoneAt, outsideAt, seededRand, agAt } from './geo.js';
+import { loadGeo, GEO, nearestRoad, nearestBandRoad, waterAt, countyAt, neighborCountyAt, hAt, inTexas, onIsland, beachAt, inWorld, borderZoneAt, outsideAt, seededRand, agAt } from './geo.js';
 
 const NEIGHBOR_STATE_NAME = { LA: 'Louisiana', AR: 'Arkansas', OK: 'Oklahoma', NM: 'New Mexico' };
-import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt } from './world.js';
+import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, CAUSEWAY, padreSites } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { initDebug } from './debug.js';
 import { CitySystem } from './cities.js';
 import { BrandSystem, groundYAt as brandGroundYAt, brandNear } from './brands.js';
 import { Player } from './vehicle.js';
-import { Gameplay } from './gameplay.js';
+import { Gameplay, LANDMARK_COUNT } from './gameplay.js';
+import { TurtleSystem } from './turtles.js';
 import { TrafficSystem } from './traffic.js';
 import { AnimalSystem, SPECIES, SPECIES_COUNT } from './animals.js';
 import { BatSystem } from './bats.js';
@@ -68,7 +69,13 @@ async function boot() {
   const traffic = new TrafficSystem(scene);
   const animals = new AnimalSystem(scene, (key) => gameplay.spotSpecies(key, SPECIES[key].name, SPECIES_COUNT, SPECIES[key].fact));
   const bats = new BatSystem(scene, () => gameplay.spotSpecies('bat', SPECIES.bat.name, SPECIES_COUNT, SPECIES.bat.fact));
+  const turtles = new TurtleSystem(scene, () => gameplay.spotSpecies('kempsridley', SPECIES.kempsridley.name, SPECIES_COUNT, SPECIES.kempsridley.fact));
   const hud = new HUD();
+  // collectible totals in the score panel/help come from the real tables —
+  // the old static copies (26/15/2) had quietly rotted
+  document.getElementById('total-landmarks').textContent = LANDMARK_COUNT;
+  document.getElementById('total-critters').textContent = SPECIES_COUNT;
+  document.getElementById('total-legends').textContent = LEGEND_COUNT;
 
   gameplay.onToast = (m) => hud.toast(m);
   const audio = new AudioSystem();
@@ -213,10 +220,11 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, inTexas, inWorld, borderZoneAt, outsideAt, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, inTexas, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
+  let lastCauseway = -Infinity; // causeway ceremony cooldown (sim seconds)
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
     // Paused: keep draining the clock every frame (so resume gets a normal ~16 ms
@@ -254,6 +262,7 @@ async function boot() {
     radio.update(dt, player, aviation, sky);
     animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
     bats.update(dt, player.pos.x, player.pos.z, sky.t);
+    turtles.update(dt, player.pos.x, player.pos.z, sky.t, sky.days);
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed);
     gameplay.checkTouchdown(player, missions.job?.kind === 'charter');
@@ -292,6 +301,16 @@ async function boot() {
         if (nc && inWorld(player.pos.x, player.pos.z)) gameplay.stampState(nc.state, NEIGHBOR_STATE_NAME[nc.state]);
       }
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
+      // Queen Isabella Causeway ceremony — a crossing, not a collectible
+      if (player.mode === 'DRIVE' && clock.elapsedTime - lastCauseway > 120) {
+        const cdx = CAUSEWAY.x2 - CAUSEWAY.x1, cdz = CAUSEWAY.z2 - CAUSEWAY.z1;
+        const t = Math.max(0, Math.min(1, ((player.pos.x - CAUSEWAY.x1) * cdx + (player.pos.z - CAUSEWAY.z1) * cdz) / (cdx * cdx + cdz * cdz)));
+        if (Math.hypot(CAUSEWAY.x1 + cdx * t - player.pos.x, CAUSEWAY.z1 + cdz * t - player.pos.z) < 4) {
+          lastCauseway = clock.elapsedTime;
+          hud.toast('🌉 Queen Isabella Causeway — the only road to South Padre Island');
+          audio.chime('county');
+        }
+      }
       hud.mission = missions.hudInfo(player.pos);
       if (sky.forecast !== lastForecast) { // weather radio breaks in on a fresh forecast
         if (sky.forecast && player.perks.radio) hud.toast(`📻 Weather radio: ${sky.forecastName()} rolling in`);

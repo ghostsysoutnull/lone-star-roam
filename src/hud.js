@@ -143,6 +143,15 @@ export class HUD {
     GEO.border.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
     ctx.closePath(); ctx.fill();
     ctx.strokeStyle = '#c8b878'; ctx.lineWidth = 2; ctx.stroke();
+    // Padre's rings — the island IS Texas, so both layers draw it (same fill,
+    // thinner ink; it reads as coastline, not a second border)
+    for (const ring of GEO.islands ?? []) {
+      ctx.beginPath();
+      ring.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+      ctx.closePath();
+      ctx.fillStyle = '#20261c'; ctx.fill();
+      ctx.strokeStyle = '#c8b878'; ctx.lineWidth = 1; ctx.stroke();
+    }
     // county lines beneath everything
     ctx.strokeStyle = '#3d4438';
     ctx.lineWidth = 0.7;

@@ -153,7 +153,7 @@ export default async function ag(t) {
       return { missing, count: Object.keys(g.SPECIES).length };
     })()`);
     t.ok(res.missing.length === 0, `species missing or factless: ${res.missing}`);
-    t.ok(res.count === 24, `SPECIES_COUNT drifted: ${res.count}`); // 20 + the wave-5 trio + wave-5b hereford
+    t.ok(res.count === 25, `SPECIES_COUNT drifted: ${res.count}`); // 20 + the wave-5 trio + wave-5b hereford + W3 Kemp's ridley
   });
 
   await t.check('censusTable: Parker horses thick, Sutton goats+sheep, Dallam bare', async () => {

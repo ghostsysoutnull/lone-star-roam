@@ -2,256 +2,196 @@
 
 ## Session briefing
 - **This session**: the Shoulder & the Shelf (`SHOULDER_SHELF_SPEC.md`),
-  wave 3 of 7 — "Padre and the coast road" (content). The island as real,
-  drivable land: beach-as-road along the seaward edge (drive cap ≈
-  road-tier on wet sand, posted on driftwood), dunes/sea oats scenery
-  rows, Laguna Madre between island and mainland; Queen Isabella Causeway
-  (arrival ceremony, not a collectible); SPI mini-town (hand-flagged
-  towers, scenery not a city — the 132 stays sacred); Port Isabel
-  Lighthouse **landmark** (+1); Malaquite dawn turtle release (seeded
-  mornings; watching logs the **Kemp's ridley**, species +1); Mansfield
-  Cut jetties; travel entry "Gulf Coast — Padre Island" arrives on the
-  sand in DRIVE. `GEO.islands`/`inTexas` already include Padre (W1); this
-  wave draws it — world.js terrain rasterization and hud.js's map layer
-  don't render the island yet (W1 gotcha, still open — see below). W2
-  (band cities/stars/Passport/aviation) shipped 2026-07-14, commit
-  `214bfe0`.
-- **Recommended setup**: model **Fable 5**, effort **high** — content/
-  register wave (beach town flavor, turtle-release seeded mornings,
-  causeway ceremony copy), per the spec's model table. Flag it if the
-  running model differs.
-- **Budget**: code + checks, no shots, grep-first.
-- **Then**: rewrite this block for wave 4 (Ferries & the working water,
-  machinery, Sonnet 5).
+  wave 4 of 7 — "Ferries & the working water" (machinery). Rideable
+  Bolivar + Port Aransas ferries: drive aboard in DRIVE, boat departs on
+  boarding (no schedule waits), ~25 s crossing, engine cut, can't skip —
+  the slow-TV verb; player/truck parented to the deck (`scene.attach`
+  precedent in dog.js); **bottlenose dolphins** bow-ride every crossing
+  (species +1, logged from the deck); SS Selma plaque wreck off
+  Galveston; bell buoys on the channel (bell synth exists in audio.js).
+  Checks: crossing position-over-time, aboard-parenting, dolphin
+  proximity + log, return trip, fast-travel/job interaction while
+  aboard. W3 (Padre & the coast road) shipped 2026-07-15, commit <fill
+  in after commit>.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — machinery
+  wave (deck parenting, crossing state machine, physics interactions),
+  per the spec's model table. Flag it if the running model differs.
+- **Budget**: code + checks, no shots — EXCEPT one sanctioned SHOT for
+  the deck composition judgment only (spec grants it).
+- **Then**: rewrite this block for wave 5 (The Shelf, content, Fable 5).
 
-Gotchas from W2 (whoever touches band cities/aviation/military/the map next must know):
-- **`GEO.bandHighways`/`GEO.bandCities` are separate arrays from
-  `GEO.highways`/`GEO.cities` — never merge them.** Confirmed the hard way:
-  `mkRoses` (gameplay.js) draws `hws[floor(rand()*hws.length)]` against
-  `GEO.highways.filter(motorway|trunk)` — changing that array's *length*,
-  even by appending, reshuffles every one of the 300 rose spots (not just
-  new ones), breaking saved rose indices. Same logic protects the 132/254
-  Texas counts from `GEO.bandCities` (hardcoded `/132` in three places:
-  `index.html:130,190`, `gameplay.js`'s visit toast).
-- **Band roads baked, but arterials only** — `tools/build-band-roads.mjs`
-  (new, separate from `build-band.mjs`) processed an Overpass fetch (GET via
-  the `maps.mail.ru` mirror; `overpass-api.de` 406s even on GET from this
-  environment) of the named through-routes (I-10/20/30/35/40, US-287/87/
-  84/62/180/71) into `data/band-highways.json`, clipped to the 402u
-  shoulder with a 3-unit inside-Texas seam overlap so it visually meets
-  `highways.json` at the border. **No metro-street tier was baked for any
-  band city** — `cities.js`'s `hasRealStreets` check now also probes
-  `nearestBandRoad(..., t => t==='street')` but it's always false today
-  (band data has no `'street'`-type ways), so every band city falls back
-  to the procedural grid. This matches how most of the 132 Texas cities
-  already work (`add-metro-streets.mjs` is opt-in/incremental) — not a gap
-  to rush, just a future polish pass if a specific band metro (Shreveport,
-  Las Cruces) wants real streets.
-- **Silver vs gold stars, world + map**: `gameplay.js`'s `mkBandCityStars()`
-  mirrors `mkCityStars()` exactly (same `mkStarMesh` from vehicle.js, color
-  `0xc7ccd4`) and ticks `save.passport.towns` instead of `save.cities` on
-  visit. `hud.js`'s `renderMapLayer` draws band dots/labels only when
-  `isWide` (the widened big-map layer) — the Law-protected minimap stays
-  Texas-only and never sees them.
-- **`save.passport`** (additive key, `gameplay.js`): `{stamps, towns,
-  landings, stones}`. `stones` is a reserved empty array — Corner Stones
-  are W6's job, don't populate it early. State stamps
-  (`gameplay.stampState`) are called from `main.js`'s hudTick block
-  **gated on `inWorld(x,z)`** — a point past the soft wall shouldn't earn a
-  Passport stamp, and gating it there also avoids a real toast race against
-  the wall's own push-back message (band.mjs's pre-existing soft-wall check
-  broke without this gate — two systems racing to write the same `#toast`
-  div on the same hudTick).
-- **`military: true` is the pattern for flavor-only fields**: Cannon AFB
-  (`CVS`) and Barksdale AFB (`BAD`) are real `AIRPORTS` entries (baked
-  runway geometry, get gate signs/beacons like any tier-2 field) but are
-  filtered out of `aviation.js`'s `daySchedule` (would otherwise crash —
-  no `ROUTES` entry needed for a `military:true` field), `radio.js`'s
-  `UNICOM` export (no ATIS/chatter), and `missions.js`'s `genCharterOffers`
-  pool (no cargo jobs out of an air base). The B-52 pair itself is a THIRD
-  `military.js` candidate (`kind: 'b52'`), same `nasa`/`lowlevel` idiom —
-  a local segment along the real Cannon↔Barksdale bearing (`CORRIDOR`),
-  not the full ~9,450-unit corridor (would take minutes to transit and
-  never plausibly render as one continuous sighting).
-- **All new AIRPORTS entries also carry `band: true`** (the 4 civilian
-  fields AND the 2 military ones) — this is the cheap tag `missions.js`
-  uses to fire the Passport landing stamp on charter delivery
-  (`toField?.band`) and `hud.js` uses to gate the minimap-vs-bigmap ✈ glyph,
-  instead of a geometry (`inTexas`) check at every call site.
-- **New seed-stream prefixes this wave** (never reuse/rename): `bandcity:`
-  (cities.js building draw), `bandfolk:`/`bandage:` (npcs.js townsfolk).
-  `cities.js`/`npcs.js` key their `live`/`townByCity` maps as `'band:'+name`
-  for band entries — same `prefix:name` idiom brands.js already uses
-  (`heb:Houston`, `lsc:Abilene`), so no collision risk with the Texas
-  roster (which never has named NPCs in the band by Law anyway).
-- **Table-size checks now hardcode 27 airports / 7-15-5 by tier / 22 gate
-  signs** (`tools/checks/aviation.mjs`, `hud.mjs`) — any future field
-  addition (W6's curated tier-3 GA strips, still unbaked/descoped this
-  wave) must bump these again, the same class of maintenance the LBJ strip
-  already required once.
+Gotchas from W3 (whoever touches Padre, the map, species counts, or
+world.js placement next must know):
+- **New seed streams** (never reuse/rename): `turtle:<day>` (release
+  mornings), `malaquite-hatch` (hatchling jitter), `padresites` (SPI/
+  jetty dressing). Island scenery uses the existing `scenery<key>`
+  streams — but island chunks now consume MORE draws (placement retries
+  onto the strip, up to 9 per prop); non-island chunks are draw-for-draw
+  identical to before (band.mjs frozen baseline proves it).
+- **Species table is 25 and two checks hardcode it**: `ag.mjs` (the
+  additive-registration check) and `padre.mjs` (DOM totals). W4's
+  dolphin → bump both to 26, same class as aviation's 27-airport count.
+- **Collectible totals in the DOM are now dynamic** (`total-landmarks`/
+  `total-critters`/`total-legends` spans in index.html, filled at boot in
+  main.js from LANDMARK_COUNT/SPECIES_COUNT/LEGEND_COUNT). The old
+  static copies had rotted to 26/15/2 (real: 37/25/9). Never hardcode a
+  collectible total in index.html again — add a span.
+- **`onIsland(x,z)` vs `inTexas(x,z)`** (geo.js): island bboxes overlap
+  the Port Isabel mainland — anything that must tell island from
+  mainland (sand mesh, beach flora, beach cap) uses `onIsland`, never
+  `inTexas`. `beachAt(x,z)` = within 6 units of an island ring
+  (either shore); vehicle.js DRIVE reads it per frame — its bbox gate
+  must stay first.
+- **The island is drawn by `buildIslands`' fine sand grid** (6-unit
+  cells, land verts at `hAt−0.08`, water at −3.5 → interpolated
+  shoreline). The coarse DEM grid can't resolve the island and is
+  force-dipped to −4 inside a hardcoded Padre bbox in `buildTerrain`
+  (x 2000–2350, z 3510–5500) — if the island data ever changes, update
+  that bbox too. `hAt` needed no change (out-bit cells store real
+  heights; the mask ignores the bit).
+- **The causeway deck is NOT a road** — `nearestRoad` is null on it, the
+  drive cap there is the offroad/beach path, and traffic will never
+  drive it. Ceremony toast lives in main.js's hudTick block
+  (`CAUSEWAY` segment distance < 4, DRIVE, 120 s cooldown on
+  `clock.elapsedTime`).
+- **`padreSites`** (world.js export, on `__game`): `{causeway, spi,
+  jetty, islands[]}` groups for checks. SPI is scenery with 7 towers —
+  if anyone ever asks to make it a city, the answer is the Law (132).
+- The travel NATURE entry "Gulf Coast — Padre Island" is now
+  `drive: true` onto Malaquite sand; the 'Padre Island' **landmark**
+  was nudged from open water onto the sand (saves key by name — no
+  break). Landmark table is 37 with the Port Isabel Lighthouse.
+- W1's "island legally Texas but visually absent" gotcha is **resolved**
+  — terrain, both map layers, and scenery all draw Padre now.
 
-Gotchas from W1 (whoever touches Padre/the map/band data next must know):
-- **Padre is legally Texas (`GEO.islands`/`inTexas`) but still visually
-  absent** — W1 only made `inTexas`/gameplay legality true there; neither
-  `world.js`'s terrain rasterization nor `hud.js`'s map layer draws the
-  island yet. **That's W3's job**, not a regression to chase.
-- Band roads (through-route arterials) and 6 band airport fields (SHV/TXK/
-  CVN/HOB/Cannon/Barksdale) **are now baked** — see the W2 gotchas above.
-  Still NOT baked: metro-street tier for any band city, and W6's curated
-  tier-3 GA strips (deliberately descoped this wave, no check depends on
-  them).
-- **`data/band-places.json`** (177 rows: LA 39, AR 15, OK 104, NM 19) has
-  `{name, state, pop, x, z}`, sorted by pop desc — built by
-  `tools/build-band.mjs` from Census cartographic boundary + Population
-  Estimates Program files (see below). **Hochatown, OK has no population
-  row at all** in the 2022 vintage (checked: no STATE=40/PLACE=35030 row) —
-  a genuine data gap, not a bug; it's in-band by distance but was dropped
-  from the join. If W2 wants Hochatown rendered, it needs a manual
-  population override, not a re-run of the join. Chattanooga, OK
-  legitimately reports **pop 0** — a real Census value, not a bug either.
-- **Classify by what a point is standing on, not by nearest border
-  segment** (`src/geo.js` `classify()`/`inWorld`/`borderZoneAt`): near El
-  Paso the closest Texas border stretch is the Rio Grande even for points
-  deep in New Mexico (Las Cruces) — a nearest-segment classifier wrongly
-  calls that 'mexico'. The fix tests point-in-neighbor-state-polygon
-  (`GEO.neighborStates`) first; only falls back to nearest-border-zone
-  ('coast' vs 'mexico') for points outside every neighbor state too (open
-  Gulf water or actually-Mexico). Any new geo classification must follow
-  the same "what are you standing in" pattern, not nearest-line-distance.
-- **The whole band data pipeline is `tools/build-band.mjs`**, not
-  `build-data.mjs` — inputs are Census cartographic boundary shapefiles
-  (`.shp`+`.dbf`, parsed by the new no-deps `tools/shp2geojson.mjs`, no
-  ogr2ogr/mapshaper needed) + the Population Estimates Program CSV.
-  Re-fetch commands (all confirmed working from this environment):
-  `curl -sS -o cb_2022_us_state_500k.zip https://www2.census.gov/geo/tiger/GENZ2022/shp/cb_2022_us_state_500k.zip`
-  (same pattern for `_county_500k` and `_place_500k`), and
-  `curl -sS -o sub-est2022.csv https://www2.census.gov/programs-surveys/popest/datasets/2020-2022/cities/totals/sub-est2022.csv`.
-  Unzip each, then: `node tools/build-band.mjs <state-base> <county-base> [<place-base> <pop-csv>]`
-  (place/pop args optional — omitting them skips `band-places.json`).
-  Raw shapefiles/CSV are scratchpad-only (not committed), same convention
-  as OSM downloads — re-fetch, don't hunt for a cached copy.
-- **`tools/build-elevation.mjs`'s CLI signature changed**: it now takes a
-  Census state-shapefile *base path* (parsed via `shp2geojson.mjs`), not
-  the old GeoJSON `us-states.json`. `GRID` widened to
-  `{w:448,h:414,minX:-7330,maxX:6230,minZ:-6630,maxZ:5800}` (+~430u land
-  sides; south/Gulf unchanged — mirrored in `src/geo.js` `ELEV`).
-- **The minimap and big map are now two separate offscreen layers**
-  (`hud.js` `renderMapLayer(W,H,bounds)` takes explicit bounds and returns
-  `{canvas,T,sc}`): `hud.miniLayer`/`miniT`/`miniSc` stay pinned to the
-  original Texas-only `GEO.bounds` (Law: "minimap layer untouched" — CLAUDE.md
-  said both maps blit from *one* shared canvas, which the widened big map
-  would have silently broken); `hud.mapLayer`/`mapT`/`mapSc` are the widened
-  shoulder/shelf layer, used by the big map and mission-target math only.
-  `drawMini` must keep using the mini* fields — don't let it drift back to
-  the shared ones.
-- **`GEO.border`/`inTexas` stayed additive, not reshaped**: `GEO.border`
-  is still the exact flat mainland ring it always was; Padre's two rings
-  live in new `GEO.islands` (`data/islands.json`), OR'd in by `inTexas`.
-  Any code that iterates `GEO.border` expecting "all of Texas" (e.g. a
-  new ground-mesh or ink-line consumer) must explicitly opt into
-  `GEO.islands` too, the way `world.js`'s terrain rasterization and
-  `hud.js`'s map layer do NOT yet (Padre isn't drawn as land in-world or
-  on the map — that's W3/content, not W1's job; W1 only had to make
-  `inTexas`/gameplay-legality true there).
-- **Aviation.mjs suite is flaky under heavy `-j` parallelism** on this
-  machine (2 different real-loop-timing checks failed once each across 3
-  full `-j6` runs, both clean standalone and at `-j2`) — pre-existing,
-  unrelated to this session's changes. If it flakes again, rerun at a
-  lower `-j` before assuming a regression.
+Carried over (evergreen until the track closes):
+- **Never change the length of `GEO.highways`/`GEO.cities`** (or merge
+  the band arrays into them) — rose indices and the 132/254 counters
+  depend on them. Band data lives in `GEO.bandHighways`/`GEO.bandCities`.
+- **Table-size checks to bump on any addition**: 27 airports / 7-15-5 by
+  tier / 22 gate signs (`aviation.mjs`, `hud.mjs`), species 25
+  (`ag.mjs`, `padre.mjs`), landmarks 37 (`padre.mjs`).
+- **`save.passport`** is additive `{stamps, towns, landings, stones}`;
+  `stones` stays empty until W6. State stamps gate on `inWorld`.
+- **Aviation.mjs flakes under heavy `-j`** (real-loop-timing checks;
+  confirmed again this session at `-j6`, clean standalone and at
+  `-j4`) — rerun lower before assuming a regression.
 - Agriculture/chapel/farmstead/brand generators stay `inTexas`-gated by
-  law (spec Laws) — the shoulder gets none of them. Padre joining
-  `inTexas` legitimately creates NEW scenery/animal chunks on the island
-  (existing chunks stay byte-identical — the W1 baseline check proves it,
-  see `tools/checks/band.mjs`). Do not "fix" that by gating the island out.
+  law; the shoulder gets none of them. Padre being `inTexas` means it
+  legitimately gets scenery/animal chunks — do not gate the island out.
 
-Playtest still owed (pre-track): the EIGHT ranch compounds (wave 5's four
-+ 5b's JA/XIT/Matador/LBJ, incl. landing at the new LBJ strip).
+Gotchas from W2 still standing (band cities/aviation/military/the map):
+- **Band roads baked, arterials only** — no metro-street tier for any band
+  city (`build-band-roads.mjs`, GET via the `maps.mail.ru` mirror;
+  `overpass-api.de` 406s even on GET here). Every band city uses the
+  procedural grid; real streets for a band metro is future polish, not a gap.
+- **Silver vs gold**: `mkBandCityStars()` ticks `save.passport.towns`,
+  never `save.cities`; `renderMapLayer` draws band dots/labels only on the
+  wide layer — the minimap stays Texas-only by Law.
+- **`military: true` is the pattern for flavor-only fields** (Cannon,
+  Barksdale): real AIRPORTS entries but filtered from `daySchedule`,
+  `UNICOM`, and charter pools. All new band-field entries also carry
+  `band: true` (Passport landing stamp + map glyph gating).
+- **Seed streams `bandcity:`/`bandfolk:`/`bandage:`** — never reuse or
+  rename; `live`/`townByCity` maps key band entries as `'band:'+name`.
 
-Gotchas from waves 5/5b (whoever touches the ranch compounds, `world.js`
-sites, `airports.js`, or `animals.js` next must know):
-- **Any new airport MUST get a `ROUTES` entry in aviation.js** — the field
-  table and route table are separate, and `daySchedule` crashes the whole
-  main loop at boot on a missing entry (found the hard way adding LBJ; the
-  crash cascades into ~56 unrelated check failures that all read as "loop
-  dead": weather stuck, cities never spawn, animals starve).
-- **Neighboring ranches can have two compounds live at once** — 6666 and
-  Matador sit ~645 units apart, inside the 780-unit chunk view radius. Any
-  check (or gameplay feature) that scans live scenery for a `ranchhq` group
-  must pick the one nearest its target site, never the first in Map order.
+Gotchas from W1 still standing (geo/map plumbing):
+- **Classify by what a point is standing on, not nearest border segment**
+  (`classify()`/`inWorld`/`borderZoneAt`): point-in-neighbor-state-polygon
+  first, nearest-zone only for open water/actually-Mexico. Any new geo
+  classification follows the same pattern.
+- **Two separate offscreen map layers**: `hud.miniLayer`/`miniT`/`miniSc`
+  pinned to Texas-only `GEO.bounds`; `mapLayer`/`mapT`/`mapSc` are the
+  widened layer. `drawMini` must keep using the mini* fields.
+- **`GEO.border` stays the flat mainland ring**; Padre's rings live in
+  `GEO.islands`, OR'd in by `inTexas`. Any consumer iterating `GEO.border`
+  expecting "all of Texas" must opt into `GEO.islands` explicitly (world
+  terrain/sand, hud map layers, and scenery placement all do now).
+- Band pipeline: `tools/build-band.mjs` (+ `shp2geojson.mjs`, no-deps) from
+  Census cartographic boundary shapefiles + PEP CSV; refetch commands in
+  the spec + git history. Raw inputs are scratchpad-only, never committed.
+- `tools/build-elevation.mjs` takes a Census state-shapefile base path;
+  `GRID` widened to `{w:448,h:414,minX:-7330,maxX:6230,minZ:-6630,
+  maxZ:5800}` — mirrored in `src/geo.js` `ELEV`, change both.
+
+Playtest still owed (pre-track): the EIGHT ranch compounds (wave 5's
+four + 5b's JA/XIT/Matador/LBJ, incl. landing at the new LBJ strip) —
+and now Padre: causeway arrival, beach drive, dawn turtle release.
+
+Gotchas from waves 5/5b (ranch compounds, `world.js` sites,
+`airports.js`, `animals.js`):
+- **Any new airport MUST get a `ROUTES` entry in aviation.js** — a missing
+  entry crashes the whole main loop at boot and cascades into ~56
+  unrelated check failures that all read as "loop dead".
+- **Neighboring ranches can have two compounds live at once** (6666 and
+  Matador sit ~645 units apart) — any scan for a `ranchhq` group must pick
+  the one nearest its target site, never the first in Map order.
 - A check that stashes a live animal reference must re-grab it after any
   teleport chain — chunks despawn and the reference points at a disposed
-  object that never moves (the axis-deer scare check does this right now).
-- LBJ's compound coexists with its own tier-3 airstrip: the site fn's
-  `airportClear` legality already handles the standoff; don't move the arch
-  (830.2, 847.1) closer to the strip center at LL(30.2518, −98.6226).
-- `ranchHQSite(i)`/`ranchHQAt(cx,cz)` (world.js) are the pure seeded site
-  functions for the four compounds — arch coords are duplicated in
-  gameplay.js `LANDMARKS` and animals.js `RANCH_ARCHES`; keep all three in
-  sync. animals.js homes the signature herds (`SIG` table in `spawn()`) at
-  the exact same sites — never re-derive or hand-place them.
-- Compound props are tagged `userData.prop` (`hqhouse`/`watertower`/`barn`/
-  `horsebarn`/`pen`/…) and the group is `userData.kind === 'ranchhq'` — the
-  ag.mjs wave-5 checks tally these; keep the tags if you rearrange the kit.
-- Water-tower sign materials are cached per ranch in a module-level Map
-  (`towerSigns`) and never disposed (shared-prototype precedent) — don't
-  create canvases inside `mkWaterTower` per spawn.
-- `RANCH_ARCHES` wave-5 rows (King santagertrudis, Y.O. axisdeer/blackbuck)
-  are APPENDED to each arch's rows so pre-wave-5 chunk draws stay identical.
-  Any future row must also append, never insert.
-- The "Cy NPC rain register" check no longer waits out townsfolk drift — it
-  now *displaces* any non-Cy NPC out of talk range (position + home) before
-  polling. Townsfolk positions are real-loop-accumulated (they walk), so any
-  check near a city that needs a specific NPC nearest must drive to that
-  state the same way, not extend timeouts.
+  object that never moves.
+- LBJ's compound coexists with its own tier-3 strip: `airportClear`
+  handles the standoff; don't move the arch (830.2, 847.1) closer to the
+  strip at LL(30.2518, −98.6226).
+- `ranchHQSite(i)`/`ranchHQAt(cx,cz)` are pure seeded site functions;
+  arch coords duplicated in gameplay.js `LANDMARKS` and animals.js
+  `RANCH_ARCHES` — keep all three in sync; animals.js homes the signature
+  herds (`SIG`) at the same sites.
+- Compound props tagged `userData.prop`, group `userData.kind==='ranchhq'`
+  — ag.mjs tallies them; keep tags if rearranging the kit.
+- Water-tower sign materials cached per ranch in module-level `towerSigns`,
+  never disposed; don't create canvases per spawn.
+- `RANCH_ARCHES` rows are APPENDED per arch so pre-wave-5 draws stay
+  identical — future rows must also append, never insert.
+- The "Cy NPC rain register" check *displaces* non-Cy NPCs out of talk
+  range (position + home) before polling — townsfolk walk; any check
+  needing a specific NPC nearest must drive to that state, not extend
+  timeouts.
 
-Gotchas carried over from wave 4.5 (crops/pivots):
-- Field decals carry an optional vertex-color `stripe` on `mkFieldPatch`
-  (own `lambVC()` material, `'vc'` matCache key). Don't add a second
-  vertex-color material; extend `CROP_STYLE[...].stripe` or
-  `defaultStripe()` instead.
-- **Two seeded streams per ag chunk**: `'crops'+key` (placement — exactly 6
-  draws/field, 4/pivot, never touched by visual code) and `'crops2'+key`
-  (row/bale visual jitter, free to consume anything). Never let visual code
-  read from `crand`.
-- `tools/checks/ag.mjs` (37 checks) hardcodes a known Hale chunk's first
-  field centroid (x≈-2147.501, z≈-3607.705) as the placement-frozen
-  baseline. If a future wave deliberately moves fields, recapture the real
-  baseline (git stash, read live centroid, hardcode) — don't hand-wave it.
-- `fieldAt(x,z)` (world.js) replays the `'crops'+key` draw sequence — if you
-  change field/pivot placement, update `fieldAt` in the same edit.
-- Pivot arm is static by scope call; if a wave wants the sweep, register it
-  in `group.userData.animated` (pumpjack idiom).
+Gotchas from wave 4.5 (crops/pivots):
+- Field decals: one vertex-color material (`lambVC()`, `'vc'` matCache
+  key) — extend `CROP_STYLE[...].stripe`/`defaultStripe()`, never add a
+  second VC material.
+- **Two seeded streams per ag chunk**: `'crops'+key` (placement — exactly
+  6 draws/field, 4/pivot) and `'crops2'+key` (visual jitter, free).
+  Visual code never reads from `crand`.
+- `ag.mjs` hardcodes a Hale chunk's first field centroid (x≈-2147.501,
+  z≈-3607.705) as the placement-frozen baseline — if a wave deliberately
+  moves fields, recapture the real baseline, don't hand-wave it.
+- `fieldAt(x,z)` replays the `'crops'+key` draw sequence — changing
+  placement means updating `fieldAt` in the same edit.
+- Pivot arm is static by scope call; a sweep wants
+  `group.userData.animated` (pumpjack idiom).
 
 Gotchas from the wave-5.5 HUD session (`main.js`/`hud.js`):
-- `main.js` per-frame nature-hint block: wildlife (`animals.nearby`, set in
-  the per-frame step loop, `SPOT_R` 24) beats crop (`fieldAt`); both
-  suppressed in FLY. The brand-resize hint is also FLY-gated.
+- Per-frame nature-hint block: wildlife (`animals.nearby`, `SPOT_R` 24)
+  beats crop (`fieldAt`); both suppressed in FLY; brand-resize hint also
+  FLY-gated.
 - `#nature-hint` / `hud.natureHint(text)` uses the interactHint
   show/hide-by-textContent pattern.
 
 Gotchas for whoever touches the jetpack (`vehicle.js`/`shop.js`/`dog.js`/
 `audio.js`) next:
 - `hovering` is a WALK-only sub-state (`GRAV=45`, `AIRDAMP=0.25`) — thrust
-  XOR gravity, no stable hover point by design. The ground-clamp guard is
+  XOR gravity, no stable hover by design. Ground-clamp guard is
   `if (this.mode !== 'FLY' && !this.hovering)`; don't drop the second half.
 - `shop.js`: `applyGear` always writes `jetThrust`/`jetAlt`/`jetSpeed`;
   only `jetpack: lvl>0` gates whether Space does anything airborne.
 - Flame prop + jet whoosh key off **active thrust** (`hovering &&
-  keys['Space']`), not merely `hovering` — don't loosen either gate.
+  keys['Space']`), not merely `hovering`.
 - `audio.jetTarget` is computed before the `!ctx || muted` early return;
   verify reads this field, never the ramping AudioParam.
 - `player.onThrust` edge-fires once per liftoff; a check that spies on it
-  must restore the real callback. Any check leaving the player airborne or
-  non-DRIVE must restore DRIVE at its end.
+  must restore the real callback, and any check leaving the player
+  airborne/non-DRIVE must restore DRIVE at its end.
 
 Gotchas for whoever touches `brands.js` next:
 - Hero/props split across `building` sub-group (scales with `SCALE`) vs
-  `group` (billboards, own terrain-sampled scale) — new props must pick the
-  right parent.
-- Foundation skirt depth: cap the TRUE relief FIRST, then divide by SCALE
+  `group` (billboards, own terrain-sampled scale) — new props must pick
+  the right parent.
+- Foundation skirt: cap TRUE relief FIRST, then divide by SCALE
   (`Math.min(8, relief + 0.4) / SCALE`). Scale range 0.1–1.25.
-- `footAt` scales half-extents/`PAD_TOP` by live `SCALE`; footprint caches
-  only hold scale-independent geometry.
+- `footAt` scales half-extents/`PAD_TOP` by live `SCALE`; footprint
+  caches only hold scale-independent geometry.
 - `brands.lscNear` triggers off each LSC site's **sign** world position
   (`signAt`), not `site.at`; `plaqueOpen` in main.js is shared via one
   `plaqueNear()` lookup — extend it, don't add a second state var.
@@ -259,7 +199,7 @@ Gotchas for whoever touches `brands.js` next:
 Gotchas for whoever touches `hud.js` next:
 - Road shield: `this.shield` (wrap div, transformed per frame by
   `animateShield`) vs `this.shieldCanvas` (2D face raster, drawn by
-  `drawShield`, cached on `ref+night`). Don't add per-frame canvas work.
+  `drawShield`, cached on `ref+night`). No per-frame canvas work.
 - `parseShield` only swallows clean "PREFIX ###" refs; messy municipal
   names fall through to the text line on purpose.
 - `#hud-speed`/`#hud-mode` offsets are rem-based; if either block grows,

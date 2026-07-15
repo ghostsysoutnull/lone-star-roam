@@ -19,7 +19,9 @@ const NATURE = [
   { name: 'Lake Texoma', at: LL(33.9, -96.6), fly: 40 },
   { name: 'Amistad Reservoir', at: LL(29.5, -101.1), fly: 40 },
   { name: 'Toledo Bend Reservoir', at: LL(31.5, -93.75), fly: 40 },
-  { name: 'Gulf Coast — Padre Island', at: LL(26.6, -97.28), fly: 35 },
+  // W3: arrives ON the sand at Malaquite in DRIVE (the old coord flew you to
+  // open water east of the island, which wasn't drawn as land yet anyway)
+  { name: 'Gulf Coast — Padre Island', at: LL(27.4326, -97.2988), drive: true },
   { name: 'Galveston Bay', at: LL(29.35, -94.85), fly: 35 },
   { name: 'Piney Woods', at: LL(31.5, -94.4), drive: true },
 ];

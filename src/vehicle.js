@@ -1,7 +1,7 @@
 // Player controller: DRIVE (pickup truck), FLY (truck sprouts wings + prop), WALK (cowboy).
 // Arcade physics, third-person chase camera, per-mode animation and night lights.
 import * as THREE from 'three';
-import { nearestRoad, nearestCity, inWorld, borderZoneAt, hAt } from './geo.js';
+import { nearestRoad, nearestCity, inWorld, borderZoneAt, hAt, beachAt } from './geo.js';
 import { ATMOS } from './sky.js';
 import { groundYAt as airportGroundYAt } from './airports.js';
 import { groundYAt as brandGroundYAt } from './brands.js';
@@ -190,11 +190,14 @@ export class Player {
 
     if (this.mode === 'DRIVE') {
       const road = nearestRoad(this.pos.x, this.pos.z, 4);
-      // top speed by road tier; offroad is slow going
+      // top speed by road tier; offroad is slow going — except Padre's wet
+      // sand, which drives like a primary road (posted 33 on the driftwood)
       const caps = { motorway: 46, trunk: 38, primary: 33, street: 26 };
+      const sand = !road && beachAt(this.pos.x, this.pos.z);
       const wet = 1 - Math.min(1, ATMOS.rain) * this.perks.rainDrag; // rain slows you like it slows traffic
-      const maxSpd = (road ? caps[road.type] * this.perks.engineCap : this.perks.offroadCap) * wet;
-      const accel = road ? 26 : this.perks.offroadAccel;
+      const maxSpd = (road ? caps[road.type] * this.perks.engineCap
+        : sand ? caps.primary * this.perks.engineCap : this.perks.offroadCap) * wet;
+      const accel = road ? 26 : sand ? 24 : this.perks.offroadAccel;
       if (fwd) this.speed += accel * dt;
       else if (back) { this.speed -= (this.speed > 0 ? 40 : 12) * dt; this.braking = this.speed > 0.5; }
       else this.speed *= Math.pow(0.35, dt); // coast friction

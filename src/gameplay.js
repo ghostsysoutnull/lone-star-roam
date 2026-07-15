@@ -33,7 +33,10 @@ export const LANDMARKS = [
   { name: 'Marfa Lights', at: LL(30.2892, -103.8543), kind: 'lights', fact: 'Mysterious orbs seen over the desert since the 1880s.' },
   { name: 'Fort Worth Stockyards', at: LL(32.7893, -97.3465), kind: 'longhorn', fact: 'Twice-daily longhorn cattle drive, every day since 1999.' },
   { name: 'Galveston Pleasure Pier', at: LL(29.2854, -94.7905), kind: 'ferris', fact: 'A ferris wheel over the Gulf of Mexico.' },
-  { name: 'Padre Island', at: LL(26.5940, -97.2780), kind: 'beach', fact: 'Longest undeveloped barrier island in the world.' },
+  // nudged 2026-07-14 (W3): the old lon sat in open Gulf water once the island
+  // became real land — now on the sand (save is by name, so nothing breaks)
+  { name: 'Padre Island', at: LL(26.5940, -97.2940), kind: 'beach', fact: 'Longest undeveloped barrier island in the world.' },
+  { name: 'Port Isabel Lighthouse', at: LL(26.0776, -97.2095), kind: 'lighthouse', fact: 'Lit in 1852 to guide ships through Brazos Santiago Pass — the only Texas lighthouse you can still climb.' },
   { name: 'El Paso Star', at: LL(31.8046, -106.4820), kind: 'star', fact: 'A 459-ft lit star on the Franklin Mountains.' },
   { name: 'Buc-ee’s New Braunfels', at: LL(29.7377, -98.0857), kind: 'beaver', fact: 'World’s largest convenience store — and famously spotless restrooms.' },
   { name: 'Stonehenge II', at: LL(30.0772, -99.3005), kind: 'henge', fact: 'A Hill Country Stonehenge replica, built on a whim in 1989.' },
@@ -532,6 +535,21 @@ function mkLandmarkMesh(kind, name) {
       const ball = add(new THREE.Mesh(new THREE.IcosahedronGeometry(1.9, 1), ballMat));
       ball.position.y = 14.8;
       g.userData.nightMats = [ballMat];                           // sparkles after dark
+      break;
+    }
+    case 'lighthouse': {
+      const white = new THREE.MeshLambertMaterial({ color: 0xf2ede2, flatShading: true });
+      const tower = add(new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.95, 6.5, 10), white));
+      tower.position.y = 3.25;
+      const gallery = add(new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.18, 10), new THREE.MeshLambertMaterial({ color: 0x2a2d33 })));
+      gallery.position.y = 6.6;
+      const lampMat = new THREE.MeshLambertMaterial({ color: 0x555044, emissive: 0xffe9a8, emissiveIntensity: 0.2, flatShading: true });
+      const lamp = add(new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.85, 8), lampMat));
+      lamp.position.y = 7.1;
+      const cap = add(new THREE.Mesh(new THREE.ConeGeometry(0.62, 0.7, 10), new THREE.MeshLambertMaterial({ color: 0x2a2d33 })));
+      cap.position.y = 7.85;
+      box(1.8, 1, 1.4, 1.5, 0.5, 0, stone); // keeper's cottage
+      g.userData.nightMats = [lampMat];     // the light earns its name after dark
       break;
     }
     case 'obelisk': {
