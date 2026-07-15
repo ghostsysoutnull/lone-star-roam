@@ -6,16 +6,15 @@ Queued work and every owed playtest live in `BACKLOG.md` — the Shoulder & Shel
 playtest list is long and entirely unspent, so a play session is the highest-value
 next move, not more code.
 
-**Unplayed change, 2026-07-15 (`8398546`)**: band roads were rebaked — the bake
-had been applying a *degree* tolerance in game units (~1000× too tight), so they
-shipped unsimplified at 2.2 u/pt against Texas's 34.6 and read dense and rough
-the moment you crossed the line. Fixed to simplify before projecting (6830 pts →
-340). The rebake also **moved the road set** (81 → 76 polylines, +478u primary,
-−173u motorway) — full verify green and the shoulder suite says the crossing
-monuments held, but no test judges how it *looks*. **Drive the band before
-stacking another band change on it** — the concurrency fix in `BACKLOG.md` is a
-second road-set shift and must not tangle with this one. Padre/Texarkana/Clovis
-are the spots to eyeball.
+**Band roads rebaked and played, 2026-07-15 (`8398546`)** — settled, no action.
+The bake had been applying a *degree* tolerance in game units (~1000× too
+tight), so band roads shipped unsimplified at 2.2 u/pt against Texas's 34.6 and
+read dense and rough the moment you crossed the line; fixed to simplify before
+projecting (6830 pts → 340). The rebake also moved the road set (81 → 76
+polylines, +478u primary, −173u motorway); **Bruno drove the band and passed
+it**, so that shift is verified play-side as well as by the suite. The band is
+now a clean baseline: the `BACKLOG.md` concurrency fix is the *next* road-set
+shift and lands against this, unstacked.
 
 ---
 
