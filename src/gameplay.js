@@ -111,6 +111,18 @@ export class Gameplay {
     this.onCollect?.('county');
   }
 
+  // Out-of-Texas parish/county crossing — flavor toast only, debounced against
+  // boundary zigzag like enterCounty, but never persisted/tallied (Law: nothing
+  // outside the state competes with the 254-county count).
+  enterBandCounty(label, dt) {
+    this.bandCountyToastT = (this.bandCountyToastT ?? 0) - dt;
+    if (!label || label === this.bandCountyNow) return;
+    this.bandCountyNow = label;
+    if (this.bandCountyToastT > 0) return;
+    this.bandCountyToastT = 6;
+    this.onToast?.(`🗺 ${label}`);
+  }
+
   ufoSighting() {
     this.save.ufo++;
     this.persist();

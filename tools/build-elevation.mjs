@@ -1,22 +1,26 @@
 #!/usr/bin/env node
 // Bake real elevation: AWS Terrarium DEM tiles -> data/elevation.bin (uint16 LE meters,
 // high bit = outside Texas) + constants that must match src/geo.js.
-// Usage: node tools/build-elevation.mjs <us-states-500k.json> [tileCacheDir]
+// Usage: node tools/build-elevation.mjs <cb_..._state_500k-shapefile-base> [tileCacheDir]
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { execSync } from 'child_process';
 import { inflateSync } from 'zlib';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { readShapefile } from './shp2geojson.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const [statesPath, cacheDir = '/tmp/terrarium'] = process.argv.slice(2);
 mkdirSync(cacheDir, { recursive: true });
 
 // --- grid constants (mirrored in src/geo.js) ---
+// Shoulder & Shelf W1: widened +~430u on the land sides (west/north/east) so
+// the 25-mi (402u) shoulder sits fully inside the DEM; south (Gulf) stays put
+// — the shelf is water, not real-DEM land.
 const LAT0 = 31.0, LON0 = -99.5;
 const M_LAT = 111320, M_LON = M_LAT * Math.cos((LAT0 * Math.PI) / 180);
 const SCALE = 1 / 100;
-export const GRID = { w: 420, h: 400, minX: -6900, maxX: 5800, minZ: -6200, maxZ: 5800 };
+export const GRID = { w: 448, h: 414, minX: -7330, maxX: 6230, minZ: -6630, maxZ: 5800 };
 
 const Z = 7; // terrarium zoom (~1.2 km/px)
 const lon2tx = (lon) => ((lon + 180) / 360) * 2 ** Z;
@@ -102,20 +106,23 @@ function elevAt(lon, lat) {
   );
 }
 
-// --- Texas border for the outside mask ---
-const states = JSON.parse(readFileSync(statesPath, 'utf8'));
-const tx = states.features.find((f) => (f.properties.name || f.properties.NAME) === 'Texas');
-let rings = tx.geometry.type === 'Polygon' ? [tx.geometry.coordinates[0]] : tx.geometry.coordinates.map((p) => p[0]);
-rings.sort((a, b) => b.length - a.length);
-const border = rings[0];
-const inTexasLL = (lon, lat) => {
+// --- Texas border (mainland + Padre's rings) for the outside mask ---
+// statesPath is a Census cartographic boundary shapefile base path (parsed by
+// tools/shp2geojson.mjs — same file tools/build-band.mjs reads for Padre).
+const tx = readShapefile(statesPath).find((f) => f.properties.STUSPS === 'TX');
+const ranked = [...tx.rings].sort((a, b) => b.length - a.length);
+const border = ranked[0]; // mainland
+const inPadreWindow = (ring) => ring.some(([lon, lat]) => lon < -96.9 && lon > -97.6 && lat > 25.9 && lat < 28.0);
+const padreRings = ranked.slice(1).filter((r) => r.length >= 100 && inPadreWindow(r));
+const inPolyLL = (lon, lat, poly) => {
   let inside = false;
-  for (let i = 0, j = border.length - 1; i < border.length; j = i++) {
-    const [xi, yi] = border[i], [xj, yj] = border[j];
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
     if (yi > lat !== yj > lat && lon < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
   }
   return inside;
 };
+const inTexasLL = (lon, lat) => inPolyLL(lon, lat, border) || padreRings.some((r) => inPolyLL(lon, lat, r));
 
 // --- city pads: flatten toward each city's center height (cities table from build-data) ---
 const cities = JSON.parse(readFileSync(join(ROOT, 'data', 'cities.json'), 'utf8'));

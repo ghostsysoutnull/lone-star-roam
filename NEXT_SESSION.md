@@ -2,39 +2,103 @@
 
 ## Session briefing
 - **This session**: the Shoulder & the Shelf (`SHOULDER_SHELF_SPEC.md`),
-  wave 1 of 7 — "the ground stops ending": DEM rebake on a wider grid,
-  Padre rings restored into `inTexas`, new `inWorld` bounds (**25-mi**
-  land shoulder / 70-mi shelf), soft wall relocated with per-edge
-  messages, band terrain + big-map margin, out-of-state HUD line (state +
-  parish/county, toast-only), and the amendment's band data bakes: Census
-  places clip (band cities + pops), band roads (through-stubs +
-  primaries around band cities), band airport runway authoring from OSM,
-  neighbor-state polygons. Spec locked 2026-07-14; land half re-specced
-  same day (data-driven presence amendment, D1–D4 approved).
-- **Recommended setup**: model **Sonnet 5**, effort **high** — structural/
-  pipeline wave, no register writing. Flag it if the running model differs.
-- **Budget**: pipeline rebakes + boundary code + checks; no shots;
-  grep-first; ≤2 full-file reads; Overpass via GET (POST 406s here).
-  Frozen-baseline checks: in-Texas scenery/rose byte-determinism,
-  `inTexas` semantics unchanged, county counter silent outside, soft wall
-  measured at all four edges + offshore, band data joined (places per
-  state > 0, parish lookup at a known LA point).
-- **Then**: rewrite this block for wave 2 (The Neighbors — band cities/
-  silver stars/townsfolk/aviation/Passport, Sonnet 5).
+  wave 2 of 7 — "The Neighbors": band cities live through the existing
+  city machinery on fresh additive seed streams (buildings scaled by real
+  pop from `data/band-places.json`, partial edge-cities render whatever
+  falls inside); silver stars (world prop + map, gold-vs-silver Law);
+  Passport save/HUD (`save.passport`: state stamps, band towns, Corner
+  Stones land in W6, away landings); townsfolk from existing pools by
+  pop (named NPCs stay Texan); band fields join AIRPORTS + ROUTES + the
+  schedule (spokes at SHV/TXK/CVN/HOB — **band roads/airport runway data
+  were NOT baked in W1**, see gotchas); Cannon + Barksdale military
+  flavor pairs; charter offers may draw TX↔band pairs. W1 (ground/bounds/
+  data pipeline) shipped 2026-07-14, commit TBD (see `git log`).
+- **Recommended setup**: model **Sonnet 5**, effort **high** — still
+  structural (city/save/aviation-table plumbing), no register writing yet
+  (that's W7). Flag it if the running model differs.
+- **Budget**: code + checks, no shots, grep-first. Checks: band city
+  renders + silver star + Passport town tick; Texas counters byte-still
+  after a full band visit; no travel-menu entry / fast-travel lock;
+  townsfolk spawn + night gate at a band city; `daySchedule` runs clean
+  over the full field table (ROUTES-completeness — the LBJ-crash class of
+  bug); a TX↔band charter full cycle + Passport landing stamp.
+- **Then**: rewrite this block for wave 3 (Padre & the coast road,
+  content, Fable 5).
 
-Gotchas for wave 1 specifically:
-- `ELEV` grid constants are duplicated (`tools/build-elevation.mjs` ↔
-  geo.js) and the projection is duplicated (`tools/build-data.mjs` `proj`
-  ↔ `LL()` in gameplay.js/maritime.js/travel.js) — change all sites or none.
-- `build-data.mjs` needs its inputs re-supplied (not in repo) to rebuild
-  `border.json` with Padre's rings — ask Bruno for `us-states.json` or
-  refetch Census 500k.
-- Padre joining `inTexas` legitimately creates NEW scenery/animal chunks
-  on the island (chunk-keyed streams — existing chunks stay byte-identical;
-  the W1 baseline check proves it). Do not "fix" that by gating the island
-  out.
+Gotchas from W1 (whoever touches band cities/aviation/the map next must know):
+- **Band roads and band airport runway geometry were never baked** — W1's
+  budget ran out on places+population (Bruno: "do it right") and the
+  runtime core (inWorld/soft wall/terrain/map/HUD), all of which W1's own
+  checks require; roads/airports are pure W2 inputs with no W1 check
+  depending on them, so they were explicitly slipped. **W2 needs to bake
+  them first**: Overpass GET refetch for through-stubs (I-10 E/W, I-20,
+  I-30, I-35, I-40, US-287/87/84/62-180/71) + primaries around band
+  cities, and `aeroway=runway` geometry for SHV/TXK/CVN/HOB + Cannon/
+  Barksdale + curated tier-3 strips (406s on POST here — GET only,
+  `maps.mail.ru/osm/tools/overpass` mirror for big bboxes).
+- **`data/band-places.json`** (177 rows: LA 39, AR 15, OK 104, NM 19) has
+  `{name, state, pop, x, z}`, sorted by pop desc — built by
+  `tools/build-band.mjs` from Census cartographic boundary + Population
+  Estimates Program files (see below). **Hochatown, OK has no population
+  row at all** in the 2022 vintage (checked: no STATE=40/PLACE=35030 row) —
+  a genuine data gap, not a bug; it's in-band by distance but was dropped
+  from the join. If W2 wants Hochatown rendered, it needs a manual
+  population override, not a re-run of the join. Chattanooga, OK
+  legitimately reports **pop 0** — a real Census value, not a bug either.
+- **Classify by what a point is standing on, not by nearest border
+  segment** (`src/geo.js` `classify()`/`inWorld`/`borderZoneAt`): near El
+  Paso the closest Texas border stretch is the Rio Grande even for points
+  deep in New Mexico (Las Cruces) — a nearest-segment classifier wrongly
+  calls that 'mexico'. The fix tests point-in-neighbor-state-polygon
+  (`GEO.neighborStates`) first; only falls back to nearest-border-zone
+  ('coast' vs 'mexico') for points outside every neighbor state too (open
+  Gulf water or actually-Mexico). Any new geo classification must follow
+  the same "what are you standing in" pattern, not nearest-line-distance.
+- **The whole band data pipeline is `tools/build-band.mjs`**, not
+  `build-data.mjs` — inputs are Census cartographic boundary shapefiles
+  (`.shp`+`.dbf`, parsed by the new no-deps `tools/shp2geojson.mjs`, no
+  ogr2ogr/mapshaper needed) + the Population Estimates Program CSV.
+  Re-fetch commands (all confirmed working from this environment):
+  `curl -sS -o cb_2022_us_state_500k.zip https://www2.census.gov/geo/tiger/GENZ2022/shp/cb_2022_us_state_500k.zip`
+  (same pattern for `_county_500k` and `_place_500k`), and
+  `curl -sS -o sub-est2022.csv https://www2.census.gov/programs-surveys/popest/datasets/2020-2022/cities/totals/sub-est2022.csv`.
+  Unzip each, then: `node tools/build-band.mjs <state-base> <county-base> [<place-base> <pop-csv>]`
+  (place/pop args optional — omitting them skips `band-places.json`).
+  Raw shapefiles/CSV are scratchpad-only (not committed), same convention
+  as OSM downloads — re-fetch, don't hunt for a cached copy.
+- **`tools/build-elevation.mjs`'s CLI signature changed**: it now takes a
+  Census state-shapefile *base path* (parsed via `shp2geojson.mjs`), not
+  the old GeoJSON `us-states.json`. `GRID` widened to
+  `{w:448,h:414,minX:-7330,maxX:6230,minZ:-6630,maxZ:5800}` (+~430u land
+  sides; south/Gulf unchanged — mirrored in `src/geo.js` `ELEV`).
+- **The minimap and big map are now two separate offscreen layers**
+  (`hud.js` `renderMapLayer(W,H,bounds)` takes explicit bounds and returns
+  `{canvas,T,sc}`): `hud.miniLayer`/`miniT`/`miniSc` stay pinned to the
+  original Texas-only `GEO.bounds` (Law: "minimap layer untouched" — CLAUDE.md
+  said both maps blit from *one* shared canvas, which the widened big map
+  would have silently broken); `hud.mapLayer`/`mapT`/`mapSc` are the widened
+  shoulder/shelf layer, used by the big map and mission-target math only.
+  `drawMini` must keep using the mini* fields — don't let it drift back to
+  the shared ones.
+- **`GEO.border`/`inTexas` stayed additive, not reshaped**: `GEO.border`
+  is still the exact flat mainland ring it always was; Padre's two rings
+  live in new `GEO.islands` (`data/islands.json`), OR'd in by `inTexas`.
+  Any code that iterates `GEO.border` expecting "all of Texas" (e.g. a
+  new ground-mesh or ink-line consumer) must explicitly opt into
+  `GEO.islands` too, the way `world.js`'s terrain rasterization and
+  `hud.js`'s map layer do NOT yet (Padre isn't drawn as land in-world or
+  on the map — that's W3/content, not W1's job; W1 only had to make
+  `inTexas`/gameplay-legality true there).
+- **Aviation.mjs suite is flaky under heavy `-j` parallelism** on this
+  machine (2 different real-loop-timing checks failed once each across 3
+  full `-j6` runs, both clean standalone and at `-j2`) — pre-existing,
+  unrelated to this session's changes. If it flakes again, rerun at a
+  lower `-j` before assuming a regression.
 - Agriculture/chapel/farmstead/brand generators stay `inTexas`-gated by
-  law (spec Laws) — the shoulder gets none of them.
+  law (spec Laws) — the shoulder gets none of them. Padre joining
+  `inTexas` legitimately creates NEW scenery/animal chunks on the island
+  (existing chunks stay byte-identical — the W1 baseline check proves it,
+  see `tools/checks/band.mjs`). Do not "fix" that by gating the island out.
 
 Playtest still owed (pre-track): the EIGHT ranch compounds (wave 5's four
 + 5b's JA/XIT/Matador/LBJ, incl. landing at the new LBJ strip).

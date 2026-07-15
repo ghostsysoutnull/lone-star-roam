@@ -151,7 +151,7 @@ export default async function aviation(t) {
       const ctx = g.hud.mapLayer.getContext('2d');
       let n = 0;
       for (const a of g.AIRPORTS) {
-        const [px, pz] = [ (a.at[0] - g.GEO.bounds.minX) * g.hud.mapSc + 20, (a.at[1] - g.GEO.bounds.minZ) * g.hud.mapSc + 20 ];
+        const [px, pz] = g.hud.mapT(a.at[0], a.at[1]);
         const d = ctx.getImageData(Math.round(px) - 8, Math.round(pz) - 8, 16, 16).data;
         for (let i = 0; i < d.length; i += 4)
           if (d[i + 2] > 180 && d[i + 2] > d[i] + 25 && d[i + 3] > 100) { n++; break; }

@@ -1,6 +1,8 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
-import { loadGeo, GEO, nearestRoad, waterAt, countyAt, hAt, inTexas, seededRand, agAt } from './geo.js';
+import { loadGeo, GEO, nearestRoad, waterAt, countyAt, neighborCountyAt, hAt, inTexas, inWorld, borderZoneAt, outsideAt, seededRand, agAt } from './geo.js';
+
+const NEIGHBOR_STATE_NAME = { LA: 'Louisiana', AR: 'Arkansas', OK: 'Oklahoma', NM: 'New Mexico' };
 import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { initDebug } from './debug.js';
@@ -119,6 +121,7 @@ async function boot() {
   gameplay.onCollect = (kind) => audio.chime(kind);
   player.onStep = () => audio.step();
   player.onThrust = () => audio.jetWhomp();
+  player.onWorldEdge = (m) => hud.toast(m);
   const flares = new FlareSystem(scene, player);
   flares.onSound = (kind) => audio.flare(kind);
   const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions }); // panel only with ?debug=1; actions drive the verify suite
@@ -210,7 +213,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, hAt, seededRand, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, inTexas, inWorld, borderZoneAt, outsideAt, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -279,6 +282,10 @@ async function boot() {
     if (hudTick > 0.08) {
       const county = countyAt(player.pos.x, player.pos.z);
       gameplay.enterCounty(county, hudTick);
+      if (!county) {
+        const nc = neighborCountyAt(player.pos.x, player.pos.z);
+        gameplay.enterBandCounty(nc ? `${nc.name}, ${NEIGHBOR_STATE_NAME[nc.state]}` : null, hudTick);
+      }
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
       hud.mission = missions.hudInfo(player.pos);
       if (sky.forecast !== lastForecast) { // weather radio breaks in on a fresh forecast

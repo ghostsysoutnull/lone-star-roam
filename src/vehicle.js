@@ -1,7 +1,7 @@
 // Player controller: DRIVE (pickup truck), FLY (truck sprouts wings + prop), WALK (cowboy).
 // Arcade physics, third-person chase camera, per-mode animation and night lights.
 import * as THREE from 'three';
-import { nearestRoad, nearestCity, inTexas, hAt } from './geo.js';
+import { nearestRoad, nearestCity, inWorld, borderZoneAt, hAt } from './geo.js';
 import { ATMOS } from './sky.js';
 import { groundYAt as airportGroundYAt } from './airports.js';
 import { groundYAt as brandGroundYAt } from './brands.js';
@@ -54,6 +54,8 @@ export class Player {
     this.keys = {};
     this.onStep = null;    // footstep audio hook
     this.onThrust = null;  // jetpack liftoff hook (fires once on the ground->hovering edge)
+    this.onWorldEdge = null; // soft-wall hook: (zone: 'land'|'coast') fires once on the inWorld->!inWorld edge
+    this._wasInWorld = true;
     this.walkPhase = 0;
     this.steerVis = 0;
     this.prevSpeed = 0;
@@ -257,8 +259,15 @@ export class Player {
       }
     }
 
-    // Soft wall at the state line — you roam Texas, not New Mexico
-    if (!inTexas(this.pos.x, this.pos.z)) {
+    // Soft wall at the edge of the roamable world — Texas proper plus the
+    // shoulder (land) / shelf (Gulf); Mexico gets no dilation (settled as out)
+    const inW = inWorld(this.pos.x, this.pos.z);
+    if (!inW) {
+      if (this._wasInWorld) {
+        const zone = borderZoneAt(this.pos.x, this.pos.z);
+        if (zone === 'coast') this.onWorldEdge?.("That's blue water, partner. Texas is the other way.");
+        else if (zone === 'land') this.onWorldEdge?.("That's about as far as this road goes.");
+      }
       const c = nearestCity(this.pos.x, this.pos.z).city;
       const dx = c.x - this.pos.x, dz = c.z - this.pos.z;
       const L = Math.hypot(dx, dz) || 1;
@@ -266,6 +275,7 @@ export class Player {
       this.pos.z += (dz / L) * Math.max(10, Math.abs(this.speed)) * dt * 2;
       this.speed *= Math.pow(0.1, dt);
     }
+    this._wasInWorld = inW;
 
     // ground modes ride the terrain (or an airport pad's flat plateau)
     const ground = groundYAt(this.pos.x, this.pos.z) ?? hAt(this.pos.x, this.pos.z);

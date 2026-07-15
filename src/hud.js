@@ -1,6 +1,6 @@
 // HUD: minimap + fullscreen map (border/highways pre-rendered once), text readouts, toasts, dialog.
 import { Vector3 } from 'three';
-import { GEO, nearestCity } from './geo.js';
+import { GEO, nearestCity, SHOULDER_U, SHELF_U } from './geo.js';
 import { AIRPORTS, fieldNear } from './airports.js';
 import { ATMOS } from './sky.js';
 
@@ -80,7 +80,16 @@ export class HUD {
       return el;
     });
     this.tagV = new Vector3();
-    this.mapLayer = this.renderMapLayer(1400, 1320);
+    // Two offscreen layers: the minimap Law says untouched — it keeps the
+    // original Texas-only bounds/scale/T exactly as before. Only the big map
+    // widens to the shoulder/shelf (band cities/stars land in W2).
+    const mini = this.renderMapLayer(1400, 1320, GEO.bounds);
+    this.miniLayer = mini.canvas; this.miniT = mini.T; this.miniSc = mini.sc;
+    const wide = this.renderMapLayer(1400, 1320, {
+      minX: GEO.bounds.minX - SHOULDER_U, maxX: GEO.bounds.maxX + SHOULDER_U,
+      minZ: GEO.bounds.minZ - SHOULDER_U, maxZ: GEO.bounds.maxZ + SHELF_U, // south = Gulf shelf
+    });
+    this.mapLayer = wide.canvas; this.mapT = wide.T; this.mapSc = wide.sc;
     this.zoomLevels = [1.4, 2.4, 4.5];
     this.zoomIdx = 1;
     this.compass = document.getElementById('compass');
@@ -105,15 +114,27 @@ export class HUD {
     this.toastTimer = null;
   }
 
-  // Pre-render border + highways + cities once to an offscreen canvas
-  renderMapLayer(W, H) {
+  // Pre-render border + highways + cities once to an offscreen canvas.
+  // `bounds` picks the world extent (Texas-only for the minimap — Law: "the
+  // minimap layer stays untouched" — or the widened shoulder/shelf extent for
+  // the big map, which gets the faded band backdrop the Texas fill sits atop).
+  renderMapLayer(W, H, bounds) {
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const ctx = c.getContext('2d');
-    const { minX, maxX, minZ, maxZ } = GEO.bounds;
+    const { minX, maxX, minZ, maxZ } = bounds;
     const pad = 20, sc = Math.min((W - 2 * pad) / (maxX - minX), (H - 2 * pad) / (maxZ - minZ));
     const T = (x, z) => [(x - minX) * sc + pad, (z - minZ) * sc + pad];
-    this.mapT = T; this.mapSc = sc;
+    const isWide = bounds !== GEO.bounds;
+    if (isWide) {
+      ctx.fillStyle = '#171a14'; // faded band backdrop, dimmer than Texas' own fill
+      ctx.fillRect(0, 0, W, H);
+      for (const ring of Object.values(GEO.neighborStates ?? {})) {
+        ctx.beginPath();
+        ring.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+        ctx.closePath(); ctx.fillStyle = '#242a1e'; ctx.fill();
+      }
+    }
     ctx.fillStyle = '#20261c';
     ctx.beginPath();
     GEO.border.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
@@ -173,7 +194,7 @@ export class HUD {
       const [px, pz] = T(city.x, city.z);
       ctx.fillText(city.name, px + 7, pz + 4);
     }
-    return c;
+    return { canvas: c, T, sc };
   }
 
   toggleBigMap() { this.big.style.display = this.big.style.display === 'block' ? 'none' : 'block'; }
@@ -686,13 +707,14 @@ export class HUD {
     const ctx = this.mini.getContext('2d');
     const W = this.mini.width, H = this.mini.height;
     ctx.clearRect(0, 0, W, H);
-    // zoomed window around player from the prerendered layer
-    const [px, pz] = this.mapT(player.pos.x, player.pos.z);
+    // zoomed window around player from the prerendered layer (Texas-only —
+    // the minimap Law keeps this layer/scale untouched by the shoulder/shelf)
+    const [px, pz] = this.miniT(player.pos.x, player.pos.z);
     const zoom = this.zoomLevels[this.zoomIdx], sw = W / zoom, sh = H / zoom;
-    ctx.drawImage(this.mapLayer, px - sw / 2, pz - sh / 2, sw, sh, 0, 0, W, H);
+    ctx.drawImage(this.miniLayer, px - sw / 2, pz - sh / 2, sw, sh, 0, 0, W, H);
     // delivery target: gold diamond, clamped to the edge as a direction pointer
     if (this.mission?.target) {
-      const [tx, tz] = this.mapT(this.mission.target[0], this.mission.target[1]);
+      const [tx, tz] = this.miniT(this.mission.target[0], this.mission.target[1]);
       const mx = Math.max(10, Math.min(W - 10, (tx - px + sw / 2) * zoom));
       const my = Math.max(10, Math.min(H - 10, (tz - pz + sh / 2) * zoom));
       this.diamond(ctx, mx, my, 8);

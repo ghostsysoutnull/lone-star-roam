@@ -2,7 +2,11 @@
 // World: 1 unit = 100 m real. +x = east, -z = north. Built from real OSM data.
 
 export const GEO = {
-  border: [],    // [[x,z], ...] Texas border polygon
+  border: [],    // [[x,z], ...] Texas mainland border polygon
+  islands: [],   // [[[x,z],...], ...] Padre's rings — part of Texas (inTexas), not the mainland ring
+  borderZones: [], // ['land'|'coast'|'mexico', ...] parallel to `border`, one per vertex
+  neighborStates: {}, // { LA: [[x,z],...], AR: [...], OK: [...], NM: [...] } mainland rings
+  neighborCounties: [], // [{state, name, ring, bbox}] LA parishes + AR/OK/NM counties
   highways: [],  // [{ref, type, pts:[[x,z],...]}]
   cities: [],    // [{name, x, z, pop}]
   rivers: [],    // [{name, pts:[[x,z],...]}]
@@ -15,6 +19,18 @@ export async function loadGeo(onStatus) {
   const get = async (f) => (await fetch(`data/${f}`)).json();
   onStatus?.('Loading border…');
   GEO.border = await get('border.json');
+  GEO.islands = await get('islands.json').catch(() => []);
+  GEO.borderZones = await get('border-zones.json').catch(() => []);
+  GEO.neighborStates = await get('neighbor-states.json').catch(() => ({}));
+  GEO.neighborCounties = await get('neighbor-counties.json').catch(() => []);
+  for (const c of GEO.neighborCounties) {
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+    for (const [x, z] of c.ring) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+    }
+    c.bbox = [minX, maxX, minZ, maxZ];
+  }
   onStatus?.('Loading highways…');
   GEO.highways = await get('highways.json');
   onStatus?.('Loading cities…');
@@ -56,7 +72,7 @@ export async function loadGeo(onStatus) {
 }
 
 // --- Real elevation (baked from AWS Terrarium DEM; constants mirror tools/build-elevation.mjs) ---
-export const ELEV = { data: null, w: 420, h: 400, minX: -6900, maxX: 5800, minZ: -6200, maxZ: 5800 };
+export const ELEV = { data: null, w: 448, h: 414, minX: -7330, maxX: 6230, minZ: -6630, maxZ: 5800 };
 const VSCALE = 0.01 * 2.5; // 1:100 horizontal, 2.5x vertical exaggeration
 
 // terrain height in game units at (x,z) — bilinear over the baked grid
@@ -201,6 +217,19 @@ export function countyAt(x, z) {
   return null;
 }
 
+// Parish/county for an out-of-Texas point (HUD flavor line only — never
+// counted; the 254-county tally is Texas-only, see countyAt/gameplay.enterCounty).
+let lastNeighborCounty = null;
+export function neighborCountyAt(x, z) {
+  if (lastNeighborCounty && inPoly(x, z, lastNeighborCounty.ring)) return lastNeighborCounty;
+  for (const c of GEO.neighborCounties) {
+    const [minX, maxX, minZ, maxZ] = c.bbox;
+    if (x < minX || x > maxX || z < minZ || z > maxZ) continue;
+    if (inPoly(x, z, c.ring)) { lastNeighborCounty = c; return c; }
+  }
+  return null;
+}
+
 // USDA census record for the county at (x,z), or null outside Texas
 export function agAt(x, z) {
   const name = countyAt(x, z);
@@ -216,14 +245,65 @@ export function nearestCity(x, z) {
   return { city: best, dist: Math.sqrt(bestD) };
 }
 
-export function inTexas(x, z) {
-  const poly = GEO.border;
+function inPoly(x, z, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
     const [xi, zi] = poly[i], [xj, zj] = poly[j];
     if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
   }
   return inside;
+}
+
+// Texas = the mainland ring OR Padre's rings (the island IS Texas — Shoulder
+// & Shelf Law #1). Every existing consumer keeps its current meaning for all
+// pre-existing land; this only adds new `true` points over Padre.
+export function inTexas(x, z) {
+  return inPoly(x, z, GEO.border) || GEO.islands.some((ring) => inPoly(x, z, ring));
+}
+
+function nearestDist(x, z, poly) {
+  let bestD = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const p = closestOnSeg(x, z, poly[j], poly[i]);
+    const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
+    if (d < bestD) bestD = d;
+  }
+  return Math.sqrt(bestD);
+}
+
+// Classify an out-of-Texas point by what it's actually standing on — NOT by
+// which border stretch is nearest (near El Paso the closest Texas border
+// segment is the Rio Grande even for points deep in New Mexico, e.g. Las
+// Cruces — a nearest-segment classifier would wrongly call that 'mexico').
+// 'land' = inside a US neighbor state polygon, 'coast' = Gulf (nearest border
+// stretch is coastal), 'mexico' = everything else (fail-safe: no dilation).
+function classify(x, z) {
+  if (GEO.neighborStates && Object.values(GEO.neighborStates).some((ring) => inPoly(x, z, ring))) return 'land';
+  let bestD = Infinity, bestI = 0;
+  const poly = GEO.border;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const p = closestOnSeg(x, z, poly[j], poly[i]);
+    const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
+    if (d < bestD) { bestD = d; bestI = i; }
+  }
+  return GEO.borderZones[bestI] === 'coast' ? 'coast' : 'mexico';
+}
+
+// Shoulder & Shelf: the roamable world, distinct from `inTexas` (Law #1 — the
+// wall relocates out here, Texas-ness never changes). 25mi (402u) past the
+// border on US-neighbor land, ~70mi (1127u) past it on the Gulf; Mexico gets
+// no dilation at all (settled as out — the wall stays at the Rio Grande).
+export const SHOULDER_U = 402, SHELF_U = 1127;
+export function inWorld(x, z) {
+  if (inTexas(x, z)) return true;
+  const zone = classify(x, z);
+  if (zone === 'mexico') return false;
+  return nearestDist(x, z, GEO.border) <= (zone === 'coast' ? SHELF_U : SHOULDER_U);
+}
+
+// What kind of out-of-Texas point this is — 'land'/'coast'/'mexico'.
+export function borderZoneAt(x, z) {
+  return classify(x, z);
 }
 
 // Deterministic RNG seeded by string — used for procedural cities/scatter
