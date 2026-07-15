@@ -23,6 +23,7 @@ import { AudioSystem } from './audio.js';
 import { NPCSystem } from './npcs.js';
 import { TrainSystem } from './trains.js';
 import { MaritimeSystem } from './maritime.js';
+import { ShoulderSystem, swampAt, shoulderClear } from './shoulder.js';
 import { UFOSystem } from './ufo.js';
 import { FlareSystem } from './flares.js';
 import { DogSystem } from './dog.js';
@@ -114,6 +115,9 @@ async function boot() {
   const travel = new TravelMenu(player, gameplay, sky, npcs, missions, dog, (m) => hud.toast(m), (k) => audio.chime(k));
   const trains = new TrainSystem(scene);
   const maritime = new MaritimeSystem(scene);
+  const shoulder = new ShoulderSystem(scene);
+  shoulder.onToast = (m) => hud.toast(m);
+  shoulder.onStone = (key, label) => gameplay.stampStone(key, label);
   const heli = new HeliSystem(scene, maritime);
   const blimp = new BlimpSystem(scene);
   const military = new MilitaryAirSystem(scene);
@@ -159,6 +163,8 @@ async function boot() {
     if (lsc) return { name: lsc.name, hint: 'read the datacenter sign', dialog: { name: '\u{1F5A5}\uFE0F Lone Star Compute — ' + lsc.name, sub: lsc.sign.tagline, text: lsc.sign.fact } };
     const sea = maritime.plaqueNear(pos, range); // shelf plaques: Tidelands buoy + the Far Rig
     if (sea) return { name: sea.name, hint: sea.hint, dialog: { name: '⚓ ' + sea.name, sub: sea.sub, text: sea.text } };
+    const ln = shoulder.plaqueNear(pos, range); // W6a line plaques: Neutral Ground, straddle, WinBig, Corner Stones
+    if (ln) return { name: ln.name, hint: ln.hint, dialog: { name: ln.icon + ' ' + ln.name, sub: ln.sub, text: ln.text } };
     return null;
   };
   let hornCd = 0;
@@ -228,11 +234,14 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, inTexas, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, inTexas, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
   let lastCauseway = -Infinity; // causeway ceremony cooldown (sim seconds)
+  // crossing ceremony (W6a): which land the player last stood on ('tx'/'band');
+  // water and the shelf are null so ferries and the Gulf never trigger it
+  let lastSide = 'tx', lastCrossT = -Infinity, returnCount = 0;
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
     // Paused: keep draining the clock every frame (so resume gets a normal ~16 ms
@@ -266,6 +275,7 @@ async function boot() {
     audio.heli(heli.nearestAirborneDist(player.pos.x, player.pos.z));
     ufo.update(dt, player.pos.x, player.pos.z, player.pos.y);
     haunts.update(dt, player.pos.x, player.pos.z, sky.t, sky.days);
+    shoulder.update(dt, player.pos.x, player.pos.z);
     flares.update(dt);
     dog.update(dt);
     springer.update(dt, player.pos);
@@ -303,8 +313,10 @@ async function boot() {
     if (hudTick > 0.08) {
       const county = countyAt(player.pos.x, player.pos.z);
       gameplay.enterCounty(county, hudTick);
+      let ncNow = null;
       if (!county) {
         const nc = neighborCountyAt(player.pos.x, player.pos.z);
+        ncNow = nc;
         gameplay.enterBandCounty(nc ? `${nc.name}, ${NEIGHBOR_STATE_NAME[nc.state]}` : null, hudTick);
         // inWorld-gated: a point past the shoulder is the soft wall's territory,
         // not a place you can linger — no Passport stamp (and no toast race
@@ -312,6 +324,21 @@ async function boot() {
         // actively rejected from.
         if (nc && inWorld(player.pos.x, player.pos.z)) gameplay.stampState(nc.state, NEIGHBOR_STATE_NAME[nc.state]);
       }
+      // crossing ceremony (W6a): leaving is a murmur, coming home is a chime.
+      // Land-to-land transitions only — river/water gaps pass through as null,
+      // and the 8 s cooldown swallows boundary zigzag.
+      const side = county ? 'tx' : ncNow ? 'band' : null;
+      if (side && side !== lastSide && clock.elapsedTime - lastCrossT > 8) {
+        lastCrossT = clock.elapsedTime;
+        if (side === 'band') hud.toast("You're leaving Texas. It'll be here.");
+        else {
+          audio.chime('texas');
+          // occasional, seeded on the return count — new stream, never rename
+          if (seededRand('missus:' + ++returnCount)() < 0.3) hud.toast('Miss us? 🤠');
+        }
+      }
+      if (side) lastSide = side;
+      audio.swamp = swampAt(player.pos.x, player.pos.z); // frog country factor
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
       // Queen Isabella Causeway ceremony — a crossing, not a collectible
       if (player.mode === 'DRIVE' && clock.elapsedTime - lastCauseway > 120) {

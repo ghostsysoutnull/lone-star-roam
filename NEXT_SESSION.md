@@ -2,26 +2,67 @@
 
 ## Session briefing
 - **This session**: the Shoulder & the Shelf (`SHOULDER_SHELF_SPEC.md`),
-  wave 6a of 7 — "The Shoulder east" (content) + the crossing ceremony.
-  The Neutral Ground: cypress/moss flora rows, frogs-over-crickets
-  ambience, crawfish ponds off the rice prairie, Vinton fireworks barns,
-  Neutral Ground plaque. Texarkana: State Line Ave, the two-state federal
-  building, the straddle spot. **WinBig World Casino** parody at the Red
-  River (exterior + lot only; the Texas plates are the joke). **Black
-  bear** in the Sabine pines (species +1, 28→29, rare, flees).
-  Beyond-band glow + control-city signs east (Lake Charles, New Orleans,
-  Natchitoches). Ceremony ships with 6a: granite WELCOME TO TEXAS —
-  DRIVE FRIENDLY monuments + bluebonnet beds at the major crossings,
-  muted leaving toast ("You're leaving Texas. It'll be here."), warm
-  return chime + occasional "Miss us?", state-stamp Passport wiring, and
-  the 7 **Corner Stones** → `save.passport.stones`. W5 (The Shelf)
-  shipped 2026-07-15, commit `38be76f`.
+  wave 6b of 7 — "The Shoulder west" (content). Texola ruins; Glenrio
+  with the two-faced FIRST/LAST IN TEXAS motel sign; Texhoma line
+  vignette; Anthony's leap-year banner; the **Carlsbad doorstep**
+  (settled call #9 — park road switchbacks + entrance sign at Whites
+  City, ZERO cave content; the caves track inherits a place, not a
+  promise); beyond-band glow + control-city signs west (Lawton,
+  Alamogordo; Roswell stays a radio wink). The crossing ceremony
+  (monuments, leave/return toasts, state stamps, all 7 Corner Stones)
+  shipped WHOLE in 6a — 6b adds no ceremony machinery, only west
+  vignettes. W6a (The Shoulder east + ceremony) shipped 2026-07-15,
+  commit `TBD`.
 - **Recommended setup**: model **Fable 5**, effort **high** — content/
-  register wave (vignettes, plaque copy, ceremony), per the spec's model
+  register wave (ruins, sign copy, vignettes), per the spec's model
   table. Flag it if the running model differs.
 - **Budget**: code + checks, no shots, grep-first.
-- **Then**: rewrite this block for wave 6b (The Shoulder west, Fable 5;
-  6b rewrites for W7).
+- **Then**: rewrite this block for W7 (People & the board, Fable 5 —
+  the track's LAST wave: its session end deletes this block and folds
+  the whole track into one ROADMAP.md entry).
+
+Gotchas from W6a (whoever touches shoulder.js, the ceremony, species
+counts, or the line next must know):
+- **`shoulder.js` is the vignette home** — 6b west content extends it
+  (same static-boot-build; `buildControlSign`/`mkTex`/`drapedPlane`/
+  `lamb` helpers ready). New buildings near a band town (Whites City!)
+  need a `CLEAR_BOXES` entry — `shoulderClear` is consumed by cities.js
+  placement (airportClear idiom) so procedural downtowns stand off.
+- **New seed streams** (never reuse/rename): `bluebonnet` (monument
+  beds), `cypress` (Sabine rows), `winbig` (lot cars), `missus:<n>`
+  (return-toast roll, n = per-session return counter).
+- **The ceremony is global and DONE**: `deriveCrossings` finds every
+  band-stub endpoint on the border (segment distance ≤ 15u), so the
+  WEST monuments (I-40×2 Glenrio/Texola, I-10 Anthony, US 87/287/62…)
+  already stand. 12 sites; `shoulder.mjs` asserts 10–15 + the five
+  interstate refs. Do NOT re-add monuments in 6b.
+- **No El Paso downtown monument is intentional** — I-10 grazes the
+  border along the Rio Grande there, but the far side is Juárez; the
+  `neighborCountyAt` outward probe filters Mexico-facing candidates by
+  design (Law: Mexico is out). Don't "fix" it.
+- **Ceremony state machine** (main.js hudTick): land-to-land only —
+  `side` is null over water so ferries/Gulf never murmur; 8 s cooldown
+  on `clock.elapsedTime`. Any check that crosses the line twice must
+  wait 8.2 s between crossings or the second transition is swallowed.
+- **Table-size checks after W6a**: species **29** (`ag.mjs`,
+  `padre.mjs`); Corner Stones 7 + monuments 10–15 (`shoulder.mjs`).
+  `save.passport.stones` is live (stampStone dedups); HUD row has the
+  `score-pass-stones` span — totals in index.html stay static /7 (small
+  enough to not need a span).
+- **Border checks use SEGMENT distance, not vertex distance** — the
+  surveyed straight lines (103°W, Panhandle edges) run 1300+ units
+  between polygon vertices; nearest-vertex reads are garbage there.
+  (Corner Stones snap to *vertices* on purpose — the corners ARE
+  vertices.)
+- **Plaques**: shoulder is the 4th branch in main.js's unified lookup
+  (`icon` field per plaque). New west brass = append `shoulder.plaques`.
+- **`swampAt` is the Neutral Ground box only** — west vignettes get no
+  frogs; `audio.swamp` is fed in hudTick, and the frog/cricket mix is
+  verify-readable via `audio.frogTarget`/`cricketTarget` (jetTarget
+  idiom, computed before the no-ctx early return).
+- Cypress standing in the Sabine is intentional (bald cypress grow in
+  water); trees keep to the LA bank — the check counts Texas-side
+  trunks and expects 0 (ScenerySystem owns the Texas side).
 
 Gotchas from W5 (whoever touches the Gulf, the map layers, legends,
 species counts, or offshore anything next must know):
@@ -156,11 +197,11 @@ Carried over (evergreen until the track closes):
   the band arrays into them) — rose indices and the 132/254 counters
   depend on them. Band data lives in `GEO.bandHighways`/`GEO.bandCities`.
 - **Table-size checks to bump on any addition**: 27 airports / 7-15-5 by
-  tier / 22 gate signs (`aviation.mjs`, `hud.mjs`), species 28
+  tier / 22 gate signs (`aviation.mjs`, `hud.mjs`), species 29
   (`ag.mjs`, `padre.mjs`), landmarks 38 (`padre.mjs`), legends 3
-  (`shelf.mjs`).
-- **`save.passport`** is additive `{stamps, towns, landings, stones}`;
-  `stones` stays empty until W6. State stamps gate on `inWorld`.
+  (`shelf.mjs`), stones 7 + monuments 10–15 (`shoulder.mjs`).
+- **`save.passport`** is additive `{stamps, towns, landings, stones}` —
+  all four live as of W6a. State stamps gate on `inWorld`.
 - **Aviation.mjs flakes under any parallel `-j`** (real-loop-timing
   checks; W5 saw it at `-j4`, clean standalone) — one standalone rerun
   before assuming a regression.
@@ -206,7 +247,11 @@ Playtest still owed (pre-track): the EIGHT ranch compounds (wave 5's
 four + 5b's JA/XIT/Matador/LBJ, incl. landing at the new LBJ strip) —
 and now Padre: causeway arrival, beach drive, dawn turtle release — and
 the Shelf: the rig skyline from Malaquite at night, the buoy + Far Rig
-plaques, the treasure light on a new-moon night, the Aransas birds.
+plaques, the treasure light on a new-moon night, the Aransas birds —
+and the Shoulder east: the I-10 crossing both ways (monument, leaving
+murmur, homecoming chime), a Vinton dusk (frogs, fireworks barns,
+Neutral Ground marker), the Texarkana straddle, the WinBig lot read
+from I-35, one Corner Stone hunt, a bear in the Sabine pines.
 
 Gotchas from waves 5/5b (ranch compounds, `world.js` sites,
 `airports.js`, `animals.js`):

@@ -105,7 +105,7 @@ export class Gameplay {
       counties: this.save.counties.length, bank: this.save.bank,
       legends: this.save.legends.length, airports: this.save.airports.length,
       passportStamps: this.save.passport.stamps.length, passportTowns: this.save.passport.towns.length,
-      passportLandings: this.save.passport.landings.length,
+      passportLandings: this.save.passport.landings.length, passportStones: this.save.passport.stones.length,
     };
   }
 
@@ -141,6 +141,15 @@ export class Gameplay {
     this.save.passport.stamps.push(state);
     this.persist();
     this.onToast?.(`🛂 Passport stamped: ${label} (${this.save.passport.stamps.length}/4)`);
+    this.onCollect?.('passport');
+  }
+
+  // Corner Stone reached — Passport (Law: the line's own subject, never a Texas tally).
+  stampStone(key, label) {
+    if (!key || this.save.passport.stones.includes(key)) return;
+    this.save.passport.stones.push(key);
+    this.persist();
+    this.onToast?.(`🪨 Corner Stone: ${label} (${this.save.passport.stones.length}/7)`);
     this.onCollect?.('passport');
   }
 

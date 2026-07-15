@@ -65,6 +65,8 @@ export const SPECIES = {
     fact: 'Not a flamingo — the pink comes from the same shrimp diet. Sweeps that spoon of a bill through the shallows like a metal detector.' },
   crane: { name: 'Whooping Crane', speed: 8, fleeR: 14, behavior: 'graze', bob: false, nightMax: 0.6,
     fact: 'The tallest bird in America, and nearly lost — the whole wild flock winters at Aransas, and every one of them gets counted.' },
+  blackbear: { name: 'Black Bear', speed: 16, fleeR: 26, behavior: 'flee', bob: true,
+    fact: 'Louisiana bears have been walking back into the Sabine pines for years — quiet, shy, and gone the moment they smell a truck.' },
   bat: { name: 'Mexican Free-tailed Bat', event: true,
     fact: 'Austin hosts the largest urban bat colony on Earth.' },
   kempsridley: { name: 'Kemp’s Ridley Sea Turtle', event: true, // turtles.js dawn release at Malaquite
@@ -83,8 +85,13 @@ function regionTable(x, z) {
     return [['pronghorn', 3, 6, 1, 0.5], ['jackrabbit', 1, 2, 1, 0.55], ['coyote', 1, 2, 1, 0.5], ['vulture', 2, 4, 1, 0.5]];
   if (x < -2200) // Trans-Pecos desert
     return [['jackrabbit', 1, 2, 1, 0.55], ['roadrunner', 1, 1, 1, 0.55], ['coyote', 1, 2, 1, 0.55], ['vulture', 2, 4, 1, 0.55], ['javelina', 2, 5, 1, 0.4], ['rattlesnake', 1, 1, 1, 0.35]];
-  if (x > 3400) // Piney Woods
-    return [['deer', 2, 4, 1, 0.55], ['hog', 2, 5, 1, 0.55], ['turkey', 3, 7, 1, 0.4], ['gator', 1, 2, 1, 0.3]];
+  if (x > 3400) { // Piney Woods
+    const rows = [['deer', 2, 4, 1, 0.55], ['hog', 2, 5, 1, 0.55], ['turkey', 3, 7, 1, 0.4], ['gator', 1, 2, 1, 0.3]];
+    // the Sabine strip only, APPENDED so western Piney Woods draws are untouched:
+    // a rare lone bear working its way back over from Louisiana (W6a, species 29)
+    if (x > 4400) rows.push(['blackbear', 1, 1, 1, 0.12]);
+    return rows;
+  }
   if (x > -900 && x < 1100 && z > -400 && z < 1500) // Hill Country
     return [['deer', 2, 4, 1, 0.55], ['turkey', 3, 6, 1, 0.45], ['armadillo', 1, 2, 1, 0.5], ['longhorn', 3, 6, 1, 0.5]];
   if (z > 2600) // South Texas brush
@@ -527,6 +534,17 @@ function mkAnimal(species, rand) {
       box(g, 0.3, 0.3, 0.4, 0, 0.55, -0.7, bristle);
       box(g, 0.14, 0.12, 0.12, 0, 0.45, -0.95, mat(0x6a5248)); // snout
       quadLegs([[-0.18, -0.35], [0.18, -0.35], [-0.18, 0.35], [0.18, 0.35]], 0.1, 0.3, bristle);
+      break;
+    }
+    case 'blackbear': {
+      const fur = mat(0x2a221c);
+      box(g, 0.7, 0.7, 1.3, 0, 0.75, 0, fur);                  // heavy body
+      box(g, 0.34, 0.3, 0.3, 0, 1.15, -0.55, fur);             // shoulder hump
+      box(g, 0.36, 0.34, 0.45, 0, 1.05, -0.85, fur);           // head
+      box(g, 0.16, 0.12, 0.14, 0, 0.95, -1.12, mat(0x6a5a48)); // tan muzzle
+      box(g, 0.1, 0.14, 0.06, -0.14, 1.28, -0.85, fur);        // round ears
+      box(g, 0.1, 0.14, 0.06, 0.14, 1.28, -0.85, fur);
+      quadLegs([[-0.24, -0.45], [0.24, -0.45], [-0.24, 0.45], [0.24, 0.45]], 0.16, 0.45, fur);
       break;
     }
     case 'vulture': {

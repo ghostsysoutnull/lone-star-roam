@@ -59,6 +59,7 @@ export class HUD {
       passStamps: document.getElementById('score-pass-stamps'),
       passTowns: document.getElementById('score-pass-towns'),
       passLandings: document.getElementById('score-pass-landings'),
+      passStones: document.getElementById('score-pass-stones'),
       job: document.getElementById('hud-job'),
       toast: document.getElementById('toast'),
       dialog: document.getElementById('dialog'),
@@ -785,6 +786,7 @@ export class HUD {
     this.els.passStamps.textContent = counts.passportStamps ?? 0;
     this.els.passTowns.textContent = counts.passportTowns ?? 0;
     this.els.passLandings.textContent = counts.passportLandings ?? 0;
+    this.els.passStones.textContent = counts.passportStones ?? 0;
     // active delivery line (set by main from missions.hudInfo)
     this.els.job.textContent = this.mission?.text ?? '';
     this.els.job.style.color = this.mission?.late ? '#ff7a66' : this.mission?.urgent ? '#ffb04a' : '#ffd35c';

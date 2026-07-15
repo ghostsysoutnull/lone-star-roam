@@ -5,6 +5,7 @@ export class AudioSystem {
   constructor() {
     this.ctx = null;
     this.muted = false;
+    this.swamp = 0; // 0..1 frog country factor, fed by main.js (shoulder.swampAt)
     const boot = () => { this.init(); removeEventListener('keydown', boot); };
     addEventListener('keydown', boot);
   }
@@ -115,6 +116,26 @@ export class AudioSystem {
     cricket.connect(pulse).connect(this.cricketGain);
     cricket.start(); lfo.start();
 
+    // --- frog chorus: two low pulsed croaks, crossfaded over the crickets by
+    // audio.swamp (main.js feeds shoulder.swampAt at HUD rate) — the Neutral
+    // Ground sounds like Louisiana at night ---
+    this.frogGain = chan();
+    const croak = (freq, rate) => {
+      const o = ctx.createOscillator();
+      o.type = 'sawtooth';
+      o.frequency.value = freq;
+      const p = ctx.createGain();
+      p.gain.value = 0;
+      const l = ctx.createOscillator();
+      l.frequency.value = rate;
+      const la = ctx.createGain();
+      la.gain.value = 0.5;
+      l.connect(la).connect(p.gain);
+      o.connect(p).connect(this.frogGain);
+      o.start(); l.start();
+    };
+    croak(96, 2.1); croak(72, 3.3);
+
     // --- theremin: eerie wavering tone, fades in near a UFO ---
     this.ufoGain = chan();
     const ufoOsc = ctx.createOscillator();
@@ -151,6 +172,11 @@ export class AudioSystem {
     // computed unconditionally (heli()/datacenterHum() pattern) so verify can
     // read the commanded target even before the AudioContext exists
     this.jetTarget = player.mode === 'WALK' && player.hovering && !!player.keys['Space'] ? 0.09 : 0;
+    // frogs-over-crickets: both targets computed unconditionally (jetTarget
+    // idiom) so verify can read the commanded mix without an AudioContext
+    const dry = atmos.night * (1 - Math.min(1, atmos.rain || 0));
+    this.cricketTarget = dry * 0.012 * (1 - this.swamp * 0.85);
+    this.frogTarget = dry * 0.02 * this.swamp;
     if (!this.ctx || this.muted) return;
     const t = this.ctx.currentTime;
     const spd = Math.abs(player.speed);
@@ -187,7 +213,8 @@ export class AudioSystem {
     const windSpd = player.mode === 'FLY' ? spd / 150 : spd / 60;
     set(this.windGain.gain, Math.min(0.14, windSpd * 0.1 + (atmos.wind - 1) * 0.02), 0.3);
     set(this.rainGain.gain, (atmos.rain || 0) * 0.05, 0.5);
-    set(this.cricketGain.gain, atmos.night * (1 - Math.min(1, atmos.rain || 0)) * 0.012, 0.5);
+    set(this.cricketGain.gain, this.cricketTarget, 0.5);
+    set(this.frogGain.gain, this.frogTarget, 0.5);
   }
 
   // rotorcraft ambience: nearest-airborne-heli distance -> gain, faded like
@@ -235,6 +262,7 @@ export class AudioSystem {
       buy: [[659, 0, 0.1, 0.07], [880, 0.09, 0.12, 0.08], [1319, 0.18, 0.35, 0.09]],
       legend: [[392, 0, 0.55, 0.06], [466, 0.18, 0.55, 0.06], [587, 0.36, 1.0, 0.07]], // minor rise — something's out there
       stamp: [[660, 0, 0.12, 0.07], [880, 0.09, 0.14, 0.08], [1320, 0.18, 0.4, 0.09]], // logbook stamped
+      texas: [[392, 0, 0.4, 0.07], [494, 0.12, 0.4, 0.07], [587, 0.24, 0.7, 0.08]], // warm come-on-home rise (crossing ceremony)
     };
     for (const [f, w, d, g] of SONGS[kind] || []) this.note(f, w, d, g ?? 0.1, 'triangle');
   }
