@@ -59,6 +59,27 @@ hostile (the horn *scares*, haunts *drift away*).
   things; a curated hundred as micro-plaques (existing plaque
   machinery) would out-Texas any single landmark. Grep-scale content
   work, perfect register for a Fable content wave.
+- **Ranch perimeter fences** — the 8 wave-5/5b ranch HQ compounds
+  (`ranchHQSite`/`ranchHQAt` in world.js) only have small working-pen
+  corrals (`mkCorral`, ~4-unit square). A full property-boundary fence
+  is a separate, bigger prop: a stylized rectangle (airport-footprint
+  idiom, not a literal GPS/parcel trace — repo has no parcel-data
+  pipeline) built with the merge-then-instance post+rail technique
+  brands.js already uses for the LSC security fence. Cheap even at real
+  scale (largest historical LBJ acreage still perimeters to ~135 game
+  units). Per-ranch sourcing needed before spec'ing:
+  - **LBJ**: acreage is era-dependent (240 ac at 1951 purchase → ~2,800
+    ac at Johnson's 1973 death → ~600 ac current NPS holding); the
+    ~600-ac modern NPS footprint is the most citable baseline.
+  - **XIT**: harder — the historical ~3M-acre spread (Capitol Syndicate,
+    1885–1912) was broken up and sold off decades ago; no single
+    boundary survives in any modern record, so any fence here is a
+    stylized historical reconstruction, not tied to a still-existing
+    property line. Worth a web search for a Texas Historical
+    Commission / Panhandle-Plains Historical Museum boundary map before
+    free-handing a shape.
+  - King, Four Sixes, Waggoner, Y.O., JA, Matador all need the same
+    acreage-sourcing pass first.
 
 ## Events — the sky and the calendar as actors
 
