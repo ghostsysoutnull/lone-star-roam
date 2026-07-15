@@ -15,7 +15,7 @@
   wave draws it — world.js terrain rasterization and hud.js's map layer
   don't render the island yet (W1 gotcha, still open — see below). W2
   (band cities/stars/Passport/aviation) shipped 2026-07-14, commit
-  `<fill in after commit>`.
+  `214bfe0`.
 - **Recommended setup**: model **Fable 5**, effort **high** — content/
   register wave (beach town flavor, turtle-release seeded mornings,
   causeway ceremony copy), per the spec's model table. Flag it if the
