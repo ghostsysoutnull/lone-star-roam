@@ -12,7 +12,7 @@
   schedule (spokes at SHV/TXK/CVN/HOB — **band roads/airport runway data
   were NOT baked in W1**, see gotchas); Cannon + Barksdale military
   flavor pairs; charter offers may draw TX↔band pairs. W1 (ground/bounds/
-  data pipeline) shipped 2026-07-14, commit TBD (see `git log`).
+  data pipeline) shipped 2026-07-14, commit `c44661b`.
 - **Recommended setup**: model **Sonnet 5**, effort **high** — still
   structural (city/save/aviation-table plumbing), no register writing yet
   (that's W7). Flag it if the running model differs.
