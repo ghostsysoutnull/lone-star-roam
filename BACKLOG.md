@@ -19,6 +19,40 @@ live in `FUTURE.md`.
 - **lights `until(trains>0, 45000)`**: drive/force a train to a known spot
   instead of waiting on the real spawn, so lights can't become the pole.
 
+## Playtest findings 2026-07-15 (Bruno's tx-urgent notes; ocean-zone fix
+already shipped as `54b3511` — these are the remaining items)
+
+- **Gulf plane pokes past the terrain grid** ("ocean after dry land on the
+  US states"): the 14000×9000 gulf plane (world.js `buildWater`) extends
+  beyond the DEM rectangle (`ELEV` maxX 6230 / maxZ 5800), so east of the
+  Louisiana band the world turns to open water with no seafloor under it.
+  Fix direction: clip or fade the plane outside the terrain grid (or extend
+  a dry skirt) — diagnosis in the 2026-07-15 session, geometry all in
+  `buildWater`/`buildTerrain`.
+- **Shields for railways**: give rail lines a presence in the HUD the way
+  roads get shields (interpretation to confirm with Bruno — crossing signs
+  at grade crossings vs a rail glyph/name line in the HUD when near track).
+- **Water sits a touch below terrain + wants effects and sound**: river
+  ribbons ride `hAt + 0.07` and lakes sit at lowest-shoreline +0.15, which
+  reads sunken at some banks; wants a look at the offsets, plus water
+  ambience (river/lakeshore loop in audio.js) and a cheap surface effect
+  (ripple/sparkle).
+- **Band land readability**: no roads connect band cities to the grid
+  (known W2 limitation — arterials only; connecting stubs is polish, needs
+  a re-bake), Bruno's "no elevation?" impression (the band DOES use the
+  real DEM — check whether the flat `cOut` 0.75 tint is washing out relief
+  cues), and "are the land colors accurate?" — a color-ramp pass on
+  out-of-Texas cells in `buildTerrain`.
+- **Brand buildings positioning review** (Bucky's / H-E-Buddy / Lone Star
+  Compute): review all sites' placement against roads/downtowns — Bruno
+  flags it wholesale; ranches and chapel–cemetery pairs confirmed good.
+- **Roads, railroads, rivers visual pass**: "make them better" — ribbon
+  width/color/texture upgrade candidates; no direction settled yet.
+- **Poly review of pre-6b props**: W6b shipped the curvier kit (8–14 seg
+  turnings); review the Shelf (W5) and Shoulder-east (6a) heroes — rigs,
+  buoy, monuments, WinBig, fed building — plus older landmarks for the
+  same treatment.
+
 ## Next in line (in order)
 
 1. **Haunted Texas wave 2 — the apparitions** (planned & approved 2026-07-11;
