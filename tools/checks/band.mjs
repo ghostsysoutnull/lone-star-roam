@@ -383,4 +383,54 @@ export default async function band(t) {
         `band ${ty} carries a vertex every ${d.band.toFixed(1)}u vs Texas's ${d.tx.toFixed(1)}u — far denser, so the bake is simplifying in game units against a degree tolerance again (tools/build-band-roads.mjs: simplify BEFORE proj)`);
     }
   });
+
+  // --- W1: the network (2026-07-16 tier-fetch rebake) ---
+
+  // The 4 state bboxes overlap on purpose (no seam gaps at the state lines),
+  // so the same OSM way can land in two input files. build-band-roads.mjs
+  // dedupes by way id, keeping the first file's copy — this guards that a
+  // future rebake of the same inputs can't reintroduce the doubled-road look
+  // (shipped once on US 71 near the LA/AR line: one polyline drawn twice,
+  // simplified independently each time). Exact point-run overlap, not a
+  // distance/parallel test — real divided highways legitimately carry two
+  // close, parallel, same-ref polylines (opposing carriageways) and must not
+  // trip this.
+  await t.check('band roads: no cross-bbox duplicate polylines (same ref+type, near-identical point run)', async () => {
+    const res = await t.ev(`(() => {
+      const byGroup = new Map();
+      for (const h of g.GEO.bandHighways) {
+        if (!h.ref) continue;
+        const k = h.type + '|' + h.ref;
+        if (!byGroup.has(k)) byGroup.set(k, []);
+        byGroup.get(k).push(h);
+      }
+      const offenders = [];
+      for (const [k, hws] of byGroup) {
+        if (hws.length < 2) continue;
+        for (let i = 0; i < hws.length; i++) for (let j = i + 1; j < hws.length; j++) {
+          const a = hws[i], b = hws[j];
+          const bSet = new Set(b.pts.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)));
+          const match = a.pts.filter((p) => bSet.has(p[0].toFixed(1) + ',' + p[1].toFixed(1))).length;
+          if (match / a.pts.length > 0.6) offenders.push({ k, frac: match / a.pts.length });
+        }
+      }
+      return offenders;
+    })()`);
+    t.ok(res.length === 0, `cross-bbox duplicate band polyline(s): ${JSON.stringify(res)} — dedup-by-way-id regressed (tools/build-band-roads.mjs)`);
+  });
+
+  // Coverage floor measured on the 2026-07-16 tier-fetch rebake (tier fetch
+  // replacing the old ref-regex allowlist): 140/177 band-places.json entries
+  // land within 25u of a band road. Asserted as a floor, not exact, so a
+  // legitimate future rebake that improves coverage still passes — only a
+  // regression hides silently otherwise.
+  await t.check('band road network connectivity: coverage floor over the 177 band places', async () => {
+    const res = await t.ev(`(async () => {
+      const places = await (await fetch('data/band-places.json')).json();
+      const covered = places.filter((p) => g.nearestBandRoad(p.x, p.z, 25));
+      return { n: places.length, covered: covered.length };
+    })()`);
+    t.ok(res.n === 177, `band-places.json count drifted: ${res.n} !== 177`);
+    t.ok(res.covered >= 140, `band road coverage regressed: ${res.covered}/${res.n} within 25u, floor is 140`);
+  });
 }

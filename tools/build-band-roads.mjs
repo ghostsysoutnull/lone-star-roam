@@ -9,14 +9,12 @@
 //   Argument ORDER IS LOAD-BEARING: chaining is greedy over file order, so a
 //   different order re-splits the polylines.
 //
-// Inputs — the exact queries, recorded 2026-07-15 after the originals were lost
-// (the first bake left only a `<routes>`/`(bbox)` template behind, so the data
-// could not be regenerated). Overpass POST 406s from here — always GET:
+// Inputs — tier fetch (2026-07-16, Band Parity W1), superseding the 2026-07-15
+// ref-regex query below. Overpass POST 406s from here — always GET:
 //
-//   REFS='I 10|I 20|I 30|I 35|I 40|US 62|US 71|US 84|US 87|US 180|US 287'
 //   curl -sG <endpoint> --data-urlencode \
 //     "data=[out:json][timeout:280];way[\"highway\"~\"motorway|trunk|primary\"]
-//      [\"ref\"~\"^($REFS)($|;)\"](<bbox>);out geom;"
+//      (<bbox>);out geom;"
 //
 //   la  28.8,-94.4,33.2,-91.8     ar  32.8,-94.9,36.7,-92.3
 //   ok  33.3,-103.3,37.2,-94.2    nm  31.1,-107.3,37.2,-102.7
@@ -26,10 +24,25 @@
 // one in ~2 min. Add `[date:"<iso>"]` after [out:json] for a pinned attic query;
 // both endpoints honour it (verified against 2015 data).
 //
-// The bboxes are RECONSTRUCTED, not the originals: they reproduce the 2026-07-14
-// trunk tier exactly (23 polylines, 4133u) but not motorway/primary, so the
-// road set moved slightly on the 2026-07-15 rebake. Rebaking shifts band
-// geometry — check the shoulder suite (crossing monuments read these endpoints).
+// Dropping the ref filter pulls every motorway/trunk/primary way in each bbox,
+// which connects the towns the old US-route allowlist skipped — but the bboxes
+// overlap on purpose (no seam gaps at the state lines), so the SAME way lands
+// in two files near every shared edge. Measured on the 2026-07-15 inputs:
+// la∩ar 21, ar∩ok 521, ok∩nm 228 duplicate OSM way ids. Loaded verbatim, a
+// duplicate gets simplified twice independently and ships as two near-identical
+// polylines drawn on top of each other — reads as denser/rougher exactly where
+// the duplication sits (shipped once on US 71 near the LA/AR line). Dedup by
+// way `id` below, keeping the FIRST file a given id appears in (argument order
+// is still load-bearing for chaining) rather than narrowing the bboxes.
+//
+// Old (2026-07-15) ref-regex query, superseded — kept for the archaeology:
+//   REFS='I 10|I 20|I 30|I 35|I 40|US 62|US 71|US 84|US 87|US 180|US 287'
+//   curl -sG <endpoint> --data-urlencode \
+//     "data=[out:json][timeout:280];way[\"highway\"~\"motorway|trunk|primary\"]
+//      [\"ref\"~\"^($REFS)($|;)\"](<bbox>);out geom;"
+//
+// Rebaking shifts band geometry — check the shoulder suite (crossing monuments
+// read these endpoints) and the band.mjs guards.
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -82,18 +95,23 @@ function simplify(pts, tol) {
 
 // --- load + chain ways by ref+type sharing endpoints (same idiom as build-data.mjs) ---
 const KEEP_TYPES = new Set(['motorway', 'trunk', 'primary']); // drop *_link ramps
+const seenIds = new Set(); // dedup across overlapping bboxes — first file wins (arg order)
 const ways = [];
+let rawCount = 0, dupCount = 0;
 for (const p of paths) {
   const data = JSON.parse(readFileSync(p, 'utf8'));
   for (const e of data.elements) {
     if (e.type !== 'way' || !e.geometry || e.geometry.length < 2) continue;
     const type = e.tags?.highway;
     if (!KEEP_TYPES.has(type)) continue;
+    rawCount++;
+    if (seenIds.has(e.id)) { dupCount++; continue; }
+    seenIds.add(e.id);
     const ref = (e.tags?.ref || e.tags?.name || '?').split(';')[0].trim();
     ways.push({ ref, type, pts: e.geometry.map((g) => [g.lon, g.lat]) });
   }
 }
-console.log(`Ways loaded: ${ways.length}`);
+console.log(`Ways loaded: ${ways.length} (${rawCount} raw, ${dupCount} cross-bbox duplicates dropped)`);
 
 const key = (p) => `${p[0].toFixed(4)},${p[1].toFixed(4)}`;
 const byGroup = new Map();
@@ -142,6 +160,14 @@ function inPoly(x, z, poly) {
   return inside;
 }
 const inTx = (x, z) => inPoly(x, z, border) || islands.some((r) => inPoly(x, z, r));
+// The tier fetch has no ref/country filter, so a bbox that reaches close to
+// the border (NM's reaches El Paso) also pulls in Ciudad Juárez, Mexico —
+// same distance-to-border test, wrong country. neighbor-counties.json only
+// has AR/LA/NM/OK counties, so requiring the point to land in one of them
+// (instead of a bare distance-to-border test) keeps Mexico out without a
+// country/ref lookup.
+const neighborCounties = JSON.parse(readFileSync(join(ROOT, 'data', 'neighbor-counties.json'), 'utf8'));
+const inNeighborState = (x, z) => neighborCounties.some((c) => inPoly(x, z, c.ring));
 const closestOnSeg = (x, z, a, b) => {
   const dx = b[0] - a[0], dz = b[1] - a[1];
   const len2 = dx * dx + dz * dz;
@@ -190,7 +216,7 @@ for (const c of chains) {
   for (const p of c.pts) {
     const [x, z] = proj(p);
     const d = distToBorder(x, z);
-    const keep = inTx(x, z) ? d <= SEAM_MARGIN : d <= SHOULDER_U;
+    const keep = inTx(x, z) ? d <= SEAM_MARGIN : d <= SHOULDER_U && inNeighborState(x, z);
     if (keep) run.push(p); else flush();
   }
   flush();
@@ -205,3 +231,28 @@ const byRef = [...new Set(kept.map((h) => h.ref))].sort();
 console.log(`  refs: ${byRef.join(', ')}`);
 
 writeFileSync(join(ROOT, 'data', 'band-highways.json'), JSON.stringify(kept));
+
+// --- coverage report: how many of the 177 band places land within 25u of a band road ---
+const places = JSON.parse(readFileSync(join(ROOT, 'data', 'band-places.json'), 'utf8'));
+const nearestDist = (x, z) => {
+  let best = Infinity;
+  for (const h of kept) {
+    for (let i = 1; i < h.pts.length; i++) {
+      const p = closestOnSeg(x, z, h.pts[i - 1], h.pts[i]);
+      const d = Math.hypot(p[0] - x, p[1] - z);
+      if (d < best) best = d;
+    }
+  }
+  return best;
+};
+const COVER_U = 25;
+const covered = places.filter((pl) => nearestDist(pl.x, pl.z) <= COVER_U);
+console.log(`Coverage: ${covered.length}/${places.length} band places within ${COVER_U}u of a band road`);
+const byState = ['LA', 'AR', 'OK', 'NM'].map((s) => {
+  const inState = places.filter((pl) => pl.state === s);
+  const cov = inState.filter((pl) => covered.includes(pl)).length;
+  return `${s} ${cov}/${inState.length}`;
+});
+console.log(`  by state: ${byState.join(', ')}`);
+const uncovered = places.filter((pl) => !covered.includes(pl)).map((pl) => pl.name);
+if (uncovered.length) console.log(`  uncovered: ${uncovered.join(', ')}`);

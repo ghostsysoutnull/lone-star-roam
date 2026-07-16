@@ -13,6 +13,16 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'Band Parity (2026-07)',
+    waves: [
+      { wave: 'W1 — the network', spots: [
+        S('🛣️ Texarkana I-30/I-49 interchange', [5206.6, -2750], { mode: 'DRIVE', note: 'two interstates cross the line within a mile of each other — each gets its own monument now, not a merged one' }),
+        S('🏙️ Hobbs, NM via NM 18', [-3486, -1923.7], { mode: 'DRIVE', note: 'pop. 39,648 — the old ref-only bake never reached it; the tier fetch does' }),
+        S('🏘️ Idabel, OK', [4459.1, -3230.3], { mode: 'DRIVE', note: 'McCurtain County seat, connected via a state route the ref allowlist used to skip' }),
+      ] },
+    ],
+  },
+  {
     track: 'Placement legality (2026-07)',
     waves: [
       { wave: 'Brands & landmarks off the ribbons', spots: [

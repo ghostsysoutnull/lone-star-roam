@@ -141,7 +141,13 @@ function deriveCrossings() {
   cands.sort((a, b) => (a.type === 'motorway' ? 0 : 1) - (b.type === 'motorway' ? 0 : 1));
   const sites = [];
   for (const c of cands) {
-    if (sites.some((s) => (s.x - c.x) ** 2 + (s.z - c.z) ** 2 < 60 * 60)) continue;
+    // merge radius collapses ONE road's own fragmented chain endpoints (a
+    // route split by the bake lands two candidates a few units apart at the
+    // same real crossing) — it must not also swallow a genuinely different
+    // road that happens to cross nearby (I-30/I-49 interchange near
+    // Texarkana sit ~52u apart; a ref-blind merge silently dropped I-30's
+    // monument once the tier fetch added I-49 to the candidate set).
+    if (sites.some((s) => s.ref === c.ref && (s.x - c.x) ** 2 + (s.z - c.z) ** 2 < 60 * 60)) continue;
     sites.push(c);
   }
   return sites;

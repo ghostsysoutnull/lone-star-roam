@@ -1,33 +1,37 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Band Parity, wave 1 of 6 — rework
-  `tools/build-band-roads.mjs` to a tier fetch (`motorway|trunk|primary`,
-  clipped to the 402u strip), rebake, report town coverage, connectivity
-  check. Spec session (track opened, all calls resolved) shipped 2026-07-16.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — data-pipeline
-  wave, table plumbing, no visual judgment. Flag it if the running model
-  differs.
-- **Budget**: code + checks + Overpass fetches, no shots, grep-first; ≤2
-  full verify runs.
-- **Then**: rewrite this block for W2 (edge signs + band traffic + visit
-  tally).
+- **This session**: Band Parity, wave 2 of 6 — life on the roads. (a)
+  Control-city distance signs at every outward stub end (`deriveCrossings`
+  idiom over W1's endpoint set — 51 crossing sites, real refs), reusing
+  shoulder.js's sign meshes. (b) Traffic on band roads — extend
+  TrafficSystem's candidate polylines to `GEO.bandHighways` when the spawn
+  ring reaches the band. (c) the `bandTowns` visit tally (save key + HUD
+  counter + toast). W1 (tier-fetch road network) shipped 2026-07-16.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — same shape as
+  W1 (data-driven system extension, table plumbing over an existing idiom).
+  Flag it if the running model differs.
+- **Budget**: code + checks, no shots (signs/traffic are data-driven, not a
+  visual-judgment wave), grep-first; ≤2 full verify runs.
+- **Then**: rewrite this block for W3 (the ground — regional tints, screenshots
+  ON, Bruno's eye required).
 
 Gotchas carried over:
-- `BAND_PARITY_SPEC.md` is the track spec — all open calls already resolved
+- `BAND_PARITY_SPEC.md` is the track spec — open calls already resolved
   (tiers, tally, airports, rails deferred); don't relitigate them.
-- Overpass: POST 406s from here — GET only; bboxes/endpoints in
-  `tools/build-band-roads.mjs`'s header (mail.ru mirror for la/ar/ok,
-  overpass-api.de for nm). The tier fetch replaces the ref regex — the
-  BACKLOG concurrency defect dies with it, don't port the ref matching.
-- Any rebake shifts band geometry: re-verify the shoulder suite (crossing
-  monuments read band endpoints) + `band.mjs` guards. Argument order of the
-  4 state files is load-bearing (greedy chaining).
-- W1 must keep per-way `ref` where OSM tags it — W2's signs and shields
-  read it.
-- Coverage target is measured, not promised: report how many of the 177
-  band places get a road within 25u (was 30); only escalate to Bruno with
-  numbers if primary leaves big gaps.
+- W1's road set: 596 polylines, per-way `ref` preserved — signs/shields read
+  it directly off `GEO.bandHighways`.
+- `deriveCrossings()` (src/shoulder.js) now dedupes candidates by **matching
+  ref**, not bare proximity — a ref-blind 60u merge silently dropped I-30's
+  monument once I-49 (a real, distinct crossing ~52u away near Texarkana)
+  joined the candidate set. W2's signs read the same 51-site list; don't
+  revert that merge condition.
+- Coverage: 140/177 band places land within 25u of a band road (LA 37/39,
+  AR 14/15, OK 73/104, NM 16/19). Not escalated — no single state left a big
+  gap. The 37 uncovered towns are informational only, not a W2 blocker.
+- Any further band-road rebake shifts geometry: re-verify the shoulder suite
+  (crossing monuments read band endpoints) + `band.mjs` guards (density
+  ratio + cross-bbox-duplicate + coverage-floor checks all live there now).
 
 ---
 
