@@ -110,6 +110,23 @@ already shipped as `54b3511` — these are the remaining items)
 3. **Big-map click-to-set-waypoint** — generalize the mission target pipeline
    (map diamond + compass diamond + guide arrow) to a map click.
 
+## Legibility passes (`/legibility-pass <subject>` — skill in `.claude/skills/`)
+
+Procedure proven on the Malaquite turtle release (`7e1c31f`): silhouette +
+per-occurrence HUD announcement + suite checks. Known same-class candidates
+(all `spotSpecies`-only, i.e. silent after the first log — announcement axis
+confirmed; silhouette axis needs the audit step):
+
+- **Bats** (`bats.js`) — Congress Ave emergence: no per-dusk announcement.
+  Ribbon flecks may be fine as silhouette; audit will say.
+- **Dolphins** (`dolphins.js`) — ferry-crossing companions: no per-encounter
+  announcement.
+- **Haunts legends** (`haunts.js`) — deliberately subtle; audit only, may be
+  exempt by design.
+- **General audit sweep** — buildings/props (procedural downtowns, farmstead
+  kit, ports): one session walking the Tours tab judging both axes, output =
+  more entries here. Do this before queueing individual passes.
+
 ## Later
 
 Haunted Texas wave 3: San Antonio ghost tracks push (~29.34 N,
