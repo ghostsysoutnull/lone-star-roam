@@ -8,6 +8,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 See `ROADMAP.md` for planned work and known limitations before proposing features. No active priority track: aviation shipped 2026-07-12, Agriculture (`AGRICULTURE_SPEC.md`, all 5 waves + 4.5/5.5 follow-ons) shipped 2026-07-14 — both folded into `ROADMAP.md`. Queued work lives in `BACKLOG.md`.
 
+## Communication register
+
+Write to Bruno as an engineering status report, not narrative prose. Default to short labeled sections (Status / Change / Files / Verification / Open), one fact per line, plain declarative statements. State findings flat — "lights flakes under `-j`; gotchas list aviation and shop only" — not "worth flagging rather than letting disappear." Drop self-narration, softeners, and editorial framing; they add length without information and read off-register. Keep complete sentences and spelled-out terms — terse is the goal, fragments and arrow chains are not. This governs *register* only; still lead with the play effect and keep implementation detail on request.
+
 ## Session briefing (greeting)
 
 On the first message of a new session — before any other work — read `NEXT_SESSION.md`. If it contains a `## Session briefing` block, greet Bruno with it: the planned wave, the **recommended model + effort** (compare against the model actually running and flag any mismatch — he must set these manually via `/model` and `/effort`), and the wave budget. Then wait for his explicit go-ahead; after it, present the implementation plan before coding as usual. At each wave's session end, rewrite the briefing block for the next wave. When an effort has no queued waves, delete the block — the greeting disappears with it until the next spec writes a new one.
