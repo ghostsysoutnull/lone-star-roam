@@ -234,12 +234,13 @@ export default async function band(t) {
       townsLen: g.gameplay.save.passport.towns.length,
       citiesLen: g.gameplay.save.cities.length,
       starGone: !g.gameplay.bandCityStars.children.find((c) => c.userData.city === 'Shreveport'),
-      hudTowns: document.getElementById('score-pass-towns').textContent,
+      passport: (g.travel.renderPassport(), document.getElementById('travel-passport').textContent),
     })`);
     t.ok(res.towns, 'Shreveport not recorded in save.passport.towns after visiting its center');
     t.ok(res.starGone, 'silver star still present after the visit');
     t.ok(res.citiesLen === before.cities, `Texas save.cities moved from a band visit: ${before.cities} -> ${res.citiesLen}`);
-    t.ok(+res.hudTowns === res.townsLen, `HUD Passport-towns row (${res.hudTowns}) doesn't match save (${res.townsLen})`);
+    t.ok(new RegExp(`· ${res.townsLen}/\\d+ towns`).test(res.passport),
+      `Passport menu towns do not match save (${res.townsLen}): "${res.passport}"`);
   });
 
   await t.check('Passport state stamp on first crossing (direct call, W1 enterBandCounty idiom)', async () => {
@@ -249,11 +250,12 @@ export default async function band(t) {
     const res = await t.ev(`({
       stamps: g.gameplay.save.passport.stamps.slice(),
       toast: document.getElementById('toast').textContent,
-      hud: document.getElementById('score-pass-stamps').textContent,
+      passport: (g.travel.renderPassport(), document.getElementById('travel-passport').textContent),
     })`);
     t.ok(res.stamps.includes('LA'), 'stampState did not record LA');
     t.ok(res.toast.includes('Louisiana'), `wrong/missing Passport stamp toast: "${res.toast}"`);
-    t.ok(+res.hud === res.stamps.length, `HUD Passport-stamps row (${res.hud}) doesn't match save (${res.stamps.length})`);
+    t.ok(new RegExp(`Passport — ${res.stamps.length}/4 states`).test(res.passport),
+      `Passport menu states do not match save (${res.stamps.length}): "${res.passport}"`);
   });
 
   await t.check('townsfolk spawn at a band city by pop tier, and night-gate the same as Texas towns', async () => {

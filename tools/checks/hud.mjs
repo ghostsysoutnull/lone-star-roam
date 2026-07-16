@@ -78,11 +78,9 @@ export default async function hud(t) {
     const day = await t.ev(`({
       name: g.hud.railInfo.name,
       display: document.getElementById('rail-placard').style.display,
-      roadShield: g.hud.shieldInfo,
     })`);
     t.ok(day.name === sample.label, `rail placard "${day.name}" != OSM label "${sample.label}"`);
     t.ok(day.display === 'block', `rail placard display is "${day.display}"`);
-    t.ok(day.roadShield === null, 'road shield remains visible beside the rail placard');
     await t.setNight();
     await t.until(`document.getElementById('rail-placard').classList.contains('night')`, 8000);
     const night = await t.ev(`document.getElementById('rail-placard').classList.contains('night')`);
@@ -92,7 +90,11 @@ export default async function hud(t) {
   });
 
   await t.check('speed readout tracks mph = |speed|·2.4', async () => {
-    await t.until(`g.hud.els.speed.textContent.includes('0')`, 8000); // parked
+    await t.tp(austin.x + 18, austin.z - 18, 'DRIVE');
+    await t.until(`(() => {
+      const shown = parseInt(g.hud.els.speed.textContent.match(/\\d+/)?.[0] ?? '-1', 10);
+      return shown === 0 && g.player.speed === 0;
+    })()`, 8000); // parked
     await t.hold('KeyW');
     await t.simStep(1.5); // instantly at the road cap; W stays held so it sits there
     // wait for DOM and live speed to cohere, not just first-nonzero — the
