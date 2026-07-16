@@ -59,27 +59,29 @@ export default async function brands(t) {
     const panel = await t.ev(`(() => {
       const r = g.brands.live.get('Katy');
       const p = r.signPanel;
-      // sample the sign's canvas: the name must be DARK glyphs on the yellow
-      // face — luminance contrast survives the warm night light; the old
-      // red-on-yellow didn't (hue-only contrast, washed out at night)
-      let minLum = 255, yellow = 0, n = 0;
+      // sample the sign's canvas: NEON idiom — a dark board carrying bright
+      // yellow wordmark pixels (the texture doubles as the emissiveMap, so
+      // bright pixels ARE the night glow; a lit-surface look washed out twice)
+      let dark = 0, glyph = 0, n = 0;
       const img = p && p.material.map && p.material.map.image;
       if (img && img.getContext) {
         const d = img.getContext('2d').getImageData(0, 0, img.width, img.height).data;
         for (let i = 0; i < d.length; i += 32) {
           const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-          if (lum < minLum) minLum = lum;
-          if (d[i] > 200 && d[i + 1] > 150 && d[i + 2] < 90) yellow++;
+          if (lum < 40) dark++;
+          if (d[i] > 200 && d[i + 1] > 150 && d[i + 2] < 120) glyph++;
           n++;
         }
       }
       return { has: !!p, mapped: !!(p && p.material && p.material.map), visible: p ? p.visible : false,
-        minLum, yellowFrac: n ? yellow / n : 0 };
+        neonWired: !!(p && p.material.emissiveMap && p.material.emissiveMap === p.material.map),
+        darkFrac: n ? dark / n : 0, glyphFrac: n ? glyph / n : 0 };
     })()`);
     t.ok(panel.has && panel.mapped, `Bucky's sign panel missing or blank: ${JSON.stringify(panel)}`);
     t.ok(panel.visible, "Bucky's sign panel not visible");
-    t.ok(panel.minLum < 60, `sign glyphs are not dark-on-yellow (night-readability): darkest sample ${panel.minLum.toFixed(0)}`);
-    t.ok(panel.yellowFrac > 0.5, `sign face lost its yellow: ${(panel.yellowFrac * 100).toFixed(0)}%`);
+    t.ok(panel.neonWired, 'sign texture is not wired as its own emissiveMap (neon idiom)');
+    t.ok(panel.darkFrac > 0.5, `sign board is not dark: ${(panel.darkFrac * 100).toFixed(0)}% dark`);
+    t.ok(panel.glyphFrac > 0.02, `no bright wordmark pixels on the board: ${(panel.glyphFrac * 100).toFixed(1)}%`);
   });
 
   await t.check('placement legality: no brand site sits on an airport field', async () => {
@@ -272,9 +274,10 @@ export default async function brands(t) {
     // by day the lights are off (the real loop, no manual brands.update)
     await t.setDay();
     await t.wait(0.4);
-    const day = await t.ev(`({ c: g.brands.canopyLight.intensity, s: g.brands.signLight.intensity })`);
+    const day = await t.ev(`({ c: g.brands.canopyLight.intensity, s: g.brands.signLight.intensity, neon: g.brands.buckySignMat.emissiveIntensity })`);
     t.near(day.c, 0, 0.001, `canopy light on by day: ${day.c}`);
     t.near(day.s, 0, 0.001, `sign light on by day: ${day.s}`);
+    t.near(day.neon, 0, 0.001, `wordmark neon glowing by day: ${day.neon}`);
 
     // at night both light up...
     await t.setNight();
@@ -285,9 +288,12 @@ export default async function brands(t) {
       const dc = Math.hypot(cl.position.x - r.group.position.x, cl.position.z - r.group.position.z);
       const ds = Math.hypot(sl.position.x - r.group.position.x, sl.position.z - r.group.position.z);
       const orig = Math.hypot(cl.position.x, cl.position.z); // guard: not dropped at world origin
-      return { ci: cl.intensity, si: sl.intensity, dc, ds, orig };
+      return { ci: cl.intensity, si: sl.intensity, dc, ds, orig, neon: g.brands.buckySignMat.emissiveIntensity };
     })()`);
     t.ok(night.ci > 1 && night.si > 1, `lights never came on at night: ${JSON.stringify(night)}`);
+    t.ok(night.neon > 0.5, `wordmark neon never lit at night: ${night.neon}`);
+    // the warm pool must stay WEAKER than the canopy so it can't wash the neon
+    t.ok(night.si < night.ci / 2, `sign light back at neon-fighting strength: sign ${night.si}, canopy ${night.ci}`);
     // regression guard: the lights must sit AT the site, not the world origin
     // (localToWorld on a fresh group reads a stale matrixWorld → origin)
     t.ok(night.dc < 25 && night.ds < 30, `lights not positioned at the site: ${JSON.stringify(night)}`);

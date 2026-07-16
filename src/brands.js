@@ -158,7 +158,8 @@ const LIGHT_COLOR = 0xffdca8;                       // warm canopy/sign light
 const CANOPY_ANCHOR = [0, 5.6, 9];                  // under the canopy: pumps, soffit, storefront
 const SIGN_ANCHOR = [15.5, 14, 18.5];               // in front of the pylon sign face + beaver
 const CANOPY_I = 30, CANOPY_R = 50;                 // intensity / range (lantern is 14 @ 22)
-const SIGN_I = 16, SIGN_R = 28;
+const SIGN_I = 5, SIGN_R = 28;   // was 16 — dropped so the warm pool grazes the pylon/beaver without fighting the neon name (Bruno, 2026-07-16)
+const BUCKY_NEON_I = 1.0;        // wordmark emissiveMap magnitude at full night (LSC SIGN_GLOW_I idiom)
 
 // H-E-Buddy (H-E-B parody) — Wave 2. Palette distinct from Bucky's: cream
 // big-box + H-E-B red, not yellow/red.
@@ -321,8 +322,16 @@ export class BrandSystem {
     this.panelGeo = new THREE.PlaneGeometry(5.0, 2.4);
     // Bucky's sign panel — one shared plane + canvas-texture material (the
     // name is identical at all 15 sites, unlike the per-site punny billboards).
+    // NEON, the LSC ID-sign idiom: dark panel with the wordmark + border baked
+    // into ONE canvas used as both map and emissiveMap, so at night only the
+    // lettering glows with its own brightness (dark bg emits ~0). Replaces two
+    // failed lit-surface looks (red-on-yellow, then dark-on-yellow) that the
+    // warm sign light washed out — Bruno picked neon-on-dark 2026-07-16.
     this.buckySignGeo = new THREE.PlaneGeometry(5.0, 3.6);
-    this.buckySignMat = new THREE.MeshLambertMaterial({ map: mkBuckySignTex(), side: THREE.DoubleSide });
+    const buckyTex = mkBuckySignTex();
+    this.buckySignMat = new THREE.MeshLambertMaterial({
+      map: buckyTex, emissiveMap: buckyTex, emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide,
+    });
     // H-E-Buddy lot-prop prototypes (cart corral, cart, light pole).
     this.corralGeo = mkCartCorral();
     this.cartGeo = mkCart();
@@ -443,6 +452,7 @@ export class BrandSystem {
     // signage lights above; onHum(Infinity) when no site is live so the hum fades.
     this.ventMat.emissiveIntensity = nf * VENT_I;
     for (const mat of this.lscSignMats.values()) mat.emissiveIntensity = nf * SIGN_GLOW_I;
+    this.buckySignMat.emissiveIntensity = nf * BUCKY_NEON_I;
     if (this.onHum) this.onHum(bestL === Infinity ? Infinity : Math.sqrt(bestL));
 
     this.acc += dt;
@@ -956,14 +966,23 @@ function mkBuckySignTex() {
   const c = document.createElement('canvas');
   c.width = 512; c.height = 384;
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#f2c200'; ctx.fillRect(0, 0, c.width, c.height);         // yellow, matches SIGN
-  // near-black, NOT the trim red: red-on-yellow is hue contrast only, and the
-  // warm night PointLight saturates both toward white — unreadable (Bruno,
-  // 2026-07-16). Dark-on-yellow is luminance contrast (the billboards' idiom,
-  // and the real wordmark is black); the warm cast keeps it from going gray.
-  ctx.fillStyle = '#241505'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // Roadside NEON on a near-black board (a deliberate departure from the real
+  // yellow sign — Bruno, 2026-07-16, after two lit-surface looks washed out
+  // under the warm sign light). The texture doubles as the emissiveMap, so
+  // everything bright here IS the night glow: brand yellow for the wordmark,
+  // trim red for the border tube, glow halos baked via canvas shadowBlur
+  // (reads as tube bloom — no postprocessing in the renderer).
+  ctx.fillStyle = '#0b0b0f'; ctx.fillRect(0, 0, c.width, c.height);
+  ctx.shadowColor = '#e8452f'; ctx.shadowBlur = 22;                         // red tube border
+  ctx.strokeStyle = '#ff5a3c'; ctx.lineWidth = 10; ctx.lineJoin = 'round';
+  ctx.strokeRect(20, 20, c.width - 40, c.height - 40);
+  ctx.strokeRect(20, 20, c.width - 40, c.height - 40);                       // second pass thickens the baked halo
+  ctx.shadowColor = '#f2c200'; ctx.shadowBlur = 26;                          // yellow tube wordmark
+  ctx.fillStyle = '#ffd83d'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = "bold italic 108px 'Georgia', serif";
   ctx.fillText("Bucky's", c.width / 2, c.height / 2);
+  ctx.fillText("Bucky's", c.width / 2, c.height / 2);
+  ctx.shadowBlur = 0;
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
   return tex;
