@@ -7,6 +7,20 @@ No active priority track (aviation shipped in full 2026-07-12; Brands,
 Jetpack, Agriculture, and the Shoulder & the Shelf followed and are folded
 in below). Queued work lives in `BACKLOG.md`.
 
+- [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
+  tools/test.mjs` runs four sub-second Node-only groups (`aviation`, `data`,
+  `progress`, `rules`) without a browser; focused group invocation keeps
+  ordinary edit loops cheap. Data contracts cover checked-in table shape,
+  counts, IDs, references, and additive-save defaults. Runtime-owned
+  `aviation-rules.js` and `mission-rules.js` supply schedule, route, offer,
+  deadline, and payout checks directly to both tests and production. The
+  browser remains authoritative for boot, real-loop, scene, DOM, and player
+  behavior: `tools/status.sh` now runs syntax plus all fast groups, named
+  browser suites remain the feature-development gate, and full
+  `node tools/verify.mjs` remains mandatory before pushing. `TEST_CYCLE_SPEC.md`
+  records the fast-group-to-browser-sentinel ledger and deferred pure-rule
+  seams.
+
 - [x] ~~Aviation wave 1 — Fields~~ — done 2026-07-11: 20 real airports
   (7 hubs / 9 regional / 4 strips incl. Terlingua's dirt strip and the 6666 +
   Armstrong ranch strips) with true runway headings/lengths/offsets authored

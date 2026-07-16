@@ -27,6 +27,7 @@ For any effort too big for one session (precedents: `AVIATION.md`, `HELICOPTER_S
    - **Budget adherence** (observable proxies, not token counts): screenshots taken, whole-file reads vs greps, reruns.
    - **Detours**: each one, its cost, and whether the cost was surfaced *before* it was taken.
    - **Honest ROI verdict**: was the wave worth its actual cost — stated plainly; mislabeled value (e.g. "optimization" that was really a reliability fix) called out.
+6. **Wave-end plain-language summary** (in-chat, after the performance report): a short non-technical description of what changed and why it matters.
 
 Briefing-block template:
 
@@ -53,6 +54,9 @@ python3 -m http.server 8317    # then open http://localhost:8317
 # start instead of separate git/node commands, and again before committing.
 tools/status.sh
 
+# Fast Node-only contracts and pure production rules: all groups, or one named group.
+node tools/test.mjs [aviation|data|progress|rules]
+
 # Rebuild geo data (only needed if changing the pipeline; inputs are NOT in the repo)
 node tools/build-data.mjs <us-states.json> <tx-motorways.json> <tx-trunks.json>
 
@@ -60,7 +64,9 @@ node tools/build-data.mjs <us-states.json> <tx-motorways.json> <tx-trunks.json>
 node tools/build-ag.mjs <tx_county_census2022.txt.gz>
 ```
 
-Headless verification: `node tools/verify.mjs [-v] [-j N] [suite…]` — checked-in harness (own static server + cached Chromium), suites in `tools/checks/*.mjs`. Runs a **pool of parallel browser workers**, each suite in its own fresh game context; full run ~24 s (`-j` sets width, default cores/2 ∧ free-RAM — RAM is the ceiling, overcommit thrashes). **Suites must be hermetic**: they run in isolation and interleaved, so a suite may not rely on ambient real-loop-accumulated state (townsfolk drift, day/night clock) or on another suite's leftover mutations (perks, weather) — drive to the state you assert. Compact by default (one summary line per suite + any FAILs); `-v` prints every check with durations ≥1 s. One-time setup: `cd ~/.cache/lonestar-verify && npm i playwright-core` (browser from `~/.cache/ms-playwright`). The game exposes everything on `window.__game` (player, all systems, `nearestRoad`/`inTexas`/`hAt`, `ATMOS`, `clock`) — teleport via `player.pos.set(x, 0, z)`, switch modes via `player.setMode('WALK')`.
+Headless verification: `node tools/verify.mjs [-v] [-j N] [suite…]` — checked-in harness (own static server + cached Chromium), suites in `tools/checks/*.mjs`. Runs a **pool of parallel browser workers**, each suite in its own fresh game context; the full run is ~70 s on the current development machine (`-j` sets width; use named suites while iterating and the full run before pushing). **Suites must be hermetic**: they run in isolation and interleaved, so a suite may not rely on ambient real-loop-accumulated state (townsfolk drift, day/night clock) or on another suite's leftover mutations (perks, weather) — drive to the state you assert. Compact by default (one summary line per suite + any FAILs); `-v` prints every check with durations ≥1 s. One-time setup: `cd ~/.cache/lonestar-verify && npm i playwright-core` (browser from `~/.cache/ms-playwright`). The game exposes everything on `window.__game` (player, all systems, `nearestRoad`/`inTexas`/`hAt`, `ATMOS`, `clock`) — teleport via `player.pos.set(x, 0, z)`, switch modes via `player.setMode('WALK')`.
+
+Testing workflow: after ordinary edits, run `node tools/test.mjs` (or its smallest named group); while changing a feature, run its named browser suite; run the full `node tools/verify.mjs` before every push. Fast checks complement browser sentinels — never treat them as a substitute for boot, wiring, scene, or player-behavior coverage. `TEST_CYCLE_SPEC.md` owns the group-to-sentinel ledger and future extraction candidates.
 
 Verification rules:
 - **Assert numbers, not pixels**: positions, speeds, headings, save state, DOM text. Screenshots (`t.shot`) only for genuinely visual judgments (composition, color, animation feel), max one per judgment, never the pass/fail signal — the charging-deer bug passed screenshot review and failed a distance-over-time assertion. **Default a new suite to no `SHOT` block** — add one only when explicitly asked for visual proof; do not copy a sibling suite's SHOT block, and a mis-staged shot is not a bug to iterate on.

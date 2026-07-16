@@ -17,3 +17,11 @@ for f in src/*.js tools/*.mjs tools/checks/*.mjs; do
   out=$(node --check "$f" 2>&1) || { echo "$out" | head -3; bad=1; }
 done
 [ "$bad" = 0 ] && echo "syntax OK ($(ls src/*.js tools/*.mjs tools/checks/*.mjs | wc -l) files)"
+
+if [ "$bad" = 0 ]; then
+  node tools/test.mjs || bad=1
+else
+  echo "fast checks skipped (syntax errors)"
+fi
+
+exit "$bad"

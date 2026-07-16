@@ -28,9 +28,10 @@ Key facts:
 - **Repo is private, GitHub Pages is deleted** (intentional) — the game is not
   currently live/public. Verify locally only.
 - Local dev: `python3 -m http.server 8317`; verify headlessly with
-  **`node tools/verify.mjs`** (parallel pool, full run ~30 s; compact; `-v`
-  per-check, `-j N` sets width). Add checks to `tools/checks/*.mjs`, never
-  throwaway scripts.
+  **`node tools/verify.mjs`** (parallel pool, full run ~70 s on this machine;
+  use named suites while iterating, then the full run before pushing; compact;
+  `-v` per-check, `-j N` sets width). Add checks to `tools/checks/*.mjs`,
+  never throwaway scripts.
 - Verify at *natural* play values (ugly mid-drive headings, parked-truck
   distances, off-axis approaches), not convenient ones.
 - If I report something broken after an update, suspect my browser cache first
