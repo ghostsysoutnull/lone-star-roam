@@ -1,8 +1,8 @@
 # Backlog — queued work
 
-Queued behind whatever track is active (currently none — the Shoulder and
-the Shelf closed 2026-07-15); when a track ends, pull the next item from here
-into `NEXT_SESSION.md`. Direction-level ideas that aren't actionable yet
+Queued behind whatever track is active (currently **Band Parity**, opened
+2026-07-16 — `BAND_PARITY_SPEC.md`, 6 waves); when a track ends, pull the
+next item from here into `NEXT_SESSION.md`. Direction-level ideas that aren't actionable yet
 live in `FUTURE.md`.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
@@ -50,6 +50,7 @@ already shipped as `54b3511` — these are the remaining items)
   on Texas; W6a/W6b made that ground drivable and nobody revisited it. Fix is
   small (retune the lerp; consider per-neighbor tints) but it's a visual
   judgment — wants Fable 5 + screenshots ON, and Bruno's eye.
+  → **Owned by Band Parity W3** (2026-07-16, `BAND_PARITY_SPEC.md`).
 - **Band roads: the concurrency defect** (diagnosed 2026-07-15) — distinct
   from the known "arterials only" scope limit below. A route is only matched
   when it's listed FIRST: the bake's Overpass regex is `^(<routes>)($|;)` and
@@ -65,6 +66,8 @@ already shipped as `54b3511` — these are the remaining items)
   recorded in `tools/build-band-roads.mjs`'s header), rebake, re-verify the
   shoulder suite (crossing monuments read band endpoints). Shifts the road set
   again — land it on its own, not stacked on another band change.
+  → **Superseded by Band Parity W1** (2026-07-16): the tier-based fetch has
+  no ref regex at all, so the defect disappears structurally.
 - **Band scope call (decide BEFORE the concurrency fix codes)**: 147 of 177
   band cities have no road within 25u, and the concurrency fix won't change
   that — only 11 through-routes were ever queried (I-10/20/30/35/40, US
@@ -72,11 +75,16 @@ already shipped as `54b3511` — these are the remaining items)
   across the line, not the road network *of* the neighbors. Connecting the
   band towns is a scope expansion (more refs? a real network fetch?), not a
   bug fix — needs Bruno's call on how far the shoulder is meant to go.
+  → **Resolved 2026-07-16**: Bruno called full parity — Band Parity track
+  opened (`BAND_PARITY_SPEC.md`); W1 is the tier-based network fetch.
 - **Brand buildings positioning review** (Bucky's / H-E-Buddy / Lone Star
   Compute): review all sites' placement against roads/downtowns — Bruno
   flags it wholesale; ranches and chapel–cemetery pairs confirmed good.
 - **Roads, railroads, rivers visual pass**: "make them better" — ribbon
   width/color/texture upgrade candidates; no direction settled yet.
+- **Band railroads** (deferred from Band Parity, 2026-07-16): OSM rail fetch
+  for the 4 neighbor strips + trains.js extension — own bake, build-rails
+  idiom. Queued behind the track's close.
 - **Poly review of pre-6b props**: W6b shipped the curvier kit (8–14 seg
   turnings); review the Shelf (W5) and Shoulder-east (6a) heroes — rigs,
   buoy, monuments, WinBig, fed building — plus older landmarks for the
