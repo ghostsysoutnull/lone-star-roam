@@ -14,6 +14,7 @@
   .hud { position: fixed; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.7); user-select: none; pointer-events: none; }
   #hud-topleft { top: 12px; left: 14px; font-size: 1.4rem; line-height: 1.5; }
   #hud-topleft .title { font-weight: 700; font-size: 1.6rem; letter-spacing: .5px; }
+  #hud-nature > div { display: none; font-size: 1.3rem; opacity: .85; }
   #hud-score { top: 12px; right: 14px; text-align: right; font-size: 1.4rem; line-height: 1.5; }
   /* Lower-right cluster stacks bottom-up as ONE column: the speed block's height
      changes with mode (the odometer is DRIVE/FLY only, and WALK swaps digits for
@@ -62,9 +63,6 @@
   #interact-hint { position: fixed; left: 50%; bottom: 150px; transform: translateX(-50%); color: #fff;
     background: rgba(12,16,24,.8); padding: 6px 14px; border-radius: 16px; font-size: 1.3rem; display: none; z-index: 8; }
   #brand-size-hint { position: fixed; left: 50%; bottom: 190px; transform: translateX(-50%); color: #fff;
-    opacity: .8; background: rgba(12,16,24,.8); padding: 6px 14px; border-radius: 16px; font-size: 1.3rem;
-    display: none; z-index: 8; }
-  #nature-hint { position: fixed; left: 50%; bottom: 230px; transform: translateX(-50%); color: #fff;
     opacity: .8; background: rgba(12,16,24,.8); padding: 6px 14px; border-radius: 16px; font-size: 1.3rem;
     display: none; z-index: 8; }
   #radio-subtitle { position: fixed; left: 50%; bottom: 19rem; transform: translateX(-50%);
@@ -142,6 +140,9 @@
   <div id="hud-road"></div>
   <div id="hud-sky" style="font-size:1.25rem;opacity:.75"></div>
   <div id="hud-job" style="color:#ffd35c;font-weight:600"></div>
+  <!-- ambient readouts, last in the panel so their churn moves nothing above them.
+       Arrival re-appends within this box, so the pair's Y order is arrival order. -->
+  <div id="hud-nature"><div id="hud-crop"></div><div id="hud-wildlife"></div></div>
 </div>
 <div id="hud-score" class="hud">
   <div>⭐ Cities <span id="score-cities">0</span>/132</div>
@@ -168,7 +169,6 @@
 <div id="dialog"><div class="npc-name"></div><div class="npc-sub"></div><div class="npc-text"></div><div class="hint">E — continue / close</div></div>
 <div id="interact-hint"></div>
 <div id="brand-size-hint">[ / ] — resize buildings</div>
-<div id="nature-hint"></div>
 <div id="toast"></div>
 <div id="radio-subtitle"><div id="radio-header"></div><span id="radio-text"></span></div>
 <div id="air-tags"></div>

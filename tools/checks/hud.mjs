@@ -396,31 +396,70 @@ export default async function hud(t) {
   await t.check('nature hint: shows crop name over a known field, hides on the clean I-10 stretch', async () => {
     await t.tp(haleFieldX, haleFieldZ, 'WALK');
     await t.wait(0.2);
-    const near = await t.ev('g.hud.els.nature.textContent');
+    const near = await t.ev('g.hud.els.crop.textContent');
     t.ok(near.includes('Cotton'), `crop hint wrong at the known Hale field: "${near}"`);
-    t.ok((await t.ev('g.hud.els.nature.style.display')) === 'block', 'crop hint not visible over the field');
+    t.ok((await t.ev('g.hud.els.crop.style.display')) === 'block', 'crop hint not visible over the field');
     await t.tp(-2767, 334, 'WALK'); // clean I-10 stretch — no fields, no wildlife
     await t.wait(0.2);
-    t.ok((await t.ev('g.hud.els.nature.style.display')) === 'none', 'nature hint still visible on the clean stretch');
+    t.ok((await t.ev('g.hud.els.crop.style.display')) === 'none', 'crop hint still visible on the clean stretch');
   });
 
-  await t.check('nature hint: suppressed in FLY mode even over a known field', async () => {
+  await t.check('nature hint: both slots suppressed in FLY mode even over a known field', async () => {
     await t.tp(haleFieldX, haleFieldZ, 'FLY');
     await t.wait(0.2);
-    t.ok((await t.ev('g.hud.els.nature.style.display')) === 'none', 'nature hint visible while flying over the field');
+    const r = await t.ev('({ crop: g.hud.els.crop.style.display, wild: g.hud.els.wildlife.style.display })');
+    t.ok(r.crop === 'none' && r.wild === 'none',
+      `nature slots visible while flying over the field (crop ${r.crop}, wildlife ${r.wild})`);
   });
 
-  await t.check('nature hint: wildlife takes priority over crop when both are true', async () => {
+  // The real-loop sentinel for the pair: main.js must feed both slots every frame,
+  // and neither may suppress the other (wildlife used to win outright).
+  await t.check('nature hint: crop and wildlife hold their own slots — neither suppresses the other', async () => {
     await t.tp(haleFieldX, haleFieldZ, 'WALK');
     await t.wait(0.2);
-    t.ok((await t.ev('g.hud.els.nature.textContent')).includes('Cotton'), 'crop hint not showing before the wildlife stub');
+    t.ok((await t.ev('g.hud.els.crop.textContent')).includes('Cotton'), 'crop hint not showing before the wildlife stub');
     // stub a wildlife hit while standing on the field, without a real nearby animal
     await t.ev(`(window.__origAnimalsUpdate = g.animals.update.bind(g.animals),
       g.animals.update = () => {}, g.animals.nearby = { species: 'deer', d2: 4 })`);
     await t.wait(0.2);
-    const txt = await t.ev('g.hud.els.nature.textContent');
-    t.ok(txt.includes('White-tailed Deer'), `wildlife didn't win priority over the crop hint: "${txt}"`);
+    const r = await t.ev(`({ crop: g.hud.els.crop.textContent, cropShown: g.hud.els.crop.style.display,
+      wild: g.hud.els.wildlife.textContent, wildShown: g.hud.els.wildlife.style.display })`);
+    t.ok(r.crop.includes('Cotton') && r.cropShown === 'block',
+      `wildlife suppressed the crop slot: "${r.crop}" (${r.cropShown})`);
+    t.ok(r.wild.includes('White-tailed Deer') && r.wildShown === 'block',
+      `wildlife slot missing while standing on a field: "${r.wild}" (${r.wildShown})`);
     await t.ev('g.animals.update = window.__origAnimalsUpdate'); // restore the real wiring
     await t.tp(haleFieldX, haleFieldZ, 'DRIVE'); // leave the suite grounded in DRIVE
+  });
+
+  // Slot mechanics, driven directly: the main loop rewrites both slots every frame
+  // from world state, so the sequence runs inside one synchronous block where no
+  // frame can interleave. The check above is what guards the real-loop wiring.
+  await t.check('nature slots: arrival order fixes Y, a rewrite holds its place, the survivor slides up', async () => {
+    const r = await t.ev(`(() => {
+      const box = g.hud.els.natureBox;
+      const order = () => [...box.children].filter((el) => el.style.display === 'block').map((el) => el.id);
+      g.hud.natureHint(null, null);
+      g.hud.natureHint(null, '🐾 Coyote');           // wildlife arrives alone
+      const a = order();
+      g.hud.natureHint('🌾 Cotton', '🐾 Coyote');    // crop arrives second — takes the lower slot
+      const b = order();
+      g.hud.natureHint('🌾 Sorghum', '🐾 Coyote');   // crop replaces its own text — must not move
+      const c = order(), cropText = g.hud.els.crop.textContent; // read before (e) rewrites it back
+      g.hud.natureHint(null, '🐾 Coyote');           // crop leaves; the survivor slides up
+      const d = order();
+      g.hud.natureHint(null, null);
+      g.hud.natureHint('🌾 Cotton', null);           // reverse arrival: crop is up first this time
+      g.hud.natureHint('🌾 Cotton', '🐾 Coyote');    // wildlife arrives second
+      const e = order();
+      return { a, b, c, d, e, cropText };
+    })()`);
+    const seq = (v) => JSON.stringify(v);
+    t.ok(seq(r.a) === '["hud-wildlife"]', `wildlife alone should hold one slot: ${seq(r.a)}`);
+    t.ok(seq(r.b) === '["hud-wildlife","hud-crop"]', `crop should arrive below the wildlife already up: ${seq(r.b)}`);
+    t.ok(seq(r.c) === '["hud-wildlife","hud-crop"]', `a crop rewrite moved the row: ${seq(r.c)}`);
+    t.ok(r.cropText.includes('Sorghum'), `crop slot didn't take the replacement text: "${r.cropText}"`);
+    t.ok(seq(r.d) === '["hud-wildlife"]', `survivor didn't hold the panel alone after the crop left: ${seq(r.d)}`);
+    t.ok(seq(r.e) === '["hud-crop","hud-wildlife"]', `reverse arrival order not honored: ${seq(r.e)}`);
   });
 }

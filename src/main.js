@@ -304,13 +304,13 @@ async function boot() {
     hud.interactHint(npcName ? `talk to ${npcName}` : skyHint ? skyHint
       : pNear && pNear.name !== plaqueOpen ? pNear.hint : null);
     hud.brandSizeHint(player.mode !== 'FLY' && brandNear(player.pos.x, player.pos.z, 60));
-    // ground-level nature readout — wildlife beats crop/pivot, both suppressed in FLY
-    if (player.mode === 'FLY') hud.natureHint(null);
-    else if (animals.nearby) hud.natureHint(`🐾 ${SPECIES[animals.nearby.species].name}`);
-    else {
-      const field = fieldAt(player.pos.x, player.pos.z);
-      hud.natureHint(field ? `🌾 ${field.crop[0].toUpperCase()}${field.crop.slice(1)}` : null);
-    }
+    // ground-level nature readout — crop underfoot and nearest wildlife each own a
+    // slot and never suppress each other; both are suppressed in FLY.
+    const ground = player.mode !== 'FLY';
+    const field = ground ? fieldAt(player.pos.x, player.pos.z) : null;
+    hud.natureHint(
+      field ? `🌾 ${field.crop[0].toUpperCase()}${field.crop.slice(1)}` : null,
+      ground && animals.nearby ? `🐾 ${SPECIES[animals.nearby.species].name}` : null);
     // walked away from an open plaque (either source): close it
     if (plaqueOpen && (!pNear || pNear.name !== plaqueOpen) && !plaqueNear(player.pos, 40)) {
       hud.dialog(null);

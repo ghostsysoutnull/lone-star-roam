@@ -66,7 +66,9 @@ export class HUD {
       dialog: document.getElementById('dialog'),
       interact: document.getElementById('interact-hint'),
       brandSize: document.getElementById('brand-size-hint'),
-      nature: document.getElementById('nature-hint'),
+      natureBox: document.getElementById('hud-nature'),
+      crop: document.getElementById('hud-crop'),
+      wildlife: document.getElementById('hud-wildlife'),
       help: document.getElementById('help'),
       paused: document.getElementById('paused'),
       subtitle: document.getElementById('radio-subtitle'),
@@ -762,10 +764,20 @@ export class HUD {
     this.els.brandSize.style.display = on ? 'block' : 'none';
   }
 
-  natureHint(text) {
-    if (!text) { this.els.nature.style.display = 'none'; return; }
-    this.els.nature.textContent = text;
-    this.els.nature.style.display = 'block';
+  // Crop and wildlife each own one slot. Re-appending only on the hidden→shown edge
+  // is what fixes Y by arrival order: whoever is already up keeps its place and the
+  // newcomer lands below it. A slot rewriting its own text never moves, and hiding
+  // one lets the survivor slide up on its own — the rows are in-flow.
+  natureSlot(el, text) {
+    if (!text) { el.style.display = 'none'; return; }
+    const arriving = el.style.display !== 'block';
+    el.textContent = text;
+    if (arriving) { el.style.display = 'block'; this.els.natureBox.appendChild(el); }
+  }
+
+  natureHint(crop, wildlife) {
+    this.natureSlot(this.els.crop, crop);
+    this.natureSlot(this.els.wildlife, wildlife);
   }
 
   update(player, counts, road, rail, water, clock, weatherIcon, stats, skyLine, county, forecast) {
