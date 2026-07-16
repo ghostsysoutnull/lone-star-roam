@@ -21,8 +21,10 @@ through a `legalize()` gate (off road ribbons at reference brand scale 0.5,
 dry, in-state), the H-E-Buddy search rejects wet/out-of-state/on-road spots
 (Corpus bay / El Paso border / Waco Brazos fixed), Bucky's billboards re-snap
 to real pavement on curves, and 5 landmarks stepped off their ribbons.
-GOTCHAS has the standing rule; `brands.mjs` asserts it all. Owed playtest:
-the "Placement legality" Tours group (5 spots).
+GOTCHAS has the standing rule; `brands.mjs` asserts it all. Play-confirmed
+same day, including the Tours group. Same session: the Bucky's pylon sign
+went neon (tube-trace wordmark on a dark board, sign light 16→5, LSC
+emissive idiom) — play-confirmed; `SHOT=1` now stages a pylon close-up.
 
 ---
 
