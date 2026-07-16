@@ -59,10 +59,27 @@ export default async function brands(t) {
     const panel = await t.ev(`(() => {
       const r = g.brands.live.get('Katy');
       const p = r.signPanel;
-      return { has: !!p, mapped: !!(p && p.material && p.material.map), visible: p ? p.visible : false };
+      // sample the sign's canvas: the name must be DARK glyphs on the yellow
+      // face — luminance contrast survives the warm night light; the old
+      // red-on-yellow didn't (hue-only contrast, washed out at night)
+      let minLum = 255, yellow = 0, n = 0;
+      const img = p && p.material.map && p.material.map.image;
+      if (img && img.getContext) {
+        const d = img.getContext('2d').getImageData(0, 0, img.width, img.height).data;
+        for (let i = 0; i < d.length; i += 32) {
+          const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+          if (lum < minLum) minLum = lum;
+          if (d[i] > 200 && d[i + 1] > 150 && d[i + 2] < 90) yellow++;
+          n++;
+        }
+      }
+      return { has: !!p, mapped: !!(p && p.material && p.material.map), visible: p ? p.visible : false,
+        minLum, yellowFrac: n ? yellow / n : 0 };
     })()`);
     t.ok(panel.has && panel.mapped, `Bucky's sign panel missing or blank: ${JSON.stringify(panel)}`);
     t.ok(panel.visible, "Bucky's sign panel not visible");
+    t.ok(panel.minLum < 60, `sign glyphs are not dark-on-yellow (night-readability): darkest sample ${panel.minLum.toFixed(0)}`);
+    t.ok(panel.yellowFrac > 0.5, `sign face lost its yellow: ${(panel.yellowFrac * 100).toFixed(0)}%`);
   });
 
   await t.check('placement legality: no brand site sits on an airport field', async () => {

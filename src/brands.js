@@ -957,7 +957,11 @@ function mkBuckySignTex() {
   c.width = 512; c.height = 384;
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#f2c200'; ctx.fillRect(0, 0, c.width, c.height);         // yellow, matches SIGN
-  ctx.fillStyle = '#c0392b'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // near-black, NOT the trim red: red-on-yellow is hue contrast only, and the
+  // warm night PointLight saturates both toward white — unreadable (Bruno,
+  // 2026-07-16). Dark-on-yellow is luminance contrast (the billboards' idiom,
+  // and the real wordmark is black); the warm cast keeps it from going gray.
+  ctx.fillStyle = '#241505'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = "bold italic 108px 'Georgia', serif";
   ctx.fillText("Bucky's", c.width / 2, c.height / 2);
   const tex = new THREE.CanvasTexture(c);
