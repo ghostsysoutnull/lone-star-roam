@@ -128,12 +128,25 @@ function stubLength(poly) {
 function deriveCrossings() {
   const cands = [];
   for (const h of GEO.bandHighways) {
+    // the OK secondary-tier top-up pulled in whole roads that never actually
+    // leave Texas (an FM/US road can run for miles within a few units of a
+    // dead-straight survey-line border, e.g. FM 769 tracking the NM line) —
+    // an endpoint near the border isn't a crossing unless the road it
+    // belongs to genuinely has a point on the far side.
+    if (h.pts.every((p) => inTexas(p[0], p[1]))) continue;
+    // a 2-point/~14u stub's tangent is noise, not direction — the OK
+    // secondary-tier top-up added a "Road II" fragment lying almost exactly
+    // ON the OK/TX panhandle line, running parallel to it; its tangent
+    // pointed further along the border rather than across it, landing the
+    // outward-neighbor check in a gap between county polygons. Every real
+    // crossing (I-10, LA 1, ...) is well over this length.
+    if (stubLength(h.pts) < 20) continue;
     for (const fromStart of [true, false]) {
       const end = fromStart ? h.pts[0] : h.pts[h.pts.length - 1];
       if (borderDist(end[0], end[1]) > 15) continue;
       const a = along(h.pts, fromStart, 0.1); // outward tangent at the line
       // a crossing must lead to a NEIGHBOR — I-10 hugging the Rio Grande in
-      // El Paso grazes the border too, but that's Mexico (settled call: out)
+      // El Paso grazes the border too, but that's Mexico (settled call: out).
       if (!neighborCountyAt(end[0] + a.tx * 10, end[1] + a.tz * 10)) continue;
       cands.push({ x: end[0], z: end[1], ox: a.tx, oz: a.tz, ref: h.ref, type: h.type, poly: h.pts, fromStart });
     }

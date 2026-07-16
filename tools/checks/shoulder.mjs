@@ -73,11 +73,11 @@ export default async function shoulder(t) {
         badNeighbor: sites.filter((s) => !g.neighborCountyAt(s.x + s.ox * 30, s.z + s.oz * 30)).map((s) => s.ref),
       };
     })()`);
-    // Was ~12 under the old ref-regex band bake (11 named US routes only).
-    // Band Parity W1's tier fetch (motorway|trunk|primary, no ref allowlist)
-    // pulls every real arterial reaching the line — measured 51 on the
-    // 2026-07-16 rebake.
-    t.ok(res.n >= 45 && res.n <= 60, `expected ~51 crossing monuments (tier-fetch band bake), got ${res.n}`);
+    // Was ~12 under the old ref-regex band bake (11 named US routes only),
+    // 51 after Band Parity W1's tier fetch (motorway|trunk|primary), 78 after
+    // the same-session OK secondary-tier top-up (more rural OK roads reach
+    // the AR/OK and TX/OK lines).
+    t.ok(res.n >= 65 && res.n <= 85, `expected ~73 crossing monuments (OK secondary-tier top-up), got ${res.n}`);
     for (const ref of ['I 10', 'I 20', 'I 30', 'I 35', 'I 40'])
       t.ok(res.refs.includes(ref), `no monument at the ${ref} crossing (refs: ${res.refs})`);
     t.ok(res.allInTexas, 'a welcome monument stands outside Texas');

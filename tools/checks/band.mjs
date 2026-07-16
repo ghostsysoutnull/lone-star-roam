@@ -419,11 +419,12 @@ export default async function band(t) {
     t.ok(res.length === 0, `cross-bbox duplicate band polyline(s): ${JSON.stringify(res)} — dedup-by-way-id regressed (tools/build-band-roads.mjs)`);
   });
 
-  // Coverage floor measured on the 2026-07-16 tier-fetch rebake (tier fetch
-  // replacing the old ref-regex allowlist): 140/177 band-places.json entries
-  // land within 25u of a band road. Asserted as a floor, not exact, so a
-  // legitimate future rebake that improves coverage still passes — only a
-  // regression hides silently otherwise.
+  // Coverage floor measured on the 2026-07-16 tier-fetch rebake: 140/177 on
+  // the primary-tier-only bake, 166/177 after the OK secondary-tier top-up
+  // (33 of OK's 37 gaps were 40-280u from any primary/trunk/motorway road —
+  // genuinely off that network, not a near-miss). Asserted as a floor, not
+  // exact, so a legitimate future rebake that improves coverage still
+  // passes — only a regression hides silently otherwise.
   await t.check('band road network connectivity: coverage floor over the 177 band places', async () => {
     const res = await t.ev(`(async () => {
       const places = await (await fetch('data/band-places.json')).json();
@@ -431,6 +432,6 @@ export default async function band(t) {
       return { n: places.length, covered: covered.length };
     })()`);
     t.ok(res.n === 177, `band-places.json count drifted: ${res.n} !== 177`);
-    t.ok(res.covered >= 140, `band road coverage regressed: ${res.covered}/${res.n} within 25u, floor is 140`);
+    t.ok(res.covered >= 166, `band road coverage regressed: ${res.covered}/${res.n} within 25u, floor is 166`);
   });
 }

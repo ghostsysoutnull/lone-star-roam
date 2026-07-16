@@ -35,7 +35,7 @@ test('cities and band places retain their identity and coordinates', async () =>
 
 test('highway data retains valid tiers and geometry', async () => {
   checkRoads(await json('highways.json'), 'highways', 14923, ROAD_TYPES);
-  checkRoads(await json('band-highways.json'), 'band highways', 596, BAND_ROAD_TYPES);
+  checkRoads(await json('band-highways.json'), 'band highways', 891, BAND_ROAD_TYPES);
 });
 
 test('rail data retains valid geometry and OSM identity when available', async () => {

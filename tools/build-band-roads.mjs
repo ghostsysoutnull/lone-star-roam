@@ -43,6 +43,17 @@
 //
 // Rebaking shifts band geometry — check the shoulder suite (crossing monuments
 // read these endpoints) and the band.mjs guards.
+//
+// OK secondary-tier top-up (2026-07-16, same session): the primary-only tier
+// left 33 of OK's 37 uncovered band places 40-280u from any road — genuinely
+// off the primary/trunk/motorway network, not a near-miss. Refetched OK ONLY
+// (33/37 gaps were there) with `secondary` added to the highway regex:
+//   way["highway"~"motorway|trunk|primary|secondary"](33.3,-103.3,37.2,-94.2)
+// Texas has no rendered "secondary" tier (world.js draws motorway/trunk/
+// primary/street only), so secondary ways are relabeled to type 'primary' at
+// load — same ribbon styling as the state highways they physically are, no
+// new tier to invent. la/ar/nm inputs are untouched (still primary-tier-only
+// fetches); the relabel is a no-op for files that never contain 'secondary'.
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -102,7 +113,10 @@ for (const p of paths) {
   const data = JSON.parse(readFileSync(p, 'utf8'));
   for (const e of data.elements) {
     if (e.type !== 'way' || !e.geometry || e.geometry.length < 2) continue;
-    const type = e.tags?.highway;
+    // Texas renders no distinct "secondary" tier — fold OSM secondary ways
+    // into 'primary' styling (the OK top-up fetch; see header) rather than
+    // invent a fifth ribbon tier that exists nowhere else in the game.
+    const type = e.tags?.highway === 'secondary' ? 'primary' : e.tags?.highway;
     if (!KEEP_TYPES.has(type)) continue;
     rawCount++;
     if (seenIds.has(e.id)) { dupCount++; continue; }

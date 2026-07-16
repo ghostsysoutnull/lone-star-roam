@@ -20,6 +20,9 @@ export const TOURS = [
         S('🏙️ Hobbs, NM via NM 18', [-3486, -1923.7], { mode: 'DRIVE', note: 'pop. 39,648 — the old ref-only bake never reached it; the tier fetch does' }),
         S('🏘️ Idabel, OK', [4459.1, -3230.3], { mode: 'DRIVE', note: 'McCurtain County seat, connected via a state route the ref allowlist used to skip' }),
       ] },
+      { wave: 'W1 top-up — OK secondary tier', spots: [
+        S('👻 Chattanooga, OK', [804.9, -3809.5], { mode: 'DRIVE', note: 'pop. 0 on the census, 213u from the nearest primary road — a secondary-tier county road reaches it now' }),
+      ] },
     ],
   },
   {
