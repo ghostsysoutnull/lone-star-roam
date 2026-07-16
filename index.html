@@ -15,11 +15,18 @@
   #hud-topleft { top: 12px; left: 14px; font-size: 1.4rem; line-height: 1.5; }
   #hud-topleft .title { font-weight: 700; font-size: 1.6rem; letter-spacing: .5px; }
   #hud-score { top: 12px; right: 14px; text-align: right; font-size: 1.4rem; line-height: 1.5; }
-  #hud-speed { bottom: 1.8rem; right: 2rem; font-size: 3rem; font-weight: 700; }
+  /* Lower-right cluster stacks bottom-up as ONE column: the speed block's height
+     changes with mode (the odometer is DRIVE/FLY only, and WALK swaps digits for
+     an emoji), which used to drag its distance from the mode line around. Anchor
+     the column, not each row, and the gaps stay put in every mode and UI scale.
+     line-height: 1 everywhere — the 3rem number's default leading was most of the
+     gap Bruno saw, so trimming it is what actually closes the space. */
+  #hud-br { bottom: 1.8rem; right: 2rem; display: flex; flex-direction: column; align-items: flex-end; gap: .8rem; }
+  #hud-speed { font-size: 3rem; font-weight: 700; line-height: 1; text-align: right; }
   #hud-speed small { font-size: 1.3rem; font-weight: 400; opacity: .8; }
-  #hud-odo { font-size: 1.2rem; font-weight: 400; opacity: .65; text-align: right; }
-  #hud-mode { bottom: 8.2rem; right: 2.2rem; font-size: 1.3rem; opacity: .9; }
-  #hud-stamina { bottom: 10.4rem; right: 2.2rem; width: 12rem; height: .6rem; border-radius: .4rem;
+  #hud-odo { font-size: 1.2rem; font-weight: 400; opacity: .65; text-align: right; line-height: 1; margin-top: .5rem; }
+  #hud-mode { font-size: 1.3rem; opacity: .9; line-height: 1; }
+  #hud-stamina { width: 12rem; height: .6rem; border-radius: .4rem;
     background: rgba(255,255,255,.15); border: 1px solid rgba(255,255,255,.3); overflow: hidden;
     opacity: 0; transition: opacity .3s; }
   #hud-stamina-fill { height: 100%; width: 100%; background: #ffd35c; transition: width .1s linear, background-color .2s; }
@@ -137,9 +144,13 @@
   <div>💵 $<span id="score-bank">0</span></div>
   <div>🛂 Passport <span id="score-pass-stamps">0</span>/4 · <span id="score-pass-towns">0</span> towns · <span id="score-pass-landings">0</span> landings · <span id="score-pass-stones">0</span>/7 stones</div>
 </div>
-<div id="hud-speed" class="hud">0 <small>mph</small></div>
-<div id="hud-mode" class="hud">🚙 DRIVE — V to change</div>
-<div id="hud-stamina" class="hud"><div id="hud-stamina-fill"></div></div>
+<!-- bottom-up: stamina, clock/mode, speed. .hud rides the wrapper — the rows are
+     in-flow, and color/text-shadow/pointer-events inherit down to them. -->
+<div id="hud-br" class="hud">
+  <div id="hud-stamina"><div id="hud-stamina-fill"></div></div>
+  <div id="hud-mode">🚙 DRIVE — V to change</div>
+  <div id="hud-speed">0 <small>mph</small></div>
+</div>
 <canvas id="minimap" width="380" height="360"></canvas>
 <canvas id="compass" width="680" height="80"></canvas>
 <div id="road-shield-wrap"><div id="road-shield-card"><canvas id="road-shield" width="120" height="104"></canvas></div></div>

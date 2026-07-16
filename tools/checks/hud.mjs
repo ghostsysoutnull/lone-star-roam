@@ -235,6 +235,25 @@ export default async function hud(t) {
     for (let i = 0; i < 10; i++) await t.key('Minus'); // restore baseline for later checks
   });
 
+  // The rows are one bottom-anchored column precisely so this gap can't drift:
+  // the speed block is shorter in WALK (no odometer, emoji for digits), which
+  // when every row was anchored on its own left the mode line 23px off the speed
+  // readout on foot and 6px off it driving. Gap is the column's, so it's uniform.
+  await t.check('lower-right HUD keeps one gap between the mode line and the speed readout', async () => {
+    const gap = `(() => {
+      const s = document.getElementById('hud-speed').getBoundingClientRect();
+      const m = document.getElementById('hud-mode').getBoundingClientRect();
+      return +(s.top - m.bottom).toFixed(1);
+    })()`;
+    const at = async (mode, y = 0) => { await t.tp(-2767, 334, mode, y); await t.wait(0.4); return t.ev(gap); };
+    const drive = await at('DRIVE'), fly = await at('FLY', 12), walk = await at('WALK');
+    // 0.8rem at the 10px baseline root — tight enough to read as one cluster
+    t.near(drive, 8, 1.5, `drive gap ${drive}px, expected the column's 0.8rem`);
+    t.near(fly, drive, 0.5, `fly gap ${fly}px drifted from drive's ${drive}px`);
+    t.near(walk, drive, 0.5, `walk gap ${walk}px drifted from drive's ${drive}px`);
+    await t.tp(-2767, 334, 'DRIVE');
+  });
+
   await t.check('stamina bar shows only when relevant and reflects the tank level', async () => {
     await t.tp(austin.x - 300, austin.z - 40, 'WALK');
     await t.ev('(g.player.stamina = 1, g.player.sprinting = false)');
