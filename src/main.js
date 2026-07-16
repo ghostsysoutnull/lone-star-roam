@@ -83,6 +83,7 @@ async function boot() {
   document.getElementById('total-legends').textContent = LEGEND_COUNT;
 
   gameplay.onToast = (m) => hud.toast(m);
+  turtles.onEvent = (m) => hud.toast(m);
   const audio = new AudioSystem();
   const radio = new TowerRadio();
   radio.onRadio = (text, meta) => { audio.radio(text, { ufo: ATMOS.ufo, voice: chatterVoices[meta?.voice] }); hud.subtitle(text, meta?.header); };

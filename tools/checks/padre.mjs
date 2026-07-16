@@ -121,12 +121,19 @@ export default async function padre(t) {
         const a = g.turtles.mesh.instanceMatrix.array;
         return [a[i * 16 + 12], a[i * 16 + 14]];
       };
-      // release morning, early: player far — animated but nothing logged yet
+      // hatchling silhouette: merged vertex-colored geometry, not the old 8-corner box
+      const geo = g.turtles.mesh.geometry;
+      const shape = { verts: geo.attributes.position.count, colored: !!geo.attributes.color && g.turtles.mesh.material.vertexColors };
+      // count event toasts without unwiring the HUD
+      let toasts = 0, lastToast = '';
+      const prevEvent = g.turtles.onEvent;
+      g.turtles.onEvent = (m) => { toasts++; lastToast = m; prevEvent?.(m); };
+      // release morning, early: player near (12u) — animated, event announced
       g.turtles.update(0.05, 2110, 3971, 0.26, D + 0.26);
-      const early = { visible: g.turtles.mesh.visible, p: posOf(24) };
-      // later the same morning: the same hatchling has moved seaward
+      const early = { visible: g.turtles.mesh.visible, p: posOf(24), toasts };
+      // later the same morning: the same hatchling has moved seaward, no re-toast
       g.turtles.update(0.05, 2110, 3971, 0.29, D + 0.29);
-      const late = { visible: g.turtles.mesh.visible, p: posOf(24) };
+      const late = { visible: g.turtles.mesh.visible, p: posOf(24), toasts };
       const moved = Math.hypot(late.p[0] - early.p[0], late.p[1] - early.p[1]);
       const spotted0 = g.gameplay.save.species.includes('kempsridley');
       // watch from parked distance (35u < SPOT_R 40) → logs the species
@@ -137,11 +144,15 @@ export default async function padre(t) {
       const offDay = g.turtles.mesh.visible;
       g.turtles.update(0.05, 2110, 3971, 0.5, D + 0.5);
       const noon = g.turtles.mesh.visible;
-      return { D, E, early, late, moved, spotted0, spotted, offDay, noon };
+      g.turtles.onEvent = prevEvent;
+      return { D, E, shape, early, late, moved, spotted0, spotted, offDay, noon, toasts, lastToast };
     })()`);
     t.ok(res.D >= 0 && res.E >= 0, `seeded scan found no release/quiet morning in 400 days (D ${res.D}, E ${res.E})`);
+    t.ok(res.shape.verts > 100 && res.shape.colored, `hatchling is still a plain box (${res.shape.verts} verts, colored ${res.shape.colored})`);
     t.ok(res.early.visible && res.late.visible, 'hatchlings invisible during a release-morning dawn');
     t.ok(res.moved > 1.5, `hatchling 24 barely moved over the morning: ${res.moved.toFixed(2)}u — animation dead`);
+    t.ok(res.early.toasts === 1 && /Kemp/.test(res.lastToast), `event toast on arrival: fired ${res.early.toasts}×, text "${res.lastToast}"`);
+    t.ok(res.toasts === 1, `event toast repeated within one morning (${res.toasts}× total)`);
     t.ok(res.spotted0, 'watching from 12u never logged the ridley');
     t.ok(res.spotted, 'kempsridley not in save.species after watching from 35u');
     t.ok(!res.offDay, 'hatchlings out on a non-release morning — seeding ignored');

@@ -21,16 +21,47 @@ const ODDS = 0.45;                   // seeded release mornings (~every other da
 // seed stream must never be re-derived elsewhere
 export const releaseOn = (day) => seededRand(`turtle:${day}`)() < ODDS;
 const SPOT_R = 40;                   // parked-truck distance, not boots-on-nest
+const HAIL_R = 150;                  // announce radius — close enough to see the scramble
+
+// One hatchling, facing -z: domed shell, head nub, four swept flippers — merged
+// into a single vertex-colored geometry so the clutch stays one InstancedMesh.
+function mkHatchGeo() {
+  const parts = [];
+  const add = (geo, hex) => {
+    const n = geo.toNonIndexed();
+    const c = new THREE.Color(hex);
+    const col = new Float32Array(n.attributes.position.count * 3);
+    for (let i = 0; i < col.length; i += 3) { col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b; }
+    n.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    parts.push(n);
+  };
+  add(new THREE.SphereGeometry(0.17, 7, 5).scale(1, 0.55, 1.25).translate(0, 0.1, 0.02), 0x49523f); // shell
+  const skin = 0x6b705c; // grey-olive head and flippers, lighter than the shell
+  add(new THREE.BoxGeometry(0.09, 0.07, 0.1).translate(0, 0.09, -0.26), skin);
+  add(new THREE.BoxGeometry(0.18, 0.025, 0.08).rotateY(0.85).translate(-0.19, 0.05, -0.1), skin);  // front flippers
+  add(new THREE.BoxGeometry(0.18, 0.025, 0.08).rotateY(-0.85).translate(0.19, 0.05, -0.1), skin);
+  add(new THREE.BoxGeometry(0.11, 0.02, 0.07).rotateY(-0.5).translate(-0.13, 0.04, 0.16), skin);   // rear flippers
+  add(new THREE.BoxGeometry(0.11, 0.02, 0.07).rotateY(0.5).translate(0.13, 0.04, 0.16), skin);
+  const geo = new THREE.BufferGeometry();
+  const total = parts.reduce((s, p) => s + p.attributes.position.count, 0);
+  for (const name of ['position', 'normal', 'color']) {
+    const arr = new Float32Array(total * 3);
+    let o = 0;
+    for (const p of parts) { arr.set(p.attributes[name].array, o); o += p.attributes[name].array.length; }
+    geo.setAttribute(name, new THREE.BufferAttribute(arr, 3));
+  }
+  return geo;
+}
 
 export class TurtleSystem {
   constructor(scene, onSpotted) {
     this.onSpotted = onSpotted;
+    this.onEvent = null;   // per-release-morning HUD announcement (main.js wires hud.toast)
+    this.toastDay = -1;
     this.day = -1;
     this.releaseToday = false;
     this.groundY = null;
-    const geo = new THREE.BoxGeometry(0.22, 0.07, 0.28);
-    // olive-dark shells, matte — hatchlings read as moving flecks on the sand
-    this.mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0x4a5442 }), N);
+    this.mesh = new THREE.InstancedMesh(mkHatchGeo(), new THREE.MeshLambertMaterial({ vertexColors: true }), N);
     this.mesh.visible = false;
     this.mesh.frustumCulled = false;
     scene.add(this.mesh);
@@ -74,7 +105,13 @@ export class TurtleSystem {
       this.mesh.setMatrixAt(i, this.m4);
     }
     this.mesh.instanceMatrix.needsUpdate = true;
+    const d2 = (px - NEST.x) ** 2 + (pz - NEST.z) ** 2;
+    // close enough to see it → announce the event, once per release morning
+    if (d2 < HAIL_R * HAIL_R && this.toastDay !== day) {
+      this.toastDay = day;
+      this.onEvent?.("🐢 Dawn release at Malaquite — Kemp's ridley hatchlings scramble for the surf");
+    }
     // watched from the beach → into the critter log
-    if ((px - NEST.x) ** 2 + (pz - NEST.z) ** 2 < SPOT_R * SPOT_R) this.onSpotted?.();
+    if (d2 < SPOT_R * SPOT_R) this.onSpotted?.();
   }
 }

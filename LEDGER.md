@@ -9,3 +9,4 @@ across sessions instead of rediscovered per wave.
 |------|--------------|-------|---------------------|-------------|-----|
 | 2026-07-16 | protocol + Tours tab (one-off) | Fable 5 | as briefed: 3 doc changes + exec-summary rule + Tours tab, backfill both lists (30 spots) | 1 targeted + 1 full / 0 flakes | high — one session unlocks the whole owed playtest backlog |
 | 2026-07-16 | tour-guarantee fixes (one-off) | Fable 5 | audit found 6 broken spots (Bruno pushed past my first count of 3); all fixed + standing rule | 2 targeted + 1 full / 0 flakes; 1 check bug (first-vs-nearest bear), reasoned not rerun | high — Tours tab now delivers on every button; flares spot was dead as shipped |
+| 2026-07-16 | turtle release readability (one-off) | Fable 5 | as approved: hatchling silhouette + per-morning event toast, both shipped with padre checks | 1 targeted + 1 full / 0 flakes | good — the event existed but was unreadable and silent after first log |
