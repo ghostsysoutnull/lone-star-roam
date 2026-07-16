@@ -50,7 +50,7 @@ Gotchas carried over: <only what the next wave must know>
 python3 -m http.server 8317    # then open http://localhost:8317
 
 # Session status in one call: git sync + dirty tree + recent commits +
-# NEXT_SESSION.md freshness + syntax check of all modules. Run at session
+# NEXT_SESSION.md freshness + syntax plus all fast Node checks. Run at session
 # start instead of separate git/node commands, and again before committing.
 tools/status.sh
 
@@ -122,6 +122,11 @@ Headless tests keep passing at *convenient* values while play breaks at *natural
 - Never change `seededRand` seed strings: determinism is what makes bugs cheaply reproducible, and players' saves + spatial memory depend on it.
 - **Per-wave budget, stated up front**: the code + its verify checks are the deliverable and warrant full effort; the layer around them (screenshots, redundant reads, brute-force reruns, prose) is where tokens leak. Open each wave by naming the budget — e.g. "code + checks, no shots, grep-first" — so it's an explicit contract, not a mid-flight judgment call. Doc updates match the established bar and no further: `NEXT_SESSION.md` is a one-paragraph kickoff (not a spec), `MODULES.md` is one line per module.
 - **Guard the briefed plan; make detour costs explicit.** A question ("what's your take on X?") is NOT a mandate to build X. Before any work that could eat significant time or divert from the briefed wave, state the concrete cost + opportunity cost and get an explicit choice — for optimization/tooling, lead with the ROI (gain vs cost, "pays back after ~N runs"), not the mechanism. A "yes" to a plan whose cost you never surfaced is an uninformed yes. (A curiosity about test perf once consumed a whole shields session this way.)
+- **Use the test layers in order.** After changing deterministic data or a
+  production-owned pure rule, run the smallest relevant `node tools/test.mjs`
+  group. While implementing a feature, run its named browser suite. Before
+  committing, run `tools/status.sh` and the full `node tools/verify.mjs`;
+  fast checks never replace browser integration coverage.
 - **Check a tool exists before building on it**: before using any non-core CLI tool (`/usr/bin/time`, `bc`, `jq`, …), verify it's installed (`command -v <tool>`, batch-probe several at once); if it's missing, ask Bruno to install it (he can run `! <cmd>` in-session) rather than working around it or letting a command fail silently. Assuming `/usr/bin/time` + `bc` were present cost wasted run cycles once.
 - Session end: update `NEXT_SESSION.md` (current task + gotchas only — queued work lives in BACKLOG.md, history in ROADMAP.md) and run `node tools/verify.mjs` before the final commit.
 
