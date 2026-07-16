@@ -26,7 +26,7 @@ export const LANDMARKS = [
   { name: 'Reunion Tower', at: LL(32.7756, -96.8089), kind: 'tower', fact: 'Dallas’ glowing ball, 561 ft up.' },
   { name: 'San Jacinto Monument', at: LL(29.7497, -95.0806), kind: 'obelisk', fact: 'World’s tallest war memorial — where Texas won independence in 18 minutes.' },
   { name: 'Space Center Houston', at: LL(29.5519, -95.0970), kind: 'rocket', fact: '"Houston" was the first word spoken from the Moon.' },
-  { name: 'Cadillac Ranch', at: LL(35.1872, -101.9871), kind: 'cadillac', fact: 'Ten Cadillacs nose-down in a Panhandle field since 1974.' },
+  { name: 'Cadillac Ranch', at: LL(35.1836, -101.9871), kind: 'cadillac', fact: 'Ten Cadillacs nose-down in a Panhandle field since 1974.' }, // true coord straddles I-40's ribbon at game scale — held 4u south of it
   { name: 'Big Bend', at: LL(29.2498, -103.2502), kind: 'canyon', fact: 'The Rio Grande’s great curve; darkest night skies in the lower 48.' },
   { name: 'Palo Duro Canyon', at: LL(34.9372, -101.6589), kind: 'hoodoo', fact: 'Second-largest canyon in the USA, hiding in the flat Panhandle.' },
   { name: 'Enchanted Rock', at: LL(30.5064, -98.8198), kind: 'dome', fact: 'A giant pink granite dome that creaks and groans at night.' },
@@ -42,15 +42,15 @@ export const LANDMARKS = [
   { name: 'Buc-ee’s New Braunfels', at: LL(29.7377, -98.0857), kind: 'beaver', fact: 'World’s largest convenience store — and famously spotless restrooms.' },
   { name: 'Stonehenge II', at: LL(30.0772, -99.3005), kind: 'henge', fact: 'A Hill Country Stonehenge replica, built on a whim in 1989.' },
   { name: 'World’s Largest Fire Hydrant', at: LL(30.0860, -94.1018), kind: 'hydrant', fact: '24 feet of Dalmatian-spotted hydrant outside Beaumont’s Fire Museum.' },
-  { name: 'Paisano Pete', at: LL(30.8940, -102.8720), kind: 'pete', fact: 'An 11-ft roadrunner, greeting Fort Stockton travelers since 1979.' },
+  { name: 'Paisano Pete', at: LL(30.8959, -102.8742), kind: 'pete', fact: 'An 11-ft roadrunner, greeting Fort Stockton travelers since 1979.' }, // held 3u off US-290's ribbon
   { name: 'Prada Marfa', at: LL(30.6039, -104.7367), kind: 'prada', fact: 'A fake Prada boutique alone in the desert since 2005. Art, not retail — the door never opens.' },
-  { name: 'Eiffel Tower of Paris, TX', at: LL(33.6609, -95.5455), kind: 'eiffel', fact: 'Paris, Texas built its own Eiffel Tower — and topped it with a red cowboy hat.' },
+  { name: 'Eiffel Tower of Paris, TX', at: LL(33.6642, -95.5471), kind: 'eiffel', fact: 'Paris, Texas built its own Eiffel Tower — and topped it with a red cowboy hat.' }, // held 4u off the crossing state highways' ribbons
   { name: 'Dinosaur Valley', at: LL(32.2465, -97.8130), kind: 'dino', fact: '113-million-year-old dinosaur tracks in the Paluxy riverbed at Glen Rose.' },
   { name: 'AT&T Stadium', at: LL(32.7473, -97.0945), kind: 'stadium', fact: 'Jerry World — its arches are among the longest single-span roofs on Earth.' },
   { name: 'The Astrodome', at: LL(29.6847, -95.4107), kind: 'astrodome', fact: 'The Eighth Wonder of the World — first domed stadium, birthplace of AstroTurf.' },
   { name: 'World’s Largest Cowboy Boots', at: LL(29.6042, -98.4919), kind: 'boots', fact: '35-foot ostrich-skin boots guarding a San Antonio mall since 1979.' },
   { name: 'Terlingua Ghost Town', at: LL(29.3211, -103.6158), kind: 'terlingua', fact: 'A quicksilver boomtown gone quiet near Big Bend; its old cemetery still hosts a Día de los Muertos every fall.' },
-  { name: 'Presidio La Bahía', at: LL(28.6470, -97.3844), kind: 'presidio', fact: 'Spanish fort at Goliad, 1749. After the massacre of Fannin’s men here in 1836, many say the garrison never mustered out.' },
+  { name: 'Presidio La Bahía', at: LL(28.6470, -97.3802), kind: 'presidio', fact: 'Spanish fort at Goliad, 1749. After the massacre of Fannin’s men here in 1836, many say the garrison never mustered out.' }, // held 4u off US-183's ribbon (and clear of the San Antonio River)
   { name: 'B-1 Gate Guardian, Dyess AFB', at: LL(32.4207, -99.8547), kind: 'b1', fact: 'Dyess is a B-1B Lancer base — the swing-wing bomber has called Abilene home since 1985.' },
   { name: 'Randolph AFB Taj Mahal', at: LL(29.5292, -98.2783), kind: 'randolph', fact: 'Pilots have trained under this Spanish Colonial tower since 1931 — its water tower still doubles as base ops.' },
   // named-ranch gate arches (AGRICULTURE_SPEC wave 4) — animals.js RANCH_ARCHES
@@ -63,7 +63,7 @@ export const LANDMARKS = [
   { name: 'JA Ranch', at: LL(34.82, -101.30), kind: 'rancharch', fact: 'Goodnight and Adair drove cattle into Palo Duro Canyon in 1876 — and the buffalo Goodnight saved here became the State Bison Herd at Caprock Canyons.' },
   { name: 'XIT Ranch', at: LL(35.684, -102.345), kind: 'rancharch', fact: 'Three million acres traded for building the Texas Capitol — 6,000 miles of barbed wire around the biggest fenced range on Earth.' },
   { name: 'Matador Ranch', at: LL(33.99, -100.84), kind: 'rancharch', fact: 'Founded 1879, run for decades from Dundee, Scotland — Scottish money, Texas grass, and Herefords by the tens of thousands.' },
-  { name: 'LBJ Ranch', at: LL(30.239, -98.630), kind: 'rancharch', fact: 'The Texas White House — LBJ ran the country from the Pedernales, landing on his own strip. The Park Service still runs his registered Herefords.' },
+  { name: 'LBJ Ranch', at: LL(30.2431, -98.6320), kind: 'rancharch', fact: 'The Texas White House — LBJ ran the country from the Pedernales, landing on his own strip. The Park Service still runs his registered Herefords.' }, // held 5u off the Pedernales ribbon
 ];
 export const LANDMARK_COUNT = LANDMARKS.length;
 

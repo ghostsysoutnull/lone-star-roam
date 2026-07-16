@@ -1,6 +1,8 @@
 // Texas Brands — real roadside institutions rebuilt as parody landmarks at
 // their real-world coordinates, proximity-streamed like CitySystem so only
-// nearby sites hold geometry. Wave 1: Bucky's (Buc-ee's) travel centers —
+// nearby sites hold geometry. Every site table resolves through the
+// placement-legality gate below (legalize/spotClear) before anything reads
+// it — authored coords are anchors, not final positions. Wave 1: Bucky's (Buc-ee's) travel centers —
 // showpiece storefront + beaver-topped sign pylon + instanced fuel canopy +
 // highway approach billboards. Wave 2: H-E-Buddy (H-E-B) big-box stores at
 // the 33 largest GEO.cities, placed on a city-edge road shoulder + instanced
@@ -23,7 +25,7 @@
 // Datacenter audio (wave 3) will arrive as an onHum constructor callback,
 // never an import.
 import * as THREE from 'three';
-import { GEO, seededRand, hAt, nearestRoad } from './geo.js';
+import { GEO, seededRand, hAt, nearestRoad, waterAt, inTexas } from './geo.js';
 import { ATMOS } from './sky.js';
 import { tinted, merge } from './traffic.js';
 import { cityRadius } from './cities.js';
@@ -49,6 +51,62 @@ let SCALE = clampScale(parseFloat(localStorage.getItem(SCALE_KEY)) || 0.15);
 
 const SPAWN_DIST = 700;      // bigger footprints than cities — hold geometry sooner
 const NIGHT_ON = 0.25;       // ATMOS.night threshold for the signage glow (airports.js)
+
+// ------------------------------------------------------- placement legality
+// Real-world coordinates put every Bucky's ON its highway at game scale (the
+// road is a 3.2-unit ribbon; the store's OSM node sits 0.1–3.6 units off the
+// centerline — audited 2026-07-16: 15/15 Bucky's, 5/8 LSC overlapped, and the
+// H-E-Buddy search shipped Corpus Christi in the bay, El Paso across the
+// border, Waco on the Brazos). legalize() keeps the authored coords as the
+// anchor and slides the site off the pavement: chapelAt's reject-list idea,
+// deterministic (no RNG — same input, same nudge, every session).
+//
+// Clearance is sized for brand scale 0.5 (REF_SCALE): the 0.15 default gets
+// ~3x margin, slider sizes past 0.5 may kiss the shoulder — a player-chosen
+// distortion; sites must NEVER move with the slider (spatial memory + the
+// brandNear consumers below). Street-tier arterials use the default-size
+// reach instead (STREET_REF): metro grids are too dense to clear a half-size
+// slab from every arterial, and the 1.1-unit street ribbon reads fine beside
+// a lot edge.
+const REF_SCALE = 0.5, STREET_REF = 0.15;
+const RIBBON_HALF = { motorway: 1.6, trunk: 1.0, primary: 0.75, street: 0.55 }; // world.js buildRibbons widths / 2
+const clearNeed = (type, reach) =>
+  RIBBON_HALF[type] + reach * (type === 'street' ? STREET_REF : REF_SCALE) + 1;
+// One fronting-road query per brand, shared by spawn + the groundYAt footprint
+// caches + legalize so heading/padY always match the rendered slab.
+const BUCKY_ROAD = (x, z) => nearestRoad(x, z, 90, (t) => t === 'motorway' || t === 'trunk' || t === 'primary') || nearestRoad(x, z, 120);
+const HEB_ROAD = (x, z) => nearestRoad(x, z, 90) || nearestRoad(x, z, 150);
+const LSC_ROAD = (x, z) => nearestRoad(x, z, 120, (t) => t === 'motorway' || t === 'trunk' || t === 'primary') || nearestRoad(x, z, 200);
+
+// true when (x,z) can hold a slab reaching `reach` local units: dry, in-state,
+// and every road ribbon clear of it (nearest-road check against the widest
+// tier's need — the 1-unit margin absorbs the rare nearer-street-masks-a-
+// farther-motorway edge).
+function spotClear(x, z, reach) {
+  if (waterAt(x, z) || !inTexas(x, z)) return false;
+  const r = nearestRoad(x, z, RIBBON_HALF.motorway + reach * REF_SCALE + 1);
+  return !r || r.dist >= clearNeed(r.type, reach);
+}
+
+// Slide (x0,z0) to the nearest legal spot: scan away from the fronting road
+// first (both sides), then along its tangent (both ways — junction sites like
+// Madisonville are boxed in by a second road parallel to the perpendicular).
+// Falls back to the authored coords when nothing within reach passes — never
+// worse than the pre-legality behavior. Moves audited at 2–56 units.
+function legalize(x0, z0, reach, findRoad) {
+  const road = findRoad(x0, z0);
+  if (!road) return [x0, z0];
+  let dx = x0 - road.x, dz = z0 - road.z, d = Math.hypot(dx, dz);
+  if (d < 0.3) { dx = -road.tz; dz = road.tx; d = 1; } // on the centerline — pick the left normal
+  dx /= d; dz /= d;
+  for (const [ux, uz] of [[dx, dz], [-dx, -dz], [road.tx, road.tz], [-road.tx, -road.tz]]) {
+    for (let out = clearNeed(road.type, reach); out <= clearNeed(road.type, reach) + 60; out += 3) {
+      const x = road.x + ux * out, z = road.z + uz * out;
+      if (spotClear(x, z, reach) && airportClear(x, z)) return [x, z];
+    }
+  }
+  return [x0, z0];
+}
 
 // Bucky's — 15 real Buc-ee's travel centers (OSM brand="Buc-ee's", 2026-07).
 // New Braunfels uses the store's own OSM node, ~14 units off the existing
@@ -297,8 +355,8 @@ export class BrandSystem {
     // (currently one: the San Antonio prototype).
     this.lscSignGeo = new THREE.PlaneGeometry(9, 3.6);
     this.lscSignMats = new Map();
-    this.lscByName = new Map(LSC_SITES.map((s) => [s.name, s])); // lscNear's name -> site lookup
-    for (const site of LSC_SITES) {
+    this.lscByName = new Map(getLscSites().map((s) => [s.name, s])); // lscNear's name -> site lookup
+    for (const site of getLscSites()) {
       if (!site.sign) continue;
       const tex = mkLSCSignTex(site.sign.tagline);
       this.lscSignMats.set(site.name, new THREE.MeshLambertMaterial({
@@ -320,7 +378,11 @@ export class BrandSystem {
     // H-E-Buddy sites derive from GEO.cities (unavailable at module load —
     // GEO is loaded before BrandSystem is constructed, so this is safe here).
     // Shared with groundYAt's footprint cache below (getHebSites memoizes).
+    // Bucky's/LSC resolved (legalized) tables exposed the same way so the
+    // verify suite asserts placement against the coords actually in play.
     this.hebSites = getHebSites();
+    this.buckySites = getBuckySites();
+    this.lscSites = getLscSites();
   }
 
   get scale() { return SCALE; }
@@ -387,7 +449,7 @@ export class BrandSystem {
     if (this.acc < 0.25 && dt) return; // ~4 Hz is plenty for 700-unit spawn rings
     this.acc = 0;
 
-    for (const site of BUCKY_SITES) {
+    for (const site of this.buckySites) {
       const d = Math.hypot(site.at[0] - px, site.at[1] - pz);
       const has = this.live.has(site.name);
       if (d < SPAWN_DIST && !has) this.spawn(site);
@@ -406,7 +468,7 @@ export class BrandSystem {
 
     // Lone Star Compute — keyed 'lsc:<name>' (Denton/Temple collide with the
     // Bucky's + H-E-Buddy tables otherwise).
-    for (const site of LSC_SITES) {
+    for (const site of this.lscSites) {
       const key = 'lsc:' + site.name;
       const d = Math.hypot(site.at[0] - px, site.at[1] - pz);
       const has = this.live.has(key);
@@ -421,8 +483,7 @@ export class BrandSystem {
     const group = new THREE.Group();
 
     // Face the store toward the nearest sizeable road so it fronts the highway.
-    const road = nearestRoad(x, z, 90, (t) => t === 'motorway' || t === 'trunk' || t === 'primary')
-      || nearestRoad(x, z, 120);
+    const road = BUCKY_ROAD(x, z);
     const heading = road ? Math.atan2(road.x - x, road.z - z) : 0;
 
     // Pad at the MAX terrain height under the lot (airport-pad pattern) so a
@@ -496,18 +557,27 @@ export class BrandSystem {
     const base = Math.floor(rand() * BILLBOARD_COPY.length); // stable seeded campaign start
     const posts = [];
     const inv = new THREE.Matrix4().makeRotationY(-group.rotation.y);
-    // step back along the road tangent from the nearest point, alternating sides
+    // step back along the road tangent from the nearest point, alternating
+    // sides — then RE-SNAP each straight-line guess to the actual pavement.
+    // The tangent extrapolation leaves curved roads (audited 2026-07-16:
+    // boards up to 44 units off-road in fields, 10 on the pavement itself);
+    // re-anchoring every guess through nearestRoad self-corrects the curve.
     for (let i = 0; i < 4; i++) {
       const back = 40 + i * 45;                     // 40..175 units up the road
-      const wx = road.x + road.tx * back * (i % 2 ? -1 : 1);
-      const wz = road.z + road.tz * back * (i % 2 ? -1 : 1);
-      // shoulder offset (perpendicular to the tangent)
-      const ox = -road.tz * 3.5, oz = road.tx * 3.5;
-      const bx = wx + ox, bz = wz + oz;
+      const gx = road.x + road.tx * back * (i % 2 ? -1 : 1);
+      const gz = road.z + road.tz * back * (i % 2 ? -1 : 1);
+      const snap = nearestRoad(gx, gz, 60, (t) => t === 'motorway' || t === 'trunk');
+      if (!snap) continue;                          // guess left the network (sharp bend / end of line) — skip the board
+      // shoulder offset (perpendicular to the LOCAL tangent at the snap point)
+      const bx = snap.x - snap.tz * 3.5, bz = snap.z + snap.tx * 3.5;
+      if (waterAt(bx, bz) || !inTexas(bx, bz)) continue;     // dry land, in-state
+      const cross = nearestRoad(bx, bz, 3);                  // a second road can cross the shoulder
+      if (cross && cross.dist < RIBBON_HALF[cross.type] + 0.5) continue;
+      if (posts.some((p) => Math.hypot(p.wx - bx, p.wz - bz) < 12)) continue; // two guesses folded onto one bend
       const by = footprintMaxH(bx, bz, 1);
       // world position → group-local (group is at x,z,padY rotated by heading)
       const local = new THREE.Vector3(bx - x, by - padY, bz - z).applyMatrix4(inv);
-      const faceWorld = Math.atan2(road.tz, road.tx) + Math.PI / 2; // billboard +z faces the road
+      const faceWorld = Math.atan2(snap.tz, snap.tx) + Math.PI / 2; // billboard +z faces the road
       const bg = new THREE.Group();
       bg.position.copy(local);
       bg.rotation.y = faceWorld - group.rotation.y;
@@ -534,7 +604,7 @@ export class BrandSystem {
     const rand = seededRand('heblot:' + site.name); // independent of the placement-search stream
     const group = new THREE.Group();
 
-    const road = nearestRoad(x, z, 90) || nearestRoad(x, z, 150);
+    const road = HEB_ROAD(x, z);
     const heading = road ? Math.atan2(road.x - x, road.z - z) : 0;
 
     const fp = footprintRange(x, z);
@@ -594,7 +664,7 @@ export class BrandSystem {
     const [x, z] = site.at;
     const group = new THREE.Group();
 
-    const road = nearestRoad(x, z, 120, (t) => t === 'motorway' || t === 'trunk' || t === 'primary') || nearestRoad(x, z, 200);
+    const road = LSC_ROAD(x, z);
     const heading = road ? Math.atan2(road.x - x, road.z - z) : 0;
 
     const fp = footprintRange(x, z);
@@ -736,6 +806,25 @@ function getHebSites() {
   return hebSitesCache;
 }
 
+// Bucky's/LSC site tables resolved through legalize() — memoized like
+// getHebSites so spawn, the groundYAt footprint caches, and brandNear all
+// read the SAME nudged coords (GEO must be loaded; first call is from the
+// BrandSystem constructor, same guarantee getHebSites already relies on).
+// `at` is replaced, every other field (name, sign, fact) carries through.
+let buckySitesCache = null;
+function getBuckySites() {
+  if (!buckySitesCache) buckySitesCache = BUCKY_SITES.map((s) => (
+    { ...s, at: legalize(s.at[0], s.at[1], BUCKY_FOOT.z1, BUCKY_ROAD) }));
+  return buckySitesCache;
+}
+
+let lscSitesCache = null;
+function getLscSites() {
+  if (!lscSitesCache) lscSitesCache = LSC_SITES.map((s) => (
+    { ...s, at: legalize(s.at[0], s.at[1], LSC_FOOT.z1, LSC_ROAD) }));
+  return lscSitesCache;
+}
+
 function siteFootprint(x, z, road) {
   const heading = road ? Math.atan2(road.x - x, road.z - z) : 0;
   return { x, z, heading, padY: footprintRange(x, z).max };
@@ -743,30 +832,25 @@ function siteFootprint(x, z, road) {
 
 let buckyFootCache = null;
 function buckyFootprints() {
-  if (!buckyFootCache) buckyFootCache = BUCKY_SITES.map((site) => {
+  if (!buckyFootCache) buckyFootCache = getBuckySites().map((site) => {
     const [x, z] = site.at;
-    const road = nearestRoad(x, z, 90, (t) => t === 'motorway' || t === 'trunk' || t === 'primary') || nearestRoad(x, z, 120);
-    return siteFootprint(x, z, road);
+    return siteFootprint(x, z, BUCKY_ROAD(x, z));
   });
   return buckyFootCache;
 }
 
 let hebFootCache = null;
 function hebFootprints() {
-  if (!hebFootCache) hebFootCache = getHebSites().map((site) => {
-    const road = nearestRoad(site.x, site.z, 90) || nearestRoad(site.x, site.z, 150);
-    return siteFootprint(site.x, site.z, road);
-  });
+  if (!hebFootCache) hebFootCache = getHebSites().map((site) => (
+    siteFootprint(site.x, site.z, HEB_ROAD(site.x, site.z))));
   return hebFootCache;
 }
 
 let lscFootCache = null;
 function lscFootprints() {
-  if (!lscFootCache) lscFootCache = LSC_SITES.map((site) => {
+  if (!lscFootCache) lscFootCache = getLscSites().map((site) => {
     const [x, z] = site.at;
-    // MUST mirror spawnLSC's road query exactly so padY/heading match the slab.
-    const road = nearestRoad(x, z, 120, (t) => t === 'motorway' || t === 'trunk' || t === 'primary') || nearestRoad(x, z, 200);
-    return siteFootprint(x, z, road);
+    return siteFootprint(x, z, LSC_ROAD(x, z)); // same query as spawnLSC so padY/heading match the slab
   });
   return lscFootCache;
 }
@@ -1004,11 +1088,15 @@ function buildBuckyHero(skirt = 0.4) {
 // just outside its downtown footprint. A seeded angle + growing radius picks
 // a candidate direction; nearestRoad snaps it to pavement; the final spot is
 // offset further from the road AWAY from the city center (clears both the
-// road and the procedural downtown). Rejected on either downtown overlap or
-// an airport footprint — retries with a wider radius, matching the roadShoulder
-// idiom in npcs.js (mirrored here rather than imported: that function is
-// module-private and this table's shape — reject-and-retry over many sites —
-// doesn't fit a single-point helper).
+// road and the procedural downtown). Rejected on downtown overlap, an airport
+// footprint, or a spot that fails spotClear (on a road ribbon / in water /
+// out of state — the pre-legality search shipped Corpus Christi in the bay,
+// El Paso across the border and Waco on the Brazos, audited 2026-07-16).
+// Retries with a wider radius, matching the roadShoulder idiom in npcs.js
+// (mirrored here rather than imported: that function is module-private and
+// this table's shape — reject-and-retry over many sites — doesn't fit a
+// single-point helper). 24 attempts: coastal/border cities need a landward
+// angle (worst audited convergence: Abilene at 14).
 function buildHEBSites() {
   const top = [...GEO.cities].sort((a, b) => b.pop - a.pop).slice(0, HEB_COUNT);
   const sites = [];
@@ -1016,7 +1104,7 @@ function buildHEBSites() {
     const R = cityRadius(city.pop);
     const rand = seededRand('heb:' + city.name);
     let spot = null;
-    for (let attempt = 0; attempt < 12 && !spot; attempt++) {
+    for (let attempt = 0; attempt < 24 && !spot; attempt++) {
       const a = rand() * Math.PI * 2;
       const rr = R + 40 + attempt * 20; // push further out each retry
       const cx = city.x + Math.cos(a) * rr, cz = city.z + Math.sin(a) * rr;
@@ -1027,6 +1115,7 @@ function buildHEBSites() {
       const ox = awayX / dAway, oz = awayZ / dAway;
       const x = road.x + ox * HEB_OFF, z = road.z + oz * HEB_OFF; // set back from the road, away from downtown
       if (Math.hypot(x - city.x, z - city.z) < R + HEB_MARGIN) continue; // still overlaps downtown
+      if (!spotClear(x, z, HEB_FOOT.z1)) continue; // on a road ribbon / wet / out of state
       if (!airportClear(x, z)) continue;
       spot = { x, z };
     }

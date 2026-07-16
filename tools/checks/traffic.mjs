@@ -37,10 +37,11 @@ export default async function traffic(t) {
     // cycle), so main.js wires traffic.groundYAt as a callback instead. This
     // proves the wiring, not just the underlying pure function (already
     // covered by tools/checks/brands.mjs).
-    const katy = await t.ev(`({
-      x: (-95.8475 + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100,
-      z: -(29.7787 - 31) * 111320 / 100,
-    })`);
+    const katy = await t.ev(`(() => {
+      // resolved (post-legalize) pad center — the raw OSM node sits off the slab
+      const s = g.brands.buckySites.find((s) => s.name === 'Katy');
+      return { x: s.at[0], z: s.at[1] };
+    })()`);
     const r = await t.ev(`(() => ({
       expect: g.brandGroundYAt(${katy.x}, ${katy.z}),
       wired: typeof g.traffic.groundYAt === 'function' ? g.traffic.groundYAt(${katy.x}, ${katy.z}) : null,

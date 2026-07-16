@@ -129,6 +129,12 @@ confirmed; silhouette axis needs the audit step):
 
 ## Later
 
+Placement audit follow-on (2026-07-16): coastal city-building scatter vs
+water is unaudited — `cities.js` rejects roads (<1.3u) but never `waterAt`,
+so Corpus/Galveston-class downtowns may push procedural buildings into the
+bay. The offline audit mirror in the placement-legality session's scratchpad
+pattern (data JSONs + projection) makes this a cheap check before any fix.
+
 Haunted Texas wave 3: San Antonio ghost tracks push (~29.34 N,
 −98.44 W — only event touching player physics; strict no-push-by-day check),
 town churches in `cities.js` (reuse `mkChapel`), USS Lexington "Blue Ghost"

@@ -13,6 +13,18 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'Placement legality (2026-07)',
+    waves: [
+      { wave: 'Brands & landmarks off the ribbons', spots: [
+        S('🏪 Ennis Bucky’s off the ribbon', [2774.3, -1481.6], { mode: 'DRIVE', note: 'was straddling the I-45 centerline — now fronts it from a legal lot' }),
+        S('🪧 Luling billboards on the bend', [1826.9, 1545.4], { mode: 'DRIVE', note: 'boards re-snap to the curved I-10 shoulder — none on the pavement' }),
+        S('🛒 Corpus H-E-Buddy on dry land', [1946.8, 3643.9], { mode: 'DRIVE', note: 'the old placement search dropped this store in the bay' }),
+        S('🛒 Waco H-E-Buddy off the Brazos', [2302.3, -548.2], { mode: 'DRIVE', note: 'was standing in the river' }),
+        S('🚗 Cadillac Ranch clear of I-40', LL(35.1836, -101.9871), { mode: 'DRIVE', note: 'held 4 units south of the ribbon — still against the freeway' }),
+      ] },
+    ],
+  },
+  {
     track: 'The Shoulder & the Shelf (2026-07)',
     waves: [
       { wave: 'W3 — Padre', spots: [

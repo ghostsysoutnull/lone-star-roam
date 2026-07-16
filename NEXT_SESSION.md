@@ -16,6 +16,14 @@ road-set shift and lands against this, unstacked.
 skill, works with cheaper models too) with a candidate queue in `BACKLOG.md`
 (bats, dolphins, and a Tours-tab audit sweep that should run first).
 
+**Placement legality shipped 2026-07-16** — all 56 brand sites now resolve
+through a `legalize()` gate (off road ribbons at reference brand scale 0.5,
+dry, in-state), the H-E-Buddy search rejects wet/out-of-state/on-road spots
+(Corpus bay / El Paso border / Waco Brazos fixed), Bucky's billboards re-snap
+to real pavement on curves, and 5 landmarks stepped off their ribbons.
+GOTCHAS has the standing rule; `brands.mjs` asserts it all. Owed playtest:
+the "Placement legality" Tours group (5 spots).
+
 ---
 
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js

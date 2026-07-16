@@ -50,6 +50,16 @@ graduate here (and out of `NEXT_SESSION.md`).
   fails silently.
 - **Glenrio and Whites City are NOT in `GEO.bandCities`** (both unincorporated) —
   hand-built vignettes. Never resolve them by city name anywhere.
+- **Never trust a real-world coordinate as a final building position** — at
+  1:100 scale the highway is a 3.2-unit ribbon and the real thing usually sits
+  ON it (2026-07-16 audit: 15/15 Bucky's straddled their road; the H-E-Buddy
+  search shipped stores in the Corpus bay, across the El Paso border, on the
+  Brazos). Authored coords are anchors: every brand table resolves through
+  `legalize()`/`spotClear()` (brands.js — road-ribbon clearance at reference
+  brand scale 0.5, street tier at the 0.15 default, dry, in-state,
+  airport-clear; `brands.mjs` asserts all 56 resolved sites + the five nudged
+  landmarks). New placed structures go through that gate or a `chapelAt`-style
+  seeded search with the same rejects.
 
 ## Geo & classification
 

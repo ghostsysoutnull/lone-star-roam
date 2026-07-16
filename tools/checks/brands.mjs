@@ -6,10 +6,11 @@
 
 export default async function brands(t) {
   // Katy sits on I-10 (motorway) — ideal for the spawn + billboard road-hug.
-  const katyAt = await t.ev(`({
-    x: (-95.8475 + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100,
-    z: -(29.7787 - 31) * 111320 / 100,
-  })`);
+  // resolved (post-legalize) pad center — the raw OSM node sits ~20u away, off the slab
+  const katyAt = await t.ev(`(() => {
+    const s = g.brands.buckySites.find((s) => s.name === 'Katy');
+    return { x: s.at[0], z: s.at[1] };
+  })()`);
 
   await t.check('streaming sentinel: the real loop spawns/despawns a site by distance', async () => {
     // teleport ONTO Katy and let the render loop (main.js brands.update) spawn it
@@ -64,20 +65,72 @@ export default async function brands(t) {
     t.ok(panel.visible, "Bucky's sign panel not visible");
   });
 
-  await t.check('placement legality: no Bucky\'s sits on an airport field', async () => {
-    // scan every site coord through the pure exclusion query
+  await t.check('placement legality: no brand site sits on an airport field', async () => {
+    // scan every RESOLVED site coord (post-legalize) through the pure exclusion query
     const bad = await t.ev(`(() => {
-      const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100, -(lat - 31) * 111320 / 100];
-      const coords = [
-        ['Luling',29.6507,-97.5935],['New Braunfels',29.7269,-98.0779],['Bastrop',30.1071,-97.3058],
-        ['Baytown',29.8008,-94.9999],['Katy',29.7787,-95.8475],['Texas City',29.4284,-95.0632],
-        ['Terrell',32.7167,-96.3212],['Temple',31.1364,-97.3293],['Denton',33.1793,-97.1026],
-        ['Melissa',33.2713,-96.5923],['Royse City',32.9792,-96.2953],['Ennis',32.3232,-96.6066],
-        ['Waller',30.0715,-95.9321],['Madisonville',30.9652,-95.8807],['Northlake',33.0242,-97.2784],
+      const sites = [
+        ...g.brands.buckySites.map((s) => ['B:' + s.name, s.at[0], s.at[1]]),
+        ...g.brands.hebSites.map((s) => ['H:' + s.name, s.x, s.z]),
+        ...g.brands.lscSites.map((s) => ['L:' + s.name, s.at[0], s.at[1]]),
       ];
-      return coords.filter(([n, la, lo]) => { const [x, z] = LL(la, lo); return !g.airportClear(x, z); }).map((c) => c[0]);
+      return sites.filter(([n, x, z]) => !g.airportClear(x, z)).map((c) => c[0]);
     })()`);
     t.ok(bad.length === 0, `sites on an airport: ${bad.join(', ')}`);
+  });
+
+  await t.check('placement legality: every brand site clears road ribbons, water, and the border', async () => {
+    // The legalize()/spotClear gate (brands.js) must hold for all 56 resolved
+    // sites: no slab over a ribbon at reference scale 0.5 (street tier judged
+    // at the 0.15 default reach), nothing wet, nothing out of state. Reaches
+    // mirror BUCKY/HEB/LSC_FOOT.z1; the 0.9 margin sits just under the gate's
+    // 1.0 so a boundary site can't flake the check.
+    const bad = await t.ev(`(() => {
+      const HALF = { motorway: 1.6, trunk: 1.0, primary: 0.75, street: 0.55 };
+      const judge = (n, x, z, reach) => {
+        const r = g.nearestRoad(x, z, 30);
+        if (r && r.dist < HALF[r.type] + reach * (r.type === 'street' ? 0.15 : 0.5) + 0.9)
+          return n + ' on ' + r.type + ' d=' + r.dist.toFixed(1);
+        if (g.waterAt(x, z)) return n + ' in ' + g.waterAt(x, z);
+        if (!g.inTexas(x, z)) return n + ' out of state';
+        return null;
+      };
+      const out = [];
+      for (const s of g.brands.buckySites) out.push(judge('B:' + s.name, s.at[0], s.at[1], 20.5));
+      for (const s of g.brands.hebSites) out.push(judge('H:' + s.name, s.x, s.z, 12));
+      for (const s of g.brands.lscSites) out.push(judge('L:' + s.name, s.at[0], s.at[1], 25));
+      return out.filter(Boolean);
+    })()`);
+    t.ok(bad.length === 0, `illegal sites: ${bad.join('; ')}`);
+  });
+
+  await t.check("placement legality: New Braunfels Bucky's keeps its beaver-landmark standoff", async () => {
+    // the store's OSM node was picked ~14u off the beaver-kind collectible;
+    // the legalize nudge must not slide it back onto the landmark
+    const d = await t.ev(`(() => {
+      const s = g.brands.buckySites.find((s) => s.name === 'New Braunfels');
+      const lm = g.LANDMARKS.find((l) => l.kind === 'beaver');
+      return Math.hypot(s.at[0] - lm.at[0], s.at[1] - lm.at[1]);
+    })()`);
+    t.ok(d >= 10, `New Braunfels site slid onto the beaver landmark: ${d.toFixed(1)}u`);
+  });
+
+  await t.check('placement legality: nudged landmarks stand clear of their road/river ribbons', async () => {
+    // the five 2026-07-16 placement-audit nudges (gameplay.js) — assert the
+    // live LANDMARKS table, so a coord revert reintroducing the straddle fails here
+    const bad = await t.ev(`(() => {
+      const HALF = { motorway: 1.6, trunk: 1.0, primary: 0.75, street: 0.55 };
+      const names = ['Cadillac Ranch', 'Presidio La Bahía', 'Eiffel Tower of Paris, TX', 'Paisano Pete', 'LBJ Ranch'];
+      return names.map((n) => {
+        const lm = g.LANDMARKS.find((l) => l.name === n);
+        if (!lm) return n + ' missing';
+        const [x, z] = lm.at;
+        const r = g.nearestRoad(x, z, 20);
+        if (r && r.dist < HALF[r.type] + 2.2) return n + ' on ' + r.type + ' d=' + r.dist.toFixed(1);
+        if (g.waterAt(x, z)) return n + ' in ' + g.waterAt(x, z);
+        return null;
+      }).filter(Boolean);
+    })()`);
+    t.ok(bad.length === 0, `landmarks still straddling: ${bad.join('; ')}`);
   });
 
   await t.check('approach billboards: 3+ posts hug the nearest motorway/trunk', async () => {
@@ -101,20 +154,42 @@ export default async function brands(t) {
     t.ok(b.variety >= 2, `billboards all show the same pun: ${b.variety} distinct`);
   });
 
+  await t.check('approach billboards: re-snapped boards stay legal on a CURVED road (Luling)', async () => {
+    // Luling's I-10 bend put pre-fix tangent-extrapolated boards on the
+    // pavement and up to 20u into the fields (2026-07-16 audit) — every
+    // surviving board must hug the freeway shoulder, dry and in-state
+    const at = await t.ev(`g.brands.buckySites.find((s) => s.name === 'Luling').at`);
+    await t.tp(at[0], at[1] + 3);
+    await t.until(`g.brands.live.has('Luling')`, 8000);
+    const b = await t.ev(`(() => {
+      const HALF = { motorway: 1.6, trunk: 1.0, primary: 0.75, street: 0.55 };
+      const r = g.brands.live.get('Luling');
+      return r.boards.map((p) => {
+        const hug = g.nearestRoad(p.wx, p.wz, 30, (ty) => ty === 'motorway' || ty === 'trunk');
+        const any = g.nearestRoad(p.wx, p.wz, 6);
+        return { hug: hug ? hug.dist : 999, onPavement: any ? any.dist < HALF[any.type] + 0.4 : false,
+          wet: !!g.waterAt(p.wx, p.wz), out: !g.inTexas(p.wx, p.wz) };
+      });
+    })()`);
+    t.ok(b.length >= 2, `the curve dropped too many boards: ${b.length}`);
+    for (const p of b) {
+      t.ok(p.hug < 4, `a board strayed off the freeway: ${p.hug.toFixed(2)}u`);
+      t.ok(!p.onPavement, 'a board stands on the pavement');
+      t.ok(!p.wet && !p.out, 'a board is wet or out of state');
+    }
+  });
+
   await t.check('grounding: pad at MAX terrain height + foundation skirt reaches below the lot MIN', async () => {
     // relief over the same ±20 lot grid brands.js samples; pick the steepest site
     const pick = await t.ev(`(() => {
-      const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100, -(lat - 31) * 111320 / 100];
-      const coords = [['Bastrop',30.1071,-97.3058],['Temple',31.1364,-97.3293],['Denton',33.1793,-97.1026],
-        ['Melissa',33.2713,-96.5923],['Terrell',32.7167,-96.3212],['Northlake',33.0242,-97.2784],
-        ['New Braunfels',29.7269,-98.0779],['Waller',30.0715,-95.9321],['Luling',29.6507,-97.5935]];
+      // resolved (post-legalize) coords — padY is computed where the slab actually sits
       const range = (x, z) => { let mn = Infinity, mx = -Infinity;
         for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const h = g.hAt(x + i * 20, z + j * 20); if (h < mn) mn = h; if (h > mx) mx = h; }
         return { mn, mx }; };
       let best = null;
-      for (const [n, la, lo] of coords) {
-        const [x, z] = LL(la, lo); const { mn, mx } = range(x, z);
-        if (!best || mx - mn > best.relief) best = { n, x, z, relief: mx - mn, mn, mx };
+      for (const s of g.brands.buckySites) {
+        const [x, z] = s.at; const { mn, mx } = range(x, z);
+        if (!best || mx - mn > best.relief) best = { n: s.name, x, z, relief: mx - mn, mn, mx };
       }
       return best;
     })()`);
@@ -349,10 +424,11 @@ export default async function brands(t) {
 
   // -------------------------------------------- Lone Star Compute (Wave 3)
   // Abilene = the real "Stargate" flagship, first in LSC_SITES.
-  const lscAt = await t.ev(`({
-    x: (-99.88 + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100,
-    z: -(32.52 - 31) * 111320 / 100,
-  })`);
+  // resolved (post-legalize) lot center, same reason as katyAt above
+  const lscAt = await t.ev(`(() => {
+    const s = g.brands.lscSites.find((s) => s.name === 'Abilene');
+    return { x: s.at[0], z: s.at[1] };
+  })()`);
 
   await t.check('LSC streaming sentinel: the real loop spawns/despawns Abilene, shared protos survive', async () => {
     await t.tp(lscAt.x, lscAt.z + 3);
