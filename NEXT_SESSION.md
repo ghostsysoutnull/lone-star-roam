@@ -11,6 +11,11 @@ highest-value next move, not more code.
 The band is a clean baseline: the `BACKLOG.md` concurrency fix is the *next*
 road-set shift and lands against this, unstacked.
 
+**Turtle release legibility shipped and play-confirmed 2026-07-16 (`7e1c31f`)**
+— and the procedure is now reusable: `/legibility-pass <subject>` (project
+skill, works with cheaper models too) with a candidate queue in `BACKLOG.md`
+(bats, dolphins, and a Tours-tab audit sweep that should run first).
+
 ---
 
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
