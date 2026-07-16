@@ -5,6 +5,9 @@
 // fields actually logged in save.airports (radio.js's playerFlow only stamps
 // tier-1 fields) — no population-equivalent sort, and an empty logbook is
 // the common case that needs its own hint.
+// Also the menu's two input laws: keystrokes in the search field never reach the
+// window-level hotkeys (typing a city name used to fire them), and an open menu
+// freezes the world — via every close path, fast travel's included.
 
 const cityTab = (t) => t.ev(`(g.travel.tab = 'Cities', g.travel.render(), true)`);
 const airportTab = (t) => t.ev(`(g.travel.tab = 'Airports', g.travel.render(), true)`);
@@ -228,5 +231,73 @@ export default async function travel(t) {
     t.ok(r.cityUnaffected, 'airport search leaked into the Cities list');
     t.ok(r.airportFiltered, 'airport search/sort not applied on the Airports tab');
     await t.ev(`(g.travel.citySearch = '', g.travel.airportSearch = '', g.travel.tab = 'Cities', g.gameplay.save.airports = [], g.travel.render())`);
+  });
+
+  // The hotkeys are window-level keydown listeners, so keystrokes in the search
+  // field bubbled straight into them: typing "Paris" toggled the menu shut,
+  // "Amarillo" steered the truck, "Vega" cycled drive mode. travel.js stops
+  // propagation at the field — Escape alone still bubbles, so it closes the menu.
+  await t.check('search field swallows the hotkeys — typing a city name is inert', async () => {
+    await t.tp(-2767, 334); // empty I-10 stretch: nothing ambient to perturb the truck
+    await t.key('KeyP');
+    t.ok((await t.ev(`g.travel.el.style.display`)) === 'flex', 'travel menu did not open');
+    // "Vega, TX" spells three hotkeys on its own: V (mode), E (interact), A (steer)
+    const r = await t.ev(`(() => {
+      const el = g.travel.searchInput, mode0 = g.player.mode;
+      el.focus();
+      for (const code of ['KeyP', 'KeyV', 'KeyM', 'KeyA'])
+        el.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true }));
+      return { disp: g.travel.el.style.display, mode: g.player.mode, mode0,
+               map: g.hud.big.style.display, steer: !!g.player.keys['KeyA'] };
+    })()`);
+    t.ok(r.disp === 'flex', 'typing P in the search field closed the menu');
+    t.ok(r.mode === r.mode0, `typing V in the search field cycled mode to ${r.mode}`);
+    t.ok(r.map !== 'block', 'typing M in the search field opened the big map');
+    t.ok(r.steer === false, 'typing A in the search field steered the truck');
+    // Escape is the deliberate exception: it must still reach main.js and close
+    await t.ev(`(() => { const el = g.travel.searchInput; el.focus();
+      el.dispatchEvent(new KeyboardEvent('keydown', { code: 'Escape', bubbles: true })); })()`);
+    t.ok((await t.ev(`g.travel.el.style.display`)) === 'none', 'Escape in the search field did not close the menu');
+    // sentinel: the fix is scoped to the field — P on the window still toggles
+    await t.key('KeyP');
+    t.ok((await t.ev(`g.travel.el.style.display`)) === 'flex', 'global P hotkey no longer opens the menu');
+    await t.key('KeyP');
+    t.ok((await t.ev(`g.travel.el.style.display`)) === 'none', 'global P hotkey no longer closes the menu');
+  });
+
+  // Real-loop sentinel: player.simT is Σ dt inside player.update, which the main
+  // loop skips while frozen. The menu freeze is silent — no PAUSED banner, and
+  // isPaused() keeps meaning the Esc pause screen, not any frozen world.
+  await t.check('open menu freezes the world, closing it resumes', async () => {
+    await t.tp(-2767, 334);
+    await t.key('KeyP');
+    t.ok((await t.ev('g.isFrozen()')) === true, 'travel menu did not freeze the world');
+    t.ok((await t.ev('g.isPaused()')) === false, 'travel menu raised the Esc pause state');
+    t.ok((await t.ev(`g.hud.els.paused.style.display`)) === 'none', 'travel menu showed the PAUSED banner');
+    const before = await t.ev('g.player.simT');
+    await t.wait(1.5);
+    const after = await t.ev('g.player.simT');
+    t.near(after, before, 0.02, `simT advanced ${(after - before).toFixed(3)} while the menu was open`);
+    // P reaches the handler despite the freeze — that is why pause carries a reason
+    await t.key('KeyP');
+    t.ok((await t.ev('g.isFrozen()')) === false, 'closing the menu left the world frozen');
+    const runBefore = await t.ev('g.player.simT');
+    await t.wait(1.5);
+    t.ok((await t.ev('g.player.simT')) - runBefore > 0.1, 'loop still frozen after the menu closed');
+  });
+
+  // travel.go() closes the menu itself, so the freeze has to live in close(), not
+  // at the P-key handler — otherwise fast travel strands you in a frozen world.
+  await t.check('fast travel from the open menu leaves the world running', async () => {
+    await t.tp(-2767, 334);
+    await t.key('KeyP');
+    t.ok((await t.ev('g.isFrozen()')) === true, 'travel menu did not freeze the world');
+    await cityTab(t);
+    await t.ev(`g.travel.go(g.travel.current.find((c) => c.name === 'Austin'))`);
+    t.ok((await t.ev(`g.travel.el.style.display`)) === 'none', 'fast travel left the menu open');
+    t.ok((await t.ev('g.isFrozen()')) === false, 'fast travel left the world frozen');
+    const before = await t.ev('g.player.simT');
+    await t.wait(1.5);
+    t.ok((await t.ev('g.player.simT')) - before > 0.1, 'loop still frozen after fast travel');
   });
 }

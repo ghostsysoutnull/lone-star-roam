@@ -39,7 +39,7 @@ const ICONS = [
 ];
 
 export class TravelMenu {
-  constructor(player, gameplay, sky, npcs, missions, dog, onToast, onChime) {
+  constructor(player, gameplay, sky, npcs, missions, dog, onToast, onChime, onFreeze) {
     this.player = player;
     this.gameplay = gameplay;
     this.sky = sky;
@@ -48,6 +48,7 @@ export class TravelMenu {
     this.dog = dog;
     this.onToast = onToast;
     this.onChime = onChime;
+    this.onFreeze = onFreeze;
     this.tab = 'Cities';
     this.citySearch = '';
     this.citySort = 'pop';
@@ -59,6 +60,12 @@ export class TravelMenu {
     this.el.querySelector('.tabs').addEventListener('click', (e) => {
       if (e.target.dataset.tab) { this.tab = e.target.dataset.tab; this.render(); }
     });
+    // The global hotkeys are window-level keydown listeners, so a keystroke in
+    // this field bubbles up to them: typing "Paris" toggled this very menu shut,
+    // "Fort Worth" fired a flare, "Amarillo" steered the truck. Swallow the lot
+    // here — Escape alone keeps bubbling, so it still closes the menu. Relies on
+    // every hotkey listener being bubble-phase; a capture-phase one would slip past.
+    this.searchInput.addEventListener('keydown', (e) => { if (e.code !== 'Escape') e.stopPropagation(); });
     this.searchInput.addEventListener('input', () => {
       if (this.tab === 'Cities') this.citySearch = this.searchInput.value;
       else if (this.tab === 'Airports') this.airportSearch = this.searchInput.value;
@@ -79,14 +86,19 @@ export class TravelMenu {
     });
   }
 
+  // Opening freezes the world (main.js setPause('menu')) so the truck doesn't
+  // keep rolling while you browse; every close path unfreezes, which is why the
+  // freeze lives here and not at the P-key handler — fast travel closes the menu
+  // from execute() below, and would otherwise leave the world frozen.
   toggle() {
     const open = this.el.style.display !== 'flex';
     this.el.style.display = open ? 'flex' : 'none';
     if (open) this.render();
+    this.onFreeze?.(open);
     return open;
   }
 
-  close() { this.el.style.display = 'none'; }
+  close() { this.el.style.display = 'none'; this.onFreeze?.(false); }
 
   render() {
     for (const t of this.el.querySelectorAll('.tabs button'))

@@ -123,6 +123,16 @@ Key facts:
   gates the input branch and ferries.js drives `player.pos` directly. Any
   proximity-triggered vehicle takeover also needs ferries.js's `armed`
   arm/disarm gate or it ping-pongs forever.
+- **The hotkeys are window-level and bubble-phase — that is load-bearing.**
+  `#city-search` (travel.js) is the game's only text input and defends itself by
+  stopping keydown propagation; a capture-phase window listener would slip past
+  it and put the hotkeys back in the search box. Escape is the deliberate
+  exception (it still bubbles, and closes the menu).
+- **Pause carries a reason, not a boolean** — `'esc'` (banner + swallows every
+  key) vs `'menu'` (travel menu, silent freeze that must NOT swallow keys, since
+  P/Esc are how it closes). `isPaused()` still means the Esc screen; `isFrozen()`
+  means the loop is skipping updates. The menu freeze lives in travel.js's
+  `toggle()`/`close()` so fast travel's own `close()` unfreezes too.
 - **A new chatter kind needs THREE rows, not two**: a `POOLS` pool, a `VOICES`
   entry, *and* a `ROLL_OK` row in radio.js. Miss the last one and the aircraft
   enters `radio.sources`, fills lines on demand, and is never picked — silent,

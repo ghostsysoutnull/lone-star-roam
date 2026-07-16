@@ -112,7 +112,8 @@ async function boot() {
   const rabbits = new RabbitSystem(scene);
   brands.onHum = (d) => audio.datacenterHum(d); // Lone Star Compute proximity hum (audio built at line 70)
   applyGear(gameplay.save, player, dog); // saved shop upgrades take effect at boot
-  const travel = new TravelMenu(player, gameplay, sky, npcs, missions, dog, (m) => hud.toast(m), (k) => audio.chime(k));
+  const travel = new TravelMenu(player, gameplay, sky, npcs, missions, dog, (m) => hud.toast(m), (k) => audio.chime(k),
+    (on) => setPause(on ? 'menu' : null));
   const trains = new TrainSystem(scene);
   const maritime = new MaritimeSystem(scene);
   const shoulder = new ShoulderSystem(scene);
@@ -171,15 +172,22 @@ async function boot() {
   // Pause: the render loop freezes every system update (see setAnimationLoop) and
   // audio suspends; Esc is context-aware — it dismisses an open menu first, and
   // only toggles pause when nothing else is showing.
-  let paused = false;
-  const setPaused = (on) => {
-    paused = on;
-    hud.setPaused(on);
-    if (on) audio.freeze(); else audio.unfreeze();
+  // Two things freeze the world, so this is a reason and not a boolean: 'esc' is
+  // the pause screen (banner + swallows every key but Esc), 'menu' is the travel
+  // menu freezing the world silently while you browse. A boolean can't tell them
+  // apart, and 'menu' must NOT swallow keys — P and Esc are how the menu closes.
+  let pauseReason = null; // 'esc' | 'menu' | null
+  const setPause = (reason) => {
+    pauseReason = reason;
+    hud.setPaused(reason === 'esc');
+    if (reason) audio.freeze(); else audio.unfreeze();
   };
+  const setPaused = (on) => setPause(on ? 'esc' : null);
   addEventListener('keydown', (e) => {
-    // Frozen world swallows every key but Esc, so nothing sneaks through while paused
-    if (paused && e.code !== 'Escape') return;
+    // The pause screen swallows every key but Esc, so nothing sneaks through while
+    // paused. A travel-menu freeze deliberately doesn't — P and Esc must reach the
+    // handlers below that close it (and P can't escape an Esc pause: no menu open).
+    if (pauseReason === 'esc' && e.code !== 'Escape') return;
     // Space is the horn in DRIVE (climb in FLY): scatters critters, startles townsfolk
     if (e.code === 'Space' && player.mode === 'DRIVE' && !e.repeat && performance.now() > hornCd) {
       hornCd = performance.now() + 400;
@@ -200,7 +208,7 @@ async function boot() {
       if (travel.el.style.display === 'flex') travel.close();
       else if (hud.els.help.style.display === 'block') hud.toggleHelp();
       else if (hud.big.style.display === 'block') hud.toggleBigMap();
-      else setPaused(!paused);
+      else setPaused(!pauseReason);
     }
     if (e.code === 'KeyN') hud.toast(audio.toggleMute() ? '🔇 Muted' : '🔊 Sound on');
     if (e.code === 'Equal' || e.code === 'NumpadAdd') hud.toast(`🔍 UI size ${hud.uiScale(1)}`);
@@ -234,7 +242,7 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, inTexas, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => paused };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, inTexas, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborCountyAt, agAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, ATMOS, clock, SPECIES, LEGENDS, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -249,7 +257,7 @@ async function boot() {
     // re-draw the frozen frame, but skip every system update below. The only system
     // reading elapsedTime (maritime's ±0.06-unit ship bob) merely snaps phase on
     // resume; its lane travel is dt-integrated, so nothing teleports.
-    if (paused) {
+    if (pauseReason) {
       if (!window.__skipRender) renderer.render(scene, camera);
       return;
     }
