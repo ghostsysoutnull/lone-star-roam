@@ -48,7 +48,12 @@ function serve() {
       if (!path.startsWith(ROOT)) { rsp.writeHead(403).end(); return; }
       try {
         const body = await readFile(path);
-        rsp.writeHead(200, { 'content-type': MIME[extname(path)] || 'application/octet-stream' }).end(body);
+        rsp.writeHead(200, {
+          'content-type': MIME[extname(path)] || 'application/octet-stream',
+          // A worker keeps one browser context for its lifetime. Its fresh
+          // pages can safely reuse static modules and data after storage reset.
+          'cache-control': 'public, max-age=3600',
+        }).end(body);
       } catch { rsp.writeHead(404).end(); }
     });
     srv.listen(0, '127.0.0.1', () => res(srv));
@@ -89,15 +94,17 @@ function mkT(page, check) {
       await ev(`(g.player.setMode('${mode}'), g.player.pos.set(${x}, ${y}, ${z}), g.player.speed = 0, g.player.vy = 0)`);
       await t.wait(0.15);
     },
-    wait: (s) => page.waitForTimeout(s * 1000),
-    // wait for N seconds of *physics* time (player.simT = Σ clamped dt) — headless
-    // frames run slow and dt clamps at 0.05, so wall/clock waits mislead physics tests
+    // Advance real game-loop frames without paying wall-clock time. Playwright's
+    // fake clock drives requestAnimationFrame and timers, so sentinels still
+    // exercise main.js wiring instead of bypassing systems with direct calls.
+    wait: (s) => page.clock.runFor(s * 1000),
+    // wait for N seconds of *physics* time (player.simT = Σ clamped dt)
     async simWait(s) {
       const t0 = await ev('g.player.simT');
       const deadline = Date.now() + Math.max(30000, s * 25000);
       while ((await ev('g.player.simT')) - t0 < s) {
         if (Date.now() > deadline) throw new Error(`simWait(${s}) timed out`);
-        await page.waitForTimeout(60);
+        await t.wait(0.06);
       }
     },
     // advance player (+ dog) physics synchronously in ONE evaluate — ~instant
@@ -159,7 +166,7 @@ function mkT(page, check) {
     async findLight(pred, candidates) {
       for (const v of candidates) {
         await t.setTime(v);
-        await page.waitForTimeout(250);
+        await t.wait(0.25);
         if (pred(await ev('g.ATMOS.night'))) return v;
       }
       throw new Error(`no sky.t in [${candidates}] satisfied the light condition`);
@@ -179,7 +186,7 @@ function mkT(page, check) {
       const deadline = Date.now() + ms;
       while (Date.now() < deadline) {
         if (await ev(expr)) return;
-        await page.waitForTimeout(every);
+        await page.clock.runFor(every);
       }
       throw new Error(`until timed out: ${expr.slice(0, 80)}`);
     },
@@ -200,7 +207,7 @@ function mkT(page, check) {
       const out = [];
       for (let i = 0; i < n; i++) {
         out.push(await ev(expr));
-        await page.waitForTimeout(dtMs);
+        await page.clock.runFor(dtMs);
       }
       return out;
     },
@@ -210,7 +217,7 @@ function mkT(page, check) {
       mkdirSync(SHOTS, { recursive: true });
       const p = join(SHOTS, `${name}.png`);
       await page.evaluate('window.__skipRender = 0');
-      await page.waitForTimeout(700); // a SwiftShader frame or two
+      await t.wait(0.7);
       await page.screenshot({ path: p });
       await page.evaluate('window.__skipRender = 1');
       console.log(`     shot: ${p}`);
@@ -241,14 +248,21 @@ if (unknown.length) { console.error(`unknown suite(s): ${unknown.join(', ')} —
 
 // Approx per-suite seconds — a SCHEDULING HINT only (longest-processing-time
 // packing so the heavy suites start first); wrong values just cost a little
-// packing efficiency, never correctness. Update loosely as suites grow.
-const WEIGHTS = { aviation: 22, lights: 13, haunts: 7, missions: 6, wildlife: 5, hud: 3, shop: 3, traffic: 2, drive: 2, npcs: 1, debug: 1 };
-// Default concurrency is capped by BOTH cores and free RAM. RAM is the real
-// ceiling: each worker's fresh-context game boot peaks ~0.8 GB under SwiftShader,
-// and overcommitting thrashes — which on this box turned j=8/10 SLOWER than j=6
-// and flaky. ~cores/2 lands at the measured knee (~30 s, stable) on 12 cores.
+// packing efficiency, never correctness. Keep every suite represented: an
+// unlisted long suite falls into the 5-second bucket and can sit behind short
+// checks, leaving workers idle near the end of a full run.
+const WEIGHTS = {
+  ag: 31, aviation: 27, hud: 24, brands: 24, shoulder: 17, lights: 16,
+  ferries: 11, shelf: 11, travel: 10, haunts: 10, band: 9, wildlife: 8,
+  shop: 8, missions: 7, springer: 6, jetpack: 5, drive: 4, debug: 4,
+  padre: 3, rabbits: 3, traffic: 3, npcs: 2, walk: 1,
+};
+// Default concurrency is capped by BOTH cores and free RAM. SwiftShader
+// rendering is CPU-heavy: on a 12-core host, 4 workers finish faster than 5+
+// because the renderer processes otherwise contend. `-j` remains available
+// when a host has different measured characteristics.
 const memCap = Math.floor(os.freemem() / (0.8 * 2 ** 30));
-const DEFAULT_J = Math.min(suites.length, Math.max(2, Math.min(Math.floor(os.cpus().length / 2), memCap)));
+const DEFAULT_J = Math.min(suites.length, Math.max(2, Math.min(Math.ceil(os.cpus().length / 3), memCap)));
 const C = Math.max(1, Math.min(suites.length, jFlag > 0 ? jFlag : DEFAULT_J));
 
 const srv = await serve();
@@ -256,41 +270,51 @@ const port = srv.address().port;
 const queue = suites.slice().sort((a, b) => (WEIGHTS[b] ?? 5) - (WEIGHTS[a] ?? 5));
 const results = new Map();
 
-// Each suite gets a FRESH browser context (clean localStorage) + a fresh game
-// boot. This is mandatory, not wasteful: suites mutate shared game state and
-// don't reset it — shop's applyGear() boosts player.perks, lights/aviation
-// leave weather/night set — so a warm-reused game leaks that into the next
-// suite (the serial runner only got away with it via fixed alphabetical
-// order). The Chromium PROCESS stays warm per worker (launched once); only the
-// per-suite game boot (~2.5 s) is re-paid, which the pool overlaps across cores.
-async function runSuite(browser, name) {
+// Each suite gets a fresh page and game boot. The worker context stays alive so
+// its HTTP cache can reuse the game's static modules and data; its init script
+// clears localStorage before game code runs, preserving the prior fresh-context
+// isolation for game saves and UI preferences.
+async function runSuite(ctx, name) {
   const sink = { name, passed: 0, failed: 0, lines: [], ms: 0 };
   results.set(name, sink);
-  const ctx = await browser.newContext({ viewport: { width: 640, height: 360 } }); // small viewport: SwiftShader fill rate limits sim fps
+  let page;
   try {
-    const page = await ctx.newPage();
+    await ctx.clearCookies();
+    page = await ctx.newPage();
+    await page.clock.install();
+    // The browser clock's default rAF cadence is 60 Hz. Its tight synchronous
+    // callback loop makes that far more CPU-intensive than a headless game
+    // frame; the game's physics deliberately clamps at 50 ms, so match that
+    // stable simulation cadence instead.
+    await page.addInitScript(() => {
+      window.requestAnimationFrame = (callback) => setTimeout(() => callback(performance.now()), 50);
+      window.cancelAnimationFrame = (id) => clearTimeout(id);
+    });
     page.on('pageerror', (e) => sink.lines.push(`     pageerror: ${String(e).split('\n')[0]}`));
     await page.goto(`http://127.0.0.1:${port}/`);
     await page.waitForFunction('window.__game && document.getElementById("loading").style.display === "none"', null, { timeout: 60000 });
     // skip the ~300 ms SwiftShader draw: the loop still runs every system update
     // at full rAF speed, sim time tracks wall time, and evaluates return fast
     await page.evaluate('window.__skipRender = 1');
-    await page.waitForTimeout(500); // first frames: chunks spawn, ATMOS settles
+    await page.clock.runFor(500); // first frames: chunks spawn, ATMOS settles
     const s0 = Date.now();
     await (await import(join(suiteDir, name + '.mjs'))).default(mkT(page, mkCheck(sink)));
     sink.ms = Date.now() - s0;
     process.stderr.write(`  ✓ ${name} (${(sink.ms / 1000).toFixed(1)}s)\n`); // live progress → stderr, off the stdout report
   } finally {
-    await ctx.close();
+    if (page) await page.close();
   }
 }
 
 async function worker() {
-  let browser;
+  let browser, ctx;
   try {
     browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
-    while (queue.length) await runSuite(browser, queue.shift());
+    ctx = await browser.newContext({ viewport: { width: 640, height: 360 } }); // small viewport: SwiftShader fill rate limits sim fps
+    await ctx.addInitScript(() => localStorage.clear());
+    while (queue.length) await runSuite(ctx, queue.shift());
   } finally {
+    if (ctx) await ctx.close();
     if (browser) await browser.close();
   }
 }
