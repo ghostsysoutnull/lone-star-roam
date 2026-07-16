@@ -18,14 +18,14 @@ export const TOURS = [
       { wave: 'W3 — Padre', spots: [
         S('🌉 Causeway arrival', [2180, 5481], { mode: 'DRIVE', heading: -1.31, note: 'a deck, not a road — ride it onto the island' }),
         S('🏖️ Beach drive', LL(27.5, -97.29), { mode: 'DRIVE', note: 'wet sand caps the speed — follow the surf line' }),
-        S('🐢 Malaquite turtle release', LL(27.4326, -97.2968), { mode: 'WALK', time: 0.25, heading: -Math.PI / 2, note: 'seeded mornings only — an empty beach means try another day' }),
+        S('🐢 Malaquite turtle release', LL(27.4326, -97.2968), { mode: 'WALK', heading: -Math.PI / 2, act: 'turtleMorning', note: 'the clock jumps to the next release morning' }),
       ] },
       { wave: 'W5 — the Shelf', spots: [
         S('🌃 Rig skyline from Malaquite', LL(27.4326, -97.2968), { mode: 'WALK', time: 0.98, heading: -Math.PI / 2, note: 'look east over the water' }),
         S('🛟 Tidelands Buoy plaque', [4762.2, 1851.5], { mode: 'FLY', note: 'settle by the red nun — the plaque reads afloat' }),
         S('🛢️ The Far Rig plaque', LL(28.0, -95.0), { mode: 'FLY', note: '64.1 miles out — brass on the platform' }),
-        S('✨ 1554 treasure light', [2130, 4942.6], { mode: 'WALK', time: 0.98, heading: -Math.PI / 2, note: 'new-moon nights only, off the Mansfield Cut' }),
-        S('🐦 Aransas whooping cranes', LL(28.26, -96.83), { mode: 'DRIVE', note: 'the wintering flock on Blackjack Peninsula' }),
+        S('✨ 1554 treasure light', [2130, 4942.6], { mode: 'WALK', heading: -Math.PI / 2, act: 'treasureNight', note: 'forced for tonight — naturally a new-moon event, off the Mansfield Cut' }),
+        S('🐦 Aransas whooping cranes', LL(28.26, -96.83), { mode: 'DRIVE', time: 0.35, note: 'the wintering flock on Blackjack Peninsula' }),
       ] },
       { wave: 'W5/5b — the eight ranches', spots: [
         S('🐂 King Ranch', [1558, 3870.1], { mode: 'DRIVE', heading: Math.PI / 2 }),
@@ -44,7 +44,7 @@ export const TOURS = [
         S('📸 Texarkana straddle', [TXK[0], TXK[1] + 7], { mode: 'WALK', note: 'stand the brass line at the federal building' }),
         S('🎰 WinBig from I-35', LL(33.71, -97.13), { mode: 'DRIVE', heading: 0, note: 'read the marquee doing seventy north' }),
         S('🪨 Corner Stone — the tripoint', LL(36.5, -103.042), { mode: 'WALK', note: 'one of seven survey caps; the rest are a hunt' }),
-        S('🐻 Sabine pines bear', LL(31.3, -93.9), { mode: 'DRIVE', note: 'cruise the pines — the bears are rare and shy' }),
+        S('🐻 Sabine pines bear', LL(31.3, -93.9), { mode: 'DRIVE', act: 'bear', note: 'a debug bear ambles ahead — wild ones stay rare' }),
       ] },
       { wave: 'W6b — the Shoulder west', spots: [
         S('🪦 Texola wall', LL(35.2211, -99.9925), { mode: 'WALK', note: 'no other place like this place anywhere near this place' }),
@@ -70,8 +70,8 @@ export const TOURS = [
         S('🏰 Presidio La Bahía', LL(28.6470, -97.3844), { mode: 'DRIVE' }),
       ] },
       { wave: 'Sound & light', spots: [
-        S('📯 Honk chorus on I-35', LL(30.30, -97.72), { mode: 'DRIVE', note: 'park across a lane and wait for the pile-up' }),
-        S('🎇 Flares at night', [100, 550], { mode: 'WALK', time: 0.98, note: 'fire the flare gun — judge the light and the recharge' }),
+        S('📯 Honk chorus on I-35', LL(30.30, -97.72), { mode: 'DRIVE', time: 0.35, note: 'park across a lane and wait for the pile-up' }),
+        S('🎇 Flares at night', [100, 550], { mode: 'FLY', time: 0.98, note: 'press F — a rack of three, they own the night' }),
         S('💡 Headlight throw', [-2767, 334], { mode: 'DRIVE', time: 0.98, heading: Math.PI / 2, note: 'empty I-10 west — judge the beam' }),
         S('🦉 Wildlife voices', [100, 550], { mode: 'WALK', time: 0.98, note: 'stand still and listen — coyotes, owls, the mix' }),
       ] },

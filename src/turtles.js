@@ -17,6 +17,9 @@ const N = 48;
 const CRAWL = 11;                    // units from nest to surf
 const WINDOW = [0.235, 0.32];        // sky.t — first light through early morning
 const ODDS = 0.45;                   // seeded release mornings (~every other day)
+// the one release-day roll, shared with debug.js's turtleMorning() — the same
+// seed stream must never be re-derived elsewhere
+export const releaseOn = (day) => seededRand(`turtle:${day}`)() < ODDS;
 const SPOT_R = 40;                   // parked-truck distance, not boots-on-nest
 
 export class TurtleSystem {
@@ -45,7 +48,7 @@ export class TurtleSystem {
     const day = Math.floor(days);
     if (day !== this.day) { // roll this morning's release once per game day
       this.day = day;
-      this.releaseToday = seededRand(`turtle:${day}`)() < ODDS;
+      this.releaseToday = releaseOn(day);
     }
     const active = this.releaseToday && skyT >= WINDOW[0] && skyT <= WINDOW[1];
     const near = (px - NEST.x) ** 2 + (pz - NEST.z) ** 2 < 600 * 600;

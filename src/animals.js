@@ -449,6 +449,28 @@ export class AnimalSystem {
     this.scene.add(group);
     this.live.set(key, { group, animals });
   }
+
+  // Debug-only lever (the tours 🐻 button): conjure one animal near (x,z)
+  // through the real build path — same mesh kit, behavior table, voices and
+  // critter log. Natural spawn odds are untouched. Spawns the chunk first if
+  // the player just teleported and update() hasn't run yet; the forced animal
+  // despawns with its chunk like any other.
+  forceSpawn(species, x, z) {
+    const key = `${Math.floor(x / CHUNK)},${Math.floor(z / CHUNK)}`;
+    if (!this.live.has(key)) this.spawn(key);
+    const rec = this.live.get(key);
+    const rand = seededRand(`force:${species}:${key}`);
+    const { g, legs } = mkAnimal(species, rand);
+    g.position.set(x, hAt(x, z), z);
+    rec.group.add(g);
+    const a = {
+      g, legs, species, homeX: x, homeZ: z,
+      state: 'idle', stateT: 0, ambling: false, zigT: 0,
+      heading: rand() * Math.PI * 2, phase: rand() * Math.PI * 2,
+    };
+    rec.animals.push(a);
+    return a;
+  }
 }
 
 // --- Low-poly critters (all face -z) ---

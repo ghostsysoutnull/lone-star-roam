@@ -5,12 +5,13 @@
 import { chapelSitesNear } from './world.js';
 import { EROCK } from './haunts.js';
 import { hAt } from './geo.js';
+import { releaseOn } from './turtles.js';
 import { TOURS } from './tours.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -75,6 +76,28 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     charter() {
       const offer = missions.force('MRF', 'DFW'); // Marfa strip → DFW: the tier-3 strip's moment
       hud.toast(offer ? `✈️ Charter forced: ${offer.from} → ${offer.to} — go land it` : '✈️ Job already active — finish or abandon it first');
+    },
+    // tour-spot forcers: guarantee probability-gated events on arrival
+    turtleMorning() {
+      // jump the date to the next seeded release day — moon phase rides along,
+      // world generation and saves never read the day counter
+      let d = Math.floor(sky.days) + 1;
+      const stop = d + 100; // ODDS 0.45 → expected ~2 tries; cap is pure paranoia
+      while (!releaseOn(d) && d < stop) d++;
+      sky.days = d;
+      sky.t = 0.26; // inside the release window
+      hud.toast('🐢 Jumped to the next release morning');
+    },
+    treasureNight() {
+      haunts.force = true; // the treasure gate honors force (haunts.js); day() clears it
+      actions.night();
+      hud.toast('✨ The gold light rides the swell tonight');
+    },
+    bear() {
+      // debug-only conjure through the real animal machinery — the natural
+      // 12%-per-chunk rarity is untouched
+      animals.forceSpawn('blackbear', player.pos.x + 30, player.pos.z);
+      hud.toast('🐻 A bear in the pines — he spooks inside 26 units');
     },
     testRadio() {
       const tw = radio.nearestTowered(player.pos.x, player.pos.z);

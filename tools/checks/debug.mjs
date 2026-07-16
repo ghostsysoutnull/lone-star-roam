@@ -54,6 +54,43 @@ export default async function debug(t) {
     await t.ev(`(g.ufo.despawnAll?.() , g.debug.actions.day())`);
   });
 
+  await t.check('turtleMorning jumps to a real release dawn through the real loop', async () => {
+    await t.tp(2102, 3971); // Malaquite — inside the nest's 600-unit gate
+    const before = await t.ev('g.sky.days');
+    await t.ev('g.debug.actions.turtleMorning()');
+    const r = await t.ev('({ days: g.sky.days, t: g.sky.t })');
+    t.ok(r.days > before && Number.isInteger(r.days), `days ${before} → ${r.days} — not a forward integer jump`);
+    t.ok(r.t > 0.235 && r.t < 0.32, `sky.t ${r.t} outside the release window`);
+    await t.until('g.turtles.releaseToday && g.turtles.mesh.visible', 10000);
+    await t.ev('g.debug.actions.day()');
+  });
+
+  await t.check('treasureNight forces the 1554 light regardless of moon phase', async () => {
+    await t.tp(2130, 4942.6); // the Padre shore spot, ~98 units from the light
+    await t.ev('g.debug.actions.treasureNight()');
+    await t.until('g.haunts.treasure.visible && g.haunts.tMat.opacity > 0.1', 15000);
+    await t.ev('(g.haunts.force = false, g.debug.actions.day())');
+  });
+
+  await t.check('bear conjures a blackbear near the player through the real machinery', async () => {
+    await t.tp(5343, -334); // the Sabine pines tour spot
+    await t.ev('g.debug.actions.bear()');
+    // nearest, not first — the pines legitimately roll natural bears in
+    // neighboring chunks, and the forced one must be the close one
+    const r = await t.ev(`(() => {
+      let best = null;
+      for (const { animals } of g.animals.live.values())
+        for (const a of animals) {
+          if (a.species !== 'blackbear') continue;
+          const d = Math.hypot(a.g.position.x - g.player.pos.x, a.g.position.z - g.player.pos.z);
+          if (!best || d < best.d) best = { d };
+        }
+      return best;
+    })()`);
+    t.ok(r, 'no blackbear in any live chunk after bear()');
+    t.ok(r.d > 20 && r.d < 45, `nearest bear ${r?.d} units out — expected the forced one at ~30`);
+  });
+
   await t.check('haunt-cemetery forces wisps through the real loop', async () => {
     await t.tp(100, 550); // Hill Country ranchland — chapel odds are 0 in the far-west desert
     await t.ev('g.debug.actions.hauntCemetery()');

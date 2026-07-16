@@ -108,6 +108,15 @@ graduate here (and out of `NEXT_SESSION.md`).
 
 ## Verification
 
+- **Tour spots guarantee their subject** (`src/tours.js`): static/ambient
+  content — teleport + staged time suffices. Schedule- or probability-gated
+  content — chain a forcing debug action (`turtleMorning`, `treasureNight`,
+  `bear` via `animals.forceSpawn` are the patterns; forcing is debug-only and
+  never changes natural odds). A "maybe you'll see it" button is allowed only
+  when its note explicitly labels it a watch (the Roswell wink). Audit lesson
+  2026-07-16: 6 of the first 30 spots violated this — three needed forcing,
+  two needed staged time (night thins traffic; cranes dim after dark), one
+  staged the wrong mode entirely (flares fire only in FLY).
 - **Aviation.mjs flakes under any parallel `-j`** (real-loop-timing checks; seen
   at -j4 and -j6, always clean standalone) — one standalone rerun before assuming
   a regression. Same policy for the shop suite's Lacy-yip check, and for the
