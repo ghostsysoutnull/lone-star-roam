@@ -977,12 +977,18 @@ function mkBuckySignTex() {
   ctx.strokeStyle = '#ff5a3c'; ctx.lineWidth = 10; ctx.lineJoin = 'round';
   ctx.strokeRect(20, 20, c.width - 40, c.height - 40);
   ctx.strokeRect(20, 20, c.width - 40, c.height - 40);                       // second pass thickens the baked halo
-  ctx.shadowColor = '#f2c200'; ctx.shadowBlur = 26;                          // yellow tube wordmark
-  ctx.fillStyle = '#ffd83d'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  // Wordmark as TUBE TRACES, not filled glyphs: solid fill + halo merged into
+  // one bright blob in play (Bruno's night read, 2026-07-16). Real neon script
+  // is an outline — stroke the letterforms so their interiors stay dark board,
+  // halo pass first (blurred), then a crisp bright tube on top.
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = "bold italic 108px 'Georgia', serif";
-  ctx.fillText("Bucky's", c.width / 2, c.height / 2);
-  ctx.fillText("Bucky's", c.width / 2, c.height / 2);
+  ctx.strokeStyle = '#f2c200'; ctx.lineWidth = 7; ctx.lineJoin = 'round';
+  ctx.shadowColor = '#f2c200'; ctx.shadowBlur = 18;                          // baked halo around the tube
+  ctx.strokeText("Bucky's", c.width / 2, c.height / 2);
   ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#ffe680'; ctx.lineWidth = 4;                            // crisp hot core of the tube
+  ctx.strokeText("Bucky's", c.width / 2, c.height / 2);
   const tex = new THREE.CanvasTexture(c);
   tex.anisotropy = 4;
   return tex;

@@ -311,6 +311,22 @@ export default async function brands(t) {
       })()`);
       await t.wait(0.5);
       await t.shot('bucky-night-lit');
+      // hover in front of the pylon panel — the wordmark-legibility read
+      await t.ev(`(() => {
+        const r = g.brands.live.get('Katy'), h = r.group.rotation.y, s = g.brands.scale;
+        const sx = r.group.position.x + (15.5 * Math.cos(h) + 18.5 * Math.sin(h)) * s;
+        const sz = r.group.position.z + (-15.5 * Math.sin(h) + 18.5 * Math.cos(h)) * s;
+        const sy = r.group.position.y + 13 * s;
+        const back = 8 * Math.max(s, 0.4);
+        const vx = sx + Math.sin(h) * back, vz = sz + Math.cos(h) * back;
+        g.player.setMode('FLY');
+        g.player.pos.set(vx, sy, vz);
+        g.player.heading = Math.atan2(-(sx - vx), -(sz - vz));
+        g.player.speed = 0;
+      })()`);
+      await t.wait(0.4);
+      await t.shot('bucky-sign-closeup');
+      await t.ev(`g.player.setMode('DRIVE')`);
     }
     await t.setDay();
   });
