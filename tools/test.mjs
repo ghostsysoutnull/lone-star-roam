@@ -26,9 +26,16 @@ let failed = 0;
 for (const group of groups) {
   const result = spawnSync(process.execPath, ['--test', join(UNIT, `${group}.test.mjs`)], {
     cwd: ROOT,
-    stdio: 'inherit',
+    encoding: 'utf8',
   });
-  if (result.status !== 0) failed++;
+  if (result.status !== 0) {
+    failed++;
+    console.error(`✗ ${group}`);
+    process.stderr.write(result.stdout || '');
+    process.stderr.write(result.stderr || '');
+  } else {
+    console.log(`✓ ${group}`);
+  }
 }
 
 console.log(`${groups.length - failed}/${groups.length} fast test groups passed (${groups.join(', ')})`);
