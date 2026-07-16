@@ -142,7 +142,10 @@ Key facts:
 **Verification**
 - **Aviation.mjs flakes under any parallel `-j`** (real-loop-timing checks; seen
   at -j4 and -j6, always clean standalone) — one standalone rerun before assuming
-  a regression. Same policy for the shop suite's Lacy-yip check.
+  a regression. Same policy for the shop suite's Lacy-yip check, and for the
+  lights suite's Levelland lantern-flicker check (`lights.mjs:254`) — the flicker
+  is a per-frame random roll, and under `-j` the wall-clock sampler can miss the
+  rare zero; clean standalone.
 - **Score-row DOM reads must `until()` the DOM, not race it** — the score spans
   ride the 12 Hz HUD tick.
 - **The ceremony state machine is land-to-land** with an 8 s cooldown on
