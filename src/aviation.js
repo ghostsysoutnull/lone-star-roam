@@ -17,6 +17,7 @@ import { seededRand, hAt } from './geo.js';
 import { ATMOS } from './sky.js';
 import { AIRPORTS, runwayInUse } from './airports.js';
 import { merge, tinted } from './traffic.js';
+import { routeProblems, scheduleAirport } from './aviation-rules.js';
 
 const DAY_S = 720;                      // mirrors sky.js DAY_SECONDS
 const SLOTS = [0, 12, 5, 2];            // daytime departures per field by tier
@@ -70,6 +71,8 @@ const ROUTES = {
   CVN: [['AMA', 2], ['LBB', 2], ['HOB', 1]],
   HOB: [['MAF', 2], ['LBB', 2], ['CVN', 1]],
 };
+const ROUTE_PROBLEMS = routeProblems(AIRPORTS, ROUTES);
+if (ROUTE_PROBLEMS.length) throw new Error(`invalid aviation routes: ${ROUTE_PROBLEMS.join('; ')}`);
 
 const byId = Object.fromEntries(AIRPORTS.map((a) => [a.id, a]));
 
@@ -138,26 +141,15 @@ function mkSlot(a, day, k, u, dest, r) {
 export function daySchedule(day) {
   // military:true fields (Cannon/Barksdale) fly no civilian schedule — the
   // rare B-52 pair is military.js's own flavor candidate, not a ROUTES entry.
-  return AIRPORTS.filter((a) => !a.military).map((a) => {
-    const routes = ROUTES[a.id];
-    const total = routes.reduce((s, [, w]) => s + w, 0);
-    const pick = (v) => { let x = v * total; for (const [id, w] of routes) { x -= w; if (x <= 0) return id; } return routes[0][0]; };
-    const slots = [];
-    const n = SLOTS[a.tier], dayW = 1 - (NIGHT_U1 - NIGHT_U0);
-    for (let k = 0; k < n; k++) {
-      const r = seededRand(`avn:${a.id}:${day}:${k}`);
-      const w = dayW * (k + r()) / n;
-      slots.push(mkSlot(a, day, k, w < NIGHT_U0 ? w : w + (NIGHT_U1 - NIGHT_U0), pick(r()), r));
-    }
-    if (a.tier === 1) {
-      const r = seededRand(`avn:${a.id}:${day}:redeye`);
-      const m = Math.floor(r() * (REDEYE_MAX + 1));
-      for (let k = 0; k < m; k++)
-        slots.push(mkSlot(a, day, 100 + k, NIGHT_U0 + ((k + r()) / m) * (NIGHT_U1 - NIGHT_U0), pick(r()), r));
-    }
-    slots.sort((x, y) => x.u - y.u);
-    return { id: a.id, slots };
-  });
+  return AIRPORTS.filter((a) => !a.military).map((a) => ({
+    id: a.id,
+    slots: scheduleAirport({
+      airport: a, day, routes: ROUTES, slotsByTier: SLOTS, redeyeMax: REDEYE_MAX,
+      nightStart: NIGHT_U0, nightEnd: NIGHT_U1,
+      random: (key) => seededRand(`avn:${key}`),
+      makeSlot: mkSlot,
+    }),
+  }));
 }
 
 // closed-form position/phase at `e` seconds after pushback. The takeoff roll

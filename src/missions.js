@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { GEO } from './geo.js';
 import { cityRadius } from './cities.js';
 import { AIRPORTS, onRunway, TD_AGL, TD_SPD } from './airports.js';
+import { charterOfferTerms, groundOfferTerms, missionPayout } from './mission-rules.js';
 
 const CHARTER_LIVERY = 0xe8a33d; // air-taxi accent, swapped in over the wings' stock color
 
@@ -172,10 +173,7 @@ export class MissionSystem {
         const rush = Math.random() < 0.25;
         offers.push({
           cargo: cargo.name, icon: cargo.icon, note: cargo.note ?? null, from: from.name, to: to.name,
-          km: Math.round(dist * 0.1), rush,
-          pay: Math.round((50 + dist * 0.1 * 1.2 * (rush ? 1.4 : 1)) / 5) * 5,
-          // tuned for driving: ~20% slack over a motorway pace, tighter on rush jobs
-          deadline: Math.round((dist / 24 + 60) * (rush ? 0.75 : 1)),
+          rush, ...groundOfferTerms(dist, rush),
         });
         break;
       }
@@ -218,10 +216,7 @@ export class MissionSystem {
         const rush = Math.random() < 0.25;
         offers.push({
           kind: 'charter', manifest, icon, fromId: from.id, toId: to.id, from: from.name, to: to.name,
-          km: Math.round(dist * 0.1), rush,
-          pay: Math.round((60 + dist * 0.1 * 1.6 * (rush ? 1.4 : 1)) / 5) * 5,
-          // ~2x headroom against FLY's 150 u/s cap, same slack ratio as ground's 24-vs-46
-          deadline: Math.round((dist / 75 + 90) * (rush ? 0.75 : 1)),
+          rush, ...charterOfferTerms(dist, rush),
         });
         break;
       }
@@ -240,9 +235,7 @@ export class MissionSystem {
     const dist = Math.hypot(to.at[0] - from.at[0], to.at[1] - from.at[1]);
     const offer = {
       kind: 'charter', manifest: 'Test charter', icon: '✈️', fromId, toId, from: from.name, to: to.name,
-      km: Math.round(dist * 0.1), rush: false,
-      pay: Math.round((60 + dist * 0.1 * 1.6) / 5) * 5,
-      deadline: Math.round(dist / 75 + 90),
+      rush: false, ...charterOfferTerms(dist, false),
     };
     this.accept(offer);
     return offer;
@@ -346,7 +339,7 @@ export class MissionSystem {
     const late = j.left <= 0;
     const rig = this.player.perks?.cargoPay ?? 1; // Cargo rig upgrade, applied at payout
     if (j.kind === 'charter') {
-      const payout = Math.round((j.pay * rig * (late ? 0.5 : 1)) / 5) * 5;
+      const payout = missionPayout(j.pay, rig, late);
       this.setLivery(false);
       const toField = AIRPORTS.find((a) => a.id === j.toId);
       if (toField?.band) this.gp.stampLanding(toField.id, toField.name);
@@ -354,7 +347,7 @@ export class MissionSystem {
       return;
     }
     const bonus = !j.flew;
-    const payout = Math.round((j.pay * rig * (late ? 0.5 : 1) * (bonus ? 1.5 : 1)) / 5) * 5;
+    const payout = missionPayout(j.pay, rig, late, bonus);
     this.crate(false);
     const notes = [bonus && '×1.5 road bonus', late && 'late — half pay'].filter(Boolean).join(', ');
     this.finishJob(payout, `💵 ${j.cargo} delivered! +$${payout}${notes ? ` (${notes})` : ''}`);
