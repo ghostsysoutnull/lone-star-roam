@@ -21,8 +21,10 @@ targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
 Key facts:
-- **Repo is private, GitHub Pages is deleted** (intentional) — the game is not
-  currently live/public. Verify locally only.
+- **Repo is public again and GitHub Pages is live** (confirmed with Bruno
+  2026-07-16) — pushes deploy to
+  https://ghostsysoutnull.github.io/lone-star-roam/. Full verify before
+  every push is mandatory again.
 - Local dev: `python3 -m http.server 8317`; verify headlessly with
   **`node tools/verify.mjs`** (parallel pool, full run ~70 s on this machine;
   use named suites while iterating, then the full run before pushing; compact;
