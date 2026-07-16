@@ -10,6 +10,50 @@ export default async function debug(t) {
     t.ok(await t.ev(`typeof g.debug.actions.hauntCemetery === 'function'`), 'debug actions missing from __game');
   });
 
+  await t.check('every tour spot is valid: in-world coords, unique labels, known modes/acts', async () => {
+    const r = await t.ev(`(() => {
+      const seen = new Set(), errs = [];
+      const modes = ['DRIVE', 'FLY', 'WALK'];
+      const weathers = ['clear', 'clouds', 'rain', 'storm', 'dust'];
+      for (const tr of g.debug.tours) for (const w of tr.waves) for (const s of w.spots) {
+        const k = tr.track + ' / ' + w.wave + ' / ' + s.label;
+        if (seen.has(k)) errs.push('duplicate: ' + k);
+        seen.add(k);
+        if (!Number.isFinite(s.x) || !Number.isFinite(s.z) || Math.abs(s.x) > 7000 || Math.abs(s.z) > 6600) errs.push('coords: ' + k);
+        if (s.mode && !modes.includes(s.mode)) errs.push('mode: ' + k);
+        if (s.act && typeof g.debug.actions[s.act] !== 'function') errs.push('act: ' + k);
+        if (s.time != null && !(s.time >= 0 && s.time <= 1)) errs.push('time: ' + k);
+        if (s.weather && !weathers.includes(s.weather)) errs.push('weather: ' + k);
+        if (s.heading != null && !Number.isFinite(s.heading)) errs.push('heading: ' + k);
+      }
+      return { n: seen.size, errs };
+    })()`);
+    t.ok(r.errs.length === 0, `bad tour spots: ${r.errs.join(', ')}`);
+    t.ok(r.n >= 25, `tour list unexpectedly small (${r.n} spots) — backfill missing?`);
+  });
+
+  await t.check('visit() teleports and stages mode, heading and time', async () => {
+    const r = await t.ev(`(() => {
+      g.debug.visit({ label: 'test', x: 1558, z: 3870.1, heading: Math.PI / 2, mode: 'WALK', time: 0.98 });
+      return { x: g.player.pos.x, z: g.player.pos.z, h: g.player.heading, mode: g.player.mode, t: g.sky.t };
+    })()`);
+    t.ok(Math.abs(r.x - 1558) < 0.01 && Math.abs(r.z - 3870.1) < 0.01, `teleport landed at ${r.x},${r.z}`);
+    t.ok(Math.abs(r.h - Math.PI / 2) < 0.01, `heading ${r.h}`);
+    t.ok(r.mode === 'WALK', `mode ${r.mode}`);
+    t.ok(Math.abs(r.t - 0.98) < 0.001, `sky.t ${r.t}`);
+    await t.ev(`(g.player.setMode('DRIVE'), g.debug.actions.day())`);
+  });
+
+  await t.check('visit() with an act chains it after the teleport', async () => {
+    const r = await t.ev(`(() => {
+      const spot = g.debug.tours.flatMap((tr) => tr.waves).flatMap((w) => w.spots).find((s) => s.act === 'saucer');
+      g.debug.visit(spot);
+      return { state: g.ufo.state, visible: g.ufo.saucer.visible };
+    })()`);
+    t.ok(r.state !== 'idle' && r.visible, `saucer tour spot did not start the encounter (state ${r.state})`);
+    await t.ev(`(g.ufo.despawnAll?.() , g.debug.actions.day())`);
+  });
+
   await t.check('haunt-cemetery forces wisps through the real loop', async () => {
     await t.tp(100, 550); // Hill Country ranchland — chapel odds are 0 in the far-west desert
     await t.ev('g.debug.actions.hauntCemetery()');

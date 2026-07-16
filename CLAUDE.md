@@ -6,11 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Lone Star Roam** — a single-page Three.js free-roam game over a 1:100-scale, geographically real Texas. Real OSM highway geometry + real border + 132 real cities; procedural downtowns, drive/fly/walk modes, collectibles, NPCs. No build step, no framework, no npm install — plain ES modules with Three.js from CDN (importmap in `index.html`).
 
-See `ROADMAP.md` for planned work and known limitations before proposing features. No active priority track: aviation shipped 2026-07-12, Agriculture (`AGRICULTURE_SPEC.md`, all 5 waves + 4.5/5.5 follow-ons) shipped 2026-07-14 — both folded into `ROADMAP.md`. Queued work lives in `BACKLOG.md`.
+See `ROADMAP.md` for planned work and known limitations before proposing features. No active priority track: aviation shipped 2026-07-12, Agriculture (`AGRICULTURE_SPEC.md`, all 5 waves + 4.5/5.5 follow-ons) shipped 2026-07-14 — both folded into `ROADMAP.md`. Queued work lives in `BACKLOG.md`. **`GOTCHAS.md` is the law book** — standing rules that survived their tracks; grep it for the area you're changing before coding there. `LEDGER.md` is the per-wave scoreboard (one line per wave, appended at wave end).
 
 ## Communication register
 
 Write to Bruno as an engineering status report, not narrative prose. Default to short labeled sections (Status / Change / Files / Verification / Open), one fact per line, plain declarative statements. State findings flat — "lights flakes under `-j`; gotchas list aviation and shop only" — not "worth flagging rather than letting disappear." Drop self-narration, softeners, and editorial framing; they add length without information and read off-register. Keep complete sentences and spelled-out terms — terse is the goal, fragments and arrow chains are not. This governs *register* only; still lead with the play effect and keep implementation detail on request.
+
+**Executive summary last.** Every goal (session greeting), plan (implementation plan awaiting go-ahead), and result (delivery / wave end) message ends with an **Executive summary** block: non-technical, feature/result-driven, stoic labeled lines (Goal / Plan / Result / Open as applicable). Technical detail stays above it; the executive summary is always the last thing Bruno reads before responding.
 
 ## Session briefing (greeting)
 
@@ -22,16 +24,13 @@ For any effort too big for one session (precedents: `AVIATION.md`, `HELICOPTER_S
 
 1. **Spec session**: write `<NAME>_SPEC.md` — goals, the wave split, and open calls resolved *before* any wave codes. Each wave = one session's deliverable: the code + its verify checks.
 2. **Per wave, recommend model + effort**: Fable 5 for content/register/pool-writing waves, Sonnet 5 for structural/table-plumbing waves; effort usually high. Also state the wave's token budget (e.g. "code + checks, no shots, grep-first").
-3. **Write the first `## Session briefing` block** into `NEXT_SESSION.md` (template below). Each wave's session end rewrites it for the next wave; the *last* wave deletes it and folds the whole track into one `ROADMAP.md` entry. The spec file stays as history.
-4. **Per-wave session cycle**: greeting from the briefing → Bruno's go-ahead → implementation plan → his approval → code + checks → full `node tools/verify.mjs` → **wave-end performance report** → commit → step 3's rewrite.
-5. **Wave-end performance report** (in-chat, before the commit): a compact ledger, not prose —
-   - **Promised vs delivered**: briefed scope/budget vs what actually shipped.
-   - **Time**: session wall-clock and where it went (code / checks / verify / detours).
-   - **Verify economics**: targeted runs, full runs, flakes hit — and whether each flake was reasoned through or brute-force rerun.
-   - **Budget adherence** (observable proxies, not token counts): screenshots taken, whole-file reads vs greps, reruns.
-   - **Detours**: each one, its cost, and whether the cost was surfaced *before* it was taken.
-   - **Honest ROI verdict**: was the wave worth its actual cost — stated plainly; mislabeled value (e.g. "optimization" that was really a reliability fix) called out.
-6. **Wave-end plain-language summary** (in-chat, after the performance report): a short non-technical description of what changed and why it matters.
+3. **Write the first `## Session briefing` block** into `NEXT_SESSION.md` (template below). Each wave's session end rewrites it for the next wave; the *last* wave deletes it and folds the whole track into one `ROADMAP.md` entry. The spec file stays as history. **Track close also sweeps the satellite docs**: update `BACKLOG.md`'s header and any doc that names the active track, and graduate the track's surviving gotchas into `GOTCHAS.md` (deleting them from `NEXT_SESSION.md` — it returns to kickoff-only).
+4. **Per-wave session cycle**: greeting from the briefing → Bruno's go-ahead → implementation plan → his approval → code + checks + **the wave's Tours entries** (`src/tours.js` teleport spots for everything the wave added or changed) → full `node tools/verify.mjs` → **wave-end performance report** → commit → step 3's rewrite.
+5. **Wave-end performance report** (in-chat, before the commit) — report by exception:
+   - **Always**: **Promised vs delivered** (briefed scope/budget vs shipped) and the **honest ROI verdict** (worth its actual cost, stated plainly; mislabeled value — e.g. "optimization" that was really a reliability fix — called out).
+   - **Only when anomalous**: time breakdown, verify economics (runs/flakes and whether flakes were reasoned or brute-forced), budget adherence (shots, whole-file reads, reruns), detours (each with its cost and whether the cost was surfaced first). Anomalous means it deviated from the briefed budget or a standing rule; a clean wave says "no anomalies".
+   - **Append one line to `LEDGER.md`**: `date | track wave | model | promised vs shipped | full-runs/flakes | ROI` — the persistent trend record.
+6. **Executive summary** (in-chat, after the performance report, always the message's last block): non-technical, feature/result-driven — what changed in the game and why it matters. (The register section's "executive summary last" rule; the wave-end result message is one of its three mandatory sites.)
 
 Briefing-block template:
 
@@ -118,7 +117,7 @@ Function-level grep anchors for every module live in `MODULES.md` — grep a nam
 - `missions.js` — `MissionSystem`: delivery jobs between real cities (💼 Jobs tab in the travel menu). Offers reference cities *by name* (resolved against `GEO.cities` at use — renaming a city orphans an in-flight job, which self-clears). Load at origin → timed haul → deliver; ×1.5 bonus if the player never entered FLY, half pay when late; travel.js locks fast-travel while `job.phase === 'haul'`. Crate meshes live in `truck.userData.cargo` (vehicle.js); pay/deadline knobs at the top of `genOffers()`.
 - `shop.js` — 🛒 Shop tab catalog + purchases. `applyGear()` turns `save.gear` levels into `player.perks` (+ truck paint via `truck.userData.bodyMat`); vehicle.js reads `perks` (never the save) in its DRIVE branch. Index 0 of each knob array is the stock value and **must match vehicle.js/gameplay defaults**. Prices/effects all live at the top of this file. The weather radio reads `sky.forecast`: weather picks hold 25–45 s as a forecast before blending (sky.js), invisible without the radio perk — harness `t.setWeather` clears it.
 - `dog.js` — Lacy the Blue Lacy (one-off shop purchase, hidden until `save.gear.dog`). Rides parented to the truck (crate perch when `cargo.visible`), `scene.attach()` reparenting for the WALK follow, 1–2 yips queued by `honked()` a beat after the Space horn (`onBark` → audio).
-- `debug.js` — playtest menu behind `?debug=1` (backquote toggles): buttons for time-of-day, haunts, UFOs, bats, weather. The `actions` table is *always* built and exposed on `__game.debug` (the verify `debug` suite drives it); only the panel + keybinding are URL-gated, so the public build stays honest.
+- `debug.js` — playtest menu behind `?debug=1` (backquote toggles): an **Actions tab** (buttons for time-of-day, haunts, UFOs, bats, weather — generic features, immediate access) and a **Tours tab** (per-track/per-wave teleport spots from `src/tours.js`, collapsible groups, newest track first). The `actions` table and `tours` data are *always* built and exposed on `__game.debug` (the verify `debug` suite drives the actions and validates every tour spot); only the panel + keybinding are URL-gated, so the public build stays honest. `tours.js` is pure data — every wave appends its spots there (protocol step 4); a spot is `{label, x, z, heading?, mode?, time?, weather?, act?, note?}`.
 - `hud.js` — DOM overlay + minimap/bigmap. Both maps blit from **one** offscreen canvas pre-rendered at startup (`renderMapLayer`); don't redraw highways per frame. UI text/panel sizes in `index.html` are **rem-based** (1rem = 10px at 100%): the +/- UI-scale setting works by retuning the root font-size (`hud.uiScale`), so new UI styles must size fonts and panel dimensions in rem, not px (px is fine for offsets/padding/radii).
 
 ### Verification lesson (learned twice)

@@ -4,6 +4,8 @@
 // exist when the URL asks for them.
 import { chapelSitesNear } from './world.js';
 import { EROCK } from './haunts.js';
+import { hAt } from './geo.js';
+import { TOURS } from './tours.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
@@ -89,6 +91,21 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
   };
   for (const w of ['clear', 'clouds', 'rain', 'storm', 'dust']) actions[w] = () => setWeather(w);
 
+  // Tours: teleport + staging for one tours.js spot. Always constructed (the
+  // verify suite validates the data and drives visit()); the panel below stays
+  // URL-gated. Staging order matters: mode/time/weather first, then the
+  // teleport, then any chained action — an action that teleports (cemetery,
+  // ghost fires) gets the last word on position.
+  const visit = (s) => {
+    if (s.mode) player.setMode(s.mode);
+    if (s.time != null) sky.t = s.time;
+    if (s.weather) setWeather(s.weather);
+    tp(s.x, s.z, s.heading);
+    if (s.mode === 'FLY') player.pos.y = Math.max(hAt(s.x, s.z) + 6, 6);
+    if (s.act) actions[s.act]();
+    hud.toast(`${s.label}${s.note ? ' — ' + s.note : ''}`);
+  };
+
   if (new URLSearchParams(location.search).has('debug')) {
     const sections = [
       ['Time', [['day', '🌞 Day'], ['night', '🌙 Night'], ['midnight', '🕛 Midnight']]],
@@ -101,12 +118,26 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       ['Weather', [['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'],
         ['storm', '⛈ Storm'], ['dust', '🌪 Dust']]],
     ];
-    const el = document.createElement('div');
-    el.id = 'debug';
-    el.innerHTML = '<h2>🔧 Debug</h2><div id="debug-state"></div>' + sections.map(([title, rows]) =>
+    const actionsHtml = sections.map(([title, rows]) =>
       `<div class="debug-section"><h3>${title}</h3><div class="debug-rows">` +
       rows.map(([k, label]) => `<button data-act="${k}">${label}</button>`).join('') +
       '</div></div>').join('');
+    // Tours tab: one <details> per track (newest first), one nested per wave.
+    // The list only grows track by track, so everything starts collapsed and
+    // the panel scrolls; generic actions keep their own tab for instant access.
+    const toursHtml = TOURS.map((tr, ti) =>
+      `<details class="debug-track"><summary>${tr.track}</summary>` +
+      tr.waves.map((w, wi) =>
+        `<details class="debug-wave"><summary>${w.wave}</summary><div class="debug-rows">` +
+        w.spots.map((s, si) =>
+          `<button data-tour="${ti}.${wi}.${si}" title="${(s.note ?? '').replace(/"/g, '&quot;')}">${s.label}</button>`).join('') +
+        '</div></details>').join('') +
+      '</details>').join('');
+    const el = document.createElement('div');
+    el.id = 'debug';
+    el.innerHTML = '<h2>🔧 Debug</h2><div id="debug-state"></div>' +
+      '<div id="debug-tabs"><button class="active" data-tab="actions">⚡ Actions</button><button data-tab="tours">🗺️ Tours</button></div>' +
+      `<div data-pane="actions">${actionsHtml}</div><div data-pane="tours" style="display:none">${toursHtml}</div>`;
     el.style.display = 'none';
     document.body.appendChild(el);
     const stateEl = el.querySelector('#debug-state');
@@ -114,12 +145,23 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       if (el.style.display === 'none') return;
       stateEl.textContent = `${sky.clockString()} · ${sky.weatherName()} · ${player.mode}`;
     };
-    el.addEventListener('click', (e) => { const a = e.target.dataset?.act; if (a) { actions[a](); refreshState(); } });
+    el.addEventListener('click', (e) => {
+      const d = e.target.dataset ?? {};
+      if (d.act) { actions[d.act](); refreshState(); }
+      else if (d.tour) {
+        const [ti, wi, si] = d.tour.split('.').map(Number);
+        visit(TOURS[ti].waves[wi].spots[si]);
+        refreshState();
+      } else if (d.tab) {
+        for (const b of el.querySelectorAll('#debug-tabs button')) b.classList.toggle('active', b === e.target);
+        for (const p of el.querySelectorAll('[data-pane]')) p.style.display = p.dataset.pane === d.tab ? '' : 'none';
+      }
+    });
     addEventListener('keydown', (e) => {
       if (e.code === 'Backquote') { el.style.display = el.style.display === 'none' ? 'grid' : 'none'; refreshState(); }
     });
     setInterval(refreshState, 500);
   }
 
-  return { actions };
+  return { actions, tours: TOURS, visit };
 }

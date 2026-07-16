@@ -1,7 +1,7 @@
 # Backlog — queued work
 
-Queued behind whatever track is active (currently Agriculture,
-`AGRICULTURE_SPEC.md`); when a track ends, pull the next item from here
+Queued behind whatever track is active (currently none — the Shoulder and
+the Shelf closed 2026-07-15); when a track ends, pull the next item from here
 into `NEXT_SESSION.md`. Direction-level ideas that aren't actionable yet
 live in `FUTURE.md`.
 
