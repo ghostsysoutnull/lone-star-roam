@@ -13,6 +13,36 @@ const cityTab = (t) => t.ev(`(g.travel.tab = 'Cities', g.travel.render(), true)`
 const airportTab = (t) => t.ev(`(g.travel.tab = 'Airports', g.travel.render(), true)`);
 
 export default async function travel(t) {
+  await t.check('Passport card is always visible in Travel and lists earned progress', async () => {
+    const r = await t.ev(`(() => {
+      const pass = g.gameplay.save.passport;
+      const before = structuredClone(pass);
+      Object.assign(pass, {
+        stamps: ['AR', 'NM'],
+        towns: ['Shreveport'],
+        landings: ['SHV'],
+        stones: ['ne'],
+      });
+      if (g.travel.el.style.display !== 'flex') g.travel.toggle();
+      g.travel.tab = 'Jobs';
+      g.travel.render();
+      const card = document.getElementById('travel-passport');
+      const result = {
+        visible: card.offsetParent !== null,
+        text: card.textContent,
+        hudRemoved: !document.getElementById('score-pass-stamps'),
+      };
+      Object.assign(pass, before);
+      g.travel.render();
+      g.travel.close();
+      return result;
+    })()`);
+    t.ok(r.visible, 'Passport card is not visible in the Travel menu');
+    t.ok(r.hudRemoved, 'legacy Passport HUD row still exists');
+    for (const label of ['2/4 states', '1/', 'Arkansas', 'New Mexico', 'Shreveport', 'Shreveport Regional', 'Panhandle NE Corner'])
+      t.ok(r.text.includes(label), `Passport card is missing "${label}": "${r.text}"`);
+  });
+
   await t.check('search: filters by name, empty query restores the full list', async () => {
     await cityTab(t);
     const total = await t.ev('g.travel.current.length');

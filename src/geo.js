@@ -16,6 +16,7 @@ export const GEO = {
                      // `cities`: the 132 Texas count is hardcoded in index.html/gameplay.js.
   rivers: [],    // [{name, pts:[[x,z],...]}]
   lakes: [],     // [{name, pts:[[x,z],...]}] closed polygons
+  rails: [],    // [{pts:[[x,z],...]}] real railway geometry
   bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
   ag: {},        // county name -> {cattle, horses, goats, sheep, onFeed, irrAcres, crops, areaKm2, dominantCrop}
 };
@@ -75,6 +76,7 @@ export async function loadGeo(onStatus) {
 
   buildRoadIndex();
   buildBandRoadIndex();
+  buildRailIndex();
   buildRiverIndex();
   return GEO;
 }
@@ -186,6 +188,40 @@ export function nearestBandRoad(x, z, radius = 300, typeFilter = null) {
         if (d < bestD) {
           bestD = d;
           best = { x: p[0], z: p[1], ref: s.hw.ref, type: s.hw.type, dist: Math.sqrt(d) };
+        }
+      }
+    }
+  }
+  return best;
+}
+
+// Separate rail index: tracks are display-only, never eligible for road physics.
+const railGrid = new Map();
+function buildRailIndex() {
+  for (const rail of GEO.rails) {
+    for (let i = 1; i < rail.pts.length; i++) {
+      const seg = { a: rail.pts[i - 1], b: rail.pts[i], rail };
+      const k = cellKey((seg.a[0] + seg.b[0]) / 2, (seg.a[1] + seg.b[1]) / 2);
+      if (!railGrid.has(k)) railGrid.set(k, []);
+      railGrid.get(k).push(seg);
+    }
+  }
+}
+
+export function nearestRail(x, z, radius = 300) {
+  let best = null, bestD = radius * radius;
+  const r = Math.ceil(radius / CELL);
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  for (let i = -r; i <= r; i++) {
+    for (let j = -r; j <= r; j++) {
+      const segs = railGrid.get(`${cx + i},${cz + j}`);
+      if (!segs) continue;
+      for (const s of segs) {
+        const p = closestOnSeg(x, z, s.a, s.b);
+        const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
+        if (d < bestD) {
+          bestD = d;
+          best = { x: p[0], z: p[1], dist: Math.sqrt(d), operator: s.rail.operator, name: s.rail.name };
         }
       }
     }

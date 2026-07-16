@@ -98,15 +98,11 @@ export default async function shoulder(t) {
     const ne = await t.ev(`g.shoulder.stones.find((s) => s.key === 'ne')`);
     await t.tp(ne.x + 6, ne.z + 4);
     await t.until(`g.gameplay.save.passport.stones.includes('ne')`, 4000);
-    // the score row rides the 12 Hz HUD tick — sync on the DOM, don't race it
-    await t.until(`document.getElementById('score-pass-stones').textContent === '1'`, 3000);
     const after = await t.ev(`({
       n: g.gameplay.save.passport.stones.length,
-      dom: document.getElementById('score-pass-stones').textContent,
       plaque: g.shoulder.plaqueNear(g.player.pos, 28)?.name,
     })`);
     t.ok(after.n === 1, `stones length ${after.n} after one stone`);
-    t.ok(after.dom === '1', `HUD stones counter reads "${after.dom}"`);
     t.ok(after.plaque === 'Corner Stone — Panhandle NE Corner', `stone plaque not readable: ${after.plaque}`);
     await t.wait(1.2); // proximity rescan — dedup must hold
     const dedup = await t.ev('g.gameplay.save.passport.stones.length');

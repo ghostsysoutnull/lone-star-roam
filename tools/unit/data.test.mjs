@@ -38,6 +38,21 @@ test('highway data retains valid tiers and geometry', async () => {
   checkRoads(await json('band-highways.json'), 'band highways', 76, BAND_ROAD_TYPES);
 });
 
+test('rail data retains valid geometry and OSM identity when available', async () => {
+  const rails = await json('rails.json');
+  assert.equal(rails.length > 400, true, 'rail count');
+  for (const [index, rail] of rails.entries()) {
+    assert.equal(rail.pts.length >= 2, true, `rails[${index}].pts needs two coordinates`);
+    for (const [point, [x, z]] of rail.pts.entries()) {
+      finite(x, `rails[${index}].pts[${point}][0]`);
+      finite(z, `rails[${index}].pts[${point}][1]`);
+    }
+    if (rail.operator != null) assert.equal(typeof rail.operator, 'string', `rails[${index}].operator`);
+    if (rail.name != null) assert.equal(typeof rail.name, 'string', `rails[${index}].name`);
+  }
+  assert.equal(rails.some((rail) => rail.operator || rail.name), true, 'at least one rail identity');
+});
+
 test('county agriculture records resolve one-to-one', async () => {
   const counties = await json('counties.json');
   const agriculture = await json('agriculture.json');

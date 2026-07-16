@@ -39,7 +39,7 @@ const WHITES = LL(32.1751, -104.3794);  // Whites City — the Carlsbad doorstep
 
 // The seven Corner Stones — real survey points, snapped onto the nearest
 // border-polygon vertex at build time so each stone provably sits ON the line.
-const STONES = [
+export const PASSPORT_STONES = [
   { key: 'nw', label: 'TX·NM·OK Tripoint', at: LL(36.5, -103.042), sub: '36°30′N 103°02′W',
     text: 'Three states meet under this cap: Texas, New Mexico, Oklahoma. Surveyors chased this corner for sixty years, and New Mexico still holds the line sits a few hundred feet too far east. The stone stays.' },
   { key: 'ne', label: 'Panhandle NE Corner', at: LL(36.5, -100.0), sub: 'The 100th meridian',
@@ -323,7 +323,7 @@ export class ShoulderSystem {
     const shaftGeo = new THREE.CylinderGeometry(0.1, 0.26, 1.5, 4);
     const capGeo = new THREE.ConeGeometry(0.12, 0.22, 4);
     const out = [];
-    for (const s of STONES) {
+    for (const s of PASSPORT_STONES) {
       let best = Infinity, bx = s.at[0], bz = s.at[1];
       for (const [vx, vz] of GEO.border) {
         const d = (vx - s.at[0]) ** 2 + (vz - s.at[1]) ** 2;

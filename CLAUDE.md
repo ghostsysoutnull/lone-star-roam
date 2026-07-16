@@ -60,6 +60,9 @@ node tools/test.mjs [aviation|data|progress|rules]
 # Rebuild geo data (only needed if changing the pipeline; inputs are NOT in the repo)
 node tools/build-data.mjs <us-states.json> <tx-motorways.json> <tx-trunks.json>
 
+# Rebuild rail geometry + OSM operator/subdivision labels
+node tools/build-rails.mjs <osm-rails.json>
+
 # Rebuild agriculture data (only needed if the census extract changes)
 node tools/build-ag.mjs <tx_county_census2022.txt.gz>
 ```

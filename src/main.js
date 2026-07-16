@@ -1,6 +1,6 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
-import { loadGeo, GEO, nearestRoad, nearestBandRoad, waterAt, countyAt, neighborCountyAt, hAt, inTexas, onIsland, beachAt, inWorld, borderZoneAt, outsideAt, seededRand, agAt, inStateWater, coastDist, TIDELANDS_U } from './geo.js';
+import { loadGeo, GEO, nearestRoad, nearestBandRoad, nearestRail, waterAt, countyAt, neighborCountyAt, hAt, inTexas, onIsland, beachAt, inWorld, borderZoneAt, outsideAt, seededRand, agAt, inStateWater, coastDist, TIDELANDS_U } from './geo.js';
 
 const NEIGHBOR_STATE_NAME = { LA: 'Louisiana', AR: 'Arkansas', OK: 'Oklahoma', NM: 'New Mexico' };
 import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, CAUSEWAY, padreSites } from './world.js';
@@ -348,6 +348,7 @@ async function boot() {
       if (side) lastSide = side;
       audio.swamp = swampAt(player.pos.x, player.pos.z); // frog country factor
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
+      const rail = player.mode !== 'FLY' ? nearestRail(player.pos.x, player.pos.z, 12) : null;
       // Queen Isabella Causeway ceremony — a crossing, not a collectible
       if (player.mode === 'DRIVE' && clock.elapsedTime - lastCauseway > 120) {
         const cdx = CAUSEWAY.x2 - CAUSEWAY.x1, cdz = CAUSEWAY.z2 - CAUSEWAY.z1;
@@ -363,7 +364,7 @@ async function boot() {
         if (sky.forecast && player.perks.radio) hud.toast(`📻 Weather radio: ${sky.forecastName()} rolling in`);
         lastForecast = sky.forecast;
       }
-      hud.update(player, gameplay.counts(), road, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading), county, player.perks.radio ? sky.forecastLine() : null);
+      hud.update(player, gameplay.counts(), road, rail, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading), county, player.perks.radio ? sky.forecastLine() : null);
       hud.updateTags(radio.sources, camera); // A5: aircraft tags share the scanner's enumeration
       hudTick = 0;
     }

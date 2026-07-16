@@ -39,6 +39,12 @@
   #road-shield-wrap canvas { width: 100%; height: 100%; display: block; }
   #road-shield-wrap.night { filter: drop-shadow(0 0 5px #ffb020) drop-shadow(0 0 10px rgba(255,176,32,.5));
     animation: shieldPulse 2.2s ease-in-out infinite; }
+  #rail-placard { position: fixed; top: 5.6rem; left: 50%; transform: translateX(-50%); display: none;
+    background: rgba(19,27,39,.9); color: #e6ecf5; border: 1px solid rgba(188,202,220,.55); border-radius: 5px;
+    max-width: calc(100vw - 2rem); box-sizing: border-box; padding: .5rem 1.3rem; font-size: 1.4rem;
+    font-weight: 700; letter-spacing: .08em; text-align: center; }
+  #rail-placard.night { background: rgba(20,13,7,.94); color: #ffd27a; border-color: #ffb020;
+    box-shadow: 0 0 .8rem rgba(255,176,32,.45); }
   @keyframes shieldPulse { 0%, 100% { opacity: .8; } 50% { opacity: 1; } }
   #minimap { position: fixed; left: 14px; bottom: 14px; width: 19rem; height: 18rem;
     border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(10,14,20,.65); }
@@ -92,6 +98,10 @@
   #travel .tabs button { background: #222a38; color: #cdd6e4; border: 1px solid rgba(255,255,255,.15);
     border-radius: 8px; padding: 6px 14px; cursor: pointer; font-size: 1.3rem; }
   #travel .tabs button.active { background: #3d5a8a; color: #fff; }
+  #travel-passport { margin: 0 0 12px; padding: 8px 10px; border: 1px solid rgba(255,211,92,.32);
+    border-radius: 8px; background: #202836; font-size: 1.2rem; }
+  #travel-passport summary { color: #ffd35c; cursor: pointer; font-weight: 600; }
+  #travel-passport .passport-list { margin-top: 6px; line-height: 1.45; opacity: .85; }
   #travel .poi-toolbar { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
   #travel .poi-toolbar #city-search { flex: 1; background: #1a2230; color: #e6ecf5;
     border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 7px 12px; font-size: 1.3rem; }
@@ -142,7 +152,6 @@
   <div>🗺 Counties <span id="score-counties">0</span>/254</div>
   <div>✈️ Logbook <span id="score-airports">0</span>/7</div>
   <div>💵 $<span id="score-bank">0</span></div>
-  <div>🛂 Passport <span id="score-pass-stamps">0</span>/4 · <span id="score-pass-towns">0</span> towns · <span id="score-pass-landings">0</span> landings · <span id="score-pass-stones">0</span>/7 stones</div>
 </div>
 <!-- bottom-up: stamina, clock/mode, speed. .hud rides the wrapper — the rows are
      in-flow, and color/text-shadow/pointer-events inherit down to them. -->
@@ -154,6 +163,7 @@
 <canvas id="minimap" width="380" height="360"></canvas>
 <canvas id="compass" width="680" height="80"></canvas>
 <div id="road-shield-wrap"><div id="road-shield-card"><canvas id="road-shield" width="120" height="104"></canvas></div></div>
+<div id="rail-placard"></div>
 <div id="bigmap"><canvas id="bigmap-canvas"></canvas></div>
 <div id="dialog"><div class="npc-name"></div><div class="npc-sub"></div><div class="npc-text"></div><div class="hint">E — continue / close</div></div>
 <div id="interact-hint"></div>
@@ -175,6 +185,7 @@
     <button data-tab="Icons">🌵 Texas Icons</button>
     <button data-tab="Folks">🤠 Folks</button>
   </div>
+  <details id="travel-passport"></details>
   <div class="poi-toolbar" style="display:none">
     <input id="city-search" type="text" placeholder="Search cities…" autocomplete="off">
     <div class="sort-btns">

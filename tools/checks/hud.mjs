@@ -63,6 +63,34 @@ export default async function hud(t) {
     t.ok(!txt.includes('🛣'), `text ref should be suppressed once the shield renders: "${txt}"`);
   });
 
+  await t.check('rail placard shows the nearby OSM operator/line and adopts the night theme', async () => {
+    const sample = await t.ev(`(() => {
+      for (const rail of g.GEO.rails) {
+        const pt = rail.pts[Math.floor(rail.pts.length / 2)];
+        if ((rail.operator || rail.name) && !g.nearestRoad(pt[0], pt[1], 6))
+          return { pt, label: [rail.operator, rail.name].filter((v, i, a) => v && a.findIndex((x) => x?.toLowerCase() === v.toLowerCase()) === i).join(' · ') };
+      }
+      return null;
+    })()`);
+    t.ok(sample, 'no labeled rail sample clear of a road shield');
+    await t.tp(sample.pt[0], sample.pt[1], 'WALK');
+    await t.until(`!!g.hud.railInfo`, 8000);
+    const day = await t.ev(`({
+      name: g.hud.railInfo.name,
+      display: document.getElementById('rail-placard').style.display,
+      roadShield: g.hud.shieldInfo,
+    })`);
+    t.ok(day.name === sample.label, `rail placard "${day.name}" != OSM label "${sample.label}"`);
+    t.ok(day.display === 'block', `rail placard display is "${day.display}"`);
+    t.ok(day.roadShield === null, 'road shield remains visible beside the rail placard');
+    await t.setNight();
+    await t.until(`document.getElementById('rail-placard').classList.contains('night')`, 8000);
+    const night = await t.ev(`document.getElementById('rail-placard').classList.contains('night')`);
+    t.ok(night, 'rail placard did not use its night theme');
+    await t.setDay();
+    await t.tp(austin.x + 18, austin.z - 18, 'DRIVE');
+  });
+
   await t.check('speed readout tracks mph = |speed|·2.4', async () => {
     await t.until(`g.hud.els.speed.textContent.includes('0')`, 8000); // parked
     await t.hold('KeyW');

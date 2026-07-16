@@ -5,11 +5,15 @@ import { GEO, nearestRoad } from './geo.js';
 import { LANDMARKS } from './gameplay.js';
 import { SHOP, ROMAN, PAINTS, PAINT_PRICE, buy, buyPaint, applyGear, gearLevel } from './shop.js';
 import { TOWERED } from './radio.js';
+import { AIRPORTS } from './airports.js';
+import { PASSPORT_STONES } from './shoulder.js';
 
 // same projection as the data pipeline
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 
 const fmtPop = (n) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}K` : `${n}`;
+const STATE_NAMES = { AR: 'Arkansas', LA: 'Louisiana', NM: 'New Mexico', OK: 'Oklahoma' };
+const escapeHTML = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 const NATURE = [
   { name: 'Big Bend — Rio Grande canyon', at: LL(29.25, -103.25), fly: 45 },
@@ -55,6 +59,7 @@ export class TravelMenu {
     this.airportSearch = '';
     this.airportSort = 'dist';
     this.el = document.getElementById('travel');
+    this.passport = document.getElementById('travel-passport');
     this.toolbar = this.el.querySelector('.poi-toolbar');
     this.searchInput = this.el.querySelector('#city-search');
     this.el.querySelector('.tabs').addEventListener('click', (e) => {
@@ -117,6 +122,7 @@ export class TravelMenu {
         .map(([k, label]) => `<button data-sort="${k}" class="${k === activeSort ? 'active' : ''}">${label}</button>`)
         .join('');
     }
+    this.renderPassport();
     if (this.tab === 'Jobs') { this.renderJobs(); return; }
     if (this.tab === 'Shop') { this.renderShop(); return; }
     // teleporting with cargo aboard would gut the missions — lock travel mid-haul;
@@ -184,6 +190,22 @@ export class TravelMenu {
       : this.tab === 'Cities' ? 'Locked cities unlock as fast-travel once you visit them.'
       : this.tab === 'Folks' ? 'Meet the locals — you can drop in on anyone whose town you’ve visited.'
       : 'Click to travel.';
+  }
+
+  renderPassport() {
+    const pass = this.gameplay.save.passport;
+    const labels = (items, resolve) => items.length
+      ? items.map((item) => escapeHTML(resolve(item))).join(' · ')
+      : 'None yet';
+    const towns = GEO.bandCities.length;
+    const landings = AIRPORTS.filter((a) => a.band).length;
+    const stoneByKey = new Map(PASSPORT_STONES.map((s) => [s.key, s.label]));
+    const airportById = new Map(AIRPORTS.filter((a) => a.band).map((a) => [a.id, a.name]));
+    this.passport.innerHTML = `<summary>🛂 Passport — ${pass.stamps.length}/4 states · ${pass.towns.length}/${towns} towns · ${pass.landings.length}/${landings} landings · ${pass.stones.length}/${PASSPORT_STONES.length} stones</summary>
+      <div class="passport-list"><b>States:</b> ${labels(pass.stamps, (s) => STATE_NAMES[s] ?? s)}<br>
+      <b>Towns:</b> ${labels(pass.towns, (town) => town)}<br>
+      <b>Landings:</b> ${labels(pass.landings, (id) => airportById.get(id) ?? id)}<br>
+      <b>Corner Stones:</b> ${labels(pass.stones, (key) => stoneByKey.get(key) ?? key)}</div>`;
   }
 
   renderJobs() {

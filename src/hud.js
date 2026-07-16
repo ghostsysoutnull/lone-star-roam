@@ -17,6 +17,11 @@ const SHIELD_HOLD = 0.8; // seconds the road shield lingers through a nearestRoa
 const AMBER = '#ffb020';     // night shield: glowing outline / lattice
 const AMBER_LIT = '#ffd27a'; // night shield: brighter core for the glyphs
 
+function railLabel(rail) {
+  return [rail.operator, rail.name].filter((part, index, parts) =>
+    part && parts.findIndex((other) => other?.toLowerCase() === part.toLowerCase()) === index).join(' · ');
+}
+
 // Road shields: only the clean "PREFIX ###" refs get a shield (real Interstate/
 // US/state formats out of tools/build-data.mjs); messy municipal names like
 // "Southwest Loop 410" or unnumbered ones like "PGBT" fall through to the
@@ -56,10 +61,6 @@ export class HUD {
       counties: document.getElementById('score-counties'),
       airports: document.getElementById('score-airports'),
       bank: document.getElementById('score-bank'),
-      passStamps: document.getElementById('score-pass-stamps'),
-      passTowns: document.getElementById('score-pass-towns'),
-      passLandings: document.getElementById('score-pass-landings'),
-      passStones: document.getElementById('score-pass-stones'),
       job: document.getElementById('hud-job'),
       toast: document.getElementById('toast'),
       dialog: document.getElementById('dialog'),
@@ -101,6 +102,8 @@ export class HUD {
     this.shield = document.getElementById('road-shield-wrap'); // outer: position/centered/perspective (static)
     this.shieldCard = document.getElementById('road-shield-card'); // inner: JS-animated sway/float transform
     this.shieldCanvas = document.getElementById('road-shield'); // innermost canvas: 2D face raster
+    this.railPlacard = document.getElementById('rail-placard');
+    this.railInfo = null;
     this.shieldInfo = null;
     this.shieldSway = 0;
     this.shieldNight = false;
@@ -417,6 +420,24 @@ export class HUD {
     if (info.shape === 'interstate') this.drawInterstateShield(ctx, cx, cy, info, night);
     else if (info.shape === 'us') this.drawUsShield(ctx, cx, cy, info, night);
     else this.drawCircleShield(ctx, cx, cy, info, night);
+  }
+
+  drawRailPlacard(rail, player) {
+    if (!rail) {
+      this.railInfo = null;
+      this.railPlacard.style.display = 'none';
+      return;
+    }
+    const name = railLabel(rail);
+    if (!name) {
+      this.railInfo = null;
+      this.railPlacard.style.display = 'none';
+      return;
+    }
+    this.railInfo = { name, dist: rail.dist };
+    this.railPlacard.textContent = `🚂 ${name}`;
+    this.railPlacard.style.display = 'block';
+    this.railPlacard.classList.toggle('night', this.shieldNight);
   }
 
   // chrome-card helpers shared by the three shield shapes: an offset dark
@@ -747,7 +768,7 @@ export class HUD {
     this.els.nature.style.display = 'block';
   }
 
-  update(player, counts, road, water, clock, weatherIcon, stats, skyLine, county, forecast) {
+  update(player, counts, road, rail, water, clock, weatherIcon, stats, skyLine, county, forecast) {
     this.lastDist = stats?.dist ?? this.lastDist;
     this.els.sky.textContent = skyLine || '';
     // location line: airport name/code when inside its footprint (A1), else
@@ -765,7 +786,8 @@ export class HUD {
     // Numbered routes get a shield near the compass instead, so skip the redundant
     // text ref there; unshielded roads (plain street names) still show as text.
     this.drawShield(road);
-    this.els.road.textContent = [road && !this.shieldInfo && `🛣 ${road.ref}`, water && `🌊 ${water}`].filter(Boolean).join('   ');
+    this.drawRailPlacard(rail, player);
+    this.els.road.textContent = [road && !this.shieldInfo && !rail && `🛣 ${road.ref}`, water && `🌊 ${water}`].filter(Boolean).join('   ');
     this.els.speed.innerHTML = player.mode === 'WALK' ? '🚶'
       : `${player.speedMph} <small>mph</small><div id="hud-odo">${Math.round(this.lastDist ?? 0).toLocaleString()} km</div>`;
     const icons = { DRIVE: '🚙', FLY: '✈️', WALK: '🚶' };
@@ -783,10 +805,6 @@ export class HUD {
     this.els.counties.textContent = counts.counties;
     this.els.airports.textContent = counts.airports ?? 0;
     this.els.bank.textContent = (counts.bank ?? 0).toLocaleString();
-    this.els.passStamps.textContent = counts.passportStamps ?? 0;
-    this.els.passTowns.textContent = counts.passportTowns ?? 0;
-    this.els.passLandings.textContent = counts.passportLandings ?? 0;
-    this.els.passStones.textContent = counts.passportStones ?? 0;
     // active delivery line (set by main from missions.hudInfo)
     this.els.job.textContent = this.mission?.text ?? '';
     this.els.job.style.color = this.mission?.late ? '#ff7a66' : this.mission?.urgent ? '#ffb04a' : '#ffd35c';
