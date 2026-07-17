@@ -19,6 +19,10 @@ wash hides it — W3 fixes the paint, not the data).
   escalates to Bruno with numbers if primary leaves big gaps.
 - **Band visits**: tracked in a separate tally — new additive save key
   (`bandTowns`), own HUD counter. The 132 Texas counter never changes (law).
+  **Correction (W2, 2026-07-16)**: this was already shipped, a day earlier,
+  as `save.passport.towns` (Shoulder & Shelf track) — same GEO.bandCities
+  source, same detection/toast/HUD-counter shape this bullet asks for. W2c is
+  a no-op; don't add a second `bandTowns` key for the same visits.
 - **Airports**: a few real band fields — 2–4 landable tier-3s (Roswell /
   Lawton / Texarkana / Lake Charles class) with traffic and charter reach.
 - **Rails**: deferred to `BACKLOG.md` — not in this track.

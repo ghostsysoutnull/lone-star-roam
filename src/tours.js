@@ -26,6 +26,10 @@ export const TOURS = [
       { wave: 'W1 top-up — LA + NM secondary tier', spots: [
         S('🌲 Pleasant Hill, LA', [5707.2, -905], { mode: 'DRIVE', note: 'pop. 611, 157u from the nearest primary road — closed by the same top-up' }),
       ] },
+      { wave: 'W2 — life on the roads', spots: [
+        S('🪧 I-30 control sign, Texarkana AR', [5232.8, -2652.2], { mode: 'DRIVE', note: 'Hope 32 / Magnolia 47 — the generic pass, not one of the 4 hand-authored signs' }),
+        S('🚚 US 64 band traffic, OK panhandle', [-523.8, -6515.9], { mode: 'DRIVE', note: '800+u from the nearest Texas highway — every car here rides GEO.bandHighways' }),
+      ] },
     ],
   },
   {

@@ -11,6 +11,35 @@ import { GEO, hAt, inTexas, neighborCountyAt, seededRand } from './geo.js';
 import { ATMOS } from './sky.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
+const UNIT_MI = 0.0621371; // 1 game unit = 100m
+
+// real beyond-band cities per neighbor state, for the generic control signs
+// (W2a) — the 4 hand-authored signs (Lake Charles/New Orleans, Natchitoches/
+// Alexandria, Tucumcari/Albuquerque, Deming/Tucson) stay hand-picked and are
+// skipped by the generic pass, not duplicated from this table.
+const CONTROL_CITIES = {
+  LA: [['Shreveport', 32.5252, -93.7502], ['Natchitoches', 31.76, -93.086], ['Alexandria', 31.3113, -92.4451],
+    ['Lake Charles', 30.226, -93.217], ['Lafayette', 30.2241, -92.0198], ['New Orleans', 29.9511, -90.0715]],
+  AR: [['Hope', 33.6668, -93.591], ['Camden', 33.5843, -92.8343], ['El Dorado', 33.2079, -92.6663],
+    ['Magnolia', 33.2671, -93.2393], ['Little Rock', 34.7465, -92.2896]],
+  OK: [['Idabel', 33.9032, -94.8225], ['Durant', 33.9938, -96.3836], ['Ardmore', 34.1743, -97.1436],
+    ['Lawton', 34.6036, -98.3959], ['Altus', 34.6382, -99.334], ['Elk City', 35.4123, -99.4046],
+    ['Woodward', 36.4336, -99.3901], ['Guymon', 36.6828, -101.4816], ['McAlester', 34.9334, -95.7697],
+    ['Oklahoma City', 35.4676, -97.5164]],
+  NM: [['Hobbs', 32.7026, -103.136], ['Carlsbad', 32.4207, -104.2288], ['Roswell', 33.3943, -104.523],
+    ['Clovis', 34.4048, -103.2052], ['Tucumcari', 35.1717, -103.725], ['Las Cruces', 32.3199, -106.7637],
+    ['Alamogordo', 32.8995, -105.9603], ['Albuquerque', 35.0844, -106.6504], ['Deming', 32.2685, -107.7586]],
+};
+// pre-projected once at load — the generic pass runs this against every crossing
+const CONTROL_CITIES_XY = Object.fromEntries(Object.entries(CONTROL_CITIES).map(([st, list]) =>
+  [st, list.map(([name, lat, lon]) => ({ name, at: LL(lat, lon) }))]));
+// predicates matching the 4 hand-authored control signs — the generic pass skips these crossings
+const HAND_SIGNED = [
+  (c) => c.ref === 'I 10' && c.x > 4500,
+  (c) => c.ref === 'US 71',
+  (c) => c.ref === 'I 40' && c.x < -3000,
+  (c) => c.ref === 'I 10' && c.x < 0,
+];
 
 const matCache = new Map();
 function lamb(hex) {
@@ -152,8 +181,9 @@ function deriveCrossings() {
       if (borderDist(far.x, far.z) - dEnd < 8) continue;
       // a crossing must lead to a NEIGHBOR — I-10 hugging the Rio Grande in
       // El Paso grazes the border too, but that's Mexico (settled call: out).
-      if (!neighborCountyAt(end[0] + a.tx * 10, end[1] + a.tz * 10)) continue;
-      cands.push({ x: end[0], z: end[1], ox: a.tx, oz: a.tz, ref: h.ref, type: h.type, poly: h.pts, fromStart });
+      const nc = neighborCountyAt(end[0] + a.tx * 10, end[1] + a.tz * 10);
+      if (!nc) continue;
+      cands.push({ x: end[0], z: end[1], ox: a.tx, oz: a.tz, ref: h.ref, type: h.type, poly: h.pts, fromStart, state: nc.state });
     }
   }
   cands.sort((a, b) => (a.type === 'motorway' ? 0 : 1) - (b.type === 'motorway' ? 0 : 1));
@@ -259,6 +289,7 @@ export class ShoulderSystem {
     this.glowMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0, fog: false, blending: THREE.AdditiveBlending, depthWrite: false });
     const g = new THREE.Group();
     g.name = 'shoulder';
+    this.signs = [];
     this.crossings = deriveCrossings();
     this.monuments = this.buildMonuments(g);
     this.stones = this.buildStones(g);
@@ -266,6 +297,7 @@ export class ShoulderSystem {
     this.buildTexarkana(g);
     this.casino = this.buildCasino(g);
     this.buildWest(g);
+    this.buildGenericControlSigns(g);
     this.buildGlows(g);
     scene.add(g);
     this.group = g;
@@ -506,7 +538,28 @@ export class ShoulderSystem {
     const board = new THREE.Mesh(new THREE.BoxGeometry(4.6, 1.7, 0.1), new THREE.MeshLambertMaterial({ map: tex }));
     board.position.y = 3.2; sign.add(board);
     g.add(sign);
-    (this.signs ??= []).push(sign);
+    this.signs.push(sign);
+  }
+
+  // control-city distance signs at every crossing the 4 hand-authored signs
+  // don't already cover — nearest 2 real beyond-band cities from
+  // CONTROL_CITIES_XY, straight-line distance in miles, same placement
+  // convention (near the stub's far end, right shoulder) as the hand ones.
+  buildGenericControlSigns(g) {
+    for (const c of this.crossings) {
+      if (!c.state || !CONTROL_CITIES_XY[c.state]) continue;
+      if (HAND_SIGNED.some((f) => f(c))) continue;
+      const L = stubLength(c.poly);
+      const p = along(c.poly, c.fromStart, Math.max(4, L - 8));
+      const sx = p.x - p.tz * 7, sz = p.z + p.tx * 7;
+      const ranked = CONTROL_CITIES_XY[c.state]
+        .map(({ name, at }) => ({ name, d: Math.hypot(at[0] - sx, at[1] - sz) }))
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 2);
+      if (!ranked.length) continue;
+      const lines = ranked.map((r) => [r.name, String(Math.max(1, Math.round(r.d * UNIT_MI)))]);
+      this.buildControlSign(g, { x: sx, z: sz, tx: p.tx, tz: p.tz }, controlSignTex(lines));
+    }
   }
 
   // Texarkana: State Line Ave, the two-state federal building, the straddle

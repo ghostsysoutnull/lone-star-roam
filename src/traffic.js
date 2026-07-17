@@ -8,7 +8,7 @@
 // Four vehicle types (sedan/pickup/suv/semi) as instanced merged geometries;
 // vertex colors bake wheels/windows dark so per-instance color tints only bodywork.
 import * as THREE from 'three';
-import { GEO, hAt, nearestCity } from './geo.js';
+import { GEO, hAt, nearestCity, nearestBandCity } from './geo.js';
 import { ATMOS } from './sky.js';
 import { cityRadius } from './cities.js';
 
@@ -143,6 +143,8 @@ function mixAt(tier, tierName, x, z) {
   }
   const { city, dist } = nearestCity(x, z);
   if (dist < cityRadius(city.pop) * 2.5 + 15) return tier.mix;
+  const { city: bc, dist: bDist } = nearestBandCity(x, z);
+  if (bc && bDist < cityRadius(bc.pop) * 2.5 + 15) return tier.mix;
   const m = { ...tier.mix };
   const bump = Math.min(0.18, m.sedan - 0.1);
   m.pickup += bump; m.sedan -= bump;
@@ -171,8 +173,11 @@ export class TrafficSystem {
       this.lampMeshes[type] = lm;
     }
 
-    // per-polyline bbox + length for candidate filtering and length-weighted spawn
-    this.polys = GEO.highways.map((h) => {
+    // per-polyline bbox + length for candidate filtering and length-weighted
+    // spawn — band highways ride the same candidate pool so traffic reaches
+    // the band once the spawn ring gets there (refreshCandidates/spawn/
+    // junctionHop are already type-generic, no other change needed)
+    this.polys = [...GEO.highways, ...GEO.bandHighways].map((h) => {
       let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9, len = 0;
       for (let i = 0; i < h.pts.length; i++) {
         const [x, z] = h.pts[i];

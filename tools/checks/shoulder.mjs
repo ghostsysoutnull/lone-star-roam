@@ -132,7 +132,6 @@ export default async function shoulder(t) {
       stub: !!g.shoulder.ngStub,
       cypress: g.shoulder.cypress.count,
       ponds: g.shoulder.ponds,
-      signs: g.shoulder.signs.length,
       cypressTexas: (() => { // trees must keep to the Louisiana bank
         const m = g.shoulder.cypress, v = new (m.matrixWorld.constructor)();
         let inTx = 0;
@@ -147,7 +146,37 @@ export default async function shoulder(t) {
     t.ok(res.cypress > 20, `cypress row too thin: ${res.cypress} trees`);
     t.ok(res.cypressTexas === 0, `${res.cypressTexas} cypresses sampled on the Texas bank (ScenerySystem's side)`);
     t.ok(res.ponds === 3, `crawfish ponds: ${res.ponds}`);
-    t.ok(res.signs === 4, `control-city signs: ${res.signs} (E: Lake Charles/NO + Natchitoches; W: Tucumcari/Abq + Deming/Tucson)`);
+  });
+
+  await t.check('control-city signs (W2a): one per crossing, real cities, true-ish distances', async () => {
+    const res = await t.ev(`(() => {
+      const crossings = g.shoulder.crossings, signs = g.shoulder.signs;
+      // I-30 at the Texarkana interchange is NOT one of the 4 hand-authored
+      // signs — a good witness that the generic pass actually ran
+      const i30 = crossings.find((c) => c.ref === 'I 30');
+      // sign sits near the stub's far end (along the whole matched OSM way
+      // fragment, which can run 100+u past the line) — check against the
+      // crossing point itself, generous radius, not a fixed outward offset
+      const nearestSignDist = (c) => Math.min(...signs.map((s) => Math.hypot(s.position.x - c.x, s.position.z - c.z)));
+      return {
+        nCrossings: crossings.length,
+        nSigns: signs.length,
+        statesCovered: [...new Set(crossings.map((c) => c.state))].sort(),
+        i30SignDist: i30 ? nearestSignDist(i30) : null,
+        allOutsideTexas: signs.every((s) => !g.inTexas(s.position.x, s.position.z)),
+      };
+    })()`);
+    // ~1 sign per crossing, +/- a handful: the US-71 hand sign is built from
+    // GEO.bandHighways directly (never one of this.crossings' sites, since
+    // its southernmost-fragment pick fails deriveCrossings' own candidacy
+    // filters), so it adds a sign with no crossing to subtract for.
+    t.ok(Math.abs(res.nSigns - res.nCrossings) <= 5,
+      `expected ~1 sign per crossing (${res.nCrossings}), got ${res.nSigns}`);
+    t.ok(res.nSigns >= 80, `too few control signs: ${res.nSigns}`);
+    t.ok(res.statesCovered.join(',') === 'AR,LA,NM,OK', `crossing states: ${res.statesCovered}`);
+    t.ok(res.i30SignDist !== null && res.i30SignDist < 200,
+      `I-30 Texarkana crossing (generic pass) has no control sign nearby: ${res.i30SignDist}u`);
+    t.ok(res.allOutsideTexas, 'a control sign stands inside Texas');
   });
 
   await t.check('frogs-over-crickets: swamp factor feeds the night mix out there only', async () => {

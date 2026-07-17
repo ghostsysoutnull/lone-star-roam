@@ -1,60 +1,42 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Band Parity, wave 2 of 6 — life on the roads. (a)
-  Control-city distance signs at every outward stub end (`deriveCrossings`
-  idiom over W1's endpoint set — 90 crossing sites, real refs), reusing
-  shoulder.js's sign meshes. (b) Traffic on band roads — extend
-  TrafficSystem's candidate polylines to `GEO.bandHighways` when the spawn
-  ring reaches the band. (c) the `bandTowns` visit tally (save key + HUD
-  counter + toast). W1 (tier-fetch network + OK, then LA+NM, secondary-tier
-  top-ups) shipped 2026-07-16.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — same shape as
-  W1 (data-driven system extension, table plumbing over an existing idiom).
-  Flag it if the running model differs.
-- **Budget**: code + checks, no shots (signs/traffic are data-driven, not a
-  visual-judgment wave), grep-first; ≤2 full verify runs.
-- **Then**: rewrite this block for W3 (the ground — regional tints, screenshots
-  ON, Bruno's eye required).
+- **This session**: Band Parity, wave 3 of 6 — the ground. Retune
+  `world.js:220`'s 0.75 out-of-state tan lerp; per-neighbor regional tints
+  (LA swamp, AR pine, OK plains, NM desert) so the real DEM relief and
+  `cPine` read again. Closes the BACKLOG "band is always desert" item. W2
+  (control-city signs at every crossing, traffic on band roads, `bandTowns`
+  tally) shipped 2026-07-16.
+- **Recommended setup**: model **Fable 5**, effort **high** — visual/register
+  wave, screenshots ON, Bruno's eye required for the tint judgment. Flag it
+  if the running model differs.
+- **Budget**: code + one staged screenshot per neighbor tint (4 judged
+  before commit, per the visual-judgments-need-eyes-early rule) + checks;
+  grep-first; ≤2 full verify runs.
+- **Then**: rewrite this block for W4 (crops and ranches — prereq: USDA
+  extracts in tx-inputs, ask Bruno to run/approve the fetch before coding).
 
 Gotchas carried over:
 - `BAND_PARITY_SPEC.md` is the track spec — open calls already resolved
   (tiers, tally, airports, rails deferred); don't relitigate them.
-- W1's road set: 1,269 polylines, per-way `ref` preserved — signs/shields
-  read it directly off `GEO.bandHighways`. LA/NM/OK carry a `secondary` OSM
-  tier folded into `type: 'primary'` (Texas has no rendered secondary tier);
-  AR is still primary/trunk/motorway-only (already 15/15 covered, no top-up
-  needed).
-- `deriveCrossings()` (src/shoulder.js) now has three candidacy filters
-  beyond the border-distance test, all load-bearing for W2's signs:
-  (1) skip a chain that's **wholly inside Texas** (an FM/county road can hug
-  a dead-straight state-line survey border for miles without ever crossing
-  it — FM 769/FM 1218/County Road 251 tracking the NM line were the cases
-  that surfaced this); (2) skip an endpoint whose **distance-to-border
-  barely grows** over 30u of outward travel (parallel-to-border roads and
-  too-short 2-point stubs both fail this the same way — a real crossing
-  grows 9-30u, every parallel-runner measured under 5; this replaced an
-  earlier length-only cutoff that FM 1218 at 113u sailed past); (3) merge
-  candidates into one site only on a **matching ref**, not bare 60u
-  proximity (a ref-blind merge dropped I-30's own monument once I-49, a
-  real crossing ~52u away near Texarkana, joined the candidate set). Also:
-  `isMexicoSeam()` guards the inTx/SEAM_MARGIN branch only — border.json's
-  polygon test misreads a point 17cm from the line at the El Paso/Juárez
-  kink as "inside Texas"; DON'T call it (or any `inNeighborState`-based
-  check) unconditionally per-point in the *build* script — that turned an
-  8-minute bake into an 18+-minute one once measured against it. Don't
-  relax any of these without re-deriving the site count.
-- Coverage: 169/177 band places land within 25u of a band road (LA 39/39,
-  AR 15/15, OK 97/104, NM 18/19), up from 140/177 on the primary-tier-only
-  bake — Bruno asked for full connectivity; the OK, then LA+NM,
-  secondary-tier top-ups closed most of the gap. Remaining 8 uncovered:
-  Ardmore OK (near-miss) + Logan NM + 6 small OK hamlets, all past even the
-  secondary network. Not escalated further — these would need OK's tertiary
-  tier (much denser, diminishing returns for towns of pop. 16-725); ask
-  Bruno before going there rather than assuming W2 should chase the rest.
+- W2c (`bandTowns` tally) turned out to be a no-op: `save.passport.towns`
+  already tracks band-city visits (shipped a day earlier in Shoulder &
+  Shelf) — same source, detection, toast, HUD counter the spec bullet
+  asked for. Corrected in `BAND_PARITY_SPEC.md`'s resolved-calls section;
+  don't build a second key for the same visits.
+- W2 gave every crossing a control-city distance sign
+  (`buildGenericControlSigns` in shoulder.js, `CONTROL_CITIES` table of real
+  lat/lon per state) and put traffic on `GEO.bandHighways`
+  (`TrafficSystem.polys` now concats `GEO.highways`+`GEO.bandHighways`;
+  `mixAt` also consults a new `nearestBandCity` so real band towns get
+  city-appropriate traffic instead of always-rural).
+- **Discovered, not fixed**: `nearestBandRoad`'s grid indexes long segments
+  by midpoint cell only, missing queries near a segment's far end (488u US
+  270 segment) — doesn't affect traffic (interpolates `h.pts` directly) or
+  W3. Logged in `BACKLOG.md` item 4.
 - Any further band-road rebake shifts geometry: re-verify the shoulder suite
-  (crossing monuments read band endpoints) + `band.mjs` guards (density
-  ratio + cross-bbox-duplicate + coverage-floor checks all live there now).
+  (crossing monuments + control signs both read band endpoints) + `band.mjs`
+  guards + `traffic.mjs`'s band-road check.
 
 ---
 

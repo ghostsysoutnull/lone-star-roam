@@ -50,6 +50,38 @@ export default async function traffic(t) {
     t.near(r.wired, r.expect, 0.001, `traffic.groundYAt not wired to brandGroundYAt: ${JSON.stringify(r)}`);
   });
 
+  await t.check('band roads (W2b): traffic reaches GEO.bandHighways, off any Texas road', async () => {
+    // US 64 in the OK panhandle strip — 800+u from the nearest Texas highway
+    // (well past SPAWN_MAX), sits directly on a band road
+    await t.tp(-523.8, -6515.9);
+    await stepTraffic(t, 4); // candidate refresh + pool fill
+    const band = await aliveCount(t);
+    t.ok(band >= 3, `only ${band} cars alive on the band road`);
+    // membership in GEO.bandHighways, not a nearestBandRoad distance check —
+    // car.h IS the exact polyline object the car interpolates along (traffic.js
+    // spawn/junctionHop), so this is direct ground truth. nearestBandRoad's
+    // grid indexes each segment by its MIDPOINT cell only; a query near one
+    // end of a 400+u unsplit band-highway segment (US 270 here) can land
+    // several cells from that midpoint and read back null within a small
+    // radius even though the point sits exactly on the road — a real gap in
+    // that index for long segments, not a traffic placement bug.
+    const res = await t.ev(`(() => {
+      const alive = g.traffic.cars.filter((c) => c.alive).slice(0, 12);
+      return {
+        onBandRoad: alive.filter((c) => g.GEO.bandHighways.includes(c.h)).length,
+        onTexasRoad: alive.filter((c) => g.GEO.highways.includes(c.h)).length,
+        total: alive.length,
+      };
+    })()`);
+    t.ok(res.onBandRoad === res.total, `${res.total - res.onBandRoad}/${res.total} cars not riding a GEO.bandHighways polyline`);
+    t.ok(res.onTexasRoad === 0, `${res.onTexasRoad} band cars riding a GEO.highways polyline (impossible this far out)`);
+    const before = await t.ev(`g.traffic.cars.filter((c) => c.alive).slice(0, 6).map((c) => [c.cx, c.cz])`);
+    await t.wait(2); // real-loop sentinel, matches the Austin "cars actually move" check
+    const after = await t.ev(`g.traffic.cars.filter((c) => c.alive).slice(0, 6).map((c) => [c.cx, c.cz])`);
+    const moved = before.filter((p, i) => after[i] && Math.hypot(after[i][0] - p[0], after[i][1] - p[1]) > 0.5).length;
+    t.ok(moved >= Math.min(3, before.length), `only ${moved}/${before.length} band cars moved`);
+  });
+
   await t.check('desert gets a trickle, not a metro pool', async () => {
     // road-poor Big Bend country — supply-based density should starve the pool
     const spot = await t.ev(`(() => {

@@ -117,6 +117,15 @@ already shipped as `54b3511` — these are the remaining items)
    `t.stubGamepad` is already in the harness waiting.
 3. **Big-map click-to-set-waypoint** — generalize the mission target pipeline
    (map diamond + compass diamond + guide arrow) to a map click.
+4. **`nearestBandRoad`'s grid indexes each segment by its midpoint cell only**
+   (found during Band Parity W2, 2026-07-16): a query point near one END of a
+   long unsplit band-highway segment (US 270 west of the OK panhandle border
+   measured 488u in one piece) can land several cells from that midpoint and
+   read back `null` at a small search radius, even though the point sits
+   exactly on the road. No current consumer breaks on it (traffic.js
+   interpolates `h.pts` directly, never calls `nearestBandRoad`) — fix
+   direction: index by every cell each segment's bbox spans, not just the
+   midpoint, mirroring the Texas `nearestRoad` grid if it already does this.
 
 ## Legibility passes (`/legibility-pass <subject>` — skill in `.claude/skills/`)
 

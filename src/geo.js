@@ -328,6 +328,18 @@ export function nearestCity(x, z) {
   return { city: best, dist: Math.sqrt(bestD) };
 }
 
+// Band-town counterpart to nearestCity — own linear scan over GEO.bandCities,
+// same {city, dist} shape (traffic.js mixAt reads both to give real band
+// towns city-appropriate traffic instead of always falling into the rural mix).
+export function nearestBandCity(x, z) {
+  let best = null, bestD = Infinity;
+  for (const c of GEO.bandCities) {
+    const d = (c.x - x) ** 2 + (c.z - z) ** 2;
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return { city: best, dist: Math.sqrt(bestD) };
+}
+
 function inPoly(x, z, poly) {
   let inside = false;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
