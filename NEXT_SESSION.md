@@ -1,41 +1,45 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Band Parity, wave 3 of 6 — the ground. Retune
-  `world.js:220`'s 0.75 out-of-state tan lerp; per-neighbor regional tints
-  (LA swamp, AR pine, OK plains, NM desert) so the real DEM relief and
-  `cPine` read again. Closes the BACKLOG "band is always desert" item. W2
-  (control-city signs at every crossing, traffic on band roads, `bandTowns`
-  tally) shipped 2026-07-16.
-- **Recommended setup**: model **Fable 5**, effort **high** — visual/register
-  wave, screenshots ON, Bruno's eye required for the tint judgment. Flag it
-  if the running model differs.
-- **Budget**: code + one staged screenshot per neighbor tint (4 judged by
-  Bruno before commit, per the visual-judgments-need-eyes-early rule; stage
-  via `tools/stage-shot.mjs`, pre-check via Copilot CLI — GOTCHAS.md →
-  Verification — Claude never loads the images) + checks; grep-first;
-  ≤2 full verify runs.
-- **Then**: rewrite this block for W4 (crops and ranches — prereq: USDA
-  extracts in tx-inputs, ask Bruno to run/approve the fetch before coding).
+- **This session**: Band Parity, wave 4 of 6 — crops and ranches. Extend the
+  ag bake to band counties (`neighbor-counties.json` already joins), teach
+  `agAt` the band, then swap the `inTexas` gates in world.js placement
+  (flora, crop decals, pivots, `farmsteadAt`, `chapelAt` + cemeteries) for
+  the in-band land test with band legality (`nearestBandRoad`,
+  `shoulderClear`, existing standoffs). W3 (per-neighbor band tints) shipped
+  2026-07-16. **Prereq before any coding**: USDA 2022 census extracts for
+  LA/AR/OK/NM in `~/claude-area/devel/tx-inputs/` — ask Bruno to run or
+  approve the fetch first; if unavailable, stop and re-plan the session.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — structural
+  table-plumbing wave (bake pipeline + gate swaps), per the spec's per-wave
+  recommendation. Flag it if the running model differs.
+- **Budget**: code + checks; grep-first; ≤2 full verify runs; screenshots
+  only via the Copilot workflow (GOTCHAS.md → Verification — stage with
+  `tools/stage-shot.mjs`, never load images; final visual batch to Bruno
+  only if placement visuals change enough to warrant it).
+- **Then**: rewrite this block for W5 (wildlife — band region boxes, species
+  rows, census herds at band farmsteads; W4's ag data is its prereq).
 
 Gotchas carried over:
 - `BAND_PARITY_SPEC.md` is the track spec — open calls already resolved
   (tiers, tally, airports, rails deferred); don't relitigate them.
-- W2c (`bandTowns` tally) turned out to be a no-op: `save.passport.towns`
-  already tracks band-city visits (shipped a day earlier in Shoulder &
-  Shelf) — same source, detection, toast, HUD counter the spec bullet
-  asked for. Corrected in `BAND_PARITY_SPEC.md`'s resolved-calls section;
-  don't build a second key for the same visits.
-- W2 gave every crossing a control-city distance sign
-  (`buildGenericControlSigns` in shoulder.js, `CONTROL_CITIES` table of real
-  lat/lon per state) and put traffic on `GEO.bandHighways`
-  (`TrafficSystem.polys` now concats `GEO.highways`+`GEO.bandHighways`;
-  `mixAt` also consults a new `nearestBandCity` so real band towns get
-  city-appropriate traffic instead of always-rural).
-- **Discovered, not fixed**: `nearestBandRoad`'s grid indexes long segments
-  by midpoint cell only, missing queries near a segment's far end (488u US
-  270 segment) — doesn't affect traffic (interpolates `h.pts` directly) or
-  W3. Logged in `BACKLOG.md` item 4.
+- **The law of Texas still stands for W4's gate swaps**: GOTCHAS.md says
+  ag/chapel/farmstead/brand generators stay `inTexas`-gated — W4 is the
+  sanctioned amendment (spec-resolved). Update that gotcha when the gates
+  swap, and keep Mexico out (band land test only, never blanket `!inTexas`).
+- W3 shipped `neighborStateAt` (geo.js, full-state rings, lazy bbox) +
+  `bandTint` (world.js `BAND_TINT`, k≤0.5; Mexico keeps the 0.75 `cOut`
+  wash). Both on `__game`; `band.mjs` asserts the 4 tints distinct, Mexico/
+  Texas null, and the W3 tour spots classifying as their own state.
+- Fog washes distant ground tints toward tan from 250u out (`sky.js` Fog
+  250→1400) — any future band tint judgment shots must stage low (agl ~18,
+  ground inside the fog-free radius). The "hard midground seam" in low
+  shots is the global fog line (Texas control shot proves it), and grazing
+  angles bunch county lines + roads into fake "zigzag defects". Sharper
+  re-query beats trusting the first read.
+- `nearestBandRoad`'s far-end grid gap (BACKLOG item) still stands — W4's
+  band legality checks should use it only within its documented limits, or
+  interpolate `h.pts` directly the way traffic does.
 - Any further band-road rebake shifts geometry: re-verify the shoulder suite
   (crossing monuments + control signs both read band endpoints) + `band.mjs`
   guards + `traffic.mjs`'s band-road check.

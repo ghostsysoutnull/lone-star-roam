@@ -478,6 +478,32 @@ export function neighborDist(key, x, z) {
   return inPoly(x, z, ring) ? 0 : nearestDist(x, z, ring);
 }
 
+// Which neighbor state a point stands in ('LA'/'AR'/'OK'/'NM'), null outside
+// all four (Texas, Mexico, Gulf). Ring bboxes are lazy-built once — the W3
+// terrain painter asks this for every out-of-Texas DEM cell at boot.
+let nsBBox = null;
+export function neighborStateAt(x, z) {
+  const ns = GEO.neighborStates;
+  if (!ns) return null;
+  if (!nsBBox) {
+    nsBBox = {};
+    for (const k in ns) {
+      const b = [Infinity, -Infinity, Infinity, -Infinity];
+      for (const [px, pz] of ns[k]) {
+        if (px < b[0]) b[0] = px; if (px > b[1]) b[1] = px;
+        if (pz < b[2]) b[2] = pz; if (pz > b[3]) b[3] = pz;
+      }
+      nsBBox[k] = b;
+    }
+  }
+  for (const k in ns) {
+    const b = nsBBox[k];
+    if (x < b[0] || x > b[1] || z < b[2] || z > b[3]) continue;
+    if (inPoly(x, z, ns[k])) return k;
+  }
+  return null;
+}
+
 // Deterministic RNG seeded by string — used for procedural cities/scatter
 export function seededRand(seedStr) {
   let h = 2166136261;

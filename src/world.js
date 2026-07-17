@@ -1,6 +1,6 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, TIDELANDS_U, coastDist } from './geo.js';
+import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, TIDELANDS_U, coastDist, neighborStateAt } from './geo.js';
 import { ATMOS } from './sky.js';
 import { cityRadius } from './cities.js';
 import { airportClear } from './airports.js';
@@ -181,6 +181,22 @@ function buildPadreSites(scene) {
   padreSites.jetty = jetty;
 }
 
+// W3: per-neighbor band paint. The old uniform 0.75 tan wash flattened every
+// out-of-state cell to one color — DEM relief and the cPine bleed vanished on
+// roamable shoulder land. Neighbor land now keeps a regional read at a
+// strength the height ramp survives; Mexico and open coast keep the full
+// wash (the Rio Grande contrast is deliberate — Mexico is out).
+const BAND_TINT = {
+  NM: { c: new THREE.Color(0xc2a76b), k: 0.35 }, // desert (shares cDry)
+  OK: { c: new THREE.Color(0x8d4038), k: 0.5 },  // red-dirt plains (brick tint — the olive base ramp eats half the red)
+  AR: { c: new THREE.Color(0x5f8a4a), k: 0.4 },  // pine (shares cPine)
+  LA: { c: new THREE.Color(0x4f6b40), k: 0.45 }, // swamp
+};
+export function bandTint(x, z) {
+  const s = neighborStateAt(x, z);
+  return s ? BAND_TINT[s] : null;
+}
+
 // Real elevation terrain — one displaced grid, vertex-colored by height/region
 function buildTerrain(scene) {
   const e = ELEV;
@@ -217,7 +233,10 @@ function buildTerrain(scene) {
       else c.lerpColors(cMid, cHigh, (t - 0.35) / 0.65);
       if (x < -2200) c.lerp(cDry, 0.5);          // Trans-Pecos / far west
       else if (x > 3400 && m < 200) c.lerp(cPine, 0.45); // piney east lowlands
-      if (out) c.lerp(cOut, 0.75);
+      if (out) {
+        const bt = bandTint(x, z);
+        c.lerp(bt ? bt.c : cOut, bt ? bt.k : 0.75);
+      }
       col[k] = c.r; col[k + 1] = c.g; col[k + 2] = c.b;
     }
   }

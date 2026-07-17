@@ -30,6 +30,12 @@ export const TOURS = [
         S('🪧 I-30 control sign, Texarkana AR', [5232.8, -2652.2], { mode: 'DRIVE', note: 'Hope 32 / Magnolia 47 — the generic pass, not one of the 4 hand-authored signs' }),
         S('🚚 US 64 band traffic, OK panhandle', [-523.8, -6515.9], { mode: 'DRIVE', note: '800+u from the nearest Texas highway — every car here rides GEO.bandHighways' }),
       ] },
+      { wave: 'W3 — the ground', spots: [
+        S('🏜️ NM desert band over Hobbs', [-3486, -1923.7], { mode: 'FLY', time: 0.35, heading: Math.PI / 2, note: 'facing west — desert tan, but hills and the height ramp read now' }),
+        S('🟥 OK red-dirt plains over Ardmore', [2281.3, -3591.2], { mode: 'FLY', time: 0.35, heading: 0, note: 'facing north — red-brown plains, distinct from the old uniform tan' }),
+        S('🌲 AR pine over Texarkana', [5262.8, -2719.2], { mode: 'FLY', time: 0.35, heading: -Math.PI / 4, note: 'facing northeast — pine green continues the East Texas read across the line' }),
+        S('🐊 LA swamp over Many', [5747.5, -629.7], { mode: 'FLY', time: 0.35, heading: -Math.PI / 2, note: 'facing east — dark swamp green, the wettest read of the four' }),
+      ] },
     ],
   },
   {

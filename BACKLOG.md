@@ -37,20 +37,17 @@ already shipped as `54b3511` — these are the remaining items)
   reads sunken at some banks; wants a look at the offsets, plus water
   ambience (river/lakeshore loop in audio.js) and a cheap surface effect
   (ripple/sparkle).
-- **The band is always desert** (`world.js:220`, diagnosed 2026-07-15 —
-  confirms this entry's earlier guess): `if (out) c.lerp(cOut, 0.75)` drags
-  every out-of-Texas cell 75% to one tan (`0xb8a888`), flattening BOTH the
-  height ramp and the regional tints — so Louisiana swamp, Arkansas pine and
-  NM desert all read as sand. Also answers Bruno's "no elevation?" impression:
-  the band does use the real DEM, the tan wash is erasing the relief cues.
-  The `cPine` tint (line 219) already isn't Texas-gated and would green the
-  east band — the 0.75 wash erases it. **Not a bug — a decision that outlived
-  its context**: `cOut` landed with the original DEM commit (`1dd0ac3`) when
-  outside Texas was unreachable backdrop, deliberately muted to keep the eye
-  on Texas; W6a/W6b made that ground drivable and nobody revisited it. Fix is
-  small (retune the lerp; consider per-neighbor tints) but it's a visual
-  judgment — wants Fable 5 + screenshots ON, and Bruno's eye.
-  → **Owned by Band Parity W3** (2026-07-16, `BAND_PARITY_SPEC.md`).
+- ~~**The band is always desert**~~ → **Shipped by Band Parity W3**
+  (2026-07-16): per-neighbor `BAND_TINT` in world.js (`bandTint(x,z)` via
+  geo.js `neighborStateAt`), strengths ≤0.5 so the height ramp reads; Mexico
+  keeps the full 0.75 `cOut` wash deliberately. Verified by `band.mjs` +
+  Bruno-approved screenshot batch.
+- **NM band mountain silhouettes read flat** (found in W3, 2026-07-16): the
+  Brokeoff/Guadalupe NM side has real 780 m local DEM gradients but at 30u
+  grid cells that's ~3° of apparent slope — no paint change can dramatize it
+  (true inside Texas too). Texas's dramatic peaks are hand-built mountain
+  meshes in world.js; extending that kit to the Guadalupes' NM side is the
+  fix if wanted. Visual judgment — Bruno's call whether it's worth a slot.
 - **Band roads: the concurrency defect** (diagnosed 2026-07-15) — distinct
   from the known "arterials only" scope limit below. A route is only matched
   when it's listed FIRST: the bake's Overpass regex is `^(<routes>)($|;)` and

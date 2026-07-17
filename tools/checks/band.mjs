@@ -435,4 +435,43 @@ export default async function band(t) {
     t.ok(res.n === 177, `band-places.json count drifted: ${res.n} !== 177`);
     t.ok(res.covered >= 169, `band road coverage regressed: ${res.covered}/${res.n} within 25u, floor is 169`);
   });
+
+  // W3 — the ground: per-neighbor band paint. bandTint(x,z) is the pure rule
+  // buildTerrain consumes for out-of-Texas cells; Mexico and in-Texas stay
+  // null (Texas keeps its own ramp, Mexico keeps the full 0.75 cOut wash).
+  await t.check('band tints: four neighbors distinct, relief-preserving, Mexico/Texas null', async () => {
+    const res = await t.ev(`(() => {
+      const at = (x, z) => { const b = g.bandTint(x, z); return b && { hex: b.c.getHexString(), k: b.k }; };
+      return {
+        nm: at(-3486, -1923.7),   // Hobbs, NM
+        ok: at(2281.3, -3591.2),  // Ardmore, OK
+        ar: at(5262.8, -2719.2),  // Texarkana, AR side
+        la: at(5747.5, -629.7),   // Many, LA
+        mexico: { zone: g.borderZoneAt(-2500, 1500), tint: at(-2500, 1500) }, // south of Big Bend
+        texas: { inTx: g.inTexas(1558, 1568), tint: at(1558, 1568) },         // Austin
+      };
+    })()`);
+    for (const k of ['nm', 'ok', 'ar', 'la']) {
+      t.ok(res[k], `${k.toUpperCase()} band point got no tint`);
+      t.ok(res[k].k <= 0.5, `${k.toUpperCase()} tint strength ${res[k].k} > 0.5 — height ramp won't read through`);
+    }
+    const hexes = new Set(['nm', 'ok', 'ar', 'la'].map((k) => res[k].hex));
+    t.ok(hexes.size === 4, `neighbor tints not distinct: ${JSON.stringify([...hexes])}`);
+    t.ok(res.mexico.zone === 'mexico', `Mexico probe misclassified: ${res.mexico.zone}`);
+    t.ok(res.mexico.tint === null, `Mexico got a band tint: ${JSON.stringify(res.mexico.tint)} — the Rio Grande wash must stay`);
+    t.ok(res.texas.inTx && res.texas.tint === null, `Texas point tinted: ${JSON.stringify(res.texas)}`);
+  });
+
+  // The four W3 tour overlooks stand on the state they claim (the tour data
+  // and the paint must agree — a drifted ring or coordinate fails here, not
+  // in Bruno's eye).
+  await t.check('band tints: W3 tour spots classify as their own state', async () => {
+    const res = await t.ev(`(() => ({
+      nm: g.neighborStateAt(-3486, -1923.7),
+      ok: g.neighborStateAt(2281.3, -3591.2),
+      ar: g.neighborStateAt(5262.8, -2719.2),
+      la: g.neighborStateAt(5747.5, -629.7),
+    }))()`);
+    for (const [k, v] of Object.entries(res)) t.ok(v === k.toUpperCase(), `${k.toUpperCase()} spot classified as ${v}`);
+  });
 }
