@@ -43,6 +43,7 @@ export class TitleScreen {
     this.introEl = document.getElementById('intro-card');
     this.factEl = document.getElementById('title-fact');
     this.onEnter = null; // main.js: welcome toast + tutorial.begin() — fires on every dismissal (boot and firstRun replays)
+    this.onShow = null; // main.js: settings.refresh() — panel labels re-read live state each time the title comes up
     this.active = false; // main.js's loop runs the attract branch while true
     this.angle = 0;
     this.facts = buildFacts();
@@ -74,6 +75,7 @@ export class TitleScreen {
     this.el.style.display = 'flex';
     document.body.classList.add('title-up'); // hides the HUD chrome (index.html rule)
     this.active = true;
+    this.onShow?.();
   }
 
   hide() {

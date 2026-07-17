@@ -15,6 +15,14 @@ export const TOURS = [
   {
     track: 'New Player (2026-07)',
     waves: [
+      { wave: 'W3 — hints, Guide, Settings', spots: [
+        S('💬 First-NPC hint — Greta near Kerrville', [242, 1046.4], { mode: 'WALK', heading: Math.PI / 2, act: 'hintsReset', note: 'hints re-armed — the E-to-talk hint fires as she comes in range' }),
+        S('🌆 First-city hint — Austin edge', LL(30.2672, -97.7431), { mode: 'DRIVE', act: 'hintsReset', note: 'inside the city radius — the map hint fires (and absorbs the W2 map tip)' }),
+        S('🌇 First-dusk hint — legends warning', [985, 1737], { mode: 'DRIVE', time: 0.79, act: 'hintsReset', note: 'dusk staged — the after-dark legends hint fires as night settles' }),
+        S('🛫 First-apron hint — Dallas Love Field', LL(32.8498, -96.8549), { mode: 'DRIVE', act: 'hintsReset', note: 'on the field footprint — the press-V-to-fly hint fires' }),
+        S('🛂 First-crossing hint — Hobbs, NM', [-3486, -1923.7], { mode: 'DRIVE', act: 'hintsReset', note: 'across the state line — the Passport hint fires' }),
+        S('⚙️ Settings & Guide', [985, 1737], { mode: 'DRIVE', note: 'press Esc for the Settings panel (also on the title screen); press H, then the Guide button, to re-read the intro and every tip' }),
+      ] },
       { wave: 'W2 — first-run experience', spots: [
         S('🌆 New-game start — San Antonio approach', [985, 1737], { mode: 'DRIVE', heading: 1.582, note: 'the curated first view: I-35 southwest into the skyline, the Alamo minutes ahead' }),
         S('🎬 Title + intro card, first run staged', [985, 1737], { mode: 'DRIVE', act: 'firstRun', note: 'title over the live attract drift; New game → concept card (Start / Skip intro & tips), then the staged tips' }),

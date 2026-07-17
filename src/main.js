@@ -1,12 +1,12 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
-import { loadGeo, GEO, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRail, waterAt, countyAt, neighborCountyAt, hAt, inTexas, onIsland, beachAt, inWorld, borderZoneAt, outsideAt, seededRand, agAt, bandAgAt, inStateWater, coastDist, TIDELANDS_U, neighborStateAt, inTexasOrBand } from './geo.js';
+import { loadGeo, GEO, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRail, nearestCity, waterAt, countyAt, neighborCountyAt, hAt, inTexas, onIsland, beachAt, inWorld, borderZoneAt, outsideAt, seededRand, agAt, bandAgAt, inStateWater, coastDist, TIDELANDS_U, neighborStateAt, inTexasOrBand } from './geo.js';
 
 const NEIGHBOR_STATE_NAME = { LA: 'Louisiana', AR: 'Arkansas', OK: 'Oklahoma', NM: 'New Mexico' };
 import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, CAUSEWAY, padreSites, bandTint } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { initDebug } from './debug.js';
-import { CitySystem, cityClear } from './cities.js';
+import { CitySystem, cityClear, cityRadius } from './cities.js';
 import { BrandSystem, groundYAt as brandGroundYAt, brandNear } from './brands.js';
 import { Player } from './vehicle.js';
 import { Gameplay, LANDMARK_COUNT, LANDMARKS } from './gameplay.js';
@@ -38,7 +38,8 @@ import { MilitaryAirSystem } from './military.js';
 import { applyGear } from './shop.js';
 import { HUD } from './hud.js';
 import { TitleScreen } from './title.js';
-import { Tutorial } from './onboarding.js';
+import { Tutorial, buildGuide } from './onboarding.js';
+import { initSettings } from './settings.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
 
@@ -160,6 +161,13 @@ async function boot() {
     player.speed = 0; player.vy = 0;
   }, SA_START);
   const tutorial = new Tutorial(gameplay, (m) => hud.toast(m));
+  // W3: Settings panel (pause + title) drives the same functions the keybinds
+  // call; Guide (inside help) replays the intro card + every tip and hint.
+  const settings = initSettings({ audio, hud, missions, brands });
+  settings.mount(document.getElementById('paused'));
+  settings.mount(document.getElementById('title'));
+  title.onShow = () => settings.refresh();
+  buildGuide();
   const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial }); // panel only with ?debug=1; actions drive the verify suite
   player.flares = flares; // hud reads the rack count off the player
 
@@ -207,7 +215,7 @@ async function boot() {
     hud.setPaused(reason === 'esc');
     // mid-stream tips skip (spec: same total effect as the card's Skip) —
     // only offered while tips are still pending
-    if (reason === 'esc') skipTipsBtn.style.display = tutorial.pending ? '' : 'none';
+    if (reason === 'esc') { skipTipsBtn.style.display = tutorial.pending ? '' : 'none'; settings.refresh(); }
     if (reason) audio.freeze(); else audio.unfreeze();
   };
   const setPaused = (on) => setPause(on ? 'esc' : null);
@@ -292,7 +300,11 @@ async function boot() {
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, nearestAnyRoad, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
+  // W3 hint signals: npc/dusk are cheap and set per frame; cityEdge/band/apron
+  // ride the 12 Hz hud block (their inputs live there). Stale-by-80ms is fine —
+  // every trigger is a lingering state, not an edge.
+  const hintSig = { npc: false, cityEdge: false, dusk: false, apron: false, band: false };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, nearestAnyRoad, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, settings, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -361,11 +373,13 @@ async function boot() {
     turtles.update(dt, player.pos.x, player.pos.z, sky.t, sky.days);
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed, player, sky);
-    tutorial.update(dt);
     gameplay.checkTouchdown(player, missions.job?.kind === 'charter');
     missions.update(dt, player.pos, player.mode, player.pos.y - hAt(player.pos.x, player.pos.z));
     hud.animateShield(player, dt); // per-frame sway/float — headless too, not gated by __skipRender
     const npcName = npcs.update(dt, player.pos);
+    hintSig.npc = !!npcName;
+    hintSig.dusk = ATMOS.night >= 0.5;
+    tutorial.update(dt, hintSig);
     const skyHint = npcName ? null : springer.nearHint(player.pos);
     const pNear = (npcName || skyHint) ? null : plaqueNear(player.pos, 28);
     hud.interactHint(npcName ? `talk to ${npcName}` : skyHint ? skyHint
@@ -413,6 +427,18 @@ async function boot() {
         }
       }
       if (side) lastSide = side;
+      // W3 hint signals that need this block's county work (guarded: veterans
+      // are seen.all and skip the nearestCity/airportClear cost entirely)
+      if (tutorial.active && !gameplay.save.seen.all) {
+        const { city, dist } = nearestCity(player.pos.x, player.pos.z);
+        hintSig.cityEdge = !!city && dist < cityRadius(city.pop);
+        hintSig.band = !county && !!ncNow;
+        hintSig.apron = player.mode !== 'FLY' && !!airportClear(player.pos.x, player.pos.z);
+      } else {
+        // never let a signal go stale across an inactive stretch — a re-arm
+        // must read this tick's world, not the last armed one's
+        hintSig.cityEdge = hintSig.band = hintSig.apron = false;
+      }
       audio.swamp = swampAt(player.pos.x, player.pos.z); // frog country factor
       const road = player.mode !== 'FLY' ? nearestRoad(player.pos.x, player.pos.z, 6) : null;
       const rail = player.mode !== 'FLY' ? nearestRail(player.pos.x, player.pos.z, 12) : null;

@@ -1,45 +1,46 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: New Player Experience (`NEWPLAYER_SPEC.md`), wave 3 of 4 —
-  contextual hints + help restructure + Guide + Settings: one-time
-  first-encounter hints via `save.seen` (first NPC in range → E, first city
-  edge → M/map, first dusk → legends, first airport apron → fly hint, first
-  band crossing → passport), help panel sectioned (Driving / Flying / Menus /
-  Goals), a Guide section replaying the concept card + every tip and hint
-  read-only, and a visible labeled Settings panel (mute, UI size, compass,
-  guide arrow, brand size) on pause + title. Wave 2 (concept card, staged
-  tips, curated SA start, attract drift + rotating fact) shipped 2026-07-17.
-- **Recommended setup**: model **Fable 5**, effort **high** — content/register
-  wave (hint copy, help/Guide restructure). Flag it if the running model
-  differs.
+- **This session**: New Player Experience (`NEWPLAYER_SPEC.md`), wave 4 of 4 —
+  named save slots + per-slot settings: three named slots on the title screen
+  (name asked at New game, rename, delete with confirm), legacy
+  `lonestar-roam-save-v1` migrates to slot 1, the four comfort keys
+  (`lonestar-arrow`/`-compass`/`-ui-scale`/`-brand-scale`) become per-slot
+  (only the active-slot pointer stays global), slot export/import to file
+  (first candidate for BACKLOG.md if the wave runs long). Wave 3 (hints,
+  help sections, Guide, Settings panel) shipped 2026-07-17.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — structural
+  storage-plumbing wave (slot table, key migration, no new copy). Flag it if
+  the running model differs.
 - **Budget**: code + checks in `tools/checks/onboarding.mjs`, grep-first;
-  shots per the 2026-07-17 policy — one Copilot-analyzed shot per new visible
-  surface (Settings panel, Guide, sectioned help), judged before commit.
-- **Then**: rewrite this block for W4 (named save slots + per-slot settings —
-  Sonnet 5 high). W4 is the last wave: its session end deletes this block,
-  folds the track into `ROADMAP.md`, graduates surviving gotchas into
-  `GOTCHAS.md`, and sweeps `BACKLOG.md`.
+  shots per policy — the reworked title slot row is the one visible surface.
+- **Then**: W4 is the last wave. Its session end deletes this block, folds the
+  track into one `ROADMAP.md` entry, graduates surviving gotchas into
+  `GOTCHAS.md`, and sweeps `BACKLOG.md` + any doc naming the track.
 
 Gotchas carried over:
-- Hints reuse the existing `interactHint`/toast surfaces — no new DOM system
-  (spec W3). Follow onboarding.js's pattern: check `seen.all || seen[key]`,
-  mark + persist at fire time. `seen.all` (the card's Skip / pause-screen
-  skip) must silence W3 hints too — the Skip promise is "no card, no toasts,
-  no hints, ever" (spec Decisions).
-- The Guide re-presents, never re-arms: card + tips + hints stay readable,
-  seen flags untouched.
-- Settings panel is storage-agnostic in W3: drive the existing keys
-  (`lonestar-arrow`/`-compass`/`-ui-scale`/`-brand-scale` + mute) through the
-  same functions the keybinds call; W4 slots the storage underneath.
-- The title screen runs a live attract branch in main.js's loop
-  (`title.active` gates it; keydown handler swallows all keys while up).
-  Anything added to the title (the Settings entry point) is DOM over the
-  drift and must not tick game systems. HUD chrome hides via `body.title-up`
-  (index.html rule) — new HUD elements should join that selector list.
-- `save.seen` is additive-key-only (same law as `save.at`); veteran saves are
-  grandfathered `intro=all=true` in gameplay.js's constructor — W3 hints will
-  therefore never fire for pre-W2 saves. That is the spec'd behavior.
+- **Slot storage goes UNDER the five functions, never beside them.** The W3
+  Settings panel and the keybinds both call `audio.toggleMute` /
+  `hud.uiScale` / `hud.toggleCompass` / `missions.toggleArrow` /
+  `brands.setScale` and read live state back — reroute those functions'
+  storage and every surface follows; `settings.js` itself needs no change.
+- Switching slots after boot must run the *apply* paths, not just swap keys:
+  `hud.ui`/compass are read from localStorage at construction,
+  brands' `SCALE` is a module-level let applied at spawn (go through
+  `setScale`), `missions.arrowOn` at construction.
+- Save law: additive keys only (`save.name` is new); rose indices/gear
+  untouched; `save.seen` (incl. `all`) is per-slot — the Skip promise never
+  crosses slots. Veteran grandfathering (`intro=all=true` for non-empty
+  saves) must survive migration to slot 1.
+- Harness bypass: auto-enter must select the active slot; slot logic
+  (`select`/`newGame`/`rename`/`delete`) lives on `__game.title` for the
+  suite (hard requirement in the spec).
+- The title screen's `.slots` DOM has two `— reserved —` placeholders waiting
+  to become slots 2/3; the Settings panel is mounted into `#title` (and
+  `#paused`) at boot and `title.onShow` refreshes its labels.
+- `tools/stage-shot.mjs` auto-enters (`__harness`) and takes
+  `--eval '<js>'` for UI staging — stage the title explicitly via
+  `--eval "__game.title.show()"`.
 
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
 free-roam Texas game. Before touching code read `CLAUDE.md` (architecture +

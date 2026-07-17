@@ -44,6 +44,15 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       title.show();
       hud.toast('🌱 First run staged — choose New game');
     },
+    // W3: stage the hint path in-game — fresh seen flags + armed tutorial, no
+    // title round-trip (firstRun is the card path; this is the hint path).
+    // Tour spots chain it so every hint spot guarantees its subject fires.
+    hintsReset() {
+      gameplay.save.seen = {};
+      gameplay.persist();
+      tutorial.begin();
+      hud.toast('🌱 Hints re-armed — approach the subject');
+    },
     night() { sky.t = 0.98; },
     midnight() { sky.t = 0.998; }, // the bell tolls on the wrap — park near a chapel first
     hauntCemetery() {

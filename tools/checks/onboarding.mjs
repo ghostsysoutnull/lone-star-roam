@@ -166,6 +166,165 @@ export default async function onboarding(t) {
     await t.ev(`g.title.hide()`);
   });
 
+  // ---- W3: contextual hints, help restructure, Guide, Settings ----
+
+  await t.check('hints fire once from signals; hintCity absorbs tipMap; seen.all silences', async () => {
+    // a fresh Tutorial instance sharing the save: the live one stays inactive,
+    // so the real loop can't interleave fires between these evals
+    await t.ev(`(g.tutorial.active = false, g.gameplay.save.seen = {},
+      window.__tut = new g.tutorial.constructor(g.gameplay, () => {}), __tut.begin())`);
+    // priority: npc outranks a simultaneous city edge
+    await t.ev(`__tut.update(0.2, { npc: true, cityEdge: true })`);
+    t.ok(await t.ev('g.gameplay.save.seen.hintNpc === true'), 'hintNpc not fired');
+    t.ok(!(await t.ev('g.gameplay.save.seen.hintCity')), 'hintCity fired in the same tick (cooldown ignored)');
+    // cooldown holds, then the city hint lands and takes tipMap with it
+    await t.ev(`__tut.update(0.2, { cityEdge: true })`);
+    t.ok(!(await t.ev('g.gameplay.save.seen.hintCity')), 'hintCity fired inside the 8 s cooldown');
+    await t.ev(`(__tut.cd = 0, __tut.update(0.2, { cityEdge: true }))`);
+    const city = await t.ev(`({ hint: g.gameplay.save.seen.hintCity, tip: g.gameplay.save.seen.tipMap,
+      persisted: JSON.parse(localStorage.getItem('lonestar-roam-save-v1')).seen.hintCity })`);
+    t.ok(city.hint === true, 'hintCity not fired after cooldown');
+    t.ok(city.tip === true, 'hintCity did not absorb tipMap');
+    t.ok(city.persisted === true, 'hintCity not persisted');
+    // remaining three, one per cleared cooldown
+    for (const sig of ['dusk', 'apron', 'band']) {
+      await t.ev(`(__tut.cd = 0, __tut.update(0.2, { ${sig}: true }))`);
+    }
+    const fired = await t.ev('__tut.fired');
+    t.ok(fired.join(',') === 'hintNpc,hintCity,hintDusk,hintAirport,hintBand', `fired order: ${fired.join(',')}`);
+    // once each: every signal re-raised, no hint re-fires (a TIP may still
+    // land here — counts() sees the W2 check's pushed city/landmark — so
+    // count hint keys, not total fires)
+    await t.ev(`(__tut.cd = 0, __tut.update(0.2, { npc: true, cityEdge: true, dusk: true, apron: true, band: true }))`);
+    t.ok((await t.ev('__tut.fired')).filter((k) => k.startsWith('hint')).length === 5, 'a hint fired twice');
+    // seen.all (the Skip promise) silences hints too
+    await t.ev(`(g.gameplay.save.seen = { all: true }, __tut.fired.length = 0, __tut.begin())`);
+    await t.ev(`__tut.update(0.2, { npc: true, cityEdge: true, dusk: true, apron: true, band: true })`);
+    t.ok((await t.ev('__tut.fired')).length === 0, 'a hint fired under seen.all');
+    t.ok(!(await t.ev('__tut.pending')), 'pending true under seen.all');
+  });
+
+  await t.check('real loop wires hint signals: NPC (per-frame path) and band (12 Hz path)', async () => {
+    // per-frame path: walk up to Greta (bespoke NPC W of Kerrville). Named
+    // NPCs are built at boot on a seeded road shoulder — read the real spot
+    // rather than trusting the authored coordinate (roadShoulder may shift it).
+    const greta = await t.ev(`(() => { const n = g.npcs.all().find((n) => n.name === 'Greta');
+      return n ? { x: n.g.position.x, z: n.g.position.z } : null; })()`);
+    t.ok(greta, 'Greta missing from npcs.all()');
+    await t.tp(greta.x + 2, greta.z, 'WALK');
+    await t.ev(`g.sky.t = 0.35`);
+    await t.ev(`(g.gameplay.save.seen = {}, g.tutorial.fired.length = 0, g.tutorial.begin())`);
+    await t.ev(`new Promise((res) => { const t0 = performance.now();
+      const id = setInterval(() => { if (g.gameplay.save.seen.hintNpc || performance.now() - t0 > 5000) { clearInterval(id); res(); } }, 100); })`);
+    t.ok(await t.ev('g.gameplay.save.seen.hintNpc === true'), 'hintNpc never fired standing in talk range');
+    // 12 Hz path: across the state line at Hobbs, NM. Every other hint is
+    // pre-marked — Hobbs has townsfolk in talk range AND an airfield
+    // footprint, and any of them firing first would eat the cooldown.
+    await t.tp(-3486, -1923.7, 'DRIVE');
+    await t.ev(`(g.gameplay.save.seen = { hintNpc: true, hintCity: true, hintDusk: true, hintAirport: true }, g.tutorial.begin())`);
+    await t.ev(`new Promise((res) => { const t0 = performance.now();
+      const id = setInterval(() => { if (g.gameplay.save.seen.hintBand || performance.now() - t0 > 5000) { clearInterval(id); res(); } }, 100); })`);
+    t.ok(await t.ev('g.gameplay.save.seen.hintBand === true'), 'hintBand never fired across the line');
+    await t.ev(`(g.gameplay.save.seen = { all: true }, g.tutorial.active = false)`);
+  });
+
+  await t.check('help panel is sectioned Driving / Flying / Menus / Goals', async () => {
+    const heads = await t.ev(`[...document.querySelectorAll('#help h3')].map((h) => h.textContent)`);
+    t.ok(heads.join(',') === 'Driving,Flying,Menus,Goals', `sections: ${heads.join(',')}`);
+    const kbds = await t.ev(`document.querySelectorAll('#help kbd').length`);
+    t.ok(kbds >= 20, `only ${kbds} keybinds listed after the restructure`);
+  });
+
+  await t.check('Guide replays card + every tip and hint, read-only', async () => {
+    const g1 = await t.ev(`(() => {
+      const list = document.getElementById('guide-list');
+      const text = list.textContent;
+      return { card: !!list.querySelector('.guide-card'), welcome: text.includes('Welcome to Texas'),
+        missing: [...g.tutorial.TIPS, ...g.tutorial.HINTS].filter((x) => !text.includes(x.msg)).map((x) => x.key) };
+    })()`);
+    t.ok(g1.card, 'concept card not cloned into the Guide');
+    t.ok(g1.welcome, 'card copy missing from the Guide');
+    t.ok(!g1.missing.length, `Guide missing: ${g1.missing.join(',')}`);
+    // re-presents, never re-arms: opening it leaves seen untouched
+    const r = await t.ev(`(() => {
+      const before = JSON.stringify(g.gameplay.save.seen);
+      const btn = document.getElementById('guide-toggle');
+      btn.click();
+      const open = document.getElementById('guide-list').style.display;
+      btn.click();
+      const closed = document.getElementById('guide-list').style.display;
+      return { open, closed, same: JSON.stringify(g.gameplay.save.seen) === before };
+    })()`);
+    t.ok(r.open === 'block' && r.closed === 'none', `toggle open/close: ${r.open}/${r.closed}`);
+    t.ok(r.same, 'opening the Guide mutated save.seen');
+  });
+
+  await t.check('Settings panel on pause + title, five labeled controls driving live state', async () => {
+    const shape = await t.ev(`(() => {
+      const p = document.querySelector('#paused .settings'), ti = document.querySelector('#title .settings');
+      return { p: !!p, t: !!ti, rows: p ? p.querySelectorAll('.settings-row').length : 0 };
+    })()`);
+    t.ok(shape.p && shape.t, `panel missing (paused: ${shape.p}, title: ${shape.t})`);
+    t.ok(shape.rows === 5, `${shape.rows} rows (want 5)`);
+    const click = (sel) => t.ev(`document.querySelector('#paused .settings [data-set="${sel}"]').click()`);
+    // toggles: observable flips + storage key + both instances agree.
+    // toggleMute no-ops without an AudioContext (headless never gets the user
+    // gesture that creates one) — stub the two members it touches so the real
+    // function runs end to end.
+    await t.ev(`(g.audio.ctx ||= { currentTime: 0 }, g.audio.master ||= { gain: { setTargetAtTime: () => {} } })`);
+    const mute0 = await t.ev('g.audio.muted');
+    await click('mute');
+    t.ok((await t.ev('g.audio.muted')) === !mute0, 'mute toggle did not flip audio.muted');
+    const titleLabel = await t.ev(`document.querySelector('#title .settings [data-set="mute"]').textContent`);
+    t.ok(titleLabel === (mute0 ? 'On' : 'Off'), `title instance label desynced: ${titleLabel}`);
+    await click('mute');
+    // drop the stub: every per-frame audio path guards on ctx being null, and
+    // a fake ctx without the real graph would crash the loop
+    await t.ev(`g.audio.ctx = null`);
+    const comp0 = await t.ev(`document.getElementById('compass').style.display !== 'none'`);
+    await click('compass');
+    t.ok((await t.ev(`document.getElementById('compass').style.display !== 'none'`)) === !comp0, 'compass toggle did not flip the compass');
+    t.ok((await t.ev(`localStorage.getItem('lonestar-compass')`)) === (comp0 ? 'off' : 'on'), 'compass key not written');
+    await click('compass');
+    const arrow0 = await t.ev('g.missions.arrowOn');
+    await click('arrow');
+    t.ok((await t.ev('g.missions.arrowOn')) === !arrow0, 'arrow toggle did not flip missions.arrowOn');
+    await click('arrow');
+    // steppers: value moves, key written, symmetric restore
+    const ui0 = await t.ev('g.hud.ui');
+    await click('ui+');
+    const ui1 = await t.ev(`({ ui: g.hud.ui, key: localStorage.getItem('lonestar-ui-scale'),
+      font: document.documentElement.style.fontSize, label: document.querySelector('#paused .settings [data-set="ui"]').textContent })`);
+    t.near(ui1.ui, ui0 + 0.1, 0.001, 'ui scale did not step +10%');
+    t.ok(parseFloat(ui1.key) === ui1.ui, `ui key ${ui1.key} vs live ${ui1.ui}`);
+    t.ok(ui1.font === 10 * ui1.ui + 'px', `root font ${ui1.font} vs ${10 * ui1.ui}px`);
+    t.ok(ui1.label === Math.round(ui1.ui * 100) + '%', `ui label ${ui1.label}`);
+    await click('ui-');
+    t.near(await t.ev('g.hud.ui'), ui0, 0.001, 'ui scale not restored');
+    const b0 = await t.ev('g.brands.scale');
+    await click('brand+');
+    t.near(await t.ev('g.brands.scale'), b0 + 0.05, 0.001, 'brand scale did not step');
+    t.ok(parseFloat(await t.ev(`localStorage.getItem('lonestar-brand-scale')`)) === (await t.ev('g.brands.scale')), 'brand key not written');
+    await click('brand-');
+    t.near(await t.ev('g.brands.scale'), b0, 0.001, 'brand scale not restored');
+    // keybind path stays in sync: title.show() refreshes labels from live state
+    await t.ev(`g.hud.uiScale(1)`);
+    await t.ev(`g.title.show()`);
+    const shown = await t.ev(`document.querySelector('#title .settings [data-set="ui"]').textContent`);
+    t.ok(shown === Math.round((ui0 + 0.1) * 100) + '%', `title show() did not refresh (label ${shown})`);
+    await t.ev(`(g.title.hide(), g.hud.uiScale(-1))`);
+  });
+
+  await t.check('hintsReset action re-arms the hint path in-game', async () => {
+    await t.ev(`g.gameplay.save.seen = { intro: true, all: true }`);
+    await t.ev(`g.debug.actions.hintsReset()`);
+    const r = await t.ev(`({ all: g.gameplay.save.seen.all, active: g.tutorial.active, title: g.title.active })`);
+    t.ok(!r.all, 'seen flags not cleared');
+    t.ok(r.active, 'tutorial not armed');
+    t.ok(!r.title, 'hintsReset must not stage the title (that is firstRun)');
+    await t.ev(`(g.gameplay.save.seen = { all: true }, g.tutorial.active = false)`);
+  });
+
   await t.check('quit write persists save.at without a reload', async () => {
     await t.tp(555.5, -444.25, 'DRIVE');
     await t.ev(`g.player.heading = 0.789`);

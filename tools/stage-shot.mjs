@@ -3,11 +3,15 @@
 // settle chunks, shoot. The image is for Bruno's eye and for Copilot CLI
 // analysis (see GOTCHAS.md → Verification) — never a pass/fail signal.
 //
-//   node tools/stage-shot.mjs <out.png> <x> <z> [heading°=270] [mode=FLY] [agl=55] [skyT=0.5]
+//   node tools/stage-shot.mjs [--eval '<js>'] <out.png> <x> <z> [heading°=270] [mode=FLY] [agl=55] [skyT=0.5]
 //
 //   heading° — compass degrees, 0 = north (−z)
 //   agl     — camera-subject height above ground (FLY only; ground modes ignore)
 //   skyT    — sky.t fraction of day: 0.5 noon, 0/1 midnight, ~0.25 dawn
+//   --eval  — JS run after positioning, before the shot (UI shots: open the
+//             panel being judged, e.g. "__game.setPaused(true)"). Boots with
+//             __harness auto-enter like verify — stage the title explicitly
+//             via --eval "__game.title.show()" when the title IS the subject.
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { readdirSync } from 'node:fs';
@@ -16,9 +20,13 @@ import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 
-const [out, xa, za, hdga = '270', mode = 'FLY', agla = '55', skyTa = '0.5'] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+let evalJs = null;
+const evalIdx = argv.indexOf('--eval');
+if (evalIdx !== -1) evalJs = argv.splice(evalIdx, 2)[1];
+const [out, xa, za, hdga = '270', mode = 'FLY', agla = '55', skyTa = '0.5'] = argv;
 if (!out || xa === undefined || za === undefined) {
-  console.error('usage: node tools/stage-shot.mjs <out.png> <x> <z> [heading°] [mode] [agl] [skyT]');
+  console.error("usage: node tools/stage-shot.mjs [--eval '<js>'] <out.png> <x> <z> [heading°] [mode] [agl] [skyT]");
   process.exit(2);
 }
 const [x, z, hdg, agl, skyT] = [xa, za, hdga, agla, skyTa].map(Number);
@@ -52,6 +60,7 @@ const ctx = await browser.newContext({ viewport: { width: 960, height: 540 } });
 const page = await ctx.newPage();
 await page.clock.install();
 await page.addInitScript(() => {
+  window.__harness = true; // auto-enter past the W1 title screen, verify-style
   window.requestAnimationFrame = (cb) => setTimeout(() => cb(performance.now()), 50);
   window.cancelAnimationFrame = (id) => clearTimeout(id);
 });
@@ -70,6 +79,7 @@ await page.evaluate(`(() => { const g = window.__game;
   g.player.speed = 0; g.player.vy = 0;
 })()`);
 await page.clock.runFor(2500); // chunks + scenery spawn around the new position
+if (evalJs) { await page.evaluate(evalJs); await page.clock.runFor(300); }
 await page.evaluate('window.__skipRender = 0');
 await page.clock.runFor(200);
 await page.screenshot({ path: out });
