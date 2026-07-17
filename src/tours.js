@@ -36,6 +36,11 @@ export const TOURS = [
         S('🌲 AR pine over Texarkana', [5262.8, -2719.2], { mode: 'FLY', time: 0.35, heading: -Math.PI / 4, note: 'facing northeast — pine green continues the East Texas read across the line' }),
         S('🐊 LA swamp over Many', [5747.5, -629.7], { mode: 'FLY', time: 0.35, heading: -Math.PI / 2, note: 'facing east — dark swamp green, the wettest read of the four' }),
       ] },
+      { wave: 'W4 — crops and ranches', spots: [
+        S('🌾 Tillman County farmstead, OK', [780.7, -3724.7], { mode: 'DRIVE', heading: Math.PI, note: 'across the Red River from Wichita Falls — house, barn, windmill, silo, pecking chickens, drawn from real USDA census truth' }),
+        S('🌱 Cotton County field, OK', [520, -3850], { mode: 'DRIVE', heading: 0, note: 'real dominant crop is cotton — the county is literally named for it' }),
+        S('⛪ Cotton County chapel + cemetery, OK', [1071.7, -3801.1], { mode: 'DRIVE', heading: -Math.PI / 2, note: 'first band chapel — same site haunts.js can wisp at night' }),
+      ] },
     ],
   },
   {

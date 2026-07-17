@@ -1,7 +1,7 @@
 // Procedural cities: street grids + skylines scaled by real population,
 // spawned/despawned by distance. Deterministic per city name.
 import * as THREE from 'three';
-import { GEO, seededRand, nearestRoad, nearestBandRoad, hAt } from './geo.js';
+import { GEO, seededRand, nearestRoad, nearestBandRoad, nearestCity, nearestBandCity, hAt } from './geo.js';
 import { airportClear } from './airports.js';
 import { shoulderClear } from './shoulder.js'; // W6a vignette footprints (fed building, WinBig lot)
 
@@ -10,6 +10,17 @@ const SPAWN_DIST = 600;
 // city footprint scale from population (game units; 1 = 100 m)
 export function cityRadius(pop) {
   return Math.min(90, 6 + Math.pow(pop, 0.38) / 9);
+}
+
+// Town standoff against both city lists — band-eligible placement systems
+// (crop fields, farmsteads, chapels) shouldn't crowd a band town any more
+// than a Texas one. Texas-only sites keep their own inline nearestCity check.
+export function cityClear(x, z, extra) {
+  const t = nearestCity(x, z);
+  if (t.city && t.dist < cityRadius(t.city.pop) + extra) return false;
+  const b = nearestBandCity(x, z);
+  if (b.city && b.dist < cityRadius(b.city.pop) + extra) return false;
+  return true;
 }
 
 export class CitySystem {

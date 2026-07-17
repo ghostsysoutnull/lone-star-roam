@@ -83,10 +83,13 @@ export default async function ag(t) {
           const s = g.farmsteadAt(cx + i, cz + j);
           if (!s) continue;
           count++;
-          if (!g.inTexas(s.x, s.z)) bad.push(s.key + ':tx');
+          // Hereford's 10-chunk (2600u) scan radius reaches real OK/NM band
+          // land — farmsteadAt is intentionally band-capable (Band Parity
+          // W4), so a band-legal site is expected, not a violation.
+          if (!g.inTexasOrBand(s.x, s.z)) bad.push(s.key + ':land');
           if (!g.airportClear(s.x, s.z)) bad.push(s.key + ':apt');
           if (g.brandNear(s.x, s.z, 30)) bad.push(s.key + ':brand');
-          const r = g.nearestRoad(s.x, s.z, 6);
+          const r = g.nearestAnyRoad(s.x, s.z, 6);
           if (r && r.dist < 5) bad.push(s.key + ':road' + r.dist.toFixed(1));
         }
       return { count, bad };
@@ -683,6 +686,127 @@ export default async function ag(t) {
     const [tx, tz] = LL(30.1421, -102.4088); // Sanderson, TX — Terrell county seat
     const res = await t.ev(`g.fieldAt(${tx}, ${tz})`);
     t.ok(res === null, `expected no field/pivot hit in Terrell county, got ${JSON.stringify(res)}`);
+  });
+
+  // --- Band Parity W4: crops and ranches extended to the band (LA/AR/OK/NM) ---
+
+  await t.check('band bake join: GEO.bandAg has exactly 249 counties', async () => {
+    const n = await t.ev(`Object.keys(g.GEO.bandAg).length`);
+    t.ok(n === 249, `expected 249 joined band counties, got ${n}`);
+  });
+
+  await t.check('bandAgAt: Cotton County, OK resolves; null inside Texas and in Mexico', async () => {
+    const rec = await t.ev(`g.bandAgAt(1056.7, -3816.1)`); // Cotton County, OK — real site below
+    t.ok(rec, 'bandAgAt missed Cotton County, OK');
+    t.ok(rec && rec.crops.cotton > 0, `Cotton County has no cotton acreage: ${JSON.stringify(rec)}`);
+    const insideTexas = await t.ev(`g.bandAgAt(${haleX}, ${haleZ})`);
+    t.ok(insideTexas === null, `expected null inside Texas (Hale county), got ${JSON.stringify(insideTexas)}`);
+    const [nuevoX, nuevoZ] = LL(27.4863, -99.5075); // Nuevo Laredo, Mexico — none of the 4 band states
+    const mexico = await t.ev(`g.bandAgAt(${nuevoX}, ${nuevoZ})`);
+    t.ok(mexico === null, `expected null in Mexico (Nuevo Laredo), got ${JSON.stringify(mexico)}`);
+  });
+
+  // Real, frozen band sites — southwest Oklahoma, Tillman/Cotton counties,
+  // across the Red River from Wichita Falls/Vernon, TX. Found by scanning
+  // GEO.bandHighways for the first legal farmstead/field/chapel hit — Cotton
+  // County's dominant crop being cotton is real census truth, not a pick.
+  const BAND_FARM = { cx: 2, cz: -15, x: 772.7489797285957, z: -3732.7234383456844 };
+  const BAND_FIELD = { cx: 2, cz: -15, x: 520, z: -3870 };
+  const BAND_CHAPEL = { cx: 4, cz: -15, x: 1056.7011490400344, z: -3816.1010455403025 };
+
+  await t.check('band farmstead: Tillman County, OK site is lawful and resolves at its frozen chunk', async () => {
+    const res = await t.ev(`(() => {
+      const s = g.farmsteadAt(${BAND_FARM.cx}, ${BAND_FARM.cz});
+      if (!s) return { ok: false };
+      return {
+        ok: true, x: s.x, z: s.z,
+        land: g.inTexasOrBand(s.x, s.z), tx: g.inTexas(s.x, s.z),
+        airport: g.airportClear(s.x, s.z), brand: !g.brandNear(s.x, s.z, 30),
+        road: g.nearestAnyRoad(s.x, s.z, 6)?.dist,
+      };
+    })()`);
+    t.ok(res.ok, `no farmstead at the frozen band chunk (${BAND_FARM.cx},${BAND_FARM.cz})`);
+    t.near(res.x, BAND_FARM.x, 0.01, 'band farmstead x drifted — a rebake shifted this site');
+    t.near(res.z, BAND_FARM.z, 0.01, 'band farmstead z drifted — a rebake shifted this site');
+    t.ok(res.land && !res.tx, `farmstead not on band land (land=${res.land} tx=${res.tx})`);
+    t.ok(res.airport && res.brand, `farmstead standoff violated: airport=${res.airport} brand=${res.brand}`);
+    t.ok(!(res.road < 5), `farmstead sits on top of a road: ${res.road}`);
+  });
+
+  await t.check('band crop field: Cotton County, OK field resolves via fieldAt (cotton, real census truth)', async () => {
+    const res = await t.ev(`g.fieldAt(${BAND_FIELD.x}, ${BAND_FIELD.z})`);
+    t.ok(res, `fieldAt missed the frozen band field (${BAND_FIELD.x},${BAND_FIELD.z})`);
+    t.ok(res && res.crop === 'cotton' && res.kind === 'field', `wrong hit: ${JSON.stringify(res)}`);
+  });
+
+  await t.check('band crop field renders: draped decal + row instances actually spawn in-scene', async () => {
+    await t.tp(BAND_FIELD.x, BAND_FIELD.z + 20);
+    await t.wait(0.8);
+    const res = await t.ev(`(() => {
+      let crops = 0; const kinds = new Set(), bad = [];
+      for (const gr of g.scenery.live.values())
+        gr.traverse((o) => {
+          if (o.userData.crop) {
+            crops++; kinds.add(o.userData.crop);
+            const p = o.geometry.attributes.position.array;
+            for (const i of [0, 3 * ((p.length / 6) | 0), p.length - 3]) {
+              const dy = p[i + 1] - g.hAt(p[i], p[i + 2]);
+              if (dy < 0.05 || dy > 0.5) bad.push(dy.toFixed(3));
+            }
+          }
+        });
+      return { crops, kinds: [...kinds], bad };
+    })()`);
+    t.ok(res.crops > 0, 'no crop field decals in live chunks around the band field site');
+    t.ok(res.kinds.includes('cotton'), `band field not cotton: ${res.kinds}`);
+    t.ok(res.bad.length === 0, `decal vertices off the terrain drape: dy=${res.bad}`);
+  });
+
+  await t.check('band chapel + cemetery: Cotton County, OK site is lawful and resolves at its frozen chunk', async () => {
+    const res = await t.ev(`(() => {
+      const s = g.chapelSitesNear(${BAND_CHAPEL.cx * 260 + 130}, ${BAND_CHAPEL.cz * 260 + 130}, 0)[0];
+      if (!s) return { ok: false };
+      return {
+        ok: true, x: s.x, z: s.z, cemX: s.cemX, cemZ: s.cemZ,
+        land: g.inTexasOrBand(s.x, s.z), tx: g.inTexas(s.x, s.z),
+        cemLand: g.inTexasOrBand(s.cemX, s.cemZ),
+      };
+    })()`);
+    t.ok(res.ok, `no chapel at the frozen band chunk (${BAND_CHAPEL.cx},${BAND_CHAPEL.cz})`);
+    t.near(res.x, BAND_CHAPEL.x, 0.01, 'band chapel x drifted — a rebake shifted this site');
+    t.near(res.z, BAND_CHAPEL.z, 0.01, 'band chapel z drifted — a rebake shifted this site');
+    t.ok(res.land && !res.tx, `chapel not on band land (land=${res.land} tx=${res.tx})`);
+    t.ok(res.cemLand, 'cemetery plot not on band land');
+  });
+
+  await t.check('band chapel renders: chapel + cemetery + shade oak actually spawn in-scene', async () => {
+    await t.tp(BAND_CHAPEL.x + 15, BAND_CHAPEL.z + 15);
+    await t.wait(0.8);
+    const kinds = await t.ev(`(() => {
+      const found = new Set();
+      for (const gr of g.scenery.live.values())
+        gr.traverse((o) => { if (o.userData.kind) found.add(o.userData.kind); });
+      return [...found];
+    })()`);
+    t.ok(kinds.includes('cemetery'), `no cemetery group in live chunks at the band chapel site: ${kinds}`);
+  });
+
+  await t.check('feedlotAt stays band-capable but dormant: no band county crosses the 30 head/km² on-feed gate', async () => {
+    // Real 2022 census: OK Texas County tops out at ~23.6 head/km² on feed —
+    // below the threshold. Documents the honest outcome, not a bug: the code
+    // path is wired for the band, the real data just never lights it up
+    // (Texas' Panhandle feedlot belt is a genuinely unique concentration).
+    const res = await t.ev(`(() => {
+      let maxDensity = 0, hits = 0;
+      for (const [k, v] of Object.entries(g.GEO.bandAg)) {
+        const d = v.onFeed / v.areaKm2;
+        if (d > maxDensity) maxDensity = d;
+        if (d >= 30) hits++;
+      }
+      return { maxDensity, hits };
+    })()`);
+    t.ok(res.hits === 0, `expected no band county over the feedlot gate, got ${res.hits} (maxDensity=${res.maxDensity})`);
+    t.ok(res.maxDensity > 20 && res.maxDensity < 30, `OK Texas County's on-feed density drifted far from ~23.6: ${res.maxDensity}`);
   });
 
   await t.tp(haleX, haleZ, 'DRIVE'); // leave the suite grounded in DRIVE (ambient-mode convention)

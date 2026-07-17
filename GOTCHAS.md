@@ -39,8 +39,19 @@ graduate here (and out of `NEXT_SESSION.md`).
 
 ## The law of Texas
 
-- Agriculture/chapel/farmstead/brand generators stay `inTexas`-gated. The
-  shoulder gets none of them. Padre being `inTexas` means it legitimately gets
+- **Amended (Band Parity W4, 2026-07-17)**: crop decals/pivots/`farmsteadAt`/
+  `feedlotAt`/`chapelAt`+cemeteries and the flora scatter loop are now
+  `inTexasOrBand`-gated (`geo.js`) — real band land (LA/AR/OK/NM) legitimately
+  grows these too, painted from `GEO.bandAg` (own bake, `tools/build-band-ag.mjs`,
+  never merged into `GEO.ag`/the 254-county tally). Road/city standoffs use
+  `nearestAnyRoad`/`cityClear` so band-side legality checks the right network.
+  `feedlotAt` is band-capable but real 2022 census data never crosses its 30
+  head/km² gate there (OK Texas County tops out ~23.6) — dormant by data, not
+  a bug. Brand generators and `ranchHQSite`/`ranchHQAt` (named real Texas
+  ranches, fixed lat/lon) stay `inTexas`-only — never widen those to
+  `inTexasOrBand`. Animal herds at band farmsteads/feedlots are NOT yet
+  wired (`animals.js` guards `farmsteadAt` herds on `inTexas` on purpose) —
+  that's Band Parity W5. Padre being `inTexas` means it legitimately gets
   scenery/animal chunks — do not gate the island out.
 - Named NPCs, landmarks, brands and haunts stay Texan. SPI is scenery, not a
   133rd city. Road-job endpoints stay Texan (`GEO.cities` by name); **charters

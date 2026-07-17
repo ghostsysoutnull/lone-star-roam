@@ -379,8 +379,12 @@ export class AnimalSystem {
       }
     };
 
+    // Band Parity W4 made farmsteadAt band-capable (buildings only); census
+    // herds at band farmsteads are W5's job (own species tables, wander/flee
+    // clamp) — stay Texas-only here so a band farmstead doesn't crash on a
+    // TX-only agAt read.
     const farm = farmsteadAt(cx, cz);
-    if (farm) {
+    if (farm && inTexas(farm.x, farm.z)) {
       const fr = seededRand('farmherd' + key);
       const ag = agAt(farm.x, farm.z);
       // main herd species rolled from the county's own inventory mix; horse

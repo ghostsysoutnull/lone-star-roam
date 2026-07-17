@@ -1,8 +1,8 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, TIDELANDS_U, coastDist, neighborStateAt } from './geo.js';
+import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, bandAgAt, TIDELANDS_U, coastDist, neighborStateAt, inTexasOrBand, nearestAnyRoad } from './geo.js';
 import { ATMOS } from './sky.js';
-import { cityRadius } from './cities.js';
+import { cityRadius, cityClear } from './cities.js';
 import { airportClear } from './airports.js';
 import { brandNear } from './brands.js';
 
@@ -438,21 +438,20 @@ export function chapelAt(cx, cz) {
   if (rand() >= odds) return null;
   for (let i = 0; i < 4; i++) { // a few tries for a lawful spot
     const sx = cx * CHUNK + rand() * CHUNK, sz = cz * CHUNK + rand() * CHUNK;
-    const road = nearestRoad(sx, sz, 25);
+    const road = nearestAnyRoad(sx, sz, 25);
     if (!road || road.dist < 0.5) continue;
     const away = 7 + rand() * 2; // set back from the shoulder
     const x = road.x + ((sx - road.x) / road.dist) * away;
     const z = road.z + ((sz - road.z) / road.dist) * away;
-    if (!inTexas(x, z) || !airportClear(x, z)) continue;
-    const near = nearestRoad(x, z, 6); // a second road may pass closer than the one we anchored to
+    if (!inTexasOrBand(x, z) || !airportClear(x, z)) continue;
+    const near = nearestAnyRoad(x, z, 6); // a second road may pass closer than the one we anchored to
     if (near && near.dist < 5) continue;
-    const { city, dist } = nearestCity(x, z);
-    if (city && dist < cityRadius(city.pop) + 20) continue;
+    if (!cityClear(x, z, 20)) continue;
     const rot = Math.atan2(-(road.x - x), -(road.z - z)); // door faces the road
     // the cemetery sits beside the chapel, along the road — pick the clear side
     for (const side of [1, -1]) {
       const cemX = x + Math.cos(rot) * 7 * side, cemZ = z - Math.sin(rot) * 7 * side;
-      if (inTexas(cemX, cemZ) && !nearestRoad(cemX, cemZ, 5)) return { x, z, rot, cemX, cemZ, key: `${cx},${cz}` };
+      if (inTexasOrBand(cemX, cemZ) && !nearestAnyRoad(cemX, cemZ, 5)) return { x, z, rot, cemX, cemZ, key: `${cx},${cz}` };
     }
   }
   return null;
@@ -490,6 +489,7 @@ const CROP_STYLE = {
   citrus:    { ground: 0x8a7a55, row: { kind: 'tree', color: 0x2f6b36 } },
   pecans:    { ground: 0x857550, row: { kind: 'tree', color: 0x49682f } },
   sugarcane: { ground: 0x4f8a3e, row: { kind: 'stalk', color: 0x55a041, h: 1.5 } },
+  soybeans:  { ground: 0x6b8a4a, row: { kind: 'tuft', color: 0x3f6b2e } }, // band-only (AR/OK/LA bottomlands) — no TX county leads on it
 };
 const PIVOT_GREEN = 0x4f7c37; // the classic irrigated circle, whatever the crop
 
@@ -620,7 +620,7 @@ function mkCropRows(rand, fx, fz, w, d, rot, row) {
 // them and the Trans-Pecos sits nearly empty — no hand-tuned region boxes.
 export function farmsteadAt(cx, cz) {
   const midX = cx * CHUNK + CHUNK / 2, midZ = cz * CHUNK + CHUNK / 2;
-  const ag = agAt(midX, midZ);
+  const ag = agAt(midX, midZ) || bandAgAt(midX, midZ);
   if (!ag) return null;
   const herd = (ag.cattle + 2 * ag.horses + ag.goats + ag.sheep) / ag.areaKm2; // head/km²
   const crop = Object.values(ag.crops).reduce((a, b) => a + b, 0) / ag.areaKm2; // acres/km²
@@ -629,16 +629,15 @@ export function farmsteadAt(cx, cz) {
   if (rand() >= odds) return null;
   for (let i = 0; i < 4; i++) { // a few tries for a lawful spot
     const sx = cx * CHUNK + rand() * CHUNK, sz = cz * CHUNK + rand() * CHUNK;
-    const road = nearestRoad(sx, sz, 25);
+    const road = nearestAnyRoad(sx, sz, 25);
     if (!road || road.dist < 0.5) continue;
     const away = 8 + rand() * 3; // gate up by the road, buildings set back
     const x = road.x + ((sx - road.x) / road.dist) * away;
     const z = road.z + ((sz - road.z) / road.dist) * away;
-    if (!inTexas(x, z) || !airportClear(x, z) || brandNear(x, z, 30)) continue;
-    const near = nearestRoad(x, z, 6); // a second road may pass closer than the anchor
+    if (!inTexasOrBand(x, z) || !airportClear(x, z) || brandNear(x, z, 30)) continue;
+    const near = nearestAnyRoad(x, z, 6); // a second road may pass closer than the anchor
     if (near && near.dist < 5) continue;
-    const { city, dist } = nearestCity(x, z);
-    if (city && dist < cityRadius(city.pop) + 20) continue;
+    if (!cityClear(x, z, 20)) continue;
     const ch = chapelAt(cx, cz); // don't crowd the chunk's chapel plot
     if (ch && Math.hypot(ch.x - x, ch.z - z) < 15) continue;
     const rot = Math.atan2(-(road.x - x), -(road.z - z)); // house faces its road
@@ -656,23 +655,22 @@ export function farmsteadAt(cx, cz) {
 // layout without cross-module coupling.
 export function feedlotAt(cx, cz) {
   const midX = cx * CHUNK + CHUNK / 2, midZ = cz * CHUNK + CHUNK / 2;
-  const ag = agAt(midX, midZ);
+  const ag = agAt(midX, midZ) || bandAgAt(midX, midZ);
   if (!ag || ag.onFeed / ag.areaKm2 < 30) return null;
   const rand = seededRand(`feedlot${cx},${cz}`);
   if (rand() >= Math.min(0.3, ag.onFeed / ag.areaKm2 / 300)) return null;
   for (let i = 0; i < 4; i++) {
     const sx = cx * CHUNK + rand() * CHUNK, sz = cz * CHUNK + rand() * CHUNK;
     const nPens = 3 + ((rand() * 3) | 0); // drawn every try — failures can't shift the stream
-    const road = nearestRoad(sx, sz, 25);
+    const road = nearestAnyRoad(sx, sz, 25);
     if (!road || road.dist < 0.5) continue;
     const away = 12 + rand() * 4; // pens sprawl, so a deeper setback than a farmstead
     const x = road.x + ((sx - road.x) / road.dist) * away;
     const z = road.z + ((sz - road.z) / road.dist) * away;
-    if (!inTexas(x, z) || !airportClear(x, z) || brandNear(x, z, 30)) continue;
-    const near = nearestRoad(x, z, 6);
+    if (!inTexasOrBand(x, z) || !airportClear(x, z) || brandNear(x, z, 30)) continue;
+    const near = nearestAnyRoad(x, z, 6);
     if (near && near.dist < 5) continue;
-    const { city, dist } = nearestCity(x, z);
-    if (city && dist < cityRadius(city.pop) + 20) continue;
+    if (!cityClear(x, z, 20)) continue;
     const ch = chapelAt(cx, cz);
     if (ch && Math.hypot(ch.x - x, ch.z - z) < 20) continue;
     const farm = farmsteadAt(cx, cz); // don't crowd the chunk's farmstead either
@@ -747,7 +745,7 @@ export function fieldAt(x, z) {
   const key = `${cx},${cz}`;
   const baseX = cx * CHUNK, baseZ = cz * CHUNK;
   const midX = baseX + CHUNK / 2, midZ = baseZ + CHUNK / 2;
-  const ag = agAt(midX, midZ);
+  const ag = agAt(midX, midZ) || bandAgAt(midX, midZ);
   if (!ag) return null;
   const crand = seededRand('crops' + key);
   const style = CROP_STYLE[ag.dominantCrop];
@@ -759,10 +757,9 @@ export function fieldAt(x, z) {
     const w = 9 + crand() * 9, d = 7 + crand() * 7, rot = crand() * Math.PI;
     crand(); // rowRoll — unused here, must still consume the draw to stay in lockstep
     const clear = Math.hypot(w, d) / 2 + 2;
-    if (!inTexas(fx, fz) || !airportClear(fx, fz)) continue;
-    if (nearestRoad(fx, fz, clear)) continue;
-    const { city, dist } = nearestCity(fx, fz);
-    if (city && dist < cityRadius(city.pop) + clear) continue;
+    if (!inTexasOrBand(fx, fz) || !airportClear(fx, fz)) continue;
+    if (nearestAnyRoad(fx, fz, clear)) continue;
+    if (!cityClear(fx, fz, clear)) continue;
     const dx = x - fx, dz = z - fz;
     const c = Math.cos(-rot), s = Math.sin(-rot);
     const lx = dx * c - dz * s, lz = dx * s + dz * c; // into field-local frame
@@ -772,10 +769,9 @@ export function fieldAt(x, z) {
     const fx = baseX + crand() * CHUNK, fz = baseZ + crand() * CHUNK;
     const r = 2 + crand() * 2;
     crand(); // armRot — unused here, must still consume the draw
-    if (!inTexas(fx, fz) || !airportClear(fx, fz)) continue;
-    if (nearestRoad(fx, fz, r + 2)) continue;
-    const { city, dist } = nearestCity(fx, fz);
-    if (city && dist < cityRadius(city.pop) + r + 2) continue;
+    if (!inTexasOrBand(fx, fz) || !airportClear(fx, fz)) continue;
+    if (nearestAnyRoad(fx, fz, r + 2)) continue;
+    if (!cityClear(fx, fz, r + 2)) continue;
     if (Math.hypot(x - fx, z - fz) <= r) return { crop: ag.dominantCrop, kind: 'pivot' };
   }
   return null;
@@ -853,9 +849,9 @@ class ScenerySystem {
           for (let tr = 0; tr < 9 && !onIsland(x, z); tr++) { x = baseX + rand() * CHUNK; z = baseZ + rand() * CHUNK; }
           if (!onIsland(x, z)) continue;
         }
-        if (!inTexas(x, z)) continue;
+        if (!inTexasOrBand(x, z)) continue;
         // bluebonnets grow along roads; everything else stays off them
-        const road = nearestRoad(x, z, 8);
+        const road = nearestAnyRoad(x, z, 8);
         if (maker === mkBluebonnets) {
           if (!road) continue;
           const away = Math.max(3.5, road.dist); // just off the shoulder
@@ -896,7 +892,7 @@ class ScenerySystem {
     // Own seed streams — the pre-ag scenery stream above stays untouched, so
     // the existing world is byte-identical. agAt sampled at chunk center
     // (county polygons dwarf 260-unit chunks; straddle error is invisible).
-    const ag = agAt(midX, midZ);
+    const ag = agAt(midX, midZ) || bandAgAt(midX, midZ);
     if (ag) {
       const crand = seededRand('crops' + key); // placement only — exactly 6 draws/field, 4 draws/pivot
       const crand2 = seededRand('crops2' + key); // all wave-4.5 visual randomness (rows, bales) — never touches crand
@@ -912,10 +908,9 @@ class ScenerySystem {
         const w = 9 + crand() * 9, d = 7 + crand() * 7, rot = crand() * Math.PI;
         const rowRoll = crand(); // drawn every iteration — placement failures can't shift the stream
         const clear = Math.hypot(w, d) / 2 + 2;
-        if (!inTexas(fx, fz) || !airportClear(fx, fz)) continue;
-        if (nearestRoad(fx, fz, clear)) continue; // fields never swallow a road
-        const { city, dist } = nearestCity(fx, fz);
-        if (city && dist < cityRadius(city.pop) + clear) continue;
+        if (!inTexasOrBand(fx, fz) || !airportClear(fx, fz)) continue;
+        if (nearestAnyRoad(fx, fz, clear)) continue; // fields never swallow a road
+        if (!cityClear(fx, fz, clear)) continue;
         const patch = mkFieldPatch(fx, fz, w, d, rot, style.ground, false, 0.12 + deck++ * 0.015, stripe);
         patch.userData.crop = ag.dominantCrop;
         group.add(patch);
@@ -931,10 +926,9 @@ class ScenerySystem {
       for (let i = 0; i < pivots; i++) {
         const fx = baseX + crand() * CHUNK, fz = baseZ + crand() * CHUNK;
         const r = 2 + crand() * 2, armRot = crand() * Math.PI * 2; // 4–8 unit circles ≈ real pivots
-        if (!inTexas(fx, fz) || !airportClear(fx, fz)) continue;
-        if (nearestRoad(fx, fz, r + 2)) continue;
-        const { city, dist } = nearestCity(fx, fz);
-        if (city && dist < cityRadius(city.pop) + r + 2) continue;
+        if (!inTexasOrBand(fx, fz) || !airportClear(fx, fz)) continue;
+        if (nearestAnyRoad(fx, fz, r + 2)) continue;
+        if (!cityClear(fx, fz, r + 2)) continue;
         const disc = mkFieldPatch(fx, fz, r * 2, r * 2, 0, PIVOT_GREEN, true, 0.12 + deck++ * 0.015);
         disc.userData.pivot = true;
         const armG = new THREE.CylinderGeometry(0.05, 0.05, r * 0.94, 4);

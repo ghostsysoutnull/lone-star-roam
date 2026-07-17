@@ -19,6 +19,7 @@ export const GEO = {
   rails: [],    // [{pts:[[x,z],...]}] real railway geometry
   bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
   ag: {},        // county name -> {cattle, horses, goats, sheep, onFeed, irrAcres, crops, areaKm2, dominantCrop}
+  bandAg: {},    // "STATE|County Name" -> same record shape as `ag`, band counties (LA/AR/OK/NM)
 };
 
 export async function loadGeo(onStatus) {
@@ -57,6 +58,7 @@ export async function loadGeo(onStatus) {
   onStatus?.('Drawing county lines…');
   GEO.counties = await get('counties.json').catch(() => []);
   GEO.ag = await get('agriculture.json').catch(() => ({}));
+  GEO.bandAg = await get('band-agriculture.json').catch(() => ({}));
   for (const c of GEO.counties) {
     // bbox per county for cheap point-in-county prefiltering
     let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
@@ -195,6 +197,13 @@ export function nearestBandRoad(x, z, radius = 300, typeFilter = null) {
   return best;
 }
 
+// Either road network, whichever has something in range. Safe because
+// GEO.highways and GEO.bandHighways are geometrically disjoint except right
+// at the border seam — a point is never legitimately "near" both.
+export function nearestAnyRoad(x, z, radius = 300, typeFilter = null) {
+  return nearestRoad(x, z, radius, typeFilter) || nearestBandRoad(x, z, radius, typeFilter);
+}
+
 // Separate rail index: tracks are display-only, never eligible for road physics.
 const railGrid = new Map();
 function buildRailIndex() {
@@ -317,6 +326,15 @@ export function neighborCountyAt(x, z) {
 export function agAt(x, z) {
   const name = countyAt(x, z);
   return name ? (GEO.ag[name] || null) : null;
+}
+
+// Band counterpart — own bake (tools/build-band-ag.mjs), own file
+// (band-agriculture.json), keyed `${state}|${name}` since county names can
+// repeat across the four states. Never merged into GEO.ag/agAt: keeps the
+// existing 254-county TX assertions untouched.
+export function bandAgAt(x, z) {
+  const c = neighborCountyAt(x, z);
+  return c ? (GEO.bandAg[`${c.state}|${c.name}`] || null) : null;
 }
 
 export function nearestCity(x, z) {
@@ -464,6 +482,14 @@ export function inStateWater(x, z) {
 // What kind of out-of-Texas point this is — 'land'/'coast'/'mexico'.
 export function borderZoneAt(x, z) {
   return classify(x, z);
+}
+
+// The Band Parity "in-band land test": Texas OR standing inside one of the
+// four neighbor states — land only, unlike inWorld (which also covers Gulf
+// shelf water). Placement systems (crops, farmsteads, chapels) use this in
+// place of a bare inTexas check to become band-eligible.
+export function inTexasOrBand(x, z) {
+  return inTexas(x, z) || neighborStateAt(x, z) !== null;
 }
 
 // Distance from a point to a neighbor state's ring ('LA'/'AR'/'OK'/'NM'), 0
