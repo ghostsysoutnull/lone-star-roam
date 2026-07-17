@@ -6,11 +6,11 @@
   like a real save — today a new player gets one vanishing toast and a hidden
   wall-of-keys help panel, and every session restarts from scratch at the
   default spawn.
-- **Features (10 total)**: title screen every boot · first-run concept card ·
-  staged tutorial toasts · resume at last position/mode/time · one-time
-  contextual hints · sectioned help panel · in-menu Guide (re-view the intro
-  card and every tip anytime) · three save slots · slot naming + delete ·
-  per-slot settings.
+- **Features (11 total)**: title screen every boot · first-run concept card ·
+  staged tutorial toasts · skip intro & tips (experienced players, per slot) ·
+  resume at last position/mode/time · one-time contextual hints · sectioned
+  help panel · in-menu Guide (re-view the intro card and every tip anytime) ·
+  three save slots · slot naming + delete · per-slot settings.
 - **Plan**: 3 waves — W1 boot screen + intro + resume; W2 hints + help + Guide;
   W3 named slots + per-slot settings.
 
@@ -31,6 +31,11 @@
   to the slot. Nothing stays global except the active-slot pointer.
 - **Guide**: the menu re-presents everything a first-time player is shown —
   the concept card plus the full tip list, browsable anytime (not re-armed).
+- **Skip**: the concept card offers **Skip intro & tips** for experienced
+  players — marks all of `save.seen` at once for that slot (no card, no
+  toasts, no hints, ever); skipping mid-tutorial has the same total effect.
+  Per-slot only, never remembered across slots. The Guide keeps everything
+  skipped readable, so the skip is never a trap.
 - Returning players (non-empty slot) never see the intro card or tutorial
   toasts; hints fire once per slot.
 
@@ -58,8 +63,9 @@
 ### W1 — Boot screen, first-run intro, resume (Fable 5, high)
 Features: title screen every boot (name, Continue with progress summary /
 New game); first boot shows the concept card — 1:100 real Texas, V cycles
-Drive/Fly/Walk, what to collect, "H for help anytime" — then 3–4 staged
-tutorial toasts in play (try V; first city visit; first collectible; press P).
+Drive/Fly/Walk, what to collect, "H for help anytime" — with Start /
+**Skip intro & tips** actions — then 3–4 staged tutorial toasts in play (try
+V; first city visit; first collectible; press P), skippable mid-stream.
 **Resume**: Continue restores last position, heading, mode, altitude, clock
 (`save.at`, written on a slow interval + pagehide). Slot UI is not in this
 wave — single-save until W3, layout reserves the slot rows.
