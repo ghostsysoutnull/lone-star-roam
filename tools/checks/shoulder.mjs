@@ -74,10 +74,10 @@ export default async function shoulder(t) {
       };
     })()`);
     // Was ~12 under the old ref-regex band bake (11 named US routes only),
-    // 51 after Band Parity W1's tier fetch (motorway|trunk|primary), 78 after
-    // the same-session OK secondary-tier top-up (more rural OK roads reach
-    // the AR/OK and TX/OK lines).
-    t.ok(res.n >= 65 && res.n <= 85, `expected ~73 crossing monuments (OK secondary-tier top-up), got ${res.n}`);
+    // 51 after Band Parity W1's tier fetch (motorway|trunk|primary), 73 after
+    // the OK secondary-tier top-up, 87 after LA + NM joined the secondary
+    // tier too (more rural roads reach more of the line, each state's turn).
+    t.ok(res.n >= 80 && res.n <= 100, `expected ~90 crossing monuments (LA+NM secondary-tier top-up), got ${res.n}`);
     for (const ref of ['I 10', 'I 20', 'I 30', 'I 35', 'I 40'])
       t.ok(res.refs.includes(ref), `no monument at the ${ref} crossing (refs: ${res.refs})`);
     t.ok(res.allInTexas, 'a welcome monument stands outside Texas');

@@ -44,16 +44,19 @@
 // Rebaking shifts band geometry — check the shoulder suite (crossing monuments
 // read these endpoints) and the band.mjs guards.
 //
-// OK secondary-tier top-up (2026-07-16, same session): the primary-only tier
-// left 33 of OK's 37 uncovered band places 40-280u from any road — genuinely
-// off the primary/trunk/motorway network, not a near-miss. Refetched OK ONLY
-// (33/37 gaps were there) with `secondary` added to the highway regex:
-//   way["highway"~"motorway|trunk|primary|secondary"](33.3,-103.3,37.2,-94.2)
+// Secondary-tier top-up (2026-07-16, same session, two passes): the
+// primary-only tier left band places 40-280u from any road, genuinely off
+// the primary/trunk/motorway network rather than a near-miss. Pass 1: OK
+// only (33 of 37 original gaps were there). Pass 2, after Bruno asked for
+// full connectivity: LA + NM too (AR skipped — already 15/15, a secondary
+// fetch there buys nothing measured). All three refetched with `secondary`
+// added to the highway regex, same bboxes:
+//   way["highway"~"motorway|trunk|primary|secondary"](<bbox>)
 // Texas has no rendered "secondary" tier (world.js draws motorway/trunk/
 // primary/street only), so secondary ways are relabeled to type 'primary' at
 // load — same ribbon styling as the state highways they physically are, no
-// new tier to invent. la/ar/nm inputs are untouched (still primary-tier-only
-// fetches); the relabel is a no-op for files that never contain 'secondary'.
+// new tier to invent. ar's input is untouched (still primary-tier-only); the
+// relabel is a no-op for files that never contain 'secondary'.
 import { readFileSync, writeFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -197,6 +200,31 @@ const distToBorder = (x, z) => {
   }
   return Math.sqrt(best);
 };
+// El Paso/Juárez: border.json's inTx() point-in-polygon test is unreliable
+// for points essentially ON the line at that kink (the LA/NM secondary-tier
+// top-up landed a 2-point "Boulevard Juan Pablo II" — an actual Ciudad
+// Juárez street — with inTx() reading TRUE at 0.17u from the border, taking
+// the SEAM_MARGIN path with no neighbor-state check at all). geo.js's own
+// classify() solves this with per-vertex border-zones.json labels.
+//
+// Only called from the SEAM_MARGIN (inTx===true) branch below, on points
+// that ALREADY passed the cheap distance test — so no inNeighborState
+// pre-check is needed here (a point can't be both inTx and the Las
+// Cruces/Mesilla case that check exists to guard against: those are outside
+// Texas, so they never reach the inTx branch at all). An inNeighborState
+// pre-check here was tried and reverted — doubling that already-expensive
+// 249-county scan on every shoulder-side point turned an 8-minute bake into
+// an 18+-minute one on the LA+NM secondary-tier top-up.
+const borderZones = JSON.parse(readFileSync(join(ROOT, 'data', 'border-zones.json'), 'utf8'));
+const isMexicoSeam = (x, z) => {
+  let bestD = Infinity, bestI = 0;
+  for (let i = 0, j = border.length - 1; i < border.length; j = i++) {
+    const p = closestOnSeg(x, z, border[j], border[i]);
+    const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
+    if (d < bestD) { bestD = d; bestI = i; }
+  }
+  return borderZones[bestI] === 'mexico';
+};
 
 const TIER = {
   motorway: { tol: 0.0025, minLen: 15 },
@@ -230,7 +258,12 @@ for (const c of chains) {
   for (const p of c.pts) {
     const [x, z] = proj(p);
     const d = distToBorder(x, z);
-    const keep = inTx(x, z) ? d <= SEAM_MARGIN : d <= SHOULDER_U && inNeighborState(x, z);
+    // isMexicoSeam() only on the SEAM_MARGIN branch, and only on points that
+    // already cleared the 3u distance test first (&& short-circuits) — see
+    // its definition above for why the outside-Texas branch never needs it.
+    const keep = inTx(x, z)
+      ? d <= SEAM_MARGIN && !isMexicoSeam(x, z)
+      : d <= SHOULDER_U && inNeighborState(x, z);
     if (keep) run.push(p); else flush();
   }
   flush();

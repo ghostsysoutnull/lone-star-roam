@@ -23,6 +23,9 @@ export const TOURS = [
       { wave: 'W1 top-up — OK secondary tier', spots: [
         S('👻 Chattanooga, OK', [804.9, -3809.5], { mode: 'DRIVE', note: 'pop. 0 on the census, 213u from the nearest primary road — a secondary-tier county road reaches it now' }),
       ] },
+      { wave: 'W1 top-up — LA + NM secondary tier', spots: [
+        S('🌲 Pleasant Hill, LA', [5707.2, -905], { mode: 'DRIVE', note: 'pop. 611, 157u from the nearest primary road — closed by the same top-up' }),
+      ] },
     ],
   },
   {
