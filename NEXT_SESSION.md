@@ -1,5 +1,20 @@
 # Lone Star Roam — next session kickoff
 
+## Session briefing
+- **This session**: New Player Experience (`NEWPLAYER_SPEC.md`), wave 1 of 3 —
+  boot/title screen (Continue / New game) + first-run concept card + staged
+  tutorial toasts, `save.seen` added. Spec written 2026-07-17.
+- **Recommended setup**: model **Fable 5**, effort **high** — content/copy +
+  UI wave. Flag it if the running model differs.
+- **Budget**: code + checks (new `tools/checks/onboarding.mjs`), one staged
+  title-card shot (Copilot + Bruno judge), grep-first. Harness bypass is a
+  hard requirement — see spec.
+- **Then**: rewrite this block for W2 (contextual hints + help restructure,
+  Fable 5 high).
+
+Gotchas carried over: boot screen must auto-enter under the harness flag and
+expose its controls on `__game`; `save.seen` is additive-key-only.
+
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
 free-roam Texas game. Before touching code read `CLAUDE.md` (architecture +
 commands + gotchas) and grep **`GOTCHAS.md`** — the law book — for the area
