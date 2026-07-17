@@ -38,6 +38,7 @@ import { MilitaryAirSystem } from './military.js';
 import { applyGear } from './shop.js';
 import { HUD } from './hud.js';
 import { TitleScreen } from './title.js';
+import { Tutorial } from './onboarding.js';
 
 const status = (t) => (document.getElementById('loading-status').textContent = t);
 
@@ -144,18 +145,28 @@ async function boot() {
   player.onWorldEdge = (m) => hud.toast(m);
   const flares = new FlareSystem(scene, player);
   flares.onSound = (kind) => audio.flare(kind);
-  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay }); // panel only with ?debug=1; actions drive the verify suite
+  // Curated new-game start (New Player W2): interpolated onto the I-35
+  // New Braunfels→San Antonio approach — skyline ahead, the Alamo minutes
+  // down the road. Heading runs the road southwest into town.
+  const SA_START = { x: 985, z: 1737, heading: 1.582 };
+  // Title screen: logic always built (debug.js's "always built, presentation
+  // gated" rule) — window.__harness (tools/verify.mjs) never shows it, so
+  // every suite keeps its current boot behavior. Real boots show it over the
+  // live attract drift (the loop's title branch below) until Continue/New game.
+  const title = new TitleScreen(gameplay, player, sky, () => {
+    player.spawnAt(SA_START.x, SA_START.z);
+    player.heading = SA_START.heading;
+    player.setMode('DRIVE');
+    player.speed = 0; player.vy = 0;
+  }, SA_START);
+  const tutorial = new Tutorial(gameplay, (m) => hud.toast(m));
+  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial }); // panel only with ?debug=1; actions drive the verify suite
   player.flares = flares; // hud reads the rack count off the player
 
-  // Spawn on I-35 just south of Austin
+  // Harness/boot spawn on I-35 just south of Austin (suites depend on it);
+  // a real New game re-spawns at SA_START via the title callback above.
   const austin = GEO.cities.find((c) => c.name === 'Austin');
   player.spawnAt(austin.x, austin.z + 12);
-  // Title screen: logic always built (debug.js's "always built, presentation
-  // gated" rule) — window.__harness (tools/verify.mjs) skips the pre-loop
-  // await below with zero timing change, so every existing suite keeps its
-  // current boot behavior. Real boots await the player's Continue/New game
-  // choice before the render loop starts (spec: boot screen is pre-loop).
-  const title = new TitleScreen(gameplay, player, sky, () => player.spawnAt(austin.x, austin.z + 12));
   // building meshes near the player, for camera occlusion
   player.getObstacles = () =>
     [...cities.live.values()].map((g) => g.children.find((c) => c.isInstancedMesh)).filter(Boolean);
@@ -185,9 +196,18 @@ async function boot() {
   // menu freezing the world silently while you browse. A boolean can't tell them
   // apart, and 'menu' must NOT swallow keys — P and Esc are how the menu closes.
   let pauseReason = null; // 'esc' | 'menu' | null
+  const skipTipsBtn = document.getElementById('paused-skiptips');
+  skipTipsBtn.addEventListener('click', () => {
+    tutorial.skip();
+    skipTipsBtn.style.display = 'none';
+    hud.toast('💡 Tips off for this save');
+  });
   const setPause = (reason) => {
     pauseReason = reason;
     hud.setPaused(reason === 'esc');
+    // mid-stream tips skip (spec: same total effect as the card's Skip) —
+    // only offered while tips are still pending
+    if (reason === 'esc') skipTipsBtn.style.display = tutorial.pending ? '' : 'none';
     if (reason) audio.freeze(); else audio.unfreeze();
   };
   const setPaused = (on) => setPause(on ? 'esc' : null);
@@ -200,6 +220,9 @@ async function boot() {
     location.reload();
   });
   addEventListener('keydown', (e) => {
+    // Title screen (and intro card) swallow everything — buttons are the only
+    // way in, and no game key may mutate state while the attract drift runs.
+    if (title.active) return;
     // The pause screen swallows every key but Esc, so nothing sneaks through while
     // paused. A travel-menu freeze deliberately doesn't — P and Esc must reach the
     // handlers below that close it (and P can't escape an Esc pause: no menu open).
@@ -254,18 +277,22 @@ async function boot() {
   });
 
   document.getElementById('loading').style.display = 'none';
-  // Harness bypass: no title await, identical spawn/timing to every prior
-  // release — every existing verify suite keeps passing unmodified. Real
-  // boots wait here (pre-loop, nothing rendered yet) for Continue/New game.
-  if (!window.__harness) {
-    const choice = await title.awaitChoice();
-    if (choice === 'continue') gameplay.applyAt(player, sky);
-  }
-  hud.toast('🤠 Welcome to Texas! Press H for controls.');
+  // Entry: onEnter fires on every title dismissal — the real boot and any
+  // debug firstRun replay — so the welcome + tip arming can't be missed.
+  // Harness bypass: the title never shows, the loop below never takes the
+  // attract branch, and the toast fires pre-loop exactly as before — every
+  // existing suite keeps passing unmodified. (W1's literal pre-loop await
+  // gave way to the attract branch: the world now runs behind the title.)
+  title.onEnter = () => {
+    hud.toast('🤠 Welcome to Texas! Press H for controls.');
+    tutorial.begin();
+  };
+  if (!window.__harness) title.awaitChoice();
+  else hud.toast('🤠 Welcome to Texas! Press H for controls.');
   const clock = new THREE.Clock();
   // debug/testing hook — tools/verify.mjs drives the game through this; expose every new system here
   // (clock gives tests sim time: headless frames run slow, wall-clock waits mislead)
-  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, nearestAnyRoad, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, nearestAnyRoad, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -275,6 +302,22 @@ async function boot() {
   let lastSide = 'tx', lastCrossT = -Infinity, returnCount = 0;
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
+    // Title/attract: the world lives, the player doesn't. Camera drifts around
+    // the resume (or curated) spot; the proximity systems that take explicit
+    // coords feed on the drift position so clouds roll, traffic drives and
+    // windmills spin behind the title. No player.update, no key handling
+    // (guarded above), no save writes.
+    if (title.active) {
+      const a = title.attract(dt, camera);
+      sky.update(dt, false, a.x, a.z, camera.position.y);
+      scenery.update(dt, a.x, a.z);
+      cities.update(a.x, a.z);
+      cities.setNight(ATMOS.night);
+      traffic.update(dt, a.x, a.z, 0);
+      traffic.setNight(ATMOS.night);
+      if (!window.__skipRender) renderer.render(scene, camera);
+      return;
+    }
     // Paused: keep draining the clock every frame (so resume gets a normal ~16 ms
     // dt, never a pause-long jump — clock.elapsedTime stays honest & monotonic) and
     // re-draw the frozen frame, but skip every system update below. The only system
@@ -318,6 +361,7 @@ async function boot() {
     turtles.update(dt, player.pos.x, player.pos.z, sky.t, sky.days);
     audio.update(player, ATMOS);
     gameplay.update(dt, player.pos, ATMOS.night, player.speed, player, sky);
+    tutorial.update(dt);
     gameplay.checkTouchdown(player, missions.job?.kind === 'charter');
     missions.update(dt, player.pos, player.mode, player.pos.y - hAt(player.pos.x, player.pos.z));
     hud.animateShield(player, dt); // per-frame sway/float — headless too, not gated by __skipRender

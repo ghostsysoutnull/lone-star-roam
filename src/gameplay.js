@@ -87,6 +87,11 @@ export class Gameplay {
     // landed at, stones = Corner Stones (W6's job — reserved empty here).
     this.save.passport ??= { stamps: [], towns: [], landings: [], stones: [] };
     this.save.at ??= null; // resume snapshot: {x,z,y,heading,mode,skyT} (title.js)
+    this.save.seen ??= {}; // first-run flags: intro card + per-tip/hint keys; 'all' = Skip intro & tips (onboarding.js)
+    // pre-W2 saves with progress never see the intro or tips — grandfather them as veterans
+    if (!this.save.seen.intro && (this.save.cities.length || this.save.landmarks.length || this.save.at)) {
+      this.save.seen.intro = this.save.seen.all = true;
+    }
     this.saveTimer = 0;
     this.countyNow = null;
     this.countyToastT = 0;

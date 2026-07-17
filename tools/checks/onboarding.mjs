@@ -56,14 +56,114 @@ export default async function onboarding(t) {
     t.near(p.skyT, want.skyT, 0.0001, 'restored clock');
   });
 
-  await t.check('New game seam spawns at the curated Austin spot', async () => {
+  await t.check('New game spawns at the curated San Antonio approach', async () => {
+    // an ugly prior state — WALK, far corner — must not leak into the fresh game
     await t.tp(9999, -9999, 'WALK');
     await t.ev(`g.title.apply('new')`);
-    const d = await t.ev(`(() => {
-      const c = g.GEO.cities.find((c) => c.name === 'Austin');
-      return Math.hypot(g.player.pos.x - c.x, g.player.pos.z - (c.z + 12));
+    const r = await t.ev(`(() => {
+      const p = g.player.pos;
+      const road = g.nearestRoad(p.x, p.z, 6);
+      const sa = g.GEO.cities.find((c) => c.name === 'San Antonio');
+      return { mode: g.player.mode, heading: g.player.heading, inTx: g.inTexas(p.x, p.z),
+        roadD: road ? Math.hypot(road.x - p.x, road.z - p.z) : 99,
+        saD: Math.hypot(p.x - sa.x, p.z - sa.z) };
     })()`);
-    t.ok(d < 20, `landed ${d.toFixed(1)} units from the Austin spawn`);
+    t.ok(r.mode === 'DRIVE', `fresh game mode: ${r.mode}`);
+    t.ok(r.inTx, 'curated spot outside Texas');
+    t.ok(r.roadD < 2, `spawned ${r.roadD.toFixed(2)} units off the road centerline`);
+    t.ok(r.saD > 15 && r.saD < 45, `San Antonio ${r.saD.toFixed(1)} units away (want an approach, not downtown)`);
+    t.near(r.heading, 1.582, 0.05, 'heading down the I-35 approach');
+  });
+
+  await t.check('intro card seam: fresh save pends it, Start and Skip mark seen', async () => {
+    await t.ev(`g.gameplay.save.seen = {}`);
+    t.ok(await t.ev('g.title.needsIntro'), 'needsIntro false on a fresh save');
+    await t.ev(`g.title.finishIntro(false)`);
+    const started = await t.ev(`({ intro: g.gameplay.save.seen.intro, all: g.gameplay.save.seen.all,
+      persisted: JSON.parse(localStorage.getItem('lonestar-roam-save-v1')).seen.intro })`);
+    t.ok(started.intro === true && !started.all, `Start: intro=${started.intro} all=${started.all} (want intro only)`);
+    t.ok(started.persisted === true, 'seen.intro not persisted');
+    t.ok(!(await t.ev('g.title.needsIntro')), 'needsIntro still true after Start');
+    await t.ev(`g.gameplay.save.seen = {}`);
+    await t.ev(`g.title.finishIntro(true)`);
+    t.ok(await t.ev('g.gameplay.save.seen.all === true'), 'Skip: seen.all not set');
+    t.ok(!(await t.ev('g.tutorial.pending')), 'tips still pending after Skip');
+  });
+
+  await t.check('tips fire in play order, once each, and skip() silences the rest', async () => {
+    // finishIntro above armed the tutorial via onEnter — reset to a clean slate
+    await t.ev(`(g.gameplay.save.seen = {}, g.tutorial.fired.length = 0, g.tutorial.begin())`);
+    await t.step(11, 'g.tutorial.update(dt)');
+    t.ok(await t.ev(`g.gameplay.save.seen.tipV === true`), 'tipV not fired after 11 s of play');
+    await t.ev(`g.gameplay.save.cities.push('Testville')`);
+    await t.step(9, 'g.tutorial.update(dt)');
+    t.ok(await t.ev(`g.gameplay.save.seen.tipMap === true`), 'tipMap not fired after first city');
+    await t.ev(`g.gameplay.save.landmarks.push('Test Marker')`);
+    await t.step(9, 'g.tutorial.update(dt)');
+    t.ok(await t.ev(`g.gameplay.save.seen.tipCollect === true`), 'tipCollect not fired after first find');
+    await t.step(120, 'g.tutorial.update(dt)');
+    const fired = await t.ev('g.tutorial.fired');
+    t.ok(fired.join(',') === 'tipV,tipMap,tipCollect,tipHelp', `fired order: ${fired.join(',')}`);
+    // re-arm and re-step: seen flags must hold, nothing fires twice
+    await t.ev(`g.tutorial.begin()`);
+    await t.step(150, 'g.tutorial.update(dt)');
+    t.ok((await t.ev('g.tutorial.fired')).length === 4, 'a tip fired twice after re-arm');
+    // mid-stream skip: pending goes false and stays false
+    await t.ev(`(g.gameplay.save.seen = {}, g.tutorial.begin(), g.tutorial.skip())`);
+    t.ok(!(await t.ev('g.tutorial.pending')), 'pending after mid-stream skip()');
+    await t.step(30, 'g.tutorial.update(dt)');
+    t.ok((await t.ev('g.tutorial.fired')).length === 4, 'a tip fired after skip()');
+  });
+
+  await t.check('title facts rotate from the landmark/critter/census pools', async () => {
+    const f = await t.ev(`({ n: g.title.facts.length,
+      bad: g.title.facts.filter((s) => typeof s !== 'string' || s.length < 10).length,
+      alamo: g.title.facts.some((s) => s.includes('1718')),
+      critter: g.title.facts.some((s) => s.includes('quadruplets')),
+      census: g.title.facts.filter((s) => s.includes('2022 census')).length })`);
+    t.ok(f.n > 50, `only ${f.n} facts pooled`);
+    t.ok(!f.bad, `${f.bad} malformed facts in the pool`);
+    t.ok(f.alamo && f.critter, `pool missing landmarks (${f.alamo}) or critters (${f.critter})`);
+    t.ok(f.census >= 4, `only ${f.census} census facts (want cattle + crop leaders)`);
+    const seq = await t.ev(`(() => { const out = [];
+      for (let i = 0; i < 3; i++) { g.title.rotateFact(); out.push(document.getElementById('title-fact').textContent); }
+      return { out, inPool: out.every((s) => g.title.facts.includes(s.replace('💡 ', ''))) }; })()`);
+    t.ok(new Set(seq.out).size === 3, 'rotation repeated a fact back-to-back');
+    t.ok(seq.inPool, 'rotated text left the pool');
+  });
+
+  await t.check('attract: world lives behind the title, player frozen', async () => {
+    await t.tp(985, 1737, 'DRIVE');
+    await t.ev(`g.sky.t = 0.35`);
+    const before = await t.ev(`({ simT: g.player.simT, x: g.player.pos.x, z: g.player.pos.z, skyT: g.sky.t, angle: g.title.angle })`);
+    await t.ev(`g.title.show()`);
+    // wait on the drift itself (player.simT is frozen here, so t.simWait would hang);
+    // bounded — resolves at 3 s regardless and the asserts below catch a dead drift
+    await t.ev(`new Promise((res) => { const a = g.title.angle, t0 = performance.now();
+      const id = setInterval(() => { if (g.title.angle > a + 0.006 || performance.now() - t0 > 3000) { clearInterval(id); res(); } }, 50); })`);
+    const after = await t.ev(`({ simT: g.player.simT, x: g.player.pos.x, z: g.player.pos.z, skyT: g.sky.t, angle: g.title.angle })`);
+    t.ok(after.angle > before.angle + 0.005, `drift never advanced (Δangle ${(after.angle - before.angle).toFixed(4)})`);
+    t.ok(after.simT === before.simT, `player sim ticked during title (ΔsimT ${(after.simT - before.simT).toFixed(3)})`);
+    t.near(after.x, before.x, 0.001, 'player x moved during title');
+    t.near(after.z, before.z, 0.001, 'player z moved during title');
+    t.ok(after.skyT > before.skyT, `sky froze behind the title (skyT ${before.skyT} → ${after.skyT})`);
+    // HUD chrome hides behind the translucent title (the Copilot shot caught it leaking)
+    const hudVis = await t.ev(`getComputedStyle(document.getElementById('minimap')).visibility`);
+    t.ok(hudVis === 'hidden', `minimap visible behind the title (visibility: ${hudVis})`);
+    await t.ev(`g.title.hide()`);
+    t.ok(!(await t.ev('g.title.active')), 'title still active after hide()');
+    t.ok((await t.ev(`getComputedStyle(document.getElementById('minimap')).visibility`)) === 'visible', 'minimap still hidden after hide()');
+  });
+
+  await t.check('firstRun action stages the empty-save path', async () => {
+    await t.ev(`g.gameplay.save.seen = { intro: true, all: true }`);
+    await t.ev(`g.debug.actions.firstRun()`);
+    const r = await t.ev(`({ active: g.title.active, intro: g.gameplay.save.seen.intro,
+      shown: document.getElementById('title').style.display })`);
+    t.ok(r.active, 'title not staged by firstRun');
+    t.ok(!r.intro, 'seen flags not cleared by firstRun');
+    t.ok(r.shown === 'flex', `title DOM not shown (display: ${r.shown})`);
+    await t.ev(`g.title.hide()`);
   });
 
   await t.check('quit write persists save.at without a reload', async () => {

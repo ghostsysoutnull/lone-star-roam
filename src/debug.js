@@ -24,7 +24,7 @@ const AIRPORT_TAG = {
 };
 const AIRPORT_STATE = { SHV: 'LA', TXK: 'AR', CVN: 'NM', HOB: 'NM', CVS: 'NM', BAD: 'LA' };
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -35,6 +35,15 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
   const actions = {
     _heliIdx: 0, // cycles medical→news→coastguard→army→… on repeated 🚁 Heli presses, instead of a random pick
     day() { sky.t = 0.35; haunts.force = false; },
+    // stages the true first-run path: empty seen flags + the title over the
+    // attract drift — New game then walks the real card → tips sequence
+    firstRun() {
+      gameplay.save.seen = {};
+      gameplay.persist();
+      tutorial.active = false;
+      title.show();
+      hud.toast('🌱 First run staged — choose New game');
+    },
     night() { sky.t = 0.98; },
     midnight() { sky.t = 0.998; }, // the bell tolls on the wrap — park near a chapel first
     hauntCemetery() {

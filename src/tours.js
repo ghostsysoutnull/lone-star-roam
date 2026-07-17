@@ -13,6 +13,15 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'New Player (2026-07)',
+    waves: [
+      { wave: 'W2 — first-run experience', spots: [
+        S('🌆 New-game start — San Antonio approach', [985, 1737], { mode: 'DRIVE', heading: 1.582, note: 'the curated first view: I-35 southwest into the skyline, the Alamo minutes ahead' }),
+        S('🎬 Title + intro card, first run staged', [985, 1737], { mode: 'DRIVE', act: 'firstRun', note: 'title over the live attract drift; New game → concept card (Start / Skip intro & tips), then the staged tips' }),
+      ] },
+    ],
+  },
+  {
     track: 'Band Parity (2026-07)',
     waves: [
       { wave: 'W1 — the network', spots: [
