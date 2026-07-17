@@ -8,6 +8,21 @@ export default async function debug(t) {
   await t.check('panel is absent without ?debug=1', async () => {
     t.ok(await t.ev(`document.getElementById('debug') === null`), 'debug panel leaked into the public build');
     t.ok(await t.ev(`typeof g.debug.actions.hauntCemetery === 'function'`), 'debug actions missing from __game');
+    t.ok(await t.ev(`typeof g.debug.actions.gotoAirport === 'function'`), 'gotoAirport missing from __game');
+  });
+
+  await t.check('every airport has a hand-authored compass tag, and band fields also have a state code', async () => {
+    const r = await t.ev(`(() => {
+      const tags = g.debug.airportTags, states = g.debug.airportStates;
+      const compass = ['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW'];
+      const bad = [];
+      for (const a of g.AIRPORTS) {
+        if (!compass.includes(tags[a.id])) bad.push(a.id + ':tag:' + tags[a.id]);
+        if (a.band && !['LA', 'AR', 'OK', 'NM'].includes(states[a.id])) bad.push(a.id + ':state:' + states[a.id]);
+      }
+      return bad;
+    })()`);
+    t.ok(r.length === 0, `bad/missing airport tags: ${r.join(', ')}`);
   });
 
   await t.check('every tour spot is valid: in-world coords, unique labels, known modes/acts', async () => {
@@ -161,6 +176,26 @@ export default async function debug(t) {
     t.ok((await t.ev('g.missions.job?.kind')) === 'charter', 'charter debug action did not start a charter job');
     t.ok((await t.ev("g.missions.job?.fromId === 'MRF' && g.missions.job?.toId === 'DFW'")), 'wrong airport pair');
     await t.ev('g.missions.abandon()');
+  });
+
+  await t.check('gotoAirport jumps to the named field by gate, in FLY mode, for both Texas and band fields', async () => {
+    const r = await t.ev(`(() => {
+      const out = {};
+      for (const id of ['DFW', 'HOB']) {
+        g.player.setMode('DRIVE');
+        g.debug.actions.gotoAirport(id);
+        const a = g.AIRPORTS.find((x) => x.id === id);
+        const d = Math.hypot(g.player.pos.x - a.gate[0], g.player.pos.z - a.gate[1]);
+        out[id] = { mode: g.player.mode, d, agl: g.player.pos.y - g.hAt(a.gate[0], a.gate[1]) };
+      }
+      return out;
+    })()`);
+    for (const id of ['DFW', 'HOB']) {
+      t.ok(r[id].mode === 'FLY', `${id}: expected FLY mode, got ${r[id].mode}`);
+      t.ok(r[id].d < 0.01, `${id}: teleport landed ${r[id].d} units from the gate`);
+      t.ok(r[id].agl > 5, `${id}: expected to be airborne above the pad, agl=${r[id].agl}`);
+    }
+    await t.ev('g.player.setMode("DRIVE")');
   });
 
   await t.check('weather actions pin the sky', async () => {

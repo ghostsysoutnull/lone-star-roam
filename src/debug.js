@@ -7,9 +7,22 @@ import { EROCK } from './haunts.js';
 import { hAt, neighborStateAt } from './geo.js';
 import { releaseOn } from './turtles.js';
 import { TOURS } from './tours.js';
+import { AIRPORTS } from './airports.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
+
+// Hand-authored orientation tags for the airport picker, display-only (not
+// game data — never read outside this menu): a compass region for every
+// field (Texas fields relative to the state, band fields relative to
+// Texas), plus a real neighbor-state code for the 6 band fields.
+const AIRPORT_TAG = {
+  DFW: 'N', DAL: 'N', IAH: 'SE', HOU: 'SE', AUS: 'S', SAT: 'S', ELP: 'W',
+  LBB: 'W', AMA: 'NW', MAF: 'W', CRP: 'SE', HRL: 'S', LRD: 'S', ABI: 'W', ACT: 'N', TYR: 'NE',
+  MRF: 'W', TRL: 'SW', SSS: 'NW', ARM: 'S', LBJ: 'S',
+  SHV: 'E', TXK: 'NE', CVN: 'W', HOB: 'W', CVS: 'W', BAD: 'E',
+};
+const AIRPORT_STATE = { SHV: 'LA', TXK: 'AR', CVN: 'NM', HOB: 'NM', CVS: 'NM', BAD: 'LA' };
 
 export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals }) {
   const tp = (x, z, heading) => {
@@ -107,6 +120,14 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       animals.forceSpawn(species, player.pos.x + 20, player.pos.z);
       hud.toast(`🐾 Band wildlife forced — ${species} (${ns ?? 'TX'})`);
     },
+    gotoAirport(id) {
+      const a = AIRPORTS.find((x) => x.id === id);
+      if (!a) return;
+      player.setMode('FLY');
+      tp(a.gate[0], a.gate[1]);
+      player.pos.y = Math.max(hAt(a.gate[0], a.gate[1]) + 6, 6);
+      hud.toast(`✈️ ${a.name}${a.band ? ' — band' : ''}${a.military ? ' (military)' : ''}`);
+    },
     testRadio() {
       const tw = radio.nearestTowered(player.pos.x, player.pos.z);
       const un = radio.nearestUnicom(player.pos.x, player.pos.z);
@@ -153,6 +174,20 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       `<div class="debug-section"><h3>${title}</h3><div class="debug-rows">` +
       rows.map(([k, label]) => `<button data-act="${k}">${label}</button>`).join('') +
       '</div></div>').join('');
+    // Airports: jump to any of the 27 fields (Texas + band, incl. military)
+    // by gate — a flat dropdown reads better than 27 individual buttons.
+    const airportGroups = [['Texas', AIRPORTS.filter((a) => !a.band)], ['Band', AIRPORTS.filter((a) => a.band)]];
+    const airportsHtml = '<div class="debug-section"><h3>Airports</h3>' +
+      '<select id="debug-airport"><option value="">✈️ Jump to airport…</option>' +
+      airportGroups.map(([label, list]) =>
+        `<optgroup label="${label}">` +
+        list.map((a) => {
+          const tag = AIRPORT_TAG[a.id] ?? '?';
+          const suffix = AIRPORT_STATE[a.id] ? `${tag} · ${AIRPORT_STATE[a.id]}` : tag;
+          return `<option value="${a.id}">${a.name} (${suffix})${a.military ? ' · mil' : ''}</option>`;
+        }).join('') +
+        '</optgroup>').join('') +
+      '</select></div>';
     // Tours tab: one <details> per track (newest first), one nested per wave.
     // The list only grows track by track, so everything starts collapsed and
     // the panel scrolls; generic actions keep their own tab for instant access.
@@ -168,7 +203,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     el.id = 'debug';
     el.innerHTML = '<h2>🔧 Debug</h2><div id="debug-state"></div>' +
       '<div id="debug-tabs"><button class="active" data-tab="actions">⚡ Actions</button><button data-tab="tours">🗺️ Tours</button></div>' +
-      `<div data-pane="actions">${actionsHtml}</div><div data-pane="tours" style="display:none">${toursHtml}</div>`;
+      `<div data-pane="actions">${actionsHtml}${airportsHtml}</div><div data-pane="tours" style="display:none">${toursHtml}</div>`;
     el.style.display = 'none';
     document.body.appendChild(el);
     const stateEl = el.querySelector('#debug-state');
@@ -188,11 +223,17 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
         for (const p of el.querySelectorAll('[data-pane]')) p.style.display = p.dataset.pane === d.tab ? '' : 'none';
       }
     });
+    el.querySelector('#debug-airport').addEventListener('change', (e) => {
+      if (!e.target.value) return;
+      actions.gotoAirport(e.target.value);
+      e.target.value = '';
+      refreshState();
+    });
     addEventListener('keydown', (e) => {
       if (e.code === 'Backquote') { el.style.display = el.style.display === 'none' ? 'grid' : 'none'; refreshState(); }
     });
     setInterval(refreshState, 500);
   }
 
-  return { actions, tours: TOURS, visit };
+  return { actions, tours: TOURS, visit, airportTags: AIRPORT_TAG, airportStates: AIRPORT_STATE };
 }
