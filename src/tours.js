@@ -15,6 +15,9 @@ export const TOURS = [
   {
     track: 'New Player (2026-07)',
     waves: [
+      { wave: 'W4 — named save slots', spots: [
+        S('💾 Save slots — title screen', [985, 1737], { mode: 'DRIVE', act: 'slotsPreview', note: 'slot 1 active, slot 2 seeded occupied, slot 3 empty — rename/delete/new game all live on the rows' }),
+      ] },
       { wave: 'W3 — hints, Guide, Settings', spots: [
         S('💬 First-NPC hint — Greta near Kerrville', [242, 1046.4], { mode: 'WALK', heading: Math.PI / 2, act: 'hintsReset', note: 'hints re-armed — the E-to-talk hint fires as she comes in range' }),
         S('🌆 First-city hint — Austin edge', LL(30.2672, -97.7431), { mode: 'DRIVE', act: 'hintsReset', note: 'inside the city radius — the map hint fires (and absorbs the W2 map tip)' }),

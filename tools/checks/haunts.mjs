@@ -109,7 +109,7 @@ export default async function haunts(t) {
 
   await t.check('legends count as the visible 9th collectible (HUD + save)', async () => {
     t.ok((await t.ev('g.gameplay.counts().legends')) === 2, 'counts().legends !== 2');
-    const saved = await t.ev(`JSON.parse(localStorage.getItem('lonestar-roam-save-v1')).legends`);
+    const saved = await t.ev(`JSON.parse(localStorage.getItem('lonestar-roam-save-v1:1')).legends`);
     t.ok(Array.isArray(saved) && saved.length === 2, `save.legends = ${JSON.stringify(saved)}`);
     await t.until(`document.getElementById('score-legends').textContent === '2'`, 5000); // 12 Hz HUD
   });

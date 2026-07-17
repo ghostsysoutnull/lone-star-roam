@@ -37,6 +37,29 @@ graduate here (and out of `NEXT_SESSION.md`).
 - **Any new airport MUST get a `ROUTES` entry in aviation.js** — a missing entry
   crashes the main loop at boot and cascades into ~56 unrelated failures that all
   read as "loop dead".
+- **Save slots (`src/slots.js`, New Player W4)**: every localStorage base key
+  name lives in `KEYS` there — never hardcode a `'lonestar-…'` string
+  elsewhere. `slotKey(base, slot = activeSlot())` builds the real key
+  (`base:slot`); `lonestar-slot` is the only key that stays global. New
+  per-slot settings follow the same pattern (hud.js/brands.js/missions.js
+  are the reference — read the key at construction, write it through
+  `slotKey()` on every change). `gameplay.save.name` is additive (slot
+  display name, `null` = unnamed). Resume writes on a 20 s interval
+  (`gameplay.update`'s `saveTimer`) plus the pause screen's Save & quit
+  button — there is no `pagehide`/`visibilitychange` listener, so a hard tab
+  close between those can lose up to 20 s.
+- **Slot switching is live, never a page reload** — the verify harness's
+  context wipes localStorage on every navigation, so a reload-based switch
+  is untestable and the hard requirement puts `select`/`newGame`/`rename`/
+  `delete` on `__game.title` specifically so the suite can drive them.
+  `gameplay.loadSlot()` disposes and rebuilds the mesh-backed visuals
+  (city/band-city stars, roses, landmarks — `mkCityStars` etc. bake
+  visited/collected state at construction and only ever *remove* a star
+  during play) and `title._afterLoad()` re-applies the 4 settings +
+  `applyGear` (shop perks/paint/dog) + the mid-haul cargo mesh. Any module
+  that caches `gameplay.save` in a field instead of reading it live through
+  a getter will go stale on a switch — `missions.js` shipped that bug once
+  (fixed to `get save() { return this.gp.save; }`).
 
 ## The law of Texas
 
@@ -112,6 +135,13 @@ graduate here (and out of `NEXT_SESSION.md`).
 
 ## Rendering & systems
 
+- **Gated UI is always built, only presentation is gated** (debug.js's
+  panel, title.js's boot screen) — the object and every method it needs
+  exist unconditionally on `__game`; only a DOM element's visibility or a
+  URL flag decides whether a human ever sees it. This is what lets the
+  verify harness drive a "hidden" screen's real logic (`title.select()`,
+  `debug.actions.firstRun()`) without a click. Never special-case behavior
+  behind `window.__harness` beyond skipping the initial reveal.
 - **Decks are not roads** — the causeway, the Carlsbad park road, Anthony's Main
   St and the Texhoma line: `nearestRoad` is null on them, traffic never drives
   them, and the drive cap there is the offroad/beach path.
@@ -184,7 +214,12 @@ graduate here (and out of `NEXT_SESSION.md`).
   input is `--attachment`, not `@path`; output reports no model line — wrong
   slugs fail loudly, so trust the flag. Copilot reports what it sees; spec and
   register comparisons are Claude's, and final aesthetic judgment is Bruno's
-  (shots still go to his eye — Copilot is the pre-check gate). Budget
+  (shots still go to his eye — Copilot is the pre-check gate). Copilot's
+  read is not authoritative for anything measurable: it twice misjudged
+  save-slot row heights as "still inconsistent" (New Player W4, 2026-07-17)
+  when `getBoundingClientRect()` on the live DOM showed all three rows at
+  the same 94px — a quick playwright script that queries real layout numbers
+  settles a metric dispute a screenshot can't. Budget
   (2026-07-17): one shot per new or changed visible surface by default,
   judged before commit; logic/data/physics work stays shot-free; never the
   pass/fail signal.

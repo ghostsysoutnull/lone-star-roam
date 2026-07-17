@@ -752,7 +752,7 @@ export default async function brands(t) {
 
     await t.ev(`g.brands.setScale(0.6)`);
     await t.until(`g.brands.live.has('Katy')`, 2000);
-    const shrunk = await t.ev(`({ scale: g.brands.live.get('Katy').building.scale.x, stored: localStorage.getItem('lonestar-brand-scale') })`);
+    const shrunk = await t.ev(`({ scale: g.brands.live.get('Katy').building.scale.x, stored: localStorage.getItem('lonestar-brand-scale:1') })`);
     t.near(shrunk.scale, 0.6, 0.001, `building sub-group not scaled: ${shrunk.scale}`);
     t.ok(shrunk.stored === '0.6', `scale not persisted to localStorage: ${shrunk.stored}`);
 

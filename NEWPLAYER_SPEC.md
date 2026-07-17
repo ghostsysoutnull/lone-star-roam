@@ -166,10 +166,12 @@ Budget: code + checks in onboarding suite, no shots, grep-first.
   delete (confirm) on the row.
 - Storage: save + the four settings keys become per-slot; `lonestar-slot` is
   the only global key; legacy keys migrate to slot 1 once.
-- shop/missions already read the save object, so the blast radius is
-  gameplay.js + hud.js/brands.js settings reads + main.js boot order.
-- **Export/import**: slot → file / file → slot on the title screen (backlog
-  candidate if the wave runs long).
+- Blast radius wider than first assumed: `missions.js` cached `this.save`
+  at construction (stale after a switch — fixed to a live getter), and
+  `shop.js`'s `applyGear` (perks/paint/dog) + `missions.crate` must be
+  re-run on every switch, not just at boot.
+- **Export/import**: dropped to `BACKLOG.md` before coding (Bruno,
+  2026-07-17) — slot → file / file → slot on the title screen.
 Budget: code + checks (slot isolation: write in slot 2, assert slot 1
 untouched; settings isolation; migration check), no shots, grep-first.
 

@@ -28,7 +28,7 @@ export default async function missions(t) {
   await t.check('accept → pickup phase, persisted, no crate yet', async () => {
     await t.ev('g.missions.accept(g.missions.offers[0])');
     t.ok((await t.ev('g.missions.job.phase')) === 'pickup', 'phase not pickup');
-    const stored = await t.ev(`JSON.parse(localStorage['lonestar-roam-save-v1']).job?.phase`);
+    const stored = await t.ev(`JSON.parse(localStorage['lonestar-roam-save-v1:1']).job?.phase`);
     t.ok(stored === 'pickup', `not persisted (got ${stored})`);
     t.ok(!(await t.ev('g.player.truck.userData.cargo.visible')), 'crate visible before loading');
   });

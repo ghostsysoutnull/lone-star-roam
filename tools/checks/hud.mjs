@@ -122,9 +122,9 @@ export default async function hud(t) {
 
   await t.check('C toggles the compass and persists the preference', async () => {
     await t.key('KeyC');
-    const off = await t.ev(`({ disp: g.hud.compass.style.display, pref: localStorage['lonestar-compass'], centered: g.hud.shield.classList.contains('centered') })`);
+    const off = await t.ev(`({ disp: g.hud.compass.style.display, pref: localStorage['lonestar-compass:1'], centered: g.hud.shield.classList.contains('centered') })`);
     await t.key('KeyC');
-    const on = await t.ev(`({ disp: g.hud.compass.style.display, pref: localStorage['lonestar-compass'], centered: g.hud.shield.classList.contains('centered') })`);
+    const on = await t.ev(`({ disp: g.hud.compass.style.display, pref: localStorage['lonestar-compass:1'], centered: g.hud.shield.classList.contains('centered') })`);
     t.ok(off.disp === 'none' && off.pref === 'off', `off state: ${JSON.stringify(off)}`);
     t.ok(on.disp !== 'none' && on.pref === 'on', `on state: ${JSON.stringify(on)}`);
     t.ok(off.centered === true && on.centered === false, `road-shield did not re-center with the compass: ${JSON.stringify({ off, on })}`);
@@ -326,7 +326,7 @@ export default async function hud(t) {
       root: parseFloat(getComputedStyle(document.documentElement).fontSize),
       hud: parseFloat(getComputedStyle(document.getElementById('hud-topleft')).fontSize),
       map: parseFloat(getComputedStyle(document.getElementById('minimap')).width),
-      pref: localStorage['lonestar-ui-scale'] ?? null,
+      pref: localStorage['lonestar-ui-scale:1'] ?? null,
     })`);
     const base = await px();
     await t.key('Equal');

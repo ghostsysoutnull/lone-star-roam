@@ -29,6 +29,6 @@ test('save initialization preserves every additive progress table', async () => 
   const gameplay = await source('gameplay.js');
   const expected = ['species', 'stats', 'counties', 'ufo', 'bank', 'jobsDone', 'job', 'gear', 'legends', 'airports', 'passport'];
   for (const key of expected)
-    assert.match(gameplay, new RegExp(`this\\.save\\.${key.replace('.', '\\.')} \\?\\?=`), `save.${key} default`);
+    assert.match(gameplay, new RegExp(`\\bsave\\.${key.replace('.', '\\.')} \\?\\?=`), `save.${key} default`);
   assert.match(gameplay, /"cities":\[\],"landmarks":\[\],"roses":\[\]/, 'base save tables');
 });

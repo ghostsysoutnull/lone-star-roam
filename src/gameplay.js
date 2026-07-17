@@ -6,8 +6,8 @@ import { mkStarMesh } from './vehicle.js';
 import { cityRadius } from './cities.js';
 import { merge, tinted } from './traffic.js';
 import { fieldNear, onRunway, TD_AGL, TD_SPD } from './airports.js';
+import { KEYS, slotKey, activeSlot, setActiveSlot } from './slots.js';
 
-const SAVE_KEY = 'lonestar-roam-save-v1';
 const pick = (arr) => arr[(Math.random() * arr.length) | 0];
 
 // flavor only, every field (unlike the towered-only save.airports logbook in radio.js)
@@ -70,28 +70,8 @@ export const LANDMARK_COUNT = LANDMARKS.length;
 export class Gameplay {
   constructor(scene) {
     this.scene = scene;
-    this.save = JSON.parse(localStorage.getItem(SAVE_KEY) || '{"cities":[],"landmarks":[],"roses":[]}');
-    this.save.species ??= []; // added later — default for older saves
-    this.save.stats ??= { dist: 0, time: 0, top: 0 }; // km real, seconds, mph
-    this.save.counties ??= [];
-    this.save.ufo ??= 0;
-    this.save.bank ??= 0;      // delivery earnings — pure score for now
-    this.save.jobsDone ??= 0;
-    this.save.job ??= null;    // active delivery, serialized by missions.js
-    this.save.gear ??= {};     // shop purchase levels by item id (shop.js)
-    this.save.legends ??= [];  // haunts witnessed (haunts.js LEGENDS keys)
-    this.save.airports ??= []; // logbook: towered fields actually landed at (radio.js)
-    // Passport: the shoulder's own progress container — NEVER folds into the
-    // Texas tallies above (Law). stamps = neighbor states first-crossed,
-    // towns = band cities visited (silver stars), landings = band airports
-    // landed at, stones = Corner Stones (W6's job — reserved empty here).
-    this.save.passport ??= { stamps: [], towns: [], landings: [], stones: [] };
-    this.save.at ??= null; // resume snapshot: {x,z,y,heading,mode,skyT} (title.js)
-    this.save.seen ??= {}; // first-run flags: intro card + per-tip/hint keys; 'all' = Skip intro & tips (onboarding.js)
-    // pre-W2 saves with progress never see the intro or tips — grandfather them as veterans
-    if (!this.save.seen.intro && (this.save.cities.length || this.save.landmarks.length || this.save.at)) {
-      this.save.seen.intro = this.save.seen.all = true;
-    }
+    this.slot = activeSlot();
+    this.save = this._readSave(this.slot);
     this.saveTimer = 0;
     this.countyNow = null;
     this.countyToastT = 0;
@@ -102,6 +82,68 @@ export class Gameplay {
     this.roseSystem = this.mkRoses();
     this.landmarkGroup = this.mkLandmarks();
     this.t = 0;
+  }
+
+  // Fills in every additive default (GOTCHAS law: new keys only) + the
+  // veteran-grandfather check. Shared by the constructor and loadSlot() so
+  // every slot gets identical treatment.
+  _readSave(slot) {
+    const save = JSON.parse(localStorage.getItem(slotKey(KEYS.save, slot)) || '{"cities":[],"landmarks":[],"roses":[]}');
+    save.species ??= []; // added later — default for older saves
+    save.stats ??= { dist: 0, time: 0, top: 0 }; // km real, seconds, mph
+    save.counties ??= [];
+    save.ufo ??= 0;
+    save.bank ??= 0;      // delivery earnings — pure score for now
+    save.jobsDone ??= 0;
+    save.job ??= null;    // active delivery, serialized by missions.js
+    save.gear ??= {};     // shop purchase levels by item id (shop.js)
+    save.legends ??= [];  // haunts witnessed (haunts.js LEGENDS keys)
+    save.airports ??= []; // logbook: towered fields actually landed at (radio.js)
+    // Passport: the shoulder's own progress container — NEVER folds into the
+    // Texas tallies above (Law). stamps = neighbor states first-crossed,
+    // towns = band cities visited (silver stars), landings = band airports
+    // landed at, stones = Corner Stones (W6's job — reserved empty here).
+    save.passport ??= { stamps: [], towns: [], landings: [], stones: [] };
+    save.at ??= null; // resume snapshot: {x,z,y,heading,mode,skyT} (title.js)
+    save.seen ??= {}; // first-run flags: intro card + per-tip/hint keys; 'all' = Skip intro & tips (onboarding.js)
+    save.name ??= null; // slot display name (null = title.js labels it "Slot N")
+    // pre-W2 saves with progress never see the intro or tips — grandfather them as veterans
+    if (!save.seen.intro && (save.cities.length || save.landmarks.length || save.at)) {
+      save.seen.intro = save.seen.all = true;
+    }
+    return save;
+  }
+
+  // Switches the live game to a different slot in place (New Player W4 —
+  // no page reload, the harness can't survive one). Rare, boot-level-cost
+  // action: mkCityStars/mkBandCityStars/mkRoses/mkLandmarks all bake save
+  // state (visited/collected) at construction and only ever *remove* a star
+  // during play, so reflecting a different slot's progress means disposing
+  // and rebuilding via those same methods, not diffing in place.
+  loadSlot(slot) {
+    setActiveSlot(slot);
+    this.slot = slot;
+    this.save = this._readSave(slot);
+    this._disposeVisuals();
+    this.cityStars = this.mkCityStars();
+    this.bandCityStars = this.mkBandCityStars();
+    this.roseSystem = this.mkRoses();
+    this.landmarkGroup = this.mkLandmarks();
+  }
+
+  _disposeVisuals() {
+    for (const group of [this.cityStars, this.bandCityStars, this.landmarkGroup]) {
+      this.scene.remove(group);
+      group.traverse((o) => {
+        o.geometry?.dispose();
+        // some meshes (rancharch's sign plate) use an array of per-face materials
+        for (const m of o.material ? [].concat(o.material) : []) { m.map?.dispose(); m.dispose(); }
+      });
+    }
+    this.scene.remove(this.roseSystem, this.roseGlow);
+    this.roseSystem.geometry.dispose(); this.roseSystem.material.dispose();
+    this.roseGlow.geometry.dispose(); this.roseGlow.material.dispose();
+    this.beams = []; this.lmSpins = []; this.lmNightMats = []; this.marfa = null;
   }
 
   counts() {
@@ -216,7 +258,7 @@ export class Gameplay {
     player.setMode('WALK');
   }
 
-  persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); }
+  persist() { localStorage.setItem(slotKey(KEYS.save, this.slot), JSON.stringify(this.save)); }
 
   // resume snapshot — position/heading/mode/altitude/clock (title.js Continue)
   snapshotAt(player, sky) {

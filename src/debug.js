@@ -8,6 +8,7 @@ import { hAt, neighborStateAt } from './geo.js';
 import { releaseOn } from './turtles.js';
 import { TOURS } from './tours.js';
 import { AIRPORTS } from './airports.js';
+import { KEYS, slotKey } from './slots.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
@@ -52,6 +53,17 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       gameplay.persist();
       tutorial.begin();
       hud.toast('🌱 Hints re-armed — approach the subject');
+    },
+    // W4: seeds slot 2 occupied + slot 3 empty so the Tours spot shows every
+    // row kind at once — active/occupied, other-occupied, empty — without
+    // touching the real (active) save.
+    slotsPreview() {
+      localStorage.setItem(slotKey(KEYS.save, 2), JSON.stringify({
+        name: 'Playtest', cities: ['Austin', 'Waco'], landmarks: ['The Alamo'], roses: [], bank: 40, seen: { all: true },
+      }));
+      for (const base of Object.values(KEYS)) localStorage.removeItem(slotKey(base, 3));
+      title.show();
+      hud.toast('💾 Slots staged — slot 2 occupied, slot 3 empty');
     },
     night() { sky.t = 0.98; },
     midnight() { sky.t = 0.998; }, // the bell tolls on the wrap — park near a chapel first

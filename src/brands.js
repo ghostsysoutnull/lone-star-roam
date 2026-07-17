@@ -30,6 +30,7 @@ import { ATMOS } from './sky.js';
 import { tinted, merge } from './traffic.js';
 import { cityRadius } from './cities.js';
 import { airportClear } from './airports.js';
+import { KEYS, slotKey } from './slots.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 
@@ -44,10 +45,9 @@ const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180)
 // (buildBillboards scales each billboard's own local group, not `group`).
 // groundYAt's footprint/pad-height math reads this same module value so the
 // physical floor always matches the shrunk/grown slab.
-const SCALE_KEY = 'lonestar-brand-scale';
 const SCALE_MIN = 0.1, SCALE_MAX = 1.25; // down to a tenth size — Bruno 2026-07-12
 const clampScale = (v) => Math.round(Math.min(SCALE_MAX, Math.max(SCALE_MIN, v)) * 100) / 100;
-let SCALE = clampScale(parseFloat(localStorage.getItem(SCALE_KEY)) || 0.15);
+let SCALE = clampScale(parseFloat(localStorage.getItem(slotKey(KEYS.brandScale))) || 0.15);
 
 const SPAWN_DIST = 700;      // bigger footprints than cities — hold geometry sooner
 const NIGHT_ON = 0.25;       // ATMOS.night threshold for the signage glow (airports.js)
@@ -404,7 +404,7 @@ export class BrandSystem {
   // rebuild by more than that same quarter second. Returns a HUD-ready "N%".
   setScale(v) {
     SCALE = clampScale(v);
-    localStorage.setItem(SCALE_KEY, SCALE);
+    localStorage.setItem(slotKey(KEYS.brandScale), SCALE);
     for (const name of [...this.live.keys()]) this.despawn(name);
     return Math.round(SCALE * 100) + '%';
   }

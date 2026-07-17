@@ -9,6 +9,7 @@ import { GEO } from './geo.js';
 import { cityRadius } from './cities.js';
 import { AIRPORTS, onRunway, TD_AGL, TD_SPD } from './airports.js';
 import { charterOfferTerms, groundOfferTerms, missionPayout } from './mission-rules.js';
+import { KEYS, slotKey } from './slots.js';
 
 const CHARTER_LIVERY = 0xe8a33d; // air-taxi accent, swapped in over the wings' stock color
 
@@ -96,7 +97,6 @@ const fmt = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.
 export class MissionSystem {
   constructor(scene, gameplay, player, onToast, onChime) {
     this.gp = gameplay;
-    this.save = gameplay.save;
     this.player = player;
     this.onToast = onToast;
     this.onChime = onChime;
@@ -107,7 +107,7 @@ export class MissionSystem {
     this.crate(this.job?.phase === 'haul');
 
     // floating guide arrow over the player, pointing at the current target
-    this.arrowOn = localStorage.getItem('lonestar-arrow') !== 'off';
+    this.arrowOn = localStorage.getItem(slotKey(KEYS.arrow)) !== 'off';
     this.arrowMat = new THREE.MeshLambertMaterial({ color: 0xffd35c, emissive: 0xbb8a1a, emissiveIntensity: 0.7, flatShading: true });
     this.arrow = new THREE.Group();
     this.arrow.add(
@@ -118,9 +118,14 @@ export class MissionSystem {
     scene.add(this.arrow);
   }
 
+  // Live getter, not a cached field — a slot switch (New Player W4)
+  // reassigns gameplay.save in place; a cached reference here would leak
+  // bank/job progress across slots.
+  get save() { return this.gp.save; }
+
   toggleArrow() {
     this.arrowOn = !this.arrowOn;
-    localStorage.setItem('lonestar-arrow', this.arrowOn ? 'on' : 'off');
+    localStorage.setItem(slotKey(KEYS.arrow), this.arrowOn ? 'on' : 'off');
     if (!this.arrowOn) this.arrow.visible = false;
     return this.arrowOn;
   }

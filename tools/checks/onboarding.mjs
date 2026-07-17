@@ -80,7 +80,7 @@ export default async function onboarding(t) {
     t.ok(await t.ev('g.title.needsIntro'), 'needsIntro false on a fresh save');
     await t.ev(`g.title.finishIntro(false)`);
     const started = await t.ev(`({ intro: g.gameplay.save.seen.intro, all: g.gameplay.save.seen.all,
-      persisted: JSON.parse(localStorage.getItem('lonestar-roam-save-v1')).seen.intro })`);
+      persisted: JSON.parse(localStorage.getItem('lonestar-roam-save-v1:1')).seen.intro })`);
     t.ok(started.intro === true && !started.all, `Start: intro=${started.intro} all=${started.all} (want intro only)`);
     t.ok(started.persisted === true, 'seen.intro not persisted');
     t.ok(!(await t.ev('g.title.needsIntro')), 'needsIntro still true after Start');
@@ -182,7 +182,7 @@ export default async function onboarding(t) {
     t.ok(!(await t.ev('g.gameplay.save.seen.hintCity')), 'hintCity fired inside the 8 s cooldown');
     await t.ev(`(__tut.cd = 0, __tut.update(0.2, { cityEdge: true }))`);
     const city = await t.ev(`({ hint: g.gameplay.save.seen.hintCity, tip: g.gameplay.save.seen.tipMap,
-      persisted: JSON.parse(localStorage.getItem('lonestar-roam-save-v1')).seen.hintCity })`);
+      persisted: JSON.parse(localStorage.getItem('lonestar-roam-save-v1:1')).seen.hintCity })`);
     t.ok(city.hint === true, 'hintCity not fired after cooldown');
     t.ok(city.tip === true, 'hintCity did not absorb tipMap');
     t.ok(city.persisted === true, 'hintCity not persisted');
@@ -284,7 +284,7 @@ export default async function onboarding(t) {
     const comp0 = await t.ev(`document.getElementById('compass').style.display !== 'none'`);
     await click('compass');
     t.ok((await t.ev(`document.getElementById('compass').style.display !== 'none'`)) === !comp0, 'compass toggle did not flip the compass');
-    t.ok((await t.ev(`localStorage.getItem('lonestar-compass')`)) === (comp0 ? 'off' : 'on'), 'compass key not written');
+    t.ok((await t.ev(`localStorage.getItem('lonestar-compass:1')`)) === (comp0 ? 'off' : 'on'), 'compass key not written');
     await click('compass');
     const arrow0 = await t.ev('g.missions.arrowOn');
     await click('arrow');
@@ -293,7 +293,7 @@ export default async function onboarding(t) {
     // steppers: value moves, key written, symmetric restore
     const ui0 = await t.ev('g.hud.ui');
     await click('ui+');
-    const ui1 = await t.ev(`({ ui: g.hud.ui, key: localStorage.getItem('lonestar-ui-scale'),
+    const ui1 = await t.ev(`({ ui: g.hud.ui, key: localStorage.getItem('lonestar-ui-scale:1'),
       font: document.documentElement.style.fontSize, label: document.querySelector('#paused .settings [data-set="ui"]').textContent })`);
     t.near(ui1.ui, ui0 + 0.1, 0.001, 'ui scale did not step +10%');
     t.ok(parseFloat(ui1.key) === ui1.ui, `ui key ${ui1.key} vs live ${ui1.ui}`);
@@ -304,7 +304,7 @@ export default async function onboarding(t) {
     const b0 = await t.ev('g.brands.scale');
     await click('brand+');
     t.near(await t.ev('g.brands.scale'), b0 + 0.05, 0.001, 'brand scale did not step');
-    t.ok(parseFloat(await t.ev(`localStorage.getItem('lonestar-brand-scale')`)) === (await t.ev('g.brands.scale')), 'brand key not written');
+    t.ok(parseFloat(await t.ev(`localStorage.getItem('lonestar-brand-scale:1')`)) === (await t.ev('g.brands.scale')), 'brand key not written');
     await click('brand-');
     t.near(await t.ev('g.brands.scale'), b0, 0.001, 'brand scale not restored');
     // keybind path stays in sync: title.show() refreshes labels from live state
@@ -330,11 +330,139 @@ export default async function onboarding(t) {
     await t.ev(`g.player.heading = 0.789`);
     await t.ev(`g.sky.t = 0.42`);
     await t.ev(`(g.gameplay.snapshotAt(g.player, g.sky), g.gameplay.persist())`);
-    const raw = await t.ev(`localStorage.getItem('lonestar-roam-save-v1')`);
+    const raw = await t.ev(`localStorage.getItem('lonestar-roam-save-v1:1')`);
     const at = JSON.parse(raw).at;
     t.near(at.x, 555.5, 0.01, 'persisted x');
     t.near(at.z, -444.25, 0.01, 'persisted z');
     t.ok(at.mode === 'DRIVE', `persisted mode: ${at.mode}`);
     t.near(at.skyT, 0.42, 0.0001, 'persisted clock');
+  });
+
+  // ---- W4: named save slots, per-slot settings ----
+
+  await t.check('migrateLegacy copies unsuffixed keys to slot 1 once, without clobbering', async () => {
+    // isolate the migration logic from whatever slot 1 already holds
+    await t.ev(`(localStorage.removeItem('lonestar-slot'),
+      ['lonestar-roam-save-v1', 'lonestar-arrow', 'lonestar-compass', 'lonestar-ui-scale', 'lonestar-brand-scale']
+        .forEach((k) => localStorage.removeItem(k + ':1')))`);
+    await t.ev(`(localStorage.setItem('lonestar-roam-save-v1', JSON.stringify({ cities: ['LegacyCity'], landmarks: [], roses: [] })),
+      localStorage.setItem('lonestar-arrow', 'off'), localStorage.setItem('lonestar-compass', 'off'),
+      localStorage.setItem('lonestar-ui-scale', '1.3'), localStorage.setItem('lonestar-brand-scale', '0.4'))`);
+    await t.ev(`g.slots.migrateLegacy()`);
+    const r1 = await t.ev(`({ pointer: localStorage.getItem('lonestar-slot'),
+      save: JSON.parse(localStorage.getItem('lonestar-roam-save-v1:1')).cities,
+      arrow: localStorage.getItem('lonestar-arrow:1'), compass: localStorage.getItem('lonestar-compass:1'),
+      ui: localStorage.getItem('lonestar-ui-scale:1'), brand: localStorage.getItem('lonestar-brand-scale:1') })`);
+    t.ok(r1.pointer === '1', `pointer after migration: ${r1.pointer}`);
+    t.ok(r1.save.includes('LegacyCity'), 'save not migrated to slot 1');
+    t.ok(r1.arrow === 'off' && r1.compass === 'off' && r1.ui === '1.3' && r1.brand === '0.4', `settings not migrated: ${JSON.stringify(r1)}`);
+    // second call with different legacy values must NOT overwrite the existing slot-1 copy
+    await t.ev(`localStorage.setItem('lonestar-roam-save-v1', JSON.stringify({ cities: ['OtherCity'], landmarks: [], roses: [] }))`);
+    await t.ev(`g.slots.migrateLegacy()`);
+    const still = await t.ev(`JSON.parse(localStorage.getItem('lonestar-roam-save-v1:1')).cities`);
+    t.ok(still.includes('LegacyCity') && !still.includes('OtherCity'), `second migration overwrote slot 1: ${still}`);
+    // this test never touches the live gameplay object (slot stays 1 from harness boot) — restore
+    // the pointer to match it so later checks aren't reading a stale lonestar-slot
+    await t.ev(`localStorage.setItem('lonestar-slot', g.gameplay.slot)`);
+  });
+
+  await t.check('newGame creates a named fresh slot with the curated spawn', async () => {
+    await t.tp(9999, -9999, 'WALK');
+    await t.ev(`g.title.newGame(2, 'Explorer')`);
+    const r = await t.ev(`({ slot: g.gameplay.slot, name: g.gameplay.save.name, mode: g.player.mode,
+      seenEmpty: Object.keys(g.gameplay.save.seen).length === 0, pointer: localStorage.getItem('lonestar-slot') })`);
+    t.ok(r.slot === 2, `active slot after newGame: ${r.slot}`);
+    t.ok(r.name === 'Explorer', `slot name: ${r.name}`);
+    t.ok(r.mode === 'DRIVE', `fresh game mode: ${r.mode}`);
+    t.ok(r.seenEmpty, 'fresh slot seen not empty');
+    t.ok(r.pointer === '2', `pointer: ${r.pointer}`);
+  });
+
+  await t.check('slot isolation: writing slot 2 leaves slot 1 storage untouched', async () => {
+    const before1 = await t.ev(`localStorage.getItem('lonestar-roam-save-v1:1')`);
+    await t.ev(`(g.gameplay.save.cities.push('SlotTwoCity'), g.gameplay.persist())`);
+    const after1 = await t.ev(`localStorage.getItem('lonestar-roam-save-v1:1')`);
+    t.ok(after1 === before1, 'a slot-2 write mutated slot 1 storage');
+    const slot2 = await t.ev(`JSON.parse(localStorage.getItem('lonestar-roam-save-v1:2'))`);
+    t.ok(slot2.cities.includes('SlotTwoCity'), 'slot-2 write not persisted under its own key');
+  });
+
+  await t.check('select() re-applies per-slot settings live, round trip survives', async () => {
+    if ((await t.ev('g.gameplay.slot')) !== 1) await t.ev(`g.title.select(1)`);
+    // pin slot 1 to known defaults via the real functions (never a bare key poke)
+    await t.ev(`(() => { while (Math.round(g.hud.ui * 10) !== 10) g.hud.uiScale(g.hud.ui < 1 ? 1 : -1); })()`);
+    await t.ev(`(document.getElementById('compass').style.display === 'none') && g.hud.toggleCompass()`);
+    await t.ev(`!g.missions.arrowOn && g.missions.toggleArrow()`);
+    await t.ev(`g.brands.setScale(0.15)`);
+    await t.ev(`g.title.select(2)`);
+    // slot 2 was never customized before this check — must read back its own (default) values, not slot 1's
+    const slot2First = await t.ev(`({ ui: g.hud.ui, compass: document.getElementById('compass').style.display !== 'none',
+      arrow: g.missions.arrowOn, brand: g.brands.scale })`);
+    t.near(slot2First.ui, 1, 0.001, 'slot 2 ui scale not default on first switch');
+    t.ok(slot2First.compass && slot2First.arrow, `slot 2 compass/arrow not default on: ${JSON.stringify(slot2First)}`);
+    t.near(slot2First.brand, 0.15, 0.001, 'slot 2 brand scale not default on first switch');
+    // customize slot 2, then round-trip through slot 1 and back
+    await t.ev(`(() => { while (Math.round(g.hud.ui * 10) !== 14) g.hud.uiScale(g.hud.ui < 1.4 ? 1 : -1); })()`);
+    await t.ev(`(g.hud.toggleCompass(), g.missions.toggleArrow(), g.brands.setScale(0.4))`);
+    const slot2Set = await t.ev(`({ ui: g.hud.ui, compass: document.getElementById('compass').style.display !== 'none',
+      arrow: g.missions.arrowOn, brand: g.brands.scale })`);
+    await t.ev(`g.title.select(1)`);
+    const slot1Live = await t.ev(`({ slot: g.gameplay.slot, ui: g.hud.ui,
+      compass: document.getElementById('compass').style.display !== 'none', arrow: g.missions.arrowOn, brand: g.brands.scale })`);
+    t.ok(slot1Live.slot === 1, `active slot: ${slot1Live.slot}`);
+    t.near(slot1Live.ui, 1, 0.001, 'slot 1 ui scale not default after switch back');
+    t.ok(slot1Live.compass && slot1Live.arrow, `slot 1 compass/arrow not default on after switch back: ${JSON.stringify(slot1Live)}`);
+    t.near(slot1Live.brand, 0.15, 0.001, 'slot 1 brand scale not default after switch back');
+    await t.ev(`g.title.select(2)`);
+    const back = await t.ev(`({ ui: g.hud.ui, compass: document.getElementById('compass').style.display !== 'none',
+      arrow: g.missions.arrowOn, brand: g.brands.scale })`);
+    t.near(back.ui, slot2Set.ui, 0.001, 'slot 2 ui scale did not survive the round trip');
+    t.ok(back.compass === slot2Set.compass && back.arrow === slot2Set.arrow, `slot 2 toggles did not survive: ${JSON.stringify(back)}`);
+    t.near(back.brand, slot2Set.brand, 0.001, 'slot 2 brand scale did not survive the round trip');
+  });
+
+  await t.check('select() rebuilds city-star visibility for the loaded slot', async () => {
+    // pushing to save.cities directly does not retroactively touch the
+    // already-built star meshes (only the real drive-in-range path removes
+    // one) — the rebuild only happens on a slot switch, so round-trip
+    // through another slot to force it
+    await t.ev(`g.title.select(1)`);
+    await t.ev(`g.gameplay.save.cities.includes('Austin') || (g.gameplay.save.cities.push('Austin'), g.gameplay.persist())`);
+    await t.ev(`g.title.newGame(3, 'Fresh')`); // brand-new slot — Austin never visited here
+    const presentOnSlot3 = await t.ev(`!!g.gameplay.cityStars.children.find((s) => s.userData.city === 'Austin')`);
+    t.ok(presentOnSlot3, 'Austin star missing on a fresh slot that never visited it');
+    await t.ev(`g.title.select(1)`);
+    const goneOnSlot1 = await t.ev(`!g.gameplay.cityStars.children.find((s) => s.userData.city === 'Austin')`);
+    t.ok(goneOnSlot1, 'Austin star still present on slot 1 after reloading it with Austin marked visited');
+  });
+
+  await t.check('rename/delete isolate the active slot from a background one', async () => {
+    await t.ev(`g.title.select(1)`);
+    await t.ev(`g.title.rename(1, 'Bruno')`);
+    t.ok((await t.ev(`g.gameplay.save.name`)) === 'Bruno', 'active-slot rename not applied live');
+    t.ok(JSON.parse(await t.ev(`localStorage.getItem('lonestar-roam-save-v1:1')`)).name === 'Bruno', 'active-slot rename not persisted');
+    await t.ev(`g.title.rename(3, 'Guest')`); // slot 3: background from the previous check
+    const afterRename = await t.ev(`({ liveSlot: g.gameplay.slot, liveName: g.gameplay.save.name,
+      slot3Name: JSON.parse(localStorage.getItem('lonestar-roam-save-v1:3')).name })`);
+    t.ok(afterRename.liveSlot === 1 && afterRename.liveName === 'Bruno', 'a background rename disturbed the active slot');
+    t.ok(afterRename.slot3Name === 'Guest', 'background rename not persisted to slot 3');
+    await t.ev(`g.title.delete(3)`);
+    const afterDelete = await t.ev(`({ raw: localStorage.getItem('lonestar-roam-save-v1:3'), liveSlot: g.gameplay.slot, liveName: g.gameplay.save.name })`);
+    t.ok(afterDelete.raw === null, 'slot 3 storage not cleared by delete');
+    t.ok(afterDelete.liveSlot === 1 && afterDelete.liveName === 'Bruno', 'a background delete disturbed the active slot');
+    // deleting the ACTIVE slot must reload it to empty defaults live, not just clear storage
+    await t.ev(`g.title.delete(1)`);
+    const emptied = await t.ev(`({ hasSave: g.title.hasSave, name: g.gameplay.save.name, cities: g.gameplay.save.cities.length })`);
+    t.ok(!emptied.hasSave && !emptied.name && emptied.cities === 0, `active-slot delete did not reset live state: ${JSON.stringify(emptied)}`);
+  });
+
+  await t.check('title.slots() reports empty/occupied rows correctly', async () => {
+    // slot 1 emptied by the previous check; slot 2 still occupied ('Explorer', customized settings)
+    const rows = await t.ev(`g.title.slots()`);
+    t.ok(rows.length === 3, `slot row count: ${rows.length}`);
+    const s1 = rows.find((r) => r.slot === 1), s2 = rows.find((r) => r.slot === 2), s3 = rows.find((r) => r.slot === 3);
+    t.ok(s1.active && s1.empty, `slot 1 row: ${JSON.stringify(s1)}`);
+    t.ok(!s2.active && !s2.empty && s2.name === 'Explorer', `slot 2 row: ${JSON.stringify(s2)}`);
+    t.ok(!s3.active && s3.empty, `slot 3 row: ${JSON.stringify(s3)}`); // deleted by the previous check
   });
 }

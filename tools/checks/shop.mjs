@@ -207,7 +207,7 @@ export default async function shop(t) {
   });
 
   await t.check('gear levels persist in the save', async () => {
-    const gear = await t.ev(`JSON.parse(localStorage['lonestar-roam-save-v1']).gear`);
+    const gear = await t.ev(`JSON.parse(localStorage['lonestar-roam-save-v1:1']).gear`);
     for (const [id, lvl] of [['engine', 3], ['tires', 3], ['lights', 3], ['airframe', 3], ['cargo', 3], ['dog', 1], ['radio', 1], ['paint', 5]])
       t.ok(gear?.[id] === lvl, `gear.${id} = ${gear?.[id]}, expected ${lvl}`);
   });

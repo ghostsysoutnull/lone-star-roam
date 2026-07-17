@@ -3,6 +3,7 @@ import { Vector3 } from 'three';
 import { GEO, nearestCity, inTexas, borderZoneAt, SHOULDER_U, SHELF_U, TIDELANDS_U, coastDist } from './geo.js';
 import { AIRPORTS, fieldNear } from './airports.js';
 import { ATMOS } from './sky.js';
+import { KEYS, slotKey } from './slots.js';
 
 // A5 tag text: airline jets show their route, GA/military just the callsign,
 // helis their operator brand (or service when unbranded — government kinds)
@@ -100,7 +101,7 @@ export class HUD {
     this.zoomLevels = [1.4, 2.4, 4.5];
     this.zoomIdx = 1;
     this.compass = document.getElementById('compass');
-    if (localStorage.getItem('lonestar-compass') === 'off') this.compass.style.display = 'none';
+    if (localStorage.getItem(slotKey(KEYS.compass)) === 'off') this.compass.style.display = 'none';
     this.shield = document.getElementById('road-shield-wrap'); // outer: position/centered/perspective (static)
     this.shieldCard = document.getElementById('road-shield-card'); // inner: JS-animated sway/float transform
     this.shieldCanvas = document.getElementById('road-shield'); // innermost canvas: 2D face raster
@@ -116,7 +117,7 @@ export class HUD {
     this._lastShieldRoad = null;
     this.shield.classList.toggle('centered', this.compass.style.display === 'none');
     // UI scale: CSS is rem-based (1rem = 10px at 100%), so one root font-size drives it all
-    this.ui = Math.max(0.9, Math.min(2, parseFloat(localStorage.getItem('lonestar-ui-scale')) || 1));
+    this.ui = Math.max(0.9, Math.min(2, parseFloat(localStorage.getItem(slotKey(KEYS.uiScale))) || 1));
     this.applyUiScale();
     const s = Math.min(innerWidth, innerHeight) - 60;
     this.bigCanvas.width = s; this.bigCanvas.height = s * 0.95;
@@ -315,7 +316,7 @@ export class HUD {
   uiScale(dir) {
     this.ui = Math.round(Math.max(0.9, Math.min(2, this.ui + dir * 0.1)) * 10) / 10;
     this.applyUiScale();
-    localStorage.setItem('lonestar-ui-scale', this.ui);
+    localStorage.setItem(slotKey(KEYS.uiScale), this.ui);
     return Math.round(this.ui * 100) + '%';
   }
 
@@ -323,7 +324,7 @@ export class HUD {
     const off = this.compass.style.display !== 'none';
     this.compass.style.display = off ? 'none' : 'block';
     this.shield.classList.toggle('centered', off);
-    localStorage.setItem('lonestar-compass', off ? 'off' : 'on');
+    localStorage.setItem(slotKey(KEYS.compass), off ? 'off' : 'on');
     return !off;
   }
 

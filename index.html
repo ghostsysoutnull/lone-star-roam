@@ -100,14 +100,16 @@
   #title .tag { opacity: .7; margin: 0 0 1.2rem; font-size: 1.4rem; }
   #title .slots { display: flex; flex-direction: column; gap: .6rem; width: min(38rem, 88vw); }
   #title .slot { display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-    background: #1a2130; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 1rem 1.4rem; }
-  #title .slot.placeholder { opacity: .35; justify-content: center; }
+    min-height: 7.2rem; background: #1a2130; border: 1px solid rgba(255,255,255,.15); border-radius: 8px; padding: 1rem 1.4rem; }
+  #title .slot.active { border-color: rgba(255,211,92,.5); }
   #title .slot span { font-size: 1.3rem; opacity: .85; }
+  #title .slot > span:first-child { flex: 1; }
+  #title .slot-actions { display: flex; gap: .5rem; align-items: center; flex-shrink: 0; }
   #title button { background: #3d5a8a; color: #fff; border: none; border-radius: 8px;
     padding: .8rem 1.6rem; font-size: 1.4rem; cursor: pointer; }
   #title button:hover { background: #4a6da6; }
-  #title #title-newgame { margin-top: .6rem; background: #222a38; }
-  #title #title-newgame:hover { background: #2c3547; }
+  #title .slot-action-sm { padding: .5rem 1rem; font-size: 1.2rem; background: #222a38; }
+  #title .slot-action-sm:hover { background: #2c3547; }
   #help { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); background: rgba(12,16,24,.95);
     color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 12px; padding: 22px 30px; z-index: 11;
     display: none; font-size: 1.4rem; line-height: 1.8; max-height: 86vh; overflow-y: auto; }
@@ -303,15 +305,7 @@
 <div id="title">
   <h1>🤠 LONE STAR <span>ROAM</span></h1>
   <p class="tag">A scaled-down, geographically real Texas.</p>
-  <div class="slots">
-    <div class="slot" id="title-slot-active">
-      <span id="title-summary"></span>
-      <button id="title-continue">Continue</button>
-    </div>
-    <div class="slot placeholder">— reserved —</div>
-    <div class="slot placeholder">— reserved —</div>
-  </div>
-  <button id="title-newgame">New game</button>
+  <div class="slots"></div>
   <div id="intro-card">
     <h2>Welcome to Texas 🤠</h2>
     <p>This is the whole state at 1:100 — every real highway, 132 real cities,

@@ -97,7 +97,17 @@ already shipped as `54b3511` — these are the remaining items)
 
 ## Next in line (in order)
 
-1. **Haunted Texas wave 2 — the apparitions** (planned & approved 2026-07-11;
+1. **Slot export/import** (deferred from New Player W4, 2026-07-17): back up
+   a save slot to a file and restore it from one, on the title screen —
+   insurance against browser-data loss (`NEWPLAYER_SPEC.md` W4's own
+   pre-authorized drop-to-backlog candidate). W4 shipped 3 named slots +
+   per-slot settings without it; storage scheme is `src/slots.js`
+   (`KEYS`/`slotKey`/`SLOT_COUNT`) — export should serialize a slot's save
+   key plus its 4 settings keys as one JSON file; import writes them back
+   under the target slot's keys and (if it's the active slot) goes through
+   `gameplay.loadSlot`/`title._afterLoad` so the live game reflects it
+   immediately, not just storage.
+2. **Haunted Texas wave 2 — the apparitions** (planned & approved 2026-07-11;
    follow wave-1 patterns in haunts.js, +4 legends → 6):
    - **Ghost Stampede at Stampede Mesa** (~33.55 N, −101.17 W caprock rim near
      Crosbyton — the legend behind "Ghost Riders in the Sky"). Gate on
@@ -117,12 +127,12 @@ already shipped as `54b3511` — these are the remaining items)
      every confirmed one was a coyote with mange. So far.
    - Verify: parallel-heading + distance-band over time (El Muerto), rim
      displacement (stampede), vanish-on-approach opacity curves, horn-flee.
-2. **Gamepad analog steering** (~1 hour, biggest driving-feel win) — Gamepad
+3. **Gamepad analog steering** (~1 hour, biggest driving-feel win) — Gamepad
    API axes/buttons alongside keyboard; poll in `Player.update`;
    `t.stubGamepad` is already in the harness waiting.
-3. **Big-map click-to-set-waypoint** — generalize the mission target pipeline
+4. **Big-map click-to-set-waypoint** — generalize the mission target pipeline
    (map diamond + compass diamond + guide arrow) to a map click.
-4. **`nearestBandRoad`'s grid indexes each segment by its midpoint cell only**
+5. **`nearestBandRoad`'s grid indexes each segment by its midpoint cell only**
    (found during Band Parity W2, 2026-07-16): a query point near one END of a
    long unsplit band-highway segment (US 270 west of the OK panhandle border
    measured 488u in one piece) can land several cells from that midpoint and

@@ -4,8 +4,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 132 city stars, 14 landmarks, 300 roses, 12 NPCs, persistent progress.
 
 No active priority track (aviation shipped in full 2026-07-12; Brands,
-Jetpack, Agriculture, and the Shoulder & the Shelf followed and are folded
-in below). Queued work lives in `BACKLOG.md`.
+Jetpack, Agriculture, the Shoulder & the Shelf, Band Parity, and New Player
+Experience followed and are folded in below). Queued work lives in
+`BACKLOG.md`.
 
 - [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
   tools/test.mjs` runs four sub-second Node-only groups (`aviation`, `data`,
@@ -588,6 +589,37 @@ in below). Queued work lives in `BACKLOG.md`.
   landable fields is backlogged. The 132 cities/254 counties/rose indices
   never changed length throughout; band data stayed in its own
   `GEO.band*`/`save.passport` arrays and keys, by law.
+
+- [x] ~~New Player Experience~~ — done 2026-07-17 (4 waves,
+  `NEWPLAYER_SPEC.md` kept as history): the first ten minutes are now
+  self-explanatory and the game restarts like a real save. **W1 — boot
+  plumbing**: a title screen every boot (Continue/New game), resume-in-place
+  (`save.at` — position/heading/mode/altitude/clock), Save & quit to title;
+  the harness-bypass rule (logic always built, presentation URL/flag-gated)
+  proven here and reused by every later wave. **W2 — first-run experience**:
+  one-time skippable concept card, staged tutorial toasts, a curated San
+  Antonio–approach start for new games, and a title-screen attract drift
+  with a rotating fact drawn from the existing landmark/critter/census
+  pools. **W3 — hints, help, Guide, Settings**: one-time first-encounter
+  hints (NPC/city/dusk/airport/band crossing), the help panel sectioned by
+  topic, a Guide that replays the card + every tip/hint anytime, and a
+  visible Settings panel (sound/text size/compass/guide arrow/brand size) on
+  pause and title — storage-agnostic, driving the same functions the
+  keybinds already called. **W4 — named save slots**: 3 slots on the title
+  screen (name/summary/rename/delete), save + the four comfort settings
+  keys go per-slot (`src/slots.js` — `KEYS`/`slotKey(base, slot)`, only
+  `lonestar-slot` stays global), legacy single-save data migrates to slot 1
+  once. Slot switching is live in place, never a page reload (the verify
+  harness can't survive one — its context wipes localStorage on every
+  navigation): `gameplay.loadSlot()` reloads `save` and rebuilds the
+  mesh-backed visuals (city/band-city stars, roses, landmarks — they bake
+  visited/collected state at construction and only ever *remove* during
+  play), then `title._afterLoad()` re-applies the 4 settings, shop
+  perks/paint/dog ownership, and the mid-haul cargo mesh through their real
+  functions. Found and fixed along the way: `missions.js` cached a stale
+  `save` reference (now a live getter) and `shop.js`'s `applyGear` wasn't
+  re-run on a switch — both would have leaked one slot's state into
+  another. Export/import backlogged (`BACKLOG.md`).
 
 ## Known limitations (v1)
 
