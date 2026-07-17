@@ -20,6 +20,7 @@ wall-of-keys help panel, and every session restarts from scratch.
 *Expected result: boot lands on a title screen, not in the game. New game:
 intro card (skippable), curated start, staged tips. Continue: restores
 position, mode, and clock. Session close loses nothing.*
+*Suggested setup: Fable 5, effort high.*
 
 **Wave 2 — the player gets:**
 - one-time hints the first time something is encountered (an NPC, a city,
@@ -32,6 +33,7 @@ position, mode, and clock. Session close loses nothing.*
 *Expected result: every feature announces itself on first encounter, once per
 save. All taught content stays readable in the Guide. All five settings
 visible and labeled; no unlabeled keybinds left.*
+*Suggested setup: Fable 5, effort high.*
 
 **Wave 3 — the player gets:**
 - three save slots with names, progress summaries, rename and delete
@@ -42,6 +44,7 @@ visible and labeled; no unlabeled keybinds left.*
 *Expected result: three named, isolated slots — saves and settings both
 per-slot; writing to one never touches another. Legacy save migrates to
 slot 1. Any slot exports to a file and restores from one.*
+*Suggested setup: Sonnet 5, effort high.*
 
 ## Decisions (Bruno, 2026-07-17)
 
