@@ -13,8 +13,9 @@
 - **Recommended setup**: model **Fable 5**, effort **high** — content/register
   wave (hint copy, help/Guide restructure). Flag it if the running model
   differs.
-- **Budget**: code + checks in `tools/checks/onboarding.mjs`, no shots,
-  grep-first.
+- **Budget**: code + checks in `tools/checks/onboarding.mjs`, grep-first;
+  shots per the 2026-07-17 policy — one Copilot-analyzed shot per new visible
+  surface (Settings panel, Guide, sectioned help), judged before commit.
 - **Then**: rewrite this block for W4 (named save slots + per-slot settings —
   Sonnet 5 high). W4 is the last wave: its session end deletes this block,
   folds the track into `ROADMAP.md`, graduates surviving gotchas into

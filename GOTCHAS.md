@@ -184,4 +184,7 @@ graduate here (and out of `NEXT_SESSION.md`).
   input is `--attachment`, not `@path`; output reports no model line — wrong
   slugs fail loudly, so trust the flag. Copilot reports what it sees; spec and
   register comparisons are Claude's, and final aesthetic judgment is Bruno's
-  (shots still go to his eye — Copilot is the pre-check gate).
+  (shots still go to his eye — Copilot is the pre-check gate). Budget
+  (2026-07-17): one shot per new or changed visible surface by default,
+  judged before commit; logic/data/physics work stays shot-free; never the
+  pass/fail signal.
