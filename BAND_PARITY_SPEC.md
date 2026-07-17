@@ -83,3 +83,54 @@ wash hides it — W3 fixes the paint, not the data).
 
 Dependencies: W1 first (every later wave reads the road set). W3 is
 independent (any time). W4 blocks W5's herds. W2/W6 read W1's endpoints.
+
+## Tier-expansion playbook (learned the hard way, W1's two secondary-tier
+top-ups, 2026-07-16 — read this BEFORE fetching a deeper tier for any state)
+
+Going from primary to secondary tier (or secondary to tertiary, if that's
+ever asked) hits the same handful of traps every time. All were rediscovered
+live, at real cost — one cost an 18-minute rebake and 3 killed background
+runs before it was profiled instead of guessed at.
+
+- **Dedupe by OSM way id across all input files, keep the first file's
+  copy.** The 4 state bboxes overlap on purpose (no seam gaps at the state
+  lines), so a wider highway regex pulls the same way into two files near
+  every shared edge — unfixed, it bakes as two near-identical polylines
+  drawn on top of each other (denser/rougher exactly at the overlap).
+- **A road that touches the border isn't necessarily a crossing.** Any
+  wider tier pulls in roads that run roughly PARALLEL to a dead-straight
+  survey-line border for real distance (an FM/county road tracking the NM
+  103°W line, sometimes for 100+ units) without ever crossing it. Neither a
+  short-stub-length cutoff nor "chain isn't 100% inside Texas" catches this
+  reliably by itself — the only test that held: **distance-to-border must
+  grow substantially (≥8u) over ~30u of outward travel** from the endpoint.
+  Real crossings (I-10, I-30, LA 1, US 62, ...) measured 9-30u of growth;
+  every parallel-runner measured under 5u, most under 0.5u.
+- **El Paso/Juárez is a known-hard spot — border.json's raw
+  point-in-polygon test misreads points essentially ON the line there** (a
+  Ciudad Juárez street tested "inside Texas" at 17cm from the border).
+  `border-zones.json` has the fix already (per-border-vertex 'land'/
+  'coast'/'mexico' labels, same data `geo.js`'s `classify()` uses) — mirror
+  that, not a bare `inTx()`/distance check, for any point this close to the
+  line. **Check `inNeighborState` (or the neighbor-states ring equivalent)
+  FIRST**, same as `geo.js`'s `classify()` does: the nearest border SEGMENT
+  to a point deep in New Mexico (Las Cruces, Mesilla) is the Rio Grande —
+  skip that first check and you'll misclassify real US towns as Mexico.
+- **Never run an expensive per-point check unconditionally in the bake
+  loop.** The clip loop runs over every raw OSM point before simplification
+  — hundreds of thousands of them for a state-wide secondary-tier fetch.
+  Anything that scans the border polygon (1,517 vertices) or the county
+  list (249 rings) must be the LAST term in a `&&` chain, after the cheap
+  distance test already rejected most points, and must not be called twice
+  redundantly (a Mexico check that re-ran `inNeighborState` after the outer
+  clip condition had already confirmed it turned an 8-minute bake into an
+  18-minute one).
+- **Texas has no rendered "secondary" tier** — fold OSM `secondary` (or
+  whatever deeper tier) into `type: 'primary'` at load rather than inventing
+  a new ribbon tier `world.js` doesn't draw.
+- **Every rebake needs the same 3 numbers re-measured and re-asserted**:
+  the coverage floor and cross-bbox-duplicate check in `tools/checks/
+  band.mjs`, the crossing-monument count range in `tools/checks/
+  shoulder.mjs`, and the band-highway polyline count in `tools/unit/
+  data.test.mjs`. All three WILL fail after a real rebake — that's the
+  check catching real geometry drift, not a false alarm to silence.
