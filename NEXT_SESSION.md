@@ -2,9 +2,11 @@
 
 ## Session briefing
 - **This session**: New Player Experience (`NEWPLAYER_SPEC.md`), wave 1 of 3 —
-  boot/title screen (Continue / New game) + first-run concept card + staged
-  tutorial toasts + resume at last position/mode/clock (`save.seen`,
-  `save.at` added). Spec written 2026-07-17.
+  boot/title screen (Continue / New game, live-world attract drift, rotating
+  Texas fact) + first-run concept card with skip + staged tutorial toasts +
+  curated new-game start + resume at last position/mode/clock + save & quit
+  to title (`save.seen`, `save.at` added). Spec finalized 2026-07-17,
+  17 features across 3 waves.
 - **Recommended setup**: model **Fable 5**, effort **high** — content/copy +
   UI wave. Flag it if the running model differs.
 - **Budget**: code + checks (new `tools/checks/onboarding.mjs`), one staged

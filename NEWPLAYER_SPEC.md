@@ -6,14 +6,16 @@
   like a real save — today a new player gets one vanishing toast and a hidden
   wall-of-keys help panel, and every session restarts from scratch at the
   default spawn.
-- **Features (12 total)**: title screen every boot · first-run concept card ·
-  staged tutorial toasts · skip intro & tips (experienced players, per slot) ·
-  resume at last position/mode/time · save & quit to title from pause ·
-  one-time contextual hints · sectioned help panel · in-menu Guide (re-view
-  the intro card and every tip anytime) · three save slots · slot naming +
-  delete · per-slot settings.
-- **Plan**: 3 waves — W1 boot screen + intro + resume; W2 hints + help + Guide;
-  W3 named slots + per-slot settings.
+- **Features (17 total)**: title screen every boot · live world backdrop
+  behind it (attract drift) · rotating Texas facts on it · first-run concept
+  card · staged tutorial toasts · skip intro & tips (experienced players, per
+  slot) · curated new-game starting spot · resume at last position/mode/time ·
+  save & quit to title from pause · one-time contextual hints · sectioned
+  help panel · in-menu Guide (re-view the intro card and every tip anytime) ·
+  Settings panel (pause + title) · three save slots · slot naming + delete ·
+  per-slot settings · save export/import.
+- **Plan**: 3 waves — W1 boot screen + intro + resume; W2 hints + help +
+  Guide + Settings panel; W3 named slots + per-slot settings + export/import.
 
 ## Decisions (Bruno, 2026-07-17)
 
@@ -42,6 +44,21 @@
   rename, delete, new game, Continue). Never loses anything — same state a
   browser close preserves. Ships in W1 with the title screen; its full
   purpose (slot switching) arrives with W3.
+- **Title presentation**: the title screen sits over a slow aerial drift of
+  the live world (attract mode — the game sells itself before a key is
+  pressed) and rotates one "Did you know" line drawn from the existing fact
+  pools (landmarks, critters, agriculture). No new fact writing.
+- **New-game start**: a fresh slot starts at a curated iconic, dense spot
+  (candidate: San Antonio approach, Alamo minutes away) so the first city,
+  first landmark, and first collectible happen naturally inside the
+  tutorial's first minutes. Exact spot chosen in W1.
+- **Settings panel**: the five hidden keybind settings (mute, UI text size,
+  compass, guide arrow, brand-building size) become a visible labeled
+  Settings section on the pause and title screens. Panel ships in W2
+  (storage-agnostic); W3 slots the storage underneath it.
+- **Export/import**: back up a slot to a file / restore from file, on the
+  title screen — insurance against browser-data loss. First candidate to
+  push to BACKLOG.md if W3 runs long.
 - Returning players (non-empty slot) never see the intro card or tutorial
   toasts; hints fire once per slot.
 
@@ -68,7 +85,8 @@
 
 ### W1 — Boot screen, first-run intro, resume (Fable 5, high)
 Features: title screen every boot (name, Continue with progress summary /
-New game); first boot shows the concept card — 1:100 real Texas, V cycles
+New game) over the live-world attract drift, rotating a Texas fact; curated
+new-game starting spot; first boot shows the concept card — 1:100 real Texas, V cycles
 Drive/Fly/Walk, what to collect, "H for help anytime" — with Start /
 **Skip intro & tips** actions — then 3–4 staged tutorial toasts in play (try
 V; first city visit; first collectible; press P), skippable mid-stream.
@@ -86,7 +104,9 @@ Features: one-time first-encounter hints via `save.seen` — first NPC in range
 hint), first band crossing (passport). Reuse the existing `interactHint`/toast
 surfaces — no new DOM system. Help panel sectioned (Driving / Flying / Menus /
 Goals). **Guide**: a help-panel section that replays the concept card and
-lists every tutorial toast + hint in one browsable place.
+lists every tutorial toast + hint in one browsable place. **Settings panel**
+on pause + title: the five hidden toggles, visible and labeled
+(storage-agnostic — W3 slots the keys underneath).
 Budget: code + checks in onboarding suite, no shots, grep-first.
 
 ### W3 — Named save slots + per-slot settings (Sonnet 5, high)
@@ -95,7 +115,9 @@ Features: 3 slots on the boot screen, each row showing name + summary
 (confirm) on the row. Storage: save + the four settings keys become per-slot;
 `lonestar-slot` is the only global key; legacy keys migrate to slot 1 once.
 shop/missions already read the save object, so the blast radius is gameplay.js
-+ hud.js/brands.js settings reads + main.js boot order.
++ hud.js/brands.js settings reads + main.js boot order. **Export/import**:
+slot → file / file → slot on the title screen (backlog candidate if the wave
+runs long).
 Budget: code + checks (slot isolation: write in slot 2, assert slot 1
 untouched; settings isolation; migration check), no shots, grep-first.
 
