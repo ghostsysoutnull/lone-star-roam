@@ -49,8 +49,13 @@ Gotchas carried over: <only what the next wave must know>
 ## Commands
 
 ```bash
-# Run (ES modules require http, not file://)
-python3 -m http.server 8317    # then open http://localhost:8317
+# Run (ES modules require http, not file://). Start it fully detached so it
+# survives the Claude Code session closing (plain background/nohup still gets
+# reaped): setsid nohup <cmd> & disown, not `run_in_background` alone. Verify
+# with `ps -o pid,ppid,sid,tty,stat,cmd -p <pid>` — real detach shows its own
+# SID, no controlling TTY.
+setsid nohup python3 -m http.server 8317 > /tmp/lonestar-http-8317.log 2>&1 < /dev/null &
+disown                          # then open http://localhost:8317
 
 # Session status in one call: git sync + dirty tree + recent commits +
 # NEXT_SESSION.md freshness + syntax plus all fast Node checks. Run at session
