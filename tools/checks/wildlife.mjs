@@ -135,4 +135,51 @@ export default async function wildlife(t) {
 
     await t.ev(`g.animals.onSound = window.__origOnSound`);
   });
+
+  // --- Band Parity W5: wildlife extended to the band (LA/AR/OK/NM) ---
+
+  await t.check('band region tables: one species flavor per neighbor state', async () => {
+    const nm = await t.ev(`g.animals.regionTable(-3486, -1923.7).map((r) => r[0])`); // Hobbs, NM — desert
+    const ok = await t.ev(`g.animals.regionTable(2281.3, -3591.2).map((r) => r[0])`); // Ardmore, OK — plains
+    const ar = await t.ev(`g.animals.regionTable(5262.8, -2719.2).map((r) => r[0])`); // Texarkana, AR — pine
+    const la = await t.ev(`g.animals.regionTable(5747.5, -629.7).map((r) => r[0])`); // Many, LA — swamp
+    t.ok(nm.includes('roadrunner') && nm.includes('javelina'), `NM desert band missing expected species: ${nm}`);
+    t.ok(ok.includes('coyote') && ok.includes('jackrabbit'), `OK plains band missing expected species: ${ok}`);
+    t.ok(ar.includes('turkey') && ar.includes('blackbear'), `AR pine band missing expected species: ${ar}`);
+    t.ok(la.includes('gator'), `LA swamp band missing expected species: ${la}`);
+  });
+
+  // same frozen Tillman County, OK farmstead ag.mjs freezes (BAND_FARM)
+  const BAND_FARM = { x: 772.7489797285957, z: -3732.7234383456844 };
+
+  await t.check('band farmstead: census herd spawns near Tillman County, OK (no crash)', async () => {
+    await t.tp(BAND_FARM.x + 20, BAND_FARM.z + 20);
+    await t.wait(0.6); // chunks spawn on the next update
+    const n = await t.ev(`(() => {
+      let n = 0;
+      for (const { animals } of g.animals.live.values())
+        for (const a of animals)
+          if (['longhorn', 'horse', 'goat', 'sheep'].includes(a.species) &&
+              Math.hypot(a.homeX - ${BAND_FARM.x}, a.homeZ - ${BAND_FARM.z}) < 40) n++;
+      return n;
+    })()`);
+    t.ok(n > 0, 'no farmstead herd found near the band farmstead (Tillman County, OK)');
+  });
+
+  await t.check('band-land animal wanders freely without bouncing back to Texas (widened clamp)', async () => {
+    const nm = { x: -3486, z: -1923.7 }; // NM desert band (Hobbs — on NM 18, so walk off the road first)
+    const res = await t.ev(`(() => {
+      let x = ${nm.x}, z = ${nm.z};
+      for (let i = 0; i < 40 && g.nearestAnyRoad(x, z, 6); i++) { x -= 5; z += 5; }
+      const a = g.animals.forceSpawn('coyote', x, z);
+      a.heading = Math.PI / 2; // face west — deeper into NM, away from Texas
+      const start = { x: a.g.position.x, z: a.g.position.z };
+      for (let i = 0; i < 40; i++) g.animals.move(a, 12, 0.05);
+      return { start, end: { x: a.g.position.x, z: a.g.position.z } };
+    })()`);
+    const moved = Math.hypot(res.end.x - res.start.x, res.end.z - res.start.z);
+    t.ok(moved > 5, `band animal barely moved — clamp still bouncing it back? moved ${moved.toFixed(2)}`);
+    const stillBand = await t.ev(`g.inTexasOrBand(${res.end.x}, ${res.end.z}) && !g.inTexas(${res.end.x}, ${res.end.z})`);
+    t.ok(stillBand, `animal left the band without crossing into Texas: ${JSON.stringify(res.end)}`);
+  });
 }

@@ -3,8 +3,10 @@
 // (rabbits zigzag, roadrunners sprint down the highway), coyotes come out at
 // night and howl. First close encounter with each species goes into the
 // critter log with a fact. Region boxes mirror world.js scenery — keep in sync.
+// Band land (LA/AR/OK/NM) gets its own flavor per neighbor state instead —
+// see regionTable's band branch.
 import * as THREE from 'three';
-import { seededRand, inTexas, nearestRoad, hAt, waterAt, agAt } from './geo.js';
+import { seededRand, inTexas, inTexasOrBand, nearestRoad, nearestAnyRoad, neighborStateAt, hAt, waterAt, agAt, bandAgAt } from './geo.js';
 import { farmsteadAt, feedlotAt, ranchHQAt } from './world.js';
 import { ATMOS } from './sky.js';
 
@@ -79,6 +81,14 @@ export const SPECIES_COUNT = Object.keys(SPECIES).length;
 // regional spawn tables: [species, herd min, herd max, groups per chunk, keep odds]
 // boxes mirror world.js (plains/Hill Country) — keep the two files consistent
 function regionTable(x, z) {
+  if (!inTexas(x, z)) { // band land: one flavor per neighbor state, the same four the W3 ground tints paint
+    const ns = neighborStateAt(x, z);
+    if (ns === 'LA') return [['gator', 1, 2, 1, 0.35], ['deer', 2, 4, 1, 0.5], ['hog', 2, 4, 1, 0.5], ['armadillo', 1, 2, 1, 0.45]];
+    if (ns === 'AR') return [['deer', 2, 4, 1, 0.55], ['hog', 2, 4, 1, 0.5], ['turkey', 2, 5, 1, 0.4], ['blackbear', 1, 1, 1, 0.1]];
+    if (ns === 'OK') return [['deer', 2, 4, 1, 0.5], ['coyote', 1, 2, 1, 0.5], ['armadillo', 1, 2, 1, 0.45], ['jackrabbit', 1, 2, 1, 0.5]];
+    if (ns === 'NM') return [['jackrabbit', 1, 2, 1, 0.55], ['roadrunner', 1, 1, 1, 0.5], ['coyote', 1, 2, 1, 0.5], ['vulture', 2, 4, 1, 0.5], ['javelina', 1, 3, 1, 0.35]];
+    return []; // outside all four rings — shouldn't be reached once callers gate on inTexasOrBand
+  }
   if (x > 1800 && x + z > 5200) // Gulf coast & RGV marsh
     return [['pelican', 2, 5, 1, 0.5], ['gator', 1, 2, 1, 0.3], ['longhorn', 3, 6, 1, 0.5], ['armadillo', 1, 2, 1, 0.5]];
   if (z < -2300 && x > -3300 && x < 1600) // High Plains / Panhandle
@@ -213,7 +223,7 @@ export class AnimalSystem {
     a.zigT = 0;
     // roadrunner: make for the road and sprint along it, away from the threat
     if (SPECIES[a.species].roadSprint) {
-      const r = nearestRoad(a.g.position.x, a.g.position.z, 20);
+      const r = nearestAnyRoad(a.g.position.x, a.g.position.z, 20);
       if (r) {
         if (r.dist > 2) {
           a.heading = Math.atan2(-(r.x - a.g.position.x), -(r.z - a.g.position.z)); // dash to the shoulder
@@ -274,7 +284,7 @@ export class AnimalSystem {
         a.zigT -= dt;
         if (a.zigT <= 0) { a.zigT = 0.3 + Math.random() * 0.25; a.heading += (Math.random() - 0.5) * 1.4; }
       }
-      const onRoad = spec.roadSprint && nearestRoad(a.g.position.x, a.g.position.z, 3);
+      const onRoad = spec.roadSprint && nearestAnyRoad(a.g.position.x, a.g.position.z, 3);
       this.move(a, spec.speed * (onRoad ? 1.3 : 1), dt);
     } else {
       // idle/wander: occasionally pick a new direction and amble
@@ -313,12 +323,12 @@ export class AnimalSystem {
   move(a, speed, dt) {
     const nx = a.g.position.x - Math.sin(a.heading) * speed * dt;
     const nz = a.g.position.z - Math.cos(a.heading) * speed * dt;
-    // stay in Texas, off roads, and near home (leash)
-    if (!inTexas(nx, nz)) { a.heading += Math.PI; return; }
+    // stay in Texas or the band, off roads, and near home (leash)
+    if (!inTexasOrBand(nx, nz)) { a.heading += Math.PI; return; }
     const spec = SPECIES[a.species];
     if (Math.hypot(nx - a.homeX, nz - a.homeZ) > (spec.leash ?? 45)) { a.heading += Math.PI / 2; return; } // feedlot cattle stay penned
     if (!spec.roadSprint) { // roadrunners own the road
-      const road = nearestRoad(nx, nz, 3);
+      const road = nearestAnyRoad(nx, nz, 3);
       if (road && a.state !== 'flee') { a.heading += Math.PI / 2; return; } // fleeing animals may cross roads
     }
     a.g.position.x = nx;
@@ -344,8 +354,8 @@ export class AnimalSystem {
             if (waterAt(wx + 1.8, wz)) { hx = wx; hz = wz; break; }
           }
         }
-        if (!inTexas(hx, hz)) continue;
-        if (nearestRoad(hx, hz, 6)) continue; // herds keep off the highway
+        if (!inTexasOrBand(hx, hz)) continue;
+        if (nearestAnyRoad(hx, hz, 6)) continue; // herds keep off the highway
         const n = lo + ((rand() * (hi - lo + 1)) | 0);
         for (let i = 0; i < n; i++) {
           const { g, legs } = mkAnimal(species, rand);
@@ -379,14 +389,14 @@ export class AnimalSystem {
       }
     };
 
-    // Band Parity W4 made farmsteadAt band-capable (buildings only); census
-    // herds at band farmsteads are W5's job (own species tables, wander/flee
-    // clamp) — stay Texas-only here so a band farmstead doesn't crash on a
-    // TX-only agAt read.
+    // Band Parity W4 made farmsteadAt band-capable (buildings only); W5 wires
+    // the census herd to band farmsteads too — same agAt||bandAgAt fallback
+    // farmsteadAt/feedlotAt already use (world.js), so a band site's county
+    // inventory drives the mix instead of crashing on a TX-only agAt read.
     const farm = farmsteadAt(cx, cz);
-    if (farm && inTexas(farm.x, farm.z)) {
+    if (farm) {
       const fr = seededRand('farmherd' + key);
-      const ag = agAt(farm.x, farm.z);
+      const ag = agAt(farm.x, farm.z) || bandAgAt(farm.x, farm.z);
       // main herd species rolled from the county's own inventory mix; horse
       // counts are working-animal counts (tiny next to cattle inventories),
       // so they're weighted up to read as the horse country they are
@@ -398,14 +408,14 @@ export class AnimalSystem {
       for (let tries = 0; tries < 4; tries++) { // pasture off the buildings, off the road
         const ang = fr() * Math.PI * 2, d = 12 + fr() * 6;
         const hx = farm.x + Math.cos(ang) * d, hz = farm.z + Math.sin(ang) * d;
-        if (!inTexas(hx, hz) || nearestRoad(hx, hz, 6)) continue;
+        if (!inTexasOrBand(hx, hz) || nearestAnyRoad(hx, hz, 6)) continue;
         home(fr, species, hx, hz, size);
         break;
       }
       // and a horse or two by the corral — farms read as horse places
       const cr = Math.cos(farm.rot), sr = Math.sin(farm.rot);
       const px = farm.x - 3.6 * cr + 10.5 * sr, pz = farm.z + 3.6 * sr + 10.5 * cr;
-      if (inTexas(px, pz) && !nearestRoad(px, pz, 6)) home(fr, 'horse', px, pz, 1 + ((fr() * 2) | 0), 3);
+      if (inTexasOrBand(px, pz) && !nearestAnyRoad(px, pz, 6)) home(fr, 'horse', px, pz, 1 + ((fr() * 2) | 0), 3);
     }
 
     const lot = feedlotAt(cx, cz);

@@ -1,45 +1,37 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Band Parity, wave 5 of 6 — wildlife. Band region boxes
-  in the animals/world tables (swamp / pine / plains / desert), species
-  rows, census herds homed at band farmsteads, wander/flee clamp widened
-  from `inTexas` to the band land test (`inTexasOrBand`, Mexico stays out).
-  W4 (crops and ranches) shipped 2026-07-17.
+- **This session**: Band Parity, wave 6 of 6 — band fields + track close.
+  2–4 real band airports (OSM runway geometry, true-north headings,
+  tier-3 kit), traffic + charter reach, `airportClear` coverage for band
+  placement. Then the close: fold the whole track into one `ROADMAP.md`
+  entry, graduate surviving gotchas into `GOTCHAS.md`, sweep
+  `BACKLOG.md`/satellite docs, delete this briefing block. W5 (wildlife)
+  shipped 2026-07-17.
 - **Recommended setup**: model **Sonnet 5**, effort **high** — per the
   spec's per-wave recommendation. Flag it if the running model differs.
-- **Budget**: code + checks; grep-first; ≤2 full verify runs; screenshots
-  only via the Copilot workflow (GOTCHAS.md → Verification — stage with
-  `tools/stage-shot.mjs`, never load images).
-- **Then**: rewrite this block for W6 (band fields + track close — 2–4 real
-  band airports, traffic + charter reach, `airportClear` coverage; W6 also
-  folds the whole track into one `ROADMAP.md` entry, graduates surviving
-  gotchas, sweeps `BACKLOG.md`/satellite docs, and deletes this block).
+- **Budget**: code + checks + track close; grep-first; ≤2 full verify runs;
+  screenshots only via the Copilot workflow (GOTCHAS.md → Verification —
+  stage with `tools/stage-shot.mjs`, never load images).
+- **Then**: this is the last wave — no further rewrite. Delete this
+  briefing block entirely once the close is done; the greeting disappears
+  with it until the next spec writes a new one.
 
 Gotchas carried over:
 - `BAND_PARITY_SPEC.md` is the track spec — open calls already resolved
-  (tiers, tally, airports, rails deferred); don't relitigate them.
-- **W4 shipped the amended "law of Texas"** (GOTCHAS.md → "The law of
-  Texas"): crop decals/pivots/`farmsteadAt`/`feedlotAt`/`chapelAt`+
-  cemeteries/flora are `inTexasOrBand`-gated; `GEO.bandAg` (own bake,
-  `tools/build-band-ag.mjs`, 249 counties) never merges into `GEO.ag`/the
-  254 tally; `nearestAnyRoad`/`cityClear` (geo.js/cities.js) are the
-  band-aware road/city standoff helpers — reuse them, don't re-derive.
-  `feedlotAt` is band-capable but real census data never crosses its
-  30 head/km² gate in the band (OK Texas County tops out ~23.6) — expect
-  it to stay dormant there unless W5's herd work changes that read.
-- **`animals.js` line ~382 deliberately guards `farmsteadAt` herds on
-  `inTexas`** (not `inTexasOrBand`) — added in W4 specifically to punt
-  band herds to this wave (calling the TX-only `agAt` on a band farmstead
-  crashed on a null `.cattle` read). W5 removes that guard and gives band
-  farmsteads their own `bandAgAt`-driven species mix instead of just
-  widening the gate blindly.
-- Region-box refactor (`inPermian`/`inPlains`/etc. in world.js, similar
-  boxes in animals.js) was explicitly out of scope through W4 — the raw
-  coordinate boxes already degrade sensibly onto adjacent band land (LA/AR
-  band falls into the piney-woods bucket, NM into desert, OK mostly into
-  plains) without edits, but W5 is where a real per-neighbor-state
-  swamp/pine/plains/desert table is due.
+  (2–4 real fields, Roswell/Lawton/Texarkana/Lake Charles class, rails
+  deferred); don't relitigate them.
+- **W5 shipped**: `animals.js` region tables now flavor band land by
+  `neighborStateAt` (LA swamp / AR pine / OK plains / NM desert — mirrors
+  W3's ground tints), census herds spawn at band farmsteads via the same
+  `agAt || bandAgAt` fallback world.js's `farmsteadAt`/`feedlotAt` already
+  use, and the wander/flee clamp + road-avoidance are `inTexasOrBand`/
+  `nearestAnyRoad` throughout. `ranchHQAt`'s compound-herd gate stays
+  `inTexas`-only on purpose (named real Texas ranches) — don't widen it
+  for W6 either.
+- `feedlotAt` is band-capable but real census data never crosses its
+  30 head/km² gate in the band (OK Texas County tops out ~23.6) — still
+  dormant there, unrelated to this wave.
 - Any further band-road rebake shifts geometry: re-verify the shoulder
   suite (crossing monuments + control signs both read band endpoints) +
   `band.mjs` guards + `traffic.mjs`'s band-road check.

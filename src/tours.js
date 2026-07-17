@@ -41,6 +41,13 @@ export const TOURS = [
         S('🌱 Cotton County field, OK', [520, -3850], { mode: 'DRIVE', heading: 0, note: 'real dominant crop is cotton — the county is literally named for it' }),
         S('⛪ Cotton County chapel + cemetery, OK', [1071.7, -3801.1], { mode: 'DRIVE', heading: -Math.PI / 2, note: 'first band chapel — same site haunts.js can wisp at night' }),
       ] },
+      { wave: 'W5 — wildlife', spots: [
+        S('🐄 Tillman County herd, OK', [772.7, -3732.7], { mode: 'DRIVE', heading: Math.PI, note: 'census-driven cattle/horse/goat/sheep mix, same farmstead as W4 — deterministic, no forcing needed' }),
+        S('🐊 LA swamp wildlife over Many', [5747.5, -629.7], { mode: 'DRIVE', act: 'bandWild', note: 'forces a gator — natural swamp draws are odds-gated' }),
+        S('🌲 AR pine wildlife over Texarkana', [5262.8, -2719.2], { mode: 'DRIVE', act: 'bandWild', note: 'forces a black bear — natural pine draws are odds-gated' }),
+        S('🟥 OK plains wildlife over Ardmore', [2281.3, -3591.2], { mode: 'DRIVE', act: 'bandWild', note: 'forces a coyote — natural plains draws are odds-gated' }),
+        S('🏜️ NM desert wildlife over Hobbs', [-3486, -1923.7], { mode: 'DRIVE', act: 'bandWild', note: 'forces a roadrunner — natural desert draws are odds-gated' }),
+      ] },
     ],
   },
   {

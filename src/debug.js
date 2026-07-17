@@ -4,7 +4,7 @@
 // exist when the URL asks for them.
 import { chapelSitesNear } from './world.js';
 import { EROCK } from './haunts.js';
-import { hAt } from './geo.js';
+import { hAt, neighborStateAt } from './geo.js';
 import { releaseOn } from './turtles.js';
 import { TOURS } from './tours.js';
 
@@ -98,6 +98,14 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       // 12%-per-chunk rarity is untouched
       animals.forceSpawn('blackbear', player.pos.x + 30, player.pos.z);
       hud.toast('🐻 A bear in the pines — he spooks inside 26 units');
+    },
+    bandWild() {
+      // one action, four Tours spots — the species follows whichever
+      // neighbor state the player is actually standing in
+      const ns = neighborStateAt(player.pos.x, player.pos.z);
+      const species = { LA: 'gator', AR: 'blackbear', OK: 'coyote', NM: 'roadrunner' }[ns] ?? 'deer';
+      animals.forceSpawn(species, player.pos.x + 20, player.pos.z);
+      hud.toast(`🐾 Band wildlife forced — ${species} (${ns ?? 'TX'})`);
     },
     testRadio() {
       const tw = radio.nearestTowered(player.pos.x, player.pos.z);
