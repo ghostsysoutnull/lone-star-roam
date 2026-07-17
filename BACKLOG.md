@@ -1,9 +1,8 @@
 # Backlog — queued work
 
-Queued behind whatever track is active (currently **Band Parity**, opened
-2026-07-16 — `BAND_PARITY_SPEC.md`, 6 waves); when a track ends, pull the
-next item from here into `NEXT_SESSION.md`. Direction-level ideas that aren't actionable yet
-live in `FUTURE.md`.
+No active track (Band Parity closed 2026-07-17 — `BAND_PARITY_SPEC.md` kept
+as history); pull the next item from here into `NEXT_SESSION.md`.
+Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
 
@@ -81,7 +80,16 @@ already shipped as `54b3511` — these are the remaining items)
   width/color/texture upgrade candidates; no direction settled yet.
 - **Band railroads** (deferred from Band Parity, 2026-07-16): OSM rail fetch
   for the 4 neighbor strips + trains.js extension — own bake, build-rails
-  idiom. Queued behind the track's close.
+  idiom.
+- **Band airports beyond the 25-mile line** (deferred from Band Parity W6,
+  2026-07-17): Roswell/Lawton/Lake Charles (and Carlsbad/Alamogordo) are
+  currently glow + radio-wink only — GOTCHAS' exclusion law, `band.mjs`
+  asserts they never appear as real content. Bruno may want one or more as
+  landable fields later. Needs: an explicit call on relaxing that exclusion
+  for the airport point specifically (not the whole town), real OSM
+  `aeroway=runway` fetch per field, ROUTES entries (aviation.js — a missing
+  one crashes boot), and the 27-field/7-15-5-tier/22-gate-sign table-size
+  bumps across `tools/checks/aviation.mjs`.
 - **Poly review of pre-6b props**: W6b shipped the curvier kit (8–14 seg
   turnings); review the Shelf (W5) and Shoulder-east (6a) heroes — rigs,
   buoy, monuments, WinBig, fed building — plus older landmarks for the

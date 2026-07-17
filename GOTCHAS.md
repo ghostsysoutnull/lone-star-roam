@@ -17,7 +17,8 @@ graduate here (and out of `NEXT_SESSION.md`).
   **reconstructed**: they reproduce the trunk tier exactly (23 polylines,
   4133u) but not motorway/primary. Arg order is load-bearing (chaining is
   greedy over file order). Any rebake shifts band geometry — run the shoulder
-  suite, the crossing monuments read band endpoints.
+  suite (the crossing monuments read band endpoints), `band.mjs`'s guards,
+  and `traffic.mjs`'s band-road check.
 - **Simplification tolerances are in DEGREES** — simplify before `proj`, never
   after (`build-data.mjs` is the reference). Reversed, 0.0025 reads as 25 cm
   instead of ~260 m and nothing gets dropped; `band.mjs` guards the ratio now.
@@ -53,6 +54,23 @@ graduate here (and out of `NEXT_SESSION.md`).
   wired (`animals.js` guards `farmsteadAt` herds on `inTexas` on purpose) —
   that's Band Parity W5. Padre being `inTexas` means it legitimately gets
   scenery/animal chunks — do not gate the island out.
+- **Amended (Band Parity W5, 2026-07-17)**: `animals.js` region tables now
+  flavor band land by `neighborStateAt` (LA swamp / AR pine / OK plains / NM
+  desert — mirrors W3's ground tints); census herds spawn at band farmsteads
+  via the same `agAt || bandAgAt` fallback world.js's `farmsteadAt`/
+  `feedlotAt` already use; the wander/flee clamp and road-avoidance are
+  `inTexasOrBand`/`nearestAnyRoad` throughout. `ranchHQAt`'s compound-herd
+  gate stays `inTexas`-only on purpose (named real Texas ranches) — never
+  widen it to the band.
+- **Roswell/Lawton/Lake Charles/Carlsbad/Alamogordo sit just past the
+  25-mile band edge** (measured in `SHOULDER_SHELF_SPEC.md`) — beyond-band
+  glow + radio-wink treatment only (`shoulder.js`), never landable content;
+  `band.mjs` asserts they never leak into `GEO.bandCities`/`bandHighways`.
+  Band Parity W6 nearly re-added them as landable airports because the
+  spec's example class named them — don't repeat that: adding them as real
+  band fields needs an explicit call on relaxing this exclusion for the
+  airport point specifically (tracked in `BACKLOG.md`), not a silent
+  table addition.
 - Named NPCs, landmarks, brands and haunts stay Texan. SPI is scenery, not a
   133rd city. Road-job endpoints stay Texan (`GEO.cities` by name); **charters
   may cross** (airport-id resolution). Flavor text is the only place that names

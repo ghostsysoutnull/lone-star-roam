@@ -558,6 +558,37 @@ in below). Queued work lives in `BACKLOG.md`.
   landings, stones}` — its own HUD row, never folded into the Texas tallies.
   Species 24 → 29, landmarks → 38, legends → 3.
 
+- [x] ~~Band Parity~~ — done 2026-07-17 (6 waves, `BAND_PARITY_SPEC.md` kept
+  as history): the 25-mile out-of-state band gets the same treatment Texas
+  gets — real road network, life on the roads, natural ground, agriculture,
+  wildlife. **W1 — the network**: `tools/build-band-roads.mjs` reworked to a
+  tier fetch (motorway/trunk/primary across the 4 neighbor states), coverage
+  140 → 169/177 band places within 25u after two secondary-tier top-ups
+  (OK, then LA+NM), fixing a cross-bbox duplicate-way defect, an El Paso/
+  Juárez border-classification leak, and a parallel-to-the-line false-
+  crossing defect along the way. **W2 — life on the roads**: real per-state
+  control-city distance signs at every outward crossing (102 crossings, 103
+  signs), traffic extended onto `GEO.bandHighways`, `bandTowns` tally
+  confirmed a no-op (`save.passport.towns` already covered it from Shoulder
+  & Shelf). **W3 — the ground**: `neighborStateAt` + per-neighbor `BAND_TINT`
+  (LA swamp / AR pine / OK plains / NM desert) replace the flat desert wash,
+  Bruno-approved via staged screenshots. **W4 — crops and ranches**: real
+  USDA 2022 census baked for the band counties, `inTexasOrBand`/
+  `nearestAnyRoad`/`cityClear` swap the Texas-only gates for crop decals,
+  pivots, `farmsteadAt`, `feedlotAt`, `chapelAt`+cemeteries, and flora;
+  `ranchHQAt` and brand generators stay Texas-only by design (named real
+  ranches). **W5 — wildlife**: `animals.js` region tables flavor band land
+  by the same `neighborStateAt` split, census herds spawn at band farmsteads
+  via `agAt || bandAgAt`, wander/flee + road-avoidance widened to
+  `inTexasOrBand`/`nearestAnyRoad`. **W6 — close**: no new airports —
+  the "2–4 real band fields" ask was already satisfied by Shoulder & Shelf's
+  6 band airports (incl. Texarkana), and the spec's other named exemplars
+  (Roswell/Lawton/Lake Charles) are deliberately excluded from the band as
+  glow-only vignettes just past the 25-mile line; revisiting them as
+  landable fields is backlogged. The 132 cities/254 counties/rose indices
+  never changed length throughout; band data stayed in its own
+  `GEO.band*`/`save.passport` arrays and keys, by law.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

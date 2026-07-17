@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Lone Star Roam** — a single-page Three.js free-roam game over a 1:100-scale, geographically real Texas. Real OSM highway geometry + real border + 132 real cities; procedural downtowns, drive/fly/walk modes, collectibles, NPCs. No build step, no framework, no npm install — plain ES modules with Three.js from CDN (importmap in `index.html`).
 
-See `ROADMAP.md` for planned work and known limitations before proposing features. No active priority track: aviation shipped 2026-07-12, Agriculture (`AGRICULTURE_SPEC.md`, all 5 waves + 4.5/5.5 follow-ons) shipped 2026-07-14 — both folded into `ROADMAP.md`. Queued work lives in `BACKLOG.md`. **`GOTCHAS.md` is the law book** — standing rules that survived their tracks; grep it for the area you're changing before coding there. `LEDGER.md` is the per-wave scoreboard (one line per wave, appended at wave end).
+See `ROADMAP.md` for planned work and known limitations before proposing features. No active priority track: aviation shipped 2026-07-12, Agriculture (`AGRICULTURE_SPEC.md`, all 5 waves + 4.5/5.5 follow-ons) shipped 2026-07-14, the Shoulder & the Shelf shipped 2026-07-15, and Band Parity (`BAND_PARITY_SPEC.md`, 6 waves) shipped 2026-07-17 — all folded into `ROADMAP.md`. Queued work lives in `BACKLOG.md`. **`GOTCHAS.md` is the law book** — standing rules that survived their tracks; grep it for the area you're changing before coding there. `LEDGER.md` is the per-wave scoreboard (one line per wave, appended at wave end).
 
 ## Communication register
 
