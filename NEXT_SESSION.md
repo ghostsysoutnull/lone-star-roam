@@ -26,7 +26,8 @@ queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to
   https://ghostsysoutnull.github.io/lone-star-roam/. Full verify before
-  every push is mandatory.
+  every code push is mandatory (doc-only diffs skip tests); commits and
+  pushes always wait for Bruno's explicit go-ahead.
 - Local dev: `python3 -m http.server 8317`; verify headlessly with
   **`node tools/verify.mjs`** (parallel pool, full run ~70 s on this machine;
   use named suites while iterating, then the full run before pushing; compact;
