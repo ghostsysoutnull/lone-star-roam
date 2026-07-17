@@ -86,6 +86,7 @@ export class Gameplay {
     // towns = band cities visited (silver stars), landings = band airports
     // landed at, stones = Corner Stones (W6's job — reserved empty here).
     this.save.passport ??= { stamps: [], towns: [], landings: [], stones: [] };
+    this.save.at ??= null; // resume snapshot: {x,z,y,heading,mode,skyT} (title.js)
     this.saveTimer = 0;
     this.countyNow = null;
     this.countyToastT = 0;
@@ -211,6 +212,24 @@ export class Gameplay {
   }
 
   persist() { localStorage.setItem(SAVE_KEY, JSON.stringify(this.save)); }
+
+  // resume snapshot — position/heading/mode/altitude/clock (title.js Continue)
+  snapshotAt(player, sky) {
+    this.save.at = { x: player.pos.x, z: player.pos.z, y: player.pos.y, heading: player.heading, mode: player.mode, skyT: sky.t };
+  }
+
+  // setMode first: it forces pos.y=0 on every non-FLY branch (vehicle.js), so
+  // FLY altitude must be restored after mode switch (gotoAirport precedent, debug.js).
+  applyAt(player, sky) {
+    const at = this.save.at;
+    if (!at) return;
+    player.pos.x = at.x;
+    player.pos.z = at.z;
+    player.heading = at.heading;
+    player.setMode(at.mode);
+    if (at.mode === 'FLY') player.pos.y = at.y;
+    sky.t = at.skyT;
+  }
 
   // nearest landmark within range — for reading its historical marker (E)
   landmarkNear(pos, range = 16) {
@@ -342,7 +361,7 @@ export class Gameplay {
     (this.bursts ??= []).push({ ring, age: 0 });
   }
 
-  update(dt, pos, night = 0, speed = 0) {
+  update(dt, pos, night = 0, speed = 0, player = null, sky = null) {
     const agl = pos.y - hAt(pos.x, pos.z); // height above ground, not sea level
     this.t += dt;
 
@@ -352,7 +371,11 @@ export class Gameplay {
     st.dist += Math.abs(speed) * dt * 0.1;
     st.top = Math.max(st.top, Math.abs(Math.round(speed * 2.4)));
     this.saveTimer += dt;
-    if (this.saveTimer > 20) { this.saveTimer = 0; this.persist(); }
+    if (this.saveTimer > 20) {
+      this.saveTimer = 0;
+      if (player && sky) this.snapshotAt(player, sky);
+      this.persist();
+    }
 
     // collect bursts: expand and fade
     if (this.bursts) {

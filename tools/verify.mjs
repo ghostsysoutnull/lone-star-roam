@@ -311,7 +311,7 @@ async function worker() {
   try {
     browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
     ctx = await browser.newContext({ viewport: { width: 640, height: 360 } }); // small viewport: SwiftShader fill rate limits sim fps
-    await ctx.addInitScript(() => localStorage.clear());
+    await ctx.addInitScript(() => { localStorage.clear(); window.__harness = 1; });
     while (queue.length) await runSuite(ctx, queue.shift());
   } finally {
     if (ctx) await ctx.close();

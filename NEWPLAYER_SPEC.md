@@ -7,22 +7,32 @@ like a real save — today a new player gets one vanishing toast, a hidden
 wall-of-keys help panel, and every session restarts from scratch.
 
 **Wave 1 — the player gets:**
-- a title screen on every boot, over a slow aerial view of the live world,
-  with a rotating Texas fact
-- Continue (resume exactly where you were — position, mode, time of day) /
-  New game
+- a title screen on every boot: Continue (resume exactly where you were —
+  position, mode, time of day) / New game
+- Esc → Save & quit to title
+- (mostly under the hood: the game's boot rebuilt around the screen)
+
+*Expected result: boot lands on a title screen, not in the game. Continue
+restores position, heading, mode, altitude, clock; Save & quit returns to
+title with state written. Session close loses nothing. All existing verify
+suites keep passing via the harness bypass. Presentation is a plain
+skeleton — polish comes in W2.*
+*Suggested setup: Sonnet 5, effort high.*
+
+**Wave 2 — the player gets:**
 - a one-time intro card explaining the game, with a skip for experienced
   players
 - a few staged tips during the first minutes of play
 - a hand-picked exciting starting spot for new games
-- Esc → Save & quit to title
+- the title screen dressed up: slow aerial view of the live world, rotating
+  Texas fact
 
-*Expected result: boot lands on a title screen, not in the game. New game:
-intro card (skippable), curated start, staged tips. Continue: restores
-position, mode, and clock. Session close loses nothing.*
+*Expected result: new game: intro card (skippable), curated start, staged
+tips, none of it shown twice per slot. Title screen sits over the live-world
+drift with a rotating fact.*
 *Suggested setup: Fable 5, effort high.*
 
-**Wave 2 — the player gets:**
+**Wave 3 — the player gets:**
 - one-time hints the first time something is encountered (an NPC, a city,
   dusk, an airport, the state line)
 - a reorganized help menu, sectioned by topic
@@ -35,7 +45,7 @@ save. All taught content stays readable in the Guide. All five settings
 visible and labeled; no unlabeled keybinds left.*
 *Suggested setup: Fable 5, effort high.*
 
-**Wave 3 — the player gets:**
+**Wave 4 — the player gets:**
 - three save slots with names, progress summaries, rename and delete
 - settings that belong to each slot, so people sharing the machine don't
   disturb each other
@@ -72,7 +82,7 @@ slot 1. Any slot exports to a file and restores from one.*
   to title**: writes the resume state and re-shows the title screen (slots,
   rename, delete, new game, Continue). Never loses anything — same state a
   browser close preserves. Ships in W1 with the title screen; its full
-  purpose (slot switching) arrives with W3.
+  purpose (slot switching) arrives with W4.
 - **Title presentation**: the title screen sits over a slow aerial drift of
   the live world (attract mode — the game sells itself before a key is
   pressed) and rotates one "Did you know" line drawn from the existing fact
@@ -80,14 +90,14 @@ slot 1. Any slot exports to a file and restores from one.*
 - **New-game start**: a fresh slot starts at a curated iconic, dense spot
   (candidate: San Antonio approach, Alamo minutes away) so the first city,
   first landmark, and first collectible happen naturally inside the
-  tutorial's first minutes. Exact spot chosen in W1.
+  tutorial's first minutes. Exact spot chosen in W2.
 - **Settings panel**: the five hidden keybind settings (mute, UI text size,
   compass, guide arrow, brand-building size) become a visible labeled
-  Settings section on the pause and title screens. Panel ships in W2
-  (storage-agnostic); W3 slots the storage underneath it.
+  Settings section on the pause and title screens. Panel ships in W3
+  (storage-agnostic); W4 slots the storage underneath it.
 - **Export/import**: back up a slot to a file / restore from file, on the
   title screen — insurance against browser-data loss. First candidate to
-  push to BACKLOG.md if W3 runs long.
+  push to BACKLOG.md if W4 runs long.
 - Returning players (non-empty slot) never see the intro card or tutorial
   toasts; hints fire once per slot.
 
@@ -112,26 +122,33 @@ slot 1. Any slot exports to a file and restores from one.*
 
 ## Waves
 
-### W1 — Boot screen, first-run intro, resume (Fable 5, high)
-- Title screen every boot: game name, Continue (with progress summary) /
-  New game, over the live-world attract drift, rotating a Texas fact.
-- Curated new-game starting spot (exact spot chosen in-wave; candidate:
-  San Antonio approach).
+### W1 — Boot plumbing (Sonnet 5, high)
+- Title screen skeleton every boot: game name, Continue (with progress
+  summary) / New game. Plain presentation — W2 dresses it.
+- **Resume**: Continue restores last position, heading, mode, altitude,
+  clock (`save.at`, written on a slow interval + pagehide).
+- **Save & quit to title** on the pause overlay (writes `save.at`, re-shows
+  the title screen — respects the GOTCHAS pause/menu freeze law).
+- **Harness bypass** built and proven here: all existing suites keep passing;
+  new `tools/checks/onboarding.mjs` drives the screen explicitly.
+- Slot UI is not in this wave — single-save until W4, layout reserves the
+  slot rows.
+Budget: code + checks, no shots, grep-first.
+
+### W2 — First-run experience (Fable 5, high)
 - Concept card on first boot — 1:100 real Texas, V cycles Drive/Fly/Walk,
   what to collect, "H for help anytime" — with Start / **Skip intro & tips**
   actions.
 - 3–4 staged tutorial toasts in play (try V; first city visit; first
   collectible; press P), skippable mid-stream.
-- **Resume**: Continue restores last position, heading, mode, altitude,
-  clock (`save.at`, written on a slow interval + pagehide).
-- **Save & quit to title** on the pause overlay (writes `save.at`, re-shows
-  the title screen — respects the GOTCHAS pause/menu freeze law).
-- Slot UI is not in this wave — single-save until W3, layout reserves the
-  slot rows.
-Budget: code + checks (new `tools/checks/onboarding.mjs`), **one** staged shot
-of the title card (legibility judgment via Copilot + Bruno), grep-first.
+- Curated new-game starting spot (exact spot chosen in-wave; candidate:
+  San Antonio approach).
+- Title screen dressing: live-world attract drift + rotating Texas fact
+  (existing fact pools, no new writing).
+Budget: code + checks in onboarding suite, **one** staged shot of the title
+screen (legibility judgment via Copilot + Bruno), grep-first.
 
-### W2 — Contextual hints, help restructure, Guide (Fable 5, high)
+### W3 — Contextual hints, help restructure, Guide, Settings (Fable 5, high)
 - One-time first-encounter hints via `save.seen`: first NPC in range (E),
   first city edge (M/map), first dusk (legends), first airport apron (fly
   hint), first band crossing (passport). Reuse the existing
@@ -140,10 +157,10 @@ of the title card (legibility judgment via Copilot + Bruno), grep-first.
 - **Guide**: a help-panel section that replays the concept card and lists
   every tutorial toast + hint in one browsable place.
 - **Settings panel** on pause + title: the five hidden toggles, visible and
-  labeled (storage-agnostic — W3 slots the keys underneath).
+  labeled (storage-agnostic — W4 slots the keys underneath).
 Budget: code + checks in onboarding suite, no shots, grep-first.
 
-### W3 — Named save slots + per-slot settings (Sonnet 5, high)
+### W4 — Named save slots + per-slot settings (Sonnet 5, high)
 - 3 slots on the boot screen, each row showing name + summary
   (cities/landmarks/bank) or "empty"; New game asks the name; rename and
   delete (confirm) on the row.

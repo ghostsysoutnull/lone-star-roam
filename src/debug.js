@@ -24,7 +24,7 @@ const AIRPORT_TAG = {
 };
 const AIRPORT_STATE = { SHV: 'LA', TXK: 'AR', CVN: 'NM', HOB: 'NM', CVS: 'NM', BAD: 'LA' };
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -140,6 +140,11 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       radio.tx(a, text, 'test');
       hud.toast(`📻 Test transmission — ${a.city} ${useUnicom ? 'traffic' : 'Tower'}`);
     },
+    saveQuitToTitle() {
+      gameplay.snapshotAt(player, sky);
+      gameplay.persist();
+      location.reload();
+    },
   };
   for (const w of ['clear', 'clouds', 'rain', 'storm', 'dust']) actions[w] = () => setWeather(w);
 
@@ -169,6 +174,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
         ['nasa', '✈️ NASA T-38'], ['lowlevel', '✈️ Low-level']]],
       ['Weather', [['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'],
         ['storm', '⛈ Storm'], ['dust', '🌪 Dust']]],
+      ['Boot', [['saveQuitToTitle', '🚪 Save & quit to title']]],
     ];
     const actionsHtml = sections.map(([title, rows]) =>
       `<div class="debug-section"><h3>${title}</h3><div class="debug-rows">` +

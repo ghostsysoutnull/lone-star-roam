@@ -1,22 +1,39 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: New Player Experience (`NEWPLAYER_SPEC.md`), wave 1 of 3 —
-  boot/title screen (Continue / New game, live-world attract drift, rotating
-  Texas fact) + first-run concept card with skip + staged tutorial toasts +
-  curated new-game start + resume at last position/mode/clock + save & quit
-  to title (`save.seen`, `save.at` added). Spec finalized 2026-07-17,
-  17 features across 3 waves.
-- **Recommended setup**: model **Fable 5**, effort **high** — content/copy +
-  UI wave. Flag it if the running model differs.
-- **Budget**: code + checks (new `tools/checks/onboarding.mjs`), one staged
-  title-card shot (Copilot + Bruno judge), grep-first. Harness bypass is a
-  hard requirement — see spec.
-- **Then**: rewrite this block for W2 (contextual hints + help restructure,
-  Fable 5 high).
+- **This session**: New Player Experience (`NEWPLAYER_SPEC.md`), wave 2 of 4 —
+  first-run experience: one-time concept card (Start / Skip intro & tips),
+  3-4 staged tutorial toasts, curated new-game starting spot (candidate: San
+  Antonio approach), title screen dressing (live-world attract drift +
+  rotating Texas fact). Wave 1 (boot plumbing: title screen, `save.at`
+  resume, save & quit to title, harness bypass) shipped 2026-07-17.
+- **Recommended setup**: model **Fable 5**, effort **high** — content/register
+  wave (concept card copy, tip staging, fact rotation). Flag it if the
+  running model differs.
+- **Budget**: code + checks in `tools/checks/onboarding.mjs`, **one** staged
+  shot of the title screen (legibility judgment via Copilot + Bruno), no
+  other shots, grep-first.
+- **Then**: rewrite this block for W3 (contextual hints, help restructure,
+  Guide, Settings panel — Fable 5 high).
 
-Gotchas carried over: boot screen must auto-enter under the harness flag and
-expose its controls on `__game`; `save.seen` is additive-key-only.
+Gotchas carried over:
+- Title screen freeze design (W1 call): render loop does **not** start until
+  the title is dismissed (`main.js` `boot()`, `await title.awaitChoice()`
+  before `renderer.setAnimationLoop`) — the literal "pre-loop" reading, no
+  freeze flag. W2's live-world attract drift needs the loop running *behind*
+  the title, so this is the first thing to revisit: either start the render
+  loop earlier and freeze sim only (the option-A shape considered and
+  deferred in W1), or find another way to render a drift shot without the
+  full loop. Decide before coding.
+- New-game spot: `main.js` passes `() => player.spawnAt(austin.x, austin.z +
+  12)` into `new TitleScreen(...)` as the New Game callback — swap this for
+  the curated spot once chosen.
+- `title.js`'s `apply(choice)` is the seam for both the concept card (fires
+  after `'new'`) and `onboarding.mjs`'s direct-drive tests — extend it,
+  don't fork a second path.
+- Harness bypass flag is `window.__harness` (set in `tools/verify.mjs`);
+  `save.seen` (intro + per-hint flags) is additive-key-only, same law as
+  `save.at`.
 
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
 free-roam Texas game. Before touching code read `CLAUDE.md` (architecture +
