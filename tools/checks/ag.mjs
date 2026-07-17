@@ -733,6 +733,20 @@ export default async function ag(t) {
     t.ok(!(res.road < 5), `farmstead sits on top of a road: ${res.road}`);
   });
 
+  await t.check('band farmstead renders: house/barn/windmill/chickens actually spawn in-scene', async () => {
+    await t.tp(BAND_FARM.x + 6, BAND_FARM.z + 6); // parked-truck distance, not on top of the house
+    await t.wait(0.8);
+    const res = await t.ev(`(() => {
+      let farm = 0;
+      for (const gr of g.scenery.live.values())
+        for (const c of gr.children) if (c.userData.kind === 'farmstead') farm++;
+      const hens = g.scenery.animated.filter((a) => a.kind === 'chicken').length;
+      return { farm, hens };
+    })()`);
+    t.ok(res.farm > 0, 'no farmstead group in live chunks at the band farmstead site');
+    t.ok(res.hens >= 3, `expected ≥3 pecking chickens in the animate loop, got ${res.hens}`);
+  });
+
   await t.check('band crop field: Cotton County, OK field resolves via fieldAt (cotton, real census truth)', async () => {
     const res = await t.ev(`g.fieldAt(${BAND_FIELD.x}, ${BAND_FIELD.z})`);
     t.ok(res, `fieldAt missed the frozen band field (${BAND_FIELD.x},${BAND_FIELD.z})`);
