@@ -10,9 +10,11 @@
 - **Recommended setup**: model **Fable 5**, effort **high** — visual/register
   wave, screenshots ON, Bruno's eye required for the tint judgment. Flag it
   if the running model differs.
-- **Budget**: code + one staged screenshot per neighbor tint (4 judged
-  before commit, per the visual-judgments-need-eyes-early rule) + checks;
-  grep-first; ≤2 full verify runs.
+- **Budget**: code + one staged screenshot per neighbor tint (4 judged by
+  Bruno before commit, per the visual-judgments-need-eyes-early rule; stage
+  via `tools/stage-shot.mjs`, pre-check via Copilot CLI — GOTCHAS.md →
+  Verification — Claude never loads the images) + checks; grep-first;
+  ≤2 full verify runs.
 - **Then**: rewrite this block for W4 (crops and ranches — prereq: USDA
   extracts in tx-inputs, ask Bruno to run/approve the fetch before coding).
 

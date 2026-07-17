@@ -143,3 +143,16 @@ graduate here (and out of `NEXT_SESSION.md`).
 - **Hand-placed coordinate pairs get a check before you trust them.** Real-world
   coordinates once put two ferry docks closer together than the boat was long.
   `ferries.mjs` asserts the gap; the Turtle Lady's SPI spot asserts `onIsland`.
+- **Screenshot analysis goes to Copilot CLI, never into Claude's context**
+  (validated 2026-07-16 on a real band shot). Stage with
+  `node tools/stage-shot.mjs <out.png> <x> <z> [heading°] [mode] [agl] [skyT]`,
+  then ask a targeted, word-capped question answerable from the image alone:
+  `copilot -p "<question>" --attachment <shot.png> --model <m> [--effort low]
+  --available-tools ask_user --no-ask-user`. The bogus `--available-tools`
+  name disables ALL of Copilot's tools — never pass `--allow-all-tools` (with
+  it, Copilot autonomously reads repo files). Tiers: factual reads →
+  `gemini-3.5-flash --effort low`; judgment reads → `claude-sonnet-5`. Image
+  input is `--attachment`, not `@path`; output reports no model line — wrong
+  slugs fail loudly, so trust the flag. Copilot reports what it sees; spec and
+  register comparisons are Claude's, and final aesthetic judgment is Bruno's
+  (shots still go to his eye — Copilot is the pre-check gate).
