@@ -6,11 +6,12 @@
   like a real save — today a new player gets one vanishing toast and a hidden
   wall-of-keys help panel, and every session restarts from scratch at the
   default spawn.
-- **Features (11 total)**: title screen every boot · first-run concept card ·
+- **Features (12 total)**: title screen every boot · first-run concept card ·
   staged tutorial toasts · skip intro & tips (experienced players, per slot) ·
-  resume at last position/mode/time · one-time contextual hints · sectioned
-  help panel · in-menu Guide (re-view the intro card and every tip anytime) ·
-  three save slots · slot naming + delete · per-slot settings.
+  resume at last position/mode/time · save & quit to title from pause ·
+  one-time contextual hints · sectioned help panel · in-menu Guide (re-view
+  the intro card and every tip anytime) · three save slots · slot naming +
+  delete · per-slot settings.
 - **Plan**: 3 waves — W1 boot screen + intro + resume; W2 hints + help + Guide;
   W3 named slots + per-slot settings.
 
@@ -36,6 +37,11 @@
   toasts, no hints, ever); skipping mid-tutorial has the same total effect.
   Per-slot only, never remembered across slots. The Guide keeps everything
   skipped readable, so the skip is never a trap.
+- **Back to title**: the pause screen (Esc) gains one action — **Save & quit
+  to title**: writes the resume state and re-shows the title screen (slots,
+  rename, delete, new game, Continue). Never loses anything — same state a
+  browser close preserves. Ships in W1 with the title screen; its full
+  purpose (slot switching) arrives with W3.
 - Returning players (non-empty slot) never see the intro card or tutorial
   toasts; hints fire once per slot.
 
@@ -67,8 +73,10 @@ Drive/Fly/Walk, what to collect, "H for help anytime" — with Start /
 **Skip intro & tips** actions — then 3–4 staged tutorial toasts in play (try
 V; first city visit; first collectible; press P), skippable mid-stream.
 **Resume**: Continue restores last position, heading, mode, altitude, clock
-(`save.at`, written on a slow interval + pagehide). Slot UI is not in this
-wave — single-save until W3, layout reserves the slot rows.
+(`save.at`, written on a slow interval + pagehide). **Save & quit to title**
+on the pause overlay (writes `save.at`, re-shows the title screen — respects
+the GOTCHAS pause/menu freeze law). Slot UI is not in this wave —
+single-save until W3, layout reserves the slot rows.
 Budget: code + checks (new `tools/checks/onboarding.mjs`), **one** staged shot
 of the title card (legibility judgment via Copilot + Bruno), grep-first.
 
