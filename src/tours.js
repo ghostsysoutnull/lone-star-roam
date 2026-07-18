@@ -15,6 +15,11 @@ export const TOURS = [
   {
     track: 'Energy (2026-07)',
     waves: [
+      { wave: 'W6 — energy jobs: crude, fuel, oversize blades', spots: [
+        S('🛢 Crude haul — Midland tanks to Baytown', LL(31.943, -102.03), { mode: 'DRIVE', act: 'crudeJob', note: 'a crude run injected and auto-loaded at the tank farm; the arrow points at the Baytown refinery gate — an ordinary clock, ×1.5 for staying grounded' }),
+        S('⛽ Fuel run — Motiva gate to Austin', [5289.6, 1240.8], { mode: 'DRIVE', act: 'fuelJob', note: 'loads at the Motiva gate, delivers downtown Austin — refinery-to-city with the usual city-arrival radius' }),
+        S('🌀 Oversize blade — Corpus docks to Roscoe', LL(27.8006, -97.3964), { mode: 'DRIVE', act: 'bladeJob', note: 'the slow haul: loads in Corpus, pays ×1.5 only if the whole run stays under 72 mph — one burst over (or going airborne) and the HUD flips to 🐢 bonus lost' }),
+      ] },
       { wave: 'W5 — 345 kV tower corridors, substations, hero plants, ERCOT radio', spots: [
         S('⚡ ERCOT tower corridor — Hill Country spine', [-128.4, 179.5], { mode: 'DRIVE', time: 0.35, note: 'a real 345 kV corridor, box-built H-frame poles instanced along its arc length every ~40u, conductor ribbon strung between them' }),
         S('⚡ South Texas Project — Energy log hero', [3298.2, 2451.7], { mode: 'DRIVE', time: 0.35, note: 'twin reactors, waisted cooling-tower silhouette + reactor dome; drive in and the log stamps' }),

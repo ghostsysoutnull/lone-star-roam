@@ -608,4 +608,95 @@ export default async function energy(t) {
     t.ok(res.near === 'the ERCOT grid', `grid token not live near a substation: ${JSON.stringify(res)}`);
     t.ok(!res.far, `grid token live 1448u from the nearest substation: ${JSON.stringify(res)}`);
   });
+
+  // --- W6: energy jobs — offers reference live site ids; the oversize blade
+  // haul's ×1.5 is a speed-over-time verdict (one burst over the cap kills it,
+  // the charging-deer lesson shape); fast-travel stays locked mid-haul.
+
+  await t.check('W6 board: 3 energy offers, one per type, every site id resolving in HEROES', async () => {
+    const res = await t.ev(`(() => {
+      const energy = g.missions.offers.filter((o) => o.kind === 'energy');
+      const ids = new Set(g.energy.heroes.map((h) => h.id));
+      const badSite = energy.filter((o) =>
+        (o.siteFrom && !ids.has(o.siteFrom)) || (o.siteTo && !ids.has(o.siteTo))).length;
+      const blade = energy.find((o) => o.type === 'blade');
+      return { types: energy.map((o) => o.type).sort(), badSite,
+               bladeCap: blade?.cap ?? null, othersCapped: energy.some((o) => o.type !== 'blade' && o.cap != null) };
+    })()`);
+    t.ok(res.types.join(',') === 'blade,crude,fuel', `energy offer types: ${res.types}`);
+    t.ok(res.badSite === 0, `${res.badSite} offers reference a site id missing from HEROES`);
+    t.ok(res.bladeCap === 30, `blade cap is ${res.bladeCap}, want 30`);
+    t.ok(!res.othersCapped, 'a non-oversize energy offer carries a speed cap');
+  });
+
+  await t.check('W6 crude: forceEnergy injects site→site; pickup auto-loads at parked-truck distance, off-axis', async () => {
+    const offer = await t.ev(`g.missions.forceEnergy('crude')`);
+    t.ok(offer && offer.siteFrom === 'midland-tanks' && offer.siteTo === 'baytown', `pinned crude run wrong: ${JSON.stringify(offer)}`);
+    // park 8.5u off the marker at an ugly diagonal, not on top of it
+    const s = await t.ev(`g.missions.site('midland-tanks')`);
+    await t.tp(s.x + 6, s.z - 6);
+    await t.until(`g.missions.job && g.missions.job.phase === 'haul'`, 20000);
+    t.ok(await t.ev('g.player.truck.userData.cargo.visible'), 'crate not visible after site load');
+  });
+
+  await t.check('W6 orphaned site id self-clears the job (city-rename lesson)', async () => {
+    await t.ev(`g.missions.job.siteTo = 'retired-site'`);
+    await t.until('!g.missions.job', 8000);
+  });
+
+  await t.check('W6 blade: cap tracking is continuous and monotonic — one burst is never forgotten', async () => {
+    await t.ev(`g.missions.forceEnergy('blade')`);
+    const from = await t.ev(`(() => { const c = g.missions.city('Corpus Christi'); return { x: c.x, z: c.z }; })()`);
+    await t.tp(from.x, from.z);
+    await t.until(`g.missions.job && g.missions.job.phase === 'haul'`, 20000);
+    // drive the tracking rule through the real update path at forced speeds
+    const tick = (spd, s) => t.step(s, `g.player.speed = ${spd}; g.missions.update(dt, g.player.pos, 'DRIVE', 0)`);
+    await tick(22, 2);
+    let j = await t.ev(`({ maxSpd: g.missions.job.maxSpd, capBlown: g.missions.job.capBlown, hud: g.missions.hudInfo(g.player.pos).text })`);
+    t.ok(j.maxSpd >= 22 && j.maxSpd <= 30 && !j.capBlown, `under-cap leg mistracked: ${JSON.stringify(j)}`);
+    t.ok(j.hud.includes('≤72 mph'), `HUD cap tag missing while under cap: "${j.hud}"`);
+    await tick(34, 0.3); // one burst over the cap…
+    await tick(10, 1); // …then slow and steady again
+    j = await t.ev(`({ maxSpd: g.missions.job.maxSpd, capBlown: g.missions.job.capBlown, hud: g.missions.hudInfo(g.player.pos).text })`);
+    t.ok(j.maxSpd >= 34 && j.capBlown, `burst forgotten after slowing down: ${JSON.stringify(j)}`);
+    t.ok(j.hud.includes('bonus lost'), `HUD tag did not flip after the burst: "${j.hud}"`);
+    await t.ev(`g.player.speed = 0`);
+  });
+
+  await t.check('W6 fast-travel lock holds during an energy haul', async () => {
+    const { allLocked, hint } = await t.ev(`(() => {
+      g.travel.tab = 'Cities'; g.travel.render();
+      const btns = [...document.querySelectorAll('#travel .poi-list button')];
+      return { allLocked: btns.length > 0 && btns.every((b) => b.disabled),
+               hint: document.querySelector('#travel .hint').textContent };
+    })()`);
+    t.ok(allLocked, 'a city button stayed enabled mid-energy-haul');
+    t.ok(hint.includes('Cargo aboard'), `hint: "${hint}"`);
+  });
+
+  await t.check('W6 blade with a blown cap delivers at ×1, off-axis at the wind-farm marker', async () => {
+    const pay = await t.ev('g.missions.job.pay');
+    const bank0 = await t.ev('g.gameplay.save.bank');
+    const s = await t.ev(`g.missions.site('roscoe')`);
+    await t.tp(s.x - 5, s.z + 7);
+    await t.until('!g.missions.job', 20000);
+    const paid = (await t.ev('g.gameplay.save.bank')) - bank0;
+    const expected = Math.round(pay / 5) * 5; // on time, no steady bonus — the burst above
+    t.ok(paid === expected, `paid $${paid}, expected $${expected} (pay $${pay})`);
+  });
+
+  await t.check('W6 blade held under the cap the whole haul delivers at ×1.5', async () => {
+    await t.ev(`g.missions.forceEnergy('blade')`);
+    const pay = await t.ev('g.missions.job.pay');
+    const from = await t.ev(`(() => { const c = g.missions.city('Corpus Christi'); return { x: c.x, z: c.z }; })()`);
+    await t.tp(from.x, from.z);
+    await t.until(`g.missions.job && g.missions.job.phase === 'haul'`, 20000);
+    const bank0 = await t.ev('g.gameplay.save.bank');
+    const s = await t.ev(`g.missions.site('roscoe')`);
+    await t.tp(s.x + 7, s.z + 4);
+    await t.until('!g.missions.job', 20000);
+    const paid = (await t.ev('g.gameplay.save.bank')) - bank0;
+    const expected = Math.round((pay * 1.5) / 5) * 5;
+    t.ok(paid === expected, `paid $${paid}, expected $${expected} (pay $${pay})`);
+  });
 }

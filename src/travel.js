@@ -227,13 +227,13 @@ export class TravelMenu {
       .map((o, i) => {
         const label = o.kind === 'charter' ? o.manifest : o.cargo;
         return `<button data-i="${i}" ${j ? 'disabled' : ''}>${o.icon} <b>${label}</b> — ${o.from} → ${o.to}<br>
-        <small style="opacity:.75">${o.km} km · $${o.pay}${o.rush ? ' · 🔥 RUSH (tight clock, +40% pay)' : ''}</small>${o.note ? `<br><small style="opacity:.55;font-style:italic">${o.note}</small>` : ''}</button>`;
+        <small style="opacity:.75">${o.km} km · $${o.pay}${o.rush ? ' · 🔥 RUSH (tight clock, +40% pay)' : ''}${o.cap != null ? ` · 🐢 OVERSIZE (stay ≤${Math.round(o.cap * 2.4)} mph for ×1.5)` : ''}</small>${o.note ? `<br><small style="opacity:.55;font-style:italic">${o.note}</small>` : ''}</button>`;
       })
       .join('');
     this.el.querySelector('.poi-list').innerHTML = html;
     this.el.querySelector('.hint').textContent = j
       ? 'One haul at a time — deliver it or abandon it to take another.'
-      : 'Take a job, load up at the origin, beat the clock. Road jobs pay a ×1.5 bonus for staying grounded; charter jobs need a real landing at both ends.';
+      : 'Take a job, load up at the origin, beat the clock. Road jobs pay a ×1.5 bonus for staying grounded; charter jobs need a real landing at both ends; oversize loads earn theirs by never breaking the posted cap.';
   }
 
   jobClick(i) {

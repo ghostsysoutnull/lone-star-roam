@@ -7,19 +7,25 @@ const cityXZ = (t, name) =>
   t.ev(`(() => { const c = g.GEO.cities.find((c) => c.name === ${JSON.stringify(name)}); return { x: c.x, z: c.z }; })()`);
 
 export default async function missions(t) {
-  await t.check('job board offers 4 ground + 4 charter resolvable jobs', async () => {
-    const { n, nGround, nCharter, bad, badCharter } = await t.ev(`(() => {
+  await t.check('job board offers 4 ground + 3 energy + 4 charter resolvable jobs', async () => {
+    const { n, nGround, nEnergy, nCharter, bad, badEnergy, badCharter } = await t.ev(`(() => {
       const offers = g.missions.offers;
-      const ground = offers.filter((o) => o.kind !== 'charter');
+      const ground = offers.filter((o) => !o.kind);
+      const energy = offers.filter((o) => o.kind === 'energy');
       const charter = offers.filter((o) => o.kind === 'charter');
       const bad = ground.filter((o) =>
         o.from === o.to || !g.missions.city(o.from) || !g.missions.city(o.to) || o.pay <= 0 || o.deadline <= 0).length;
+      // energy endpoints resolve as a hero site (by id) or a city (by name)
+      const end = (siteId, name) => siteId ? g.missions.site(siteId) : g.missions.city(name);
+      const badEnergy = energy.filter((o) =>
+        o.from === o.to || !end(o.siteFrom, o.from) || !end(o.siteTo, o.to) || o.pay <= 0 || o.deadline <= 0).length;
       const badCharter = charter.filter((o) =>
         o.fromId === o.toId || !g.AIRPORTS.find((a) => a.id === o.fromId) || !g.AIRPORTS.find((a) => a.id === o.toId) || o.pay <= 0 || o.deadline <= 0).length;
-      return { n: offers.length, nGround: ground.length, nCharter: charter.length, bad, badCharter };
+      return { n: offers.length, nGround: ground.length, nEnergy: energy.length, nCharter: charter.length, bad, badEnergy, badCharter };
     })()`);
-    t.ok(n === 8 && nGround === 4 && nCharter === 4, `${n} offers (${nGround} ground, ${nCharter} charter)`);
+    t.ok(n === 11 && nGround === 4 && nEnergy === 3 && nCharter === 4, `${n} offers (${nGround} ground, ${nEnergy} energy, ${nCharter} charter)`);
     t.ok(bad === 0, `${bad} malformed ground offers`);
+    t.ok(badEnergy === 0, `${badEnergy} malformed energy offers`);
     t.ok(badCharter === 0, `${badCharter} malformed charter offers`);
   });
 
@@ -79,7 +85,7 @@ export default async function missions(t) {
     t.ok(bank1 - bank0 === expected, `paid $${bank1 - bank0}, expected $${expected}`);
     t.ok((await t.ev('g.gameplay.save.jobsDone')) >= 1, 'jobsDone not bumped');
     t.ok(!(await t.ev('g.player.truck.userData.cargo.visible')), 'crate still visible');
-    t.ok((await t.ev('g.missions.offers.length')) === 8, 'offers not regenerated');
+    t.ok((await t.ev('g.missions.offers.length')) === 11, 'offers not regenerated');
   });
 
   await t.check('late road delivery pays ×0.5×1.5', async () => {

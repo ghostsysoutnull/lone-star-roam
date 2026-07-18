@@ -1,8 +1,9 @@
 # Backlog — queued work
 
-Active track: **Energy** (`ENERGY_SPEC.md`, 6 waves, opened 2026-07-17) —
-briefing in `NEXT_SESSION.md`. Items below queue behind it.
-Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
+No active track — Energy (`ENERGY_SPEC.md`, 6 waves + the W4.5 solar
+rework) shipped 2026-07-18 and is folded into `ROADMAP.md`. Items below
+are the queue. Direction-level ideas that aren't actionable yet live in
+`FUTURE.md`.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
 

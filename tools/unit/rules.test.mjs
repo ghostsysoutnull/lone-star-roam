@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { pickRoute, routeProblems, scheduleAirport } from '../../src/aviation-rules.js';
-import { charterOfferTerms, groundOfferTerms, missionPayout } from '../../src/mission-rules.js';
+import { charterOfferTerms, groundOfferTerms, missionPayout, OVERSIZE_CAP, oversizeBonus, oversizeOfferTerms } from '../../src/mission-rules.js';
 
 test('aviation route helpers reject unresolved routes and select by weight', () => {
   const airports = [{ id: 'AAA' }, { id: 'BBB' }, { id: 'MIL', military: true }];
@@ -44,4 +44,14 @@ test('mission offer terms and payout modifiers retain their shared rounding rule
   assert.equal(missionPayout(175, 1.2, false, true), 315);
   assert.equal(missionPayout(175, 1.2, true, true), 160);
   assert.equal(missionPayout(175, 1.2, true), 105);
+});
+
+test('oversize offer terms and the steady-haul bonus follow the speed-over-time cap rule', () => {
+  assert.equal(OVERSIZE_CAP, 30); // ≈72 mph shown, under the 46 motorway cap
+  assert.deepEqual(oversizeOfferTerms(6000), { km: 600, pay: 1050, deadline: 525 });
+  assert.deepEqual(oversizeOfferTerms(336), { km: 34, pay: 145, deadline: 171 });
+  assert.equal(oversizeBonus(22, OVERSIZE_CAP, false), true);
+  assert.equal(oversizeBonus(30, OVERSIZE_CAP, false), true); // at the cap is still under it
+  assert.equal(oversizeBonus(30.01, OVERSIZE_CAP, false), false); // one burst kills it
+  assert.equal(oversizeBonus(12, OVERSIZE_CAP, true), false); // going airborne kills it too
 });

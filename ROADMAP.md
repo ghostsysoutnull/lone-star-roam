@@ -4,9 +4,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 132 city stars, 14 landmarks, 300 roses, 12 NPCs, persistent progress.
 
 No active priority track (aviation shipped in full 2026-07-12; Brands,
-Jetpack, Agriculture, the Shoulder & the Shelf, Band Parity, and New Player
-Experience followed and are folded in below). Queued work lives in
-`BACKLOG.md`.
+Jetpack, Agriculture, the Shoulder & the Shelf, Band Parity, New Player
+Experience, and Energy followed and are folded in below). Queued work lives
+in `BACKLOG.md`.
 
 - [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
   tools/test.mjs` runs four sub-second Node-only groups (`aviation`, `data`,
@@ -620,6 +620,39 @@ Experience followed and are folded in below). Queued work lives in
   `save` reference (now a live getter) and `shop.js`'s `applyGear` wasn't
   re-run on a switch — both would have leaked one slot's state into
   another. Export/import backlogged (`BACKLOG.md`).
+
+- [x] ~~Energy~~ — done 2026-07-18 (6 waves + a W4.5 solar rework,
+  `ENERGY_SPEC.md` kept as history): the Texas energy economy on the map as
+  real data, not decoration — realism-first, data-placed or absent. **W1 —
+  bake**: `tools/build-energy.mjs` (8 Overpass extracts, queries recorded in
+  the script header) → `data/energy.json` (5th boot file): per-county well
+  density, clustered wind farms, plants, refineries (33 after the W4
+  rebake), 345 kV lines, substations, 227 offshore platforms, fairway
+  snap-points; `GEO.energy` + `energyAt(x,z)`. **W2 — extraction real**:
+  `wellSiteAt` pads seeded by county density (pumpjack/tank-battery/derrick
+  kit, night-gated gas flares), the uniform Permian scatter retired;
+  offshore rebased onto the real platform fleet (Far Rig = farthest
+  *reachable* major, fairway-snapped port-approach legs); the Energy log
+  (11th collectible, `save.energy`) + the approach announcer (real site
+  names on the HUD, armed per site, re-arms on exit, unnamed silent).
+  **W3 — wind + solar**: instanced turbines spinning on `ATMOS.wind` inside
+  the real farm clusters, solar fields; W4.5 reworked solar into
+  tilted-panel blocks on dirt pads with per-block road/river clearance.
+  **W4 — refineries**: the kit at all 33 baked sites, 4 hero skylines
+  (Deer Park, Baytown, Motiva Port Arthur, Corpus Row) with brass + log
+  entries, the sanctioned local light pool (6 pooled PointLights,
+  nearest-anchor assignment) + spill decals. **W5 — the grid**: ~7,400
+  H-frame towers instanced along the real 345 kV corridors + conductor
+  ribbon, ~600 thinned substations joining the announcer, 4 hero plants
+  (South Texas Project, Comanche Peak, W.A. Parish, Martin Lake), ERCOT
+  radio flavor as a `{grid}` chatter token. **W6 — energy jobs**: the Jobs
+  board grows 8 → 11 — crude hauls (Midland tanks → refinery heroes), fuel
+  runs (refinery → city), and oversize wind-blade loads (Corpus docks →
+  wind heroes) whose ×1.5 pays only for a whole haul at ≤72 mph, tracked
+  every frame (speed-over-time; pure terms + verdict in `mission-rules.js`
+  under `tools/test.mjs rules`). Job endpoints reference hero *ids* resolved
+  at use; an orphaned id self-clears. Fast-travel lock inherited from the
+  existing haul gate; zero new announcer/log machinery after W2, as specced.
 
 ## Known limitations (v1)
 

@@ -48,6 +48,12 @@ graduate here (and out of `NEXT_SESSION.md`).
   (`gameplay.update`'s `saveTimer`) plus the pause screen's Save & quit
   button — there is no `pagehide`/`visibilitychange` listener, so a hard tab
   close between those can lose up to 20 s.
+- **Energy `HEROES` ids are stable save keys AND job references**
+  (`energy.js`): `save.energy` entries and energy-job `siteFrom`/`siteTo`
+  fields store them. Never rename or re-key a shipped id. Jobs resolve ids
+  at use (`missions.site(id)`) and an orphaned id self-clears through
+  `target()` — the city-rename lesson; never hardcode a site's coords into
+  a job.
 - **Slot switching is live, never a page reload** — the verify harness's
   context wipes localStorage on every navigation, so a reload-based switch
   is untestable and the hard requirement puts `select`/`newGame`/`rename`/
@@ -132,6 +138,13 @@ graduate here (and out of `NEXT_SESSION.md`).
   Port Isabel mainland.
 - The coarse DEM is force-dipped inside a hardcoded Padre bbox in `buildTerrain`
   (x 2000–2350, z 3510–5500) — if island data changes, update that bbox too.
+- **OSM `voltage` is multi-value** (`345000;138000`) — match the target value
+  anywhere in the list, never `split(';')[0]` (`build-energy.mjs`; same
+  defect class as the band-roads concurrency refs).
+- **Wind turbines bake as clustered farms** (`{x, z, count, r}`), never as
+  27k individual nodes — scenery instances the fleet from a seeded stream
+  inside each radius, and the bake asserts Roscoe + Horse Hollow survive
+  clustering. Keeps the boot JSON small and the fleet honest.
 
 ## Rendering & systems
 
@@ -150,6 +163,17 @@ graduate here (and out of `NEXT_SESSION.md`).
   linear values, not the hex you typed.
 - **sky.js owns every light.** Night glows are shared materials with `fog: false`
   and opacity driven off `ATMOS.night` — reuse them, never mint per-prop glow mats.
+- **Every gas/refinery flame shares ScenerySystem's one `flareMat`** — its
+  opacity rides `ATMOS.night` (flares burn 24/7: faint by day, punching
+  through after dark — Bruno's call, Energy W4); flicker is a per-flame
+  scale pulse via the animated registry. New flame props reuse the material
+  — the gate and the day/night look live in exactly one place.
+- **The oversize-load bonus is speed-over-time** (Energy W6): `j.maxSpd` is
+  tracked EVERY frame in `missions.update`, never sampled at arrival — a
+  burst over the cap must not be able to slip between checks (the
+  charging-deer lesson applied to a game rule). The terms + verdict
+  (`oversizeOfferTerms`/`oversizeBonus`) are pure in `mission-rules.js` so
+  `tools/test.mjs rules` covers them without a browser.
 - **Plaques are one unified lookup in main.js** (brands / maritime / shoulder,
   each with an `icon` field). New brass appends to a list; it never adds a branch
   or a second state var. Maritime plaques are NOT landmarks.

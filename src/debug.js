@@ -170,6 +170,11 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       radio.tx(a, text, 'test');
       hud.toast(`📻 Test transmission — ${a.city} ${useUnicom ? 'traffic' : 'Tower'}`);
     },
+    // Energy W6: inject a pinned energy run (forceEnergy clears any active
+    // job first, so Tours spots can always chain these)
+    crudeJob() { missions.forceEnergy('crude'); },
+    fuelJob() { missions.forceEnergy('fuel'); },
+    bladeJob() { missions.forceEnergy('blade'); },
     saveQuitToTitle() {
       gameplay.snapshotAt(player, sky);
       gameplay.persist();
@@ -204,6 +209,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
         ['nasa', '✈️ NASA T-38'], ['lowlevel', '✈️ Low-level']]],
       ['Weather', [['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'],
         ['storm', '⛈ Storm'], ['dust', '🌪 Dust']]],
+      ['Energy jobs', [['crudeJob', '🛢 Crude haul'], ['fuelJob', '⛽ Fuel run'], ['bladeJob', '🌀 Blade load']]],
       ['Boot', [['saveQuitToTitle', '🚪 Save & quit to title']]],
     ];
     const actionsHtml = sections.map(([title, rows]) =>

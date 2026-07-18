@@ -8,7 +8,8 @@ import * as THREE from 'three';
 import { GEO } from './geo.js';
 import { cityRadius } from './cities.js';
 import { AIRPORTS, onRunway, TD_AGL, TD_SPD } from './airports.js';
-import { charterOfferTerms, groundOfferTerms, missionPayout } from './mission-rules.js';
+import { charterOfferTerms, groundOfferTerms, missionPayout, OVERSIZE_CAP, oversizeBonus, oversizeOfferTerms } from './mission-rules.js';
+import { HEROES } from './energy.js';
 import { KEYS, slotKey } from './slots.js';
 
 const CHARTER_LIVERY = 0xe8a33d; // air-taxi accent, swapped in over the wings' stock color
@@ -88,9 +89,25 @@ const REAL_ROUTES = [
 ];
 const CHARTER_BANDS = [[300, 1200], [1200, 3200], [3200, 8500], [300, 8500]];
 
+// Energy runs (Energy W6): endpoints are shipped hero sites referenced BY ID
+// (the city-rename lesson — resolved against HEROES at use, so an orphaned id
+// self-clears through target() like a renamed city). `oversize` marks the
+// blade haul: its ×1.5 pays for a whole haul spent under OVERSIZE_CAP — the
+// inverse of every other clock on the board.
+const ENERGY_RUNS = [
+  { type: 'crude', cargo: 'Permian crude', icon: '🛢', fromSites: ['midland-tanks'],
+    toSites: ['shipchannel', 'baytown', 'motiva', 'corpus'],
+    note: 'Staged in the Midland tanks and bound for the coast the slow way — the pipeline is full and the refinery is not waiting.' },
+  { type: 'fuel', cargo: 'Refined fuel', icon: '⛽', fromSites: ['shipchannel', 'baytown', 'motiva', 'corpus'],
+    note: 'Fresh out of the crackers. Every pump between the gate and the city square is running on what is in this trailer.' },
+  { type: 'blade', cargo: 'Turbine blade, oversize', icon: '🌀', fromCities: ['Corpus Christi'],
+    toSites: ['roscoe', 'horsehollow', 'papalote'], oversize: true,
+    note: 'Came off a ship at the Corpus docks, longer than the trailer under it. Keep it under 72 mph the whole way and the escort pay is yours.' },
+];
+
 // the npcs.js POOLS idiom — the board's content tables, exposed so the checks
 // can assert every city/airport name resolves instead of trusting the spelling
-export const POOLS = { CARGO, MANIFEST, REAL_ROUTES };
+export const POOLS = { CARGO, MANIFEST, REAL_ROUTES, ENERGY_RUNS };
 
 const fmt = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 
@@ -132,6 +149,9 @@ export class MissionSystem {
 
   get job() { return this.save.job; }
   city(name) { return GEO.cities.find((c) => c.name === name); }
+  // energy hero site by id — `site: true` switches the arrival radius from
+  // cityRadius to a fixed parked-truck distance in update()
+  site(id) { const h = HEROES.find((x) => x.id === id); return h && { x: h.at[0], z: h.at[1], name: h.name, site: true }; }
   field(id) { const a = AIRPORTS.find((x) => x.id === id); return a && { x: a.at[0], z: a.at[1], a }; }
   crate(on) { this.player.truck.userData.cargo.visible = !!on; }
   setLivery(on) {
@@ -142,11 +162,15 @@ export class MissionSystem {
   // the job's current waypoint: a city for ground hauls, an airport for
   // charters — both shapes carry x/z so update()/hudInfo() stay kind-agnostic
   target(j) {
-    return j.kind === 'charter' ? this.field(j.phase === 'pickup' ? j.fromId : j.toId)
-      : this.city(j.phase === 'pickup' ? j.from : j.to);
+    if (j.kind === 'charter') return this.field(j.phase === 'pickup' ? j.fromId : j.toId);
+    if (j.kind === 'energy') {
+      const [siteId, name] = j.phase === 'pickup' ? [j.siteFrom, j.from] : [j.siteTo, j.to];
+      return siteId ? this.site(siteId) : this.city(name);
+    }
+    return this.city(j.phase === 'pickup' ? j.from : j.to);
   }
 
-  genOffers() { return [...this.genGroundOffers(), ...this.genCharterOffers()]; }
+  genOffers() { return [...this.genGroundOffers(), ...this.genEnergyOffers(), ...this.genCharterOffers()]; }
 
   // 4 offers: short / medium / long haul + a wildcard. Regenerated per delivery.
   genGroundOffers() {
@@ -229,6 +253,70 @@ export class MissionSystem {
     return offers;
   }
 
+  // 3 offers, one per ENERGY_RUNS type. Sites resolve at generation time off
+  // the live HEROES table; a run whose sites are gone simply drops off the
+  // board (nothing hardcodes a coordinate into the job).
+  genEnergyOffers() {
+    const offers = [];
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    for (const run of ENERGY_RUNS) {
+      for (let tries = 0; tries < 30; tries++) {
+        const siteFrom = run.fromSites ? pick(run.fromSites) : null;
+        const from = siteFrom ? this.site(siteFrom) : this.city(pick(run.fromCities));
+        if (!from) break;
+        let siteTo = null, to;
+        if (run.toSites) {
+          siteTo = pick(run.toSites);
+          to = this.site(siteTo);
+        } else {
+          // fuel runs roam: any city in a sensible band from the refinery gate
+          const dests = GEO.cities.filter((c) => {
+            const d = Math.hypot(c.x - from.x, c.z - from.z);
+            return d >= 400 && d <= 3000;
+          });
+          if (!dests.length) break;
+          to = pick(dests);
+        }
+        if (!to || to.name === from.name) continue;
+        if (offers.some((o) => o.from === from.name && o.to === to.name)) continue;
+        const dist = Math.hypot(to.x - from.x, to.z - from.z);
+        const rush = !run.oversize && Math.random() < 0.25;
+        offers.push({
+          kind: 'energy', type: run.type, cargo: run.cargo, icon: run.icon, note: run.note ?? null,
+          from: from.name, to: to.name, siteFrom, siteTo, rush,
+          ...(run.oversize ? { cap: OVERSIZE_CAP, ...oversizeOfferTerms(dist) } : groundOfferTerms(dist, rush)),
+        });
+        break;
+      }
+    }
+    return offers;
+  }
+
+  // debug/test hook (the charter force() idiom): inject an energy run of the
+  // given type with PINNED endpoints — deterministic for Tours and verify.
+  // Clears any active job first so a Tours spot can always chain it.
+  forceEnergy(type) {
+    if (this.job) this.abandon();
+    const pin = {
+      crude: { siteFrom: 'midland-tanks', siteTo: 'baytown' },
+      fuel: { siteFrom: 'motiva', to: 'Austin' },
+      blade: { from: 'Corpus Christi', siteTo: 'roscoe' },
+    }[type];
+    const run = ENERGY_RUNS.find((r) => r.type === type);
+    if (!pin || !run) return null;
+    const from = pin.siteFrom ? this.site(pin.siteFrom) : this.city(pin.from);
+    const to = pin.siteTo ? this.site(pin.siteTo) : this.city(pin.to);
+    if (!from || !to) return null;
+    const dist = Math.hypot(to.x - from.x, to.z - from.z);
+    const offer = {
+      kind: 'energy', type, cargo: run.cargo, icon: run.icon, note: run.note ?? null,
+      from: from.name, to: to.name, siteFrom: pin.siteFrom ?? null, siteTo: pin.siteTo ?? null, rush: false,
+      ...(run.oversize ? { cap: OVERSIZE_CAP, ...oversizeOfferTerms(dist) } : groundOfferTerms(dist, false)),
+    };
+    this.accept(offer);
+    return offer;
+  }
+
   // debug/test hook: inject a charter job for a specific airport pair
   // directly, bypassing genOffers()'s randomness — mirrors military.js's
   // force()/despawnAll idiom. Always built (not URL-gated); verify.mjs and
@@ -278,7 +366,17 @@ export class MissionSystem {
     if (j.phase === 'haul') {
       if (j.kind !== 'charter' && mode === 'FLY' && !j.flew) {
         j.flew = true;
-        this.onToast?.('✈️ Cargo went airborne — road bonus lost');
+        if (j.cap != null) j.capBlown = true; // one toast, not two — flying kills the same bonus
+        this.onToast?.(j.cap != null ? '✈️ Blade went airborne — steady-haul bonus lost' : '✈️ Cargo went airborne — road bonus lost');
+      }
+      // oversize speed-over-time: tracked every frame, not at arrival — a
+      // burst over the cap can never slip between arrival samples
+      if (j.cap != null) {
+        j.maxSpd = Math.max(j.maxSpd ?? 0, Math.abs(this.player.speed));
+        if (!j.capBlown && j.maxSpd > j.cap) {
+          j.capBlown = true;
+          this.onToast?.(`⚠️ Over ${Math.round(j.cap * 2.4)} mph — steady-haul bonus lost`);
+        }
       }
       const wasLate = j.left <= 0;
       j.left -= dt;
@@ -307,7 +405,8 @@ export class MissionSystem {
     }
     if (agl > 12) return; // must be on (or near) the ground, same as city visits
     const d = Math.hypot(tgt.x - pos.x, tgt.z - pos.z);
-    if (d < Math.max(6, cityRadius(tgt.pop) * 0.5)) {
+    // hero sites use a fixed parked-truck radius; cities keep their pop radius
+    if (d < (tgt.site ? 10 : Math.max(6, cityRadius(tgt.pop) * 0.5))) {
       if (j.phase === 'pickup') this.load(j);
       else this.deliver(j);
     }
@@ -317,12 +416,14 @@ export class MissionSystem {
     j.phase = 'haul';
     j.left = j.deadline;
     j.flew = false;
+    if (j.cap != null) { j.maxSpd = 0; j.capBlown = false; } // the haul's speed record starts here
     this.gp.persist();
     if (j.kind === 'charter') {
       this.onToast?.(`✈️ ${j.icon} ${j.manifest} aboard — logged in at ${j.from}. Next stop ${j.to} in ⏱ ${fmt(j.deadline)}${j.rush ? ' — 🔥 rush job' : ''}`);
     } else {
       this.crate(true);
-      this.onToast?.(`${j.icon} ${j.cargo} loaded! ${j.to} in ⏱ ${fmt(j.deadline)}${j.rush ? ' — 🔥 rush job' : ''}`);
+      const capNote = j.cap != null ? ` — 🐢 keep it under ${Math.round(j.cap * 2.4)} mph` : '';
+      this.onToast?.(`${j.icon} ${j.cargo} loaded! ${j.to} in ⏱ ${fmt(j.deadline)}${j.rush ? ' — 🔥 rush job' : ''}${capNote}`);
     }
     this.onChime?.('load');
   }
@@ -351,10 +452,12 @@ export class MissionSystem {
       this.finishJob(payout, `💵 ${j.manifest} delivered to ${j.to}! +$${payout}${late ? ' (late — half pay)' : ''}`);
       return;
     }
-    const bonus = !j.flew;
+    // oversize hauls earn the ×1.5 by staying under the cap the whole way;
+    // every other ground haul earns it by staying grounded
+    const bonus = j.cap != null ? oversizeBonus(j.maxSpd ?? 0, j.cap, !!j.flew) : !j.flew;
     const payout = missionPayout(j.pay, rig, late, bonus);
     this.crate(false);
-    const notes = [bonus && '×1.5 road bonus', late && 'late — half pay'].filter(Boolean).join(', ');
+    const notes = [bonus && (j.cap != null ? '×1.5 steady-haul bonus' : '×1.5 road bonus'), late && 'late — half pay'].filter(Boolean).join(', ');
     this.finishJob(payout, `💵 ${j.cargo} delivered! +$${payout}${notes ? ` (${notes})` : ''}`);
   }
 
@@ -372,10 +475,11 @@ export class MissionSystem {
         late: false, target: [tgt.x, tgt.z],
       };
     const late = j.left <= 0;
+    const capTag = j.cap != null ? (j.capBlown ? ' · 🐢 bonus lost' : ` · 🐢 ≤${Math.round(j.cap * 2.4)} mph`) : '';
     return {
       text: j.kind === 'charter'
         ? `${j.icon} ${label} → land at ${j.to} · ${km} km · ${late ? '⏱ LATE' : '⏱ ' + fmt(j.left)}${j.rush ? ' 🔥' : ''}`
-        : `${j.icon} ${label} → ${j.to} · ${km} km · ${late ? '⏱ LATE' : '⏱ ' + fmt(j.left)}${j.rush ? ' 🔥' : ''}`,
+        : `${j.icon} ${label} → ${j.to} · ${km} km · ${late ? '⏱ LATE' : '⏱ ' + fmt(j.left)}${j.rush ? ' 🔥' : ''}${capTag}`,
       late, urgent: !late && j.left < 45, target: [tgt.x, tgt.z],
     };
   }
