@@ -45,21 +45,24 @@ real split and may change them.
 ## Estimated waves — model/effort
 
 Estimates only; each spec session re-plans its own track. Model split per
-the standing rule: Fable 5 for content/register/pool waves, Sonnet 5 for
-structural/plumbing waves; effort high unless noted.
+the risk-based grading rule (CLAUDE.md protocol step 2, adopted
+2026-07-18): waves are graded by **where the risk lives** — new visible
+surface, new-system architecture, or feel-tuning → Fable 5 even if mostly
+plumbing; pure execution of spec-settled design → Sonnet 5. Specs and tech
+design are always Fable 5. Effort high unless noted.
 
 | # | Track | Wave | Shape | Model | Effort |
 |---|---|---|---|---|---|
 | 1 | Rails | W1 — liveries + operator surfacing (trains.js reads baked fields) | structural | Sonnet 5 | high |
 | 1 | Rails | W2 — rail identity on HUD/maps (announcer + shields item) | structural | Sonnet 5 | high |
 | 1 | Rails | W3 — border crossings + named trains + chatter | content | Fable 5 | high |
-| 2 | Boat | W1 — BOAT mode: physics branch, avatar, transitions, docks | structural | Sonnet 5 | high |
+| 2 | Boat | W1 — BOAT mode: physics branch, avatar, transitions, docks | structural, feel-critical | Fable 5 | high |
 | 2 | Boat | W2 — water feel: chop/wake/ambience + lakes/Intracoastal scope | content | Fable 5 | high |
 | 2 | Boat | W3 — announcer wiring, marina dressing, polish + close | content | Fable 5 | high |
 | 3 | Sea | W1 — route lanes (AIS-informed, scout-gated) + lane retirement | structural | Sonnet 5 | high |
 | 3 | Sea | W2 — the eight ports as dressed named sites + water hauls (missions) | content | Fable 5 | high |
 | 3 | Sea | W3 — fleets (transport/fishing/patrol) + VHF chatter + close | content | Fable 5 | high |
-| 4 | Mexico | W0 — data scout: OSM vs INEGI memo + sample bake (gates spec) | research | Sonnet 5 | medium |
+| 4 | Mexico | W0 — data scout: OSM vs INEGI memo + sample bake (gates spec) | research | Fable 5 | medium |
 | 4 | Mexico | W1 — bake + ground/tint + the law-repeal sweep | structural | Sonnet 5 | high |
 | 4 | Mexico | W2 — roads + international bridges as crossing monuments | structural | Sonnet 5 | high |
 | 4 | Mexico | W3 — south-side visual register: building kit, palette, plaza layout | content | Fable 5 | high |
