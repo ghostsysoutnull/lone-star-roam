@@ -174,6 +174,17 @@ graduate here (and out of `NEXT_SESSION.md`).
   entry, *and* a `ROLL_OK` row in radio.js. Miss the last one and the aircraft
   enters `radio.sources`, fills lines on demand, and is never picked — silent,
   with nothing failing. (Cost W7 a real bug; the wiring sentinel caught it.)
+- **New props/buildings ship at the W6b poly bar** (standing rule, Bruno
+  2026-07-17). Round/turned forms use 8–14 radial segments — hero/landmark
+  one-offs at the top (12–14, merged vertex-colored geometry per the
+  legibility-pass skill / `mkHatchGeo` idiom), chunked instanced scatter
+  never below 8 and per-instance vertex counts in the low hundreds.
+  A 6-segment cylinder reads hexagonal at parked-truck distance — that's
+  the failure this rule exists to prevent. Boxy/lattice subjects (barns,
+  transmission towers) stay box-built; boxes are their correct silhouette.
+  Retrofit of pre-W6b props is the queued BACKLOG review, one
+  legibility-pass per subject — not license to rework shipped meshes
+  mid-track.
 
 ## Verification
 

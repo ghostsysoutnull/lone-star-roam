@@ -1,9 +1,24 @@
 # Lone Star Roam — next session kickoff
 
-No active priority track — New Player Experience (`NEWPLAYER_SPEC.md`, 4
-waves) shipped 2026-07-17, folded into `ROADMAP.md`; surviving gotchas
-(slot key scheme, live-switch rebuild, harness-bypass pattern) graduated
-into `GOTCHAS.md`. Pull the next item from `BACKLOG.md`.
+## Session briefing
+- **This session**: Energy (`ENERGY_SPEC.md`), wave 1 of 6 — OSM fetch +
+  `tools/build-energy.mjs` bake + `data/energy.json` + geo.js
+  `energyAt`/site lists + `tools/checks/energy.mjs` data truths. Spec
+  shipped 2026-07-17.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — pure
+  fetch/bake/table plumbing, no content work. Flag it if the running
+  model differs.
+- **Budget**: code + checks, no shots, grep-first. Overpass **GET** only
+  (mirror `maps.mail.ru/osm/tools/overpass` when overpass-api.de is
+  busy); raw fetches to `~/claude-area/devel/tx-inputs/`, queries
+  recorded in the script header (band-roads idiom).
+- **Then**: rewrite this briefing for W2 (extraction country, Fable 5,
+  high — one staged shot: Permian flares at night).
+
+Gotchas carried over: OSM `voltage` is multi-value (`345000;138000`) —
+match anywhere, never `split(';')[0]` (the band-roads concurrency
+defect's idiom); assert the county join at bake (ag 254/254 idiom);
+W1 must measure the filtered 345 kV volume before committing to it.
 
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
 free-roam Texas game. Before touching code read `CLAUDE.md` (architecture +

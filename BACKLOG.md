@@ -1,7 +1,7 @@
 # Backlog — queued work
 
-No active track (Band Parity closed 2026-07-17 — `BAND_PARITY_SPEC.md` kept
-as history); pull the next item from here into `NEXT_SESSION.md`.
+Active track: **Energy** (`ENERGY_SPEC.md`, 6 waves, opened 2026-07-17) —
+briefing in `NEXT_SESSION.md`. Items below queue behind it.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
