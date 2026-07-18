@@ -46,9 +46,18 @@ export default async function energy(t) {
     t.ok(near.hcount > 100, `Horse Hollow's nearest farm cluster too small: ${near.hcount} turbines`);
   });
 
-  await t.check('refineries: all 22 real Texas refineries baked', async () => {
-    const n = await t.ev(`g.GEO.energy.refineries.length`);
-    t.ok(n === 22, `expected 22 refineries, got ${n}`);
+  await t.check('refineries: 33 baked (W4 broadened query + 2 hand-placed), Ship Channel present', async () => {
+    const r = await t.ev(`(() => {
+      const refs = g.GEO.energy.refineries;
+      const has = (n) => refs.some((x) => x.name && x.name.includes(n));
+      return { n: refs.length, named: refs.filter((x) => x.name).length,
+        deerPark: has('Deer Park'), baytown: has('Baytown'), bigSpring: has('Big Spring'),
+        junk: refs.some((x) => x.name && /Recycle|Lithium|Power/.test(x.name)) };
+    })()`);
+    t.ok(r.n === 33, `expected 33 refineries, got ${r.n}`);
+    t.ok(r.named === 28, `expected 28 named, got ${r.named}`);
+    t.ok(r.deerPark && r.baytown && r.bigSpring, `missing majors: deerPark=${r.deerPark} baytown=${r.baytown} bigSpring=${r.bigSpring}`);
+    t.ok(!r.junk, 'junk record (recycler/lithium/power-station sub-site) survived the filter');
   });
 
   await t.check('offshore: platforms[] has a beyond-state-waters major (inStateWater, not longitude)', async () => {
@@ -139,15 +148,15 @@ export default async function energy(t) {
     t.ok(res.minVerts > 100, `pumpjack prototype under the poly bar: ${res.minVerts} verts`);
   });
 
-  await t.check('gas flares: shared flame material gates on ATMOS.night (0 by day)', async () => {
+  await t.check('gas flares: shared flame material burns 24/7 — faint day floor, full at night (W4 revision)', async () => {
     await t.setDay();
     await t.wait(0.4); // scenery.update drives the gate in the real loop
     const day = await t.ev('g.scenery.flareMat.opacity');
-    t.ok(day < 0.15, `flare flame lit in daylight: ${day}`);
+    t.ok(day > 0.2 && day < 0.45, `flare day floor off (expected ~0.3): ${day}`);
     await t.setNight();
     await t.wait(0.4);
     const night = await t.ev('({ o: g.scenery.flareMat.opacity, fog: g.scenery.flareMat.fog })');
-    t.ok(night.o > 0.6, `flare flame dark at night: ${night.o}`);
+    t.ok(night.o > 0.85, `flare flame dim at night (expected ~1): ${night.o}`);
     t.ok(night.fog === false, 'flare flame must ignore scene fog (basin skyline)');
   });
 
@@ -339,5 +348,141 @@ export default async function energy(t) {
     const roscoe = await t.ev(`g.energy.heroes.find((h) => h.id === 'roscoe')`);
     await t.tp(roscoe.at[0], roscoe.at[1]);
     await t.until(`g.gameplay.save.energy.includes('roscoe')`, 6000);
+  });
+
+  // --- Wave 4: refinery kit + hero skylines + local light pool + spill decals ---
+
+  await t.check('refinery kit: merged skyline geometry stands at every baked site (sites as numbers, not pixels)', async () => {
+    const res = await t.ev(`(() => {
+      const steel = g.energy.refineryMeshes.steel.geometry.attributes.position;
+      const sites = g.GEO.energy.refineries.map((s) => ({ name: s.name || '?', x: s.x, z: s.z, hit: false }));
+      for (let i = 0; i < steel.count; i += 3) {
+        const vx = steel.getX(i), vz = steel.getZ(i);
+        for (const s of sites) if (!s.hit && Math.hypot(s.x - vx, s.z - vz) < 35) s.hit = true;
+      }
+      return { total: sites.length, missing: sites.filter((s) => !s.hit).map((s) => s.name) };
+    })()`);
+    t.ok(res.total === 33, `expected 33 baked refineries, got ${res.total}`);
+    t.ok(res.missing.length === 0, `sites with no skyline geometry: ${res.missing.join(', ')}`);
+  });
+
+  await t.check('refinery kit: every prop cleared the road/river footprint law (Blue Wing lesson, applied per prop)', async () => {
+    const res = await t.ev(`(() => {
+      const bad = [];
+      for (const k of ['steel', 'dark', 'tank', 'rust']) {
+        const pos = g.energy.refineryMeshes[k].geometry.attributes.position;
+        for (let i = 0; i < pos.count; i += 24) { // sample — full scan is 100k+ verts
+          const vx = pos.getX(i), vz = pos.getZ(i);
+          const d = Math.min(g.nearestAnyRoad(vx, vz, 6)?.dist ?? 99, g.nearestRiver(vx, vz, 6)?.dist ?? 99);
+          if (d < 2.5) bad.push({ k, vx: +vx.toFixed(0), vz: +vz.toFixed(0), d: +d.toFixed(1) });
+        }
+      }
+      return bad.slice(0, 5);
+    })()`);
+    t.ok(res.length === 0, `kit vertices on a road/river: ${JSON.stringify(res)}`);
+  });
+
+  await t.check('hero plaque: Motiva brass reads at parked-truck distance on an ugly heading', async () => {
+    const at = await t.ev(`g.energy.heroes.find((h) => h.id === 'motiva').at`);
+    await t.tp(at[0] + 9, at[1] + 7); // parked distance, off-axis approach
+    await t.ev('g.player.heading = 3.87');
+    await t.wait(0.4); // hint rides the ~12 Hz hud tick
+    const hint = await t.ev('g.hud.els.interact.textContent');
+    t.ok(hint === 'E — read the marker', `expected the marker hint, got "${hint}"`);
+    await t.key('KeyE');
+    const dlg = await t.ev(`({
+      name: g.hud.els.dialog.querySelector('.npc-name').textContent,
+      text: g.hud.els.dialog.querySelector('.npc-text').textContent,
+    })`);
+    t.ok(dlg.name.includes('Motiva'), `dialog name is "${dlg.name}"`);
+    t.ok(dlg.text.includes('biggest refinery on the continent'), `Motiva plaque copy drifted: "${dlg.text.slice(0, 60)}…"`);
+    await t.key('KeyE');
+  });
+
+  await t.check('refinery heroes: all four log on arrival', async () => {
+    const ids = await t.ev(`g.energy.heroes.filter((h) => h.kind === 'refinery').map((h) => h.id)`);
+    t.ok(ids.length === 4, `expected 4 refinery heroes, got ${ids.length}`);
+    for (const id of ['shipchannel', 'baytown', 'motiva', 'corpus']) t.ok(ids.includes(id), `missing refinery hero id: ${id}`);
+    await t.ev(`g.gameplay.save.energy = []`);
+    const bay = await t.ev(`g.energy.heroes.find((h) => h.id === 'baytown')`);
+    await t.tp(bay.at[0], bay.at[1]);
+    await t.until(`g.gameplay.save.energy.includes('baytown')`, 6000);
+  });
+
+  await t.check('light pool: scene light count is IDENTICAL across nightfall and a two-site drive (the recompile guard)', async () => {
+    const count = `(() => { let n = 0; g.sky.scene.traverse((o) => { if (o.isLight) n++; }); return n; })()`;
+    await t.setDay();
+    const day = await t.ev(count);
+    await t.setNight();
+    const m = await t.ev(`g.energy.heroes.find((h) => h.id === 'motiva').at`);
+    await t.tp(m[0], m[1]);
+    await t.wait(0.8);
+    const nightA = await t.ev(count);
+    const d = await t.ev(`g.energy.heroes.find((h) => h.id === 'shipchannel').at`);
+    await t.tp(d[0], d[1]);
+    await t.wait(0.8);
+    const nightB = await t.ev(count);
+    t.ok(day === nightA && nightA === nightB, `light count moved: day=${day} night@motiva=${nightA} night@deerpark=${nightB}`);
+    const pool = await t.ev('g.sky.pool.length');
+    t.ok(pool === 6, `pool is not the fixed 6: ${pool}`);
+  });
+
+  await t.check('light pool: 0-intensity by day, lit near a refinery at night, flare anchors flicker orange', async () => {
+    await t.setDay();
+    const m = await t.ev(`g.energy.heroes.find((h) => h.id === 'motiva').at`);
+    await t.tp(m[0], m[1]);
+    await t.wait(0.8);
+    const day = await t.ev('g.sky.pool.map((l) => l.intensity)');
+    t.ok(day.every((i) => i === 0), `pool lit by day: ${JSON.stringify(day)}`);
+    await t.setNight();
+    await t.wait(0.8); // one 0.5 s assignment tick + a frame
+    const night = await t.ev(`g.sky.pool.filter((l) => l.userData.anchor).map((l) => ({ i: l.intensity, kind: l.userData.anchor.kind }))`);
+    t.ok(night.length > 0, 'no pool light assigned beside the Motiva skyline at night');
+    t.ok(night.every((l) => l.i > 0), `assigned pool light dark at night: ${JSON.stringify(night)}`);
+    t.ok(night.some((l) => l.kind === 'flare' || l.kind === 'refinery'), `no refinery/flare anchor served: ${JSON.stringify(night)}`);
+  });
+
+  await t.check('light pool: nearest-assignment follows the player between two sites', async () => {
+    await t.setNight();
+    const m = await t.ev(`g.energy.heroes.find((h) => h.id === 'motiva').at`);
+    await t.tp(m[0], m[1]);
+    await t.wait(0.8);
+    const atMotiva = await t.ev(`g.sky.pool.filter((l) => l.userData.anchor).map((l) => ({ x: l.position.x, z: l.position.z }))`);
+    t.ok(atMotiva.length > 0, 'no anchors served at Motiva');
+    const d = await t.ev(`g.energy.heroes.find((h) => h.id === 'shipchannel').at`);
+    await t.tp(d[0], d[1]);
+    await t.wait(0.8);
+    const atDeer = await t.ev(`g.sky.pool.filter((l) => l.userData.anchor).map((l) => ({ x: l.position.x, z: l.position.z }))`);
+    t.ok(atDeer.length > 0, 'no anchors served at Deer Park');
+    // the pool serves the nearest anchors to the PLAYER — a neighboring
+    // refinery's flare 100u out can legitimately hold a light, so assert
+    // relative nearness (Motiva side vs Deer Park side), not a fixed radius
+    const nearM = atMotiva.every((l) => Math.hypot(l.x - m[0], l.z - m[1]) < Math.hypot(l.x - d[0], l.z - d[1]));
+    const nearD = atDeer.every((l) => Math.hypot(l.x - d[0], l.z - d[1]) < Math.hypot(l.x - m[0], l.z - m[1]));
+    t.ok(nearM, `Motiva-side lights sit closer to Deer Park: ${JSON.stringify(atMotiva)}`);
+    t.ok(nearD, `assignment did not flip to Deer Park: ${JSON.stringify(atDeer)}`);
+  });
+
+  await t.check('spill decals: refinery ground glow and rig water glow both track ATMOS.night', async () => {
+    await t.setDay();
+    await t.wait(0.3);
+    const day = await t.ev(`({ ref: g.energy.spillMat.opacity, rig: g.maritime.spillMat.opacity })`);
+    t.ok(day.ref === 0 && day.rig === 0, `spill glowing by day: ${JSON.stringify(day)}`);
+    await t.setNight();
+    await t.wait(0.3);
+    const night = await t.ev(`({ ref: g.energy.spillMat.opacity, rig: g.maritime.spillMat.opacity, n: g.ATMOS.night })`);
+    t.ok(night.ref > 0.2 && night.rig > 0.2, `spill dark at night: ${JSON.stringify(night)}`);
+  });
+
+  await t.check('rig decks: major platforms registered warm-white pool anchors; water spill instanced under the fleet', async () => {
+    const res = await t.ev(`(() => {
+      const rigAnchors = g.sky.glowAnchors.filter((a) => a.kind === 'rig').length;
+      const majors = g.GEO.energy.platforms.filter((p) => p.tier === 'major').length;
+      const flare = g.sky.glowAnchors.some((a) => a.kind === 'flare' && g.maritime.farSite && Math.hypot(a.x - g.maritime.farSite.x, a.z - g.maritime.farSite.z) < 12);
+      return { rigAnchors, majors, farFlare: flare };
+    })()`);
+    // majors minus one: the Far Rig is a major but registers flare-kind at its flame
+    t.ok(res.rigAnchors === res.majors - 1, `rig anchors (${res.rigAnchors}) != major platforms - farRig (${res.majors - 1})`);
+    t.ok(res.farFlare, 'the Far Rig has no flare-kind anchor');
   });
 }

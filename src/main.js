@@ -122,8 +122,8 @@ async function boot() {
   const travel = new TravelMenu(player, gameplay, sky, npcs, missions, dog, (m) => hud.toast(m), (k) => audio.chime(k),
     (on) => setPause(on ? 'menu' : null));
   const trains = new TrainSystem(scene);
-  const maritime = new MaritimeSystem(scene);
-  const energy = new EnergySystem(scene, gameplay);
+  const maritime = new MaritimeSystem(scene, sky);
+  const energy = new EnergySystem(scene, gameplay, sky, scenery);
   energy.onToast = (m) => hud.toast(m); // approach announcer — real names on the HUD
   const shoulder = new ShoulderSystem(scene);
   shoulder.onToast = (m) => hud.toast(m);
@@ -200,6 +200,8 @@ async function boot() {
     if (sea) return { name: sea.name, hint: sea.hint, dialog: { name: '⚓ ' + sea.name, sub: sea.sub, text: sea.text } };
     const ln = shoulder.plaqueNear(pos, range); // W6a line plaques: Neutral Ground, straddle, WinBig, Corner Stones
     if (ln) return { name: ln.name, hint: ln.hint, dialog: { name: ln.icon + ' ' + ln.name, sub: ln.sub, text: ln.text } };
+    const en = energy.plaqueNear(pos, range); // Energy W4 hero-skyline brass
+    if (en) return { name: en.name, hint: en.hint, dialog: { name: '🏭 ' + en.name, sub: en.sub, text: en.text } };
     return null;
   };
   let hornCd = 0;

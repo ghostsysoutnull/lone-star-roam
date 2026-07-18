@@ -20,7 +20,14 @@
 //                 relation["industrial"="refinery"](TXBBOX);
 //                 way["man_made"="works"]["product"~"oil|petroleum|fuel"](TXBBOX);
 //                 relation["man_made"="works"]["product"~"oil|petroleum|fuel"](TXBBOX);
+//                 way["landuse"="industrial"]["name"~"[Rr]efiner"](TXBBOX);
+//                 relation["landuse"="industrial"]["name"~"[Rr]efiner"](TXBBOX);
+//                 node["landuse"="industrial"]["name"~"[Rr]efiner"](TXBBOX);
 //                );out center tags;
+//                (broadened 2026-07-18, Energy W4: industrial=refinery alone
+//                missed the entire Houston Ship Channel cluster — Deer Park,
+//                Big Spring, Borger, McKee, Corpus East only carry the
+//                landuse+name tagging)
 //   lines345     way["power"="line"]["voltage"~"(^|;)345000(;|$)"](TXBBOX);
 //                out tags geom;
 //   substations  (node["power"="substation"]["voltage"](TXBBOX);
@@ -240,8 +247,13 @@ for (const el of plantsRaw) {
 console.log(`plants: ${plantsRaw.length} raw -> ${plants.length} kept, ${solarCount} solar (${plants.filter((p) => p.name).length} named)`);
 
 // =================================================================
-// Refineries — industrial=refinery + man_made=works w/ oil product tags.
+// Refineries — industrial=refinery + man_made=works w/ oil product tags,
+// plus landuse=industrial areas *named* refinery (W4 broadening — see the
+// query record above). Sub-facility ways of a refinery complex (its power
+// station, receiving terminal) and non-petroleum "refineries" (metal
+// recyclers, lithium) are junk-filtered by name; the complex itself stays.
 // =================================================================
+const REF_JUNK = /Recycle|Lithium|Power (Station|Plant)|Cogeneration|Oil Recieving/i;
 const refRaw = load('refineries');
 const refineries = [];
 for (const el of refRaw) {
@@ -249,12 +261,35 @@ for (const el of refRaw) {
   if (!c) continue;
   const [x, z] = proj(c[0], c[1]);
   const tags = el.tags || {};
+  if (tags.name && REF_JUNK.test(tags.name)) continue;
   const rec = { x: +x.toFixed(1), z: +z.toFixed(1) };
   if (tags.name) rec.name = tags.name;
   if (tags.operator) rec.operator = tags.operator;
   refineries.push(rec);
 }
-console.log(`refineries: ${refRaw.length} raw -> ${refineries.length} kept`);
+// Near-dup collapse: the broadened query can return the same complex twice
+// (its industrial=refinery way + its named landuse area — e.g. the bare
+// "Port Arthur Refinery" 2.8u from Motiva's polygon). Real neighbors are
+// tens of units apart (Valero/Motiva/Total PA); 6u only merges true dups.
+// Keep the better-tagged record (operator+name > name > bare).
+refineries.sort((a, b) => (!!b.operator - !!a.operator) || (!!b.name - !!a.name));
+for (let i = refineries.length - 1; i >= 0; i--) {
+  const r = refineries[i];
+  if (refineries.some((o, j) => j < i && Math.hypot(o.x - r.x, o.z - r.z) < 6)) refineries.splice(i, 1);
+}
+// Hand-placed majors OSM has no refinery-tagged area for (Bruno-approved
+// scarcity exception, 2026-07-18 — the Spindletop-precedent hand list).
+// Real coordinates; re-check against OSM before any future rebake and
+// delete each entry the moment the real polygon appears.
+const REF_HAND = [
+  { lat: 29.756, lon: -95.011, name: 'ExxonMobil Baytown Refinery', operator: 'ExxonMobil' },
+  { lat: 29.375, lon: -94.931, name: 'Galveston Bay Refinery', operator: 'Marathon Petroleum' },
+];
+for (const h of REF_HAND) {
+  const [x, z] = proj(h.lon, h.lat);
+  refineries.push({ x, z, name: h.name, operator: h.operator, hand: true });
+}
+console.log(`refineries: ${refRaw.length} raw -> ${refineries.length} kept (${REF_HAND.length} hand-placed)`);
 
 // =================================================================
 // Transmission — 345 kV only (pre-filtered server-side by the token-anchored

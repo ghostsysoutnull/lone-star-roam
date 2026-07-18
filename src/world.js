@@ -890,7 +890,7 @@ class ScenerySystem {
 
     // animate pumpjacks (nodding), windmills (spinning), chickens (pecking)
     this.t += dt;
-    this.flareMat.opacity = ATMOS.night; // gas flares punch through after dark
+    this.flareMat.opacity = 0.3 + 0.7 * ATMOS.night; // flares burn 24/7 — faint by day, punching through after dark (Energy W4, Bruno's call)
     for (const a of this.animated) {
       if (a.kind === 'pumpjack') a.obj.rotation.x = Math.sin(this.t * 1.4 + a.phase) * 0.22; // beam nods across its x pivot
       else if (a.kind === 'chicken') a.obj.rotation.x = -Math.max(0, Math.sin(this.t * 2.6 + a.phase)) * 0.5; // beak-to-dirt peck bursts
@@ -1590,10 +1590,11 @@ export function mkTurbineBladeGeo() {
   return mergeGeoms(parts);
 }
 // position+normal concat, no vertex color — every part shares one flat material
-function mergeGeoms(parts) {
+export function mergeGeoms(parts) { // exported for energy.js's merged refinery kit
   const g = new THREE.BufferGeometry();
   const total = parts.reduce((s, p) => s + p.attributes.position.count, 0);
-  for (const name of ['position', 'normal']) {
+  const names = parts[0].attributes.color ? ['position', 'normal', 'color'] : ['position', 'normal'];
+  for (const name of names) {
     const arr = new Float32Array(total * 3);
     let o = 0;
     for (const p of parts) { arr.set(p.attributes[name].array, o); o += p.attributes[name].array.length; }

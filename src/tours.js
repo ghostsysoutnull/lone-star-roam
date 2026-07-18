@@ -15,12 +15,13 @@ export const TOURS = [
   {
     track: 'Energy (2026-07)',
     waves: [
-      { wave: 'W2 — wells, offshore rebase, log, announcer', spots: [
-        S('🔥 Permian night flares — Loving county pad', [-4042.1, -355.1], { mode: 'DRIVE', time: 0.98, note: 'a real-density well site: pumpjack, 4-tank battery, workover derrick, gas flare flickering after dark' }),
-        S('🛢️ Spindletop — Energy log hero', [5191.6, 1096.9], { mode: 'DRIVE', note: 'the 1901 gusher: granite obelisk + timber derrick; drive in and the log stamps (11th collectible)' }),
-        S('🛢️ Midland Tank Farm — Energy log hero', LL(31.943, -102.03), { mode: 'DRIVE', note: 'Permian crude staging — nine bermed tanks; the log stamps on arrival' }),
-        S('📣 Approach announcer — NANSEN platform', [4801.7, 4043.8], { mode: 'FLY', note: 'fly the offshore row: every named/operated platform announces itself on approach, every visit; unnamed sites stay silent' }),
-        S('⚓ Corpus fairway leg — approach tanker', [2057.9, 3551.4], { mode: 'FLY', note: 'watch: a tanker works the real Aransas Pass fairway points in and out (position varies with boot time)' }),
+      { wave: 'W4 — refineries, hero skylines, light pool, spill decals', spots: [
+        S('🏭 Ship Channel at night — Deer Park hero', [4174.9, 1421.1], { mode: 'DRIVE', time: 0.98, note: 'the hero skyline glowing: cracker towers, tank farm, twin flares; park under a flare and the truck catches real orange light (the W4 pool)' }),
+        S('🏭 Baytown Refinery — hero + log', [4285.7, 1390.3], { mode: 'DRIVE', time: 0.98, note: 'hand-placed at the real ExxonMobil complex (OSM has no polygon — scarcity exception); the log stamps, brass at the marker' }),
+        S('🏭 Motiva Port Arthur — largest in North America', [5289.6, 1240.8], { mode: 'DRIVE', time: 0.98, note: 'hero skyline beside Valero + Total — the Port Arthur refinery row lights the whole horizon after dark' }),
+        S('🏭 Corpus Christi Refinery Row — hero + plaque', [1956.1, 3546.7], { mode: 'DRIVE', time: 0.98, note: 'refinery row on the Corpus ship channel; sodium-orange spill decals under the lit clusters' }),
+        S('🛢️ Rig water glow — offshore at night', [4542, 3160.6], { mode: 'FLY', time: 0.98, note: 'the Far Rig: flare-lit deck, warm spill on the water under the fleet (majors get real deck light from the pool)' }),
+        S('🏭 A working refinery by day — Big Spring', [-1828.2, -1415.4], { mode: 'DRIVE', time: 0.35, note: 'the generic kit at a W4-recovered site (the old bake missed it): columns, tanks, pipe rack — and the flare burning faint even in daylight (flares run 24/7)' }),
       ] },
       { wave: 'W3 — wind farms, solar fields, log', spots: [
         S('💨 Wind farm — Sweetwater/Nolan corridor', [-650, -1430], { mode: 'FLY', time: 0.79, note: 'the densest baked cluster (1336 real turbines): instanced towers, blades spinning live with ATMOS.wind' }),
@@ -28,6 +29,13 @@ export const TOURS = [
         S('💨 Horse Hollow Wind Energy Center — Energy log hero', [-524.8, -1324.7], { mode: 'DRIVE', note: '421 turbines, one of the largest wind farms on Earth at its 2006 completion' }),
         S('💨 Papalote Creek Wind Farm — Energy log hero', [1664.7, 3380.0], { mode: 'DRIVE', note: 'the coastal wind farm — steady Gulf breeze, San Patricio County' }),
         S('☀️ Blue Wing Solar Farm — panel field', [1047.4, 1886.4], { mode: 'FLY', note: 'dark panel-field decal from the air, near-ground panel rows on approach; the announcer fires its real name' }),
+      ] },
+      { wave: 'W2 — wells, offshore rebase, log, announcer', spots: [
+        S('🔥 Permian night flares — Loving county pad', [-4042.1, -355.1], { mode: 'DRIVE', time: 0.98, note: 'a real-density well site: pumpjack, 4-tank battery, workover derrick, gas flare flickering after dark' }),
+        S('🛢️ Spindletop — Energy log hero', [5191.6, 1096.9], { mode: 'DRIVE', note: 'the 1901 gusher: granite obelisk + timber derrick; drive in and the log stamps (11th collectible)' }),
+        S('🛢️ Midland Tank Farm — Energy log hero', LL(31.943, -102.03), { mode: 'DRIVE', note: 'Permian crude staging — nine bermed tanks; the log stamps on arrival' }),
+        S('📣 Approach announcer — NANSEN platform', [4801.7, 4043.8], { mode: 'FLY', note: 'fly the offshore row: every named/operated platform announces itself on approach, every visit; unnamed sites stay silent' }),
+        S('⚓ Corpus fairway leg — approach tanker', [2057.9, 3551.4], { mode: 'FLY', note: 'watch: a tanker works the real Aransas Pass fairway points in and out (position varies with boot time)' }),
       ] },
     ],
   },

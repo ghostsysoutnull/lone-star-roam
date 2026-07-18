@@ -168,6 +168,14 @@ stash in `~/claude-area/devel/tx-inputs/`, not the repo.
 - **Refineries** — 22 (`industrial=refinery` + `man_made=works` with
   oil/petroleum/fuel product tags). All 22 get skylines; 4 heroes
   (Ship Channel, Baytown, Port Arthur, Corpus) get extra dressing.
+  **W4 revision (2026-07-18)**: the tag pair missed the entire Houston
+  Ship Channel cluster — query broadened with `landuse=industrial` +
+  `name~refiner` (recovers Deer Park, Big Spring, Borger, McKee, Corpus
+  East), junk-filtered (recyclers, lithium, power-station sub-ways),
+  near-dup-collapsed (6u), plus 2 Bruno-approved hand-placed majors OSM
+  has no polygon for (ExxonMobil Baytown, Marathon Galveston Bay) →
+  **33 baked / 28 named**. Heroes: Deer Park (Ship Channel), Baytown
+  (hand), Motiva Port Arthur, Valero Corpus East.
 - **Transmission** — 42,881 `power=line` ways total; bake filters to
   **345 kV**. OSM `voltage` is multi-value (`345000;138000`) — **match
   the value anywhere in the list, never `split(';')[0]`** (the band-roads

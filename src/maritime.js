@@ -7,6 +7,19 @@ import { ATMOS } from './sky.js';
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const SEA = -2.1; // gulf water plane is at -2.5; hulls sit slightly proud
 
+// radial vertex-color falloff for glow discs (center white -> black rim);
+// black + AdditiveBlending contributes nothing, so the edge dissolves
+export function fadeDisc(geo, r = 1) {
+  const pos = geo.attributes.position, col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const d = Math.hypot(pos.getX(i), pos.getZ(i)) / r;
+    const c = Math.max(0, 1 - d * d);
+    col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = c;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+
 // real port locations
 const PORTS = [
   { name: 'Port of Houston', at: LL(29.735, -95.01), cranes: 4 },
@@ -27,7 +40,8 @@ const LANE = [
 const BUOY_AT = [4762.2, 1851.5];
 
 export class MaritimeSystem {
-  constructor(scene) {
+  constructor(scene, sky) {
+    this.sky = sky; // Energy W4: rig decks register into sky's local light pool
     // emissive glow materials (rig flares, work lights, buoy lamp) — opacity
     // driven by ATMOS.night in update; fog:false so the horizon skyline
     // survives scene fog (sky.js owns all real lights, these are just glow)
@@ -190,7 +204,28 @@ export class MaritimeSystem {
         ? at(1.8, deckY + 0.35 + 5.4, 1.5, 1.5, 1.5, 1.5)
         : at(0, deckY + 0.8, 0, 0.9, 0.9, 0.9));
     });
-    for (const inst of [legI, deckI, modI, derrickI, flareI, glowI]) scene.add(inst);
+    // W4 spill decals: warm glow pooled on the water under every platform —
+    // flat circles floating above the one gulf plane (deck y-stagger, never a
+    // second water plane); opacity rides ATMOS.night in update via spillMat.
+    // vertex-colored radial falloff: rim fades to black, which under additive
+    // blending IS transparent — soft pool edge with no extra material
+    this.spillMat = new THREE.MeshBasicMaterial({ color: 0xff9040, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, vertexColors: true });
+    const spillGeo = new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2);
+    fadeDisc(spillGeo);
+    const spillI = new THREE.InstancedMesh(spillGeo, this.spillMat, rest.length);
+    rest.forEach((p, i) => {
+      const r = p.tier === 'major' ? 7 : 4;
+      m.compose(v.set(p.x, -2.28, p.z), q.identity(), sc.set(r, 1, r));
+      spillI.setMatrixAt(i, m);
+    });
+    for (const inst of [legI, deckI, modI, derrickI, flareI, glowI, spillI]) scene.add(inst);
+    // W4 light pool: major work decks put real light on the water/deck at
+    // close range (warm white); flare tips flicker orange. Minors stay
+    // emissive-only — the pool only ever serves the nearest ~6 anchors.
+    for (const p of rest) {
+      if (p.tier !== 'major') continue;
+      this.sky?.registerGlowAnchor({ x: p.x, z: p.z, y: SEA + 7, kind: 'rig' });
+    }
 
     // the Far Rig — bespoke, upgraded: the farthest real major off the coast
     if (this.farSite) {
@@ -222,6 +257,11 @@ export class MaritimeSystem {
       g.userData.far = true;
       scene.add(g);
       this.farRig = g;
+      // Far Rig: bigger spill + a flare-kind anchor at the flame itself
+      const spill = new THREE.Mesh(fadeDisc(new THREE.CircleGeometry(11, 24).rotateX(-Math.PI / 2), 11), this.spillMat);
+      spill.position.set(this.farSite.x, -2.26, this.farSite.z);
+      scene.add(spill);
+      this.sky?.registerGlowAnchor({ x: this.farSite.x + 1.8 * 1.5, z: this.farSite.z + 1.5 * 1.5, y: SEA + 5.35 + 5 * 1.5, kind: 'flare' });
     }
   }
 
@@ -326,6 +366,7 @@ export class MaritimeSystem {
     // night gate for every glow (rig flares, work lights, buoy lamp)
     this.rigGlow.opacity = ATMOS.night;
     this.workGlow.opacity = ATMOS.night;
+    this.spillMat.opacity = ATMOS.night * 0.32;
     // the buoy bobs on the line
     this.buoy.position.y = Math.sin(t * 0.8) * 0.12;
     this.buoy.rotation.z = Math.sin(t * 0.55) * 0.06;

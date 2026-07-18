@@ -42,6 +42,17 @@ const regionOf = (x, z) => (x < -2200 ? 'west' : z < -2200 ? 'panhandle' : x > 3
 
 const RAIN_N = 340, CLOUD_N = 44;
 
+// Local light pool (Energy W4): fixed count forever (resizing recompiles
+// every lit shader). Kind → color + base intensity (the brands PointLight
+// scale — Bucky's canopy runs 30 @ r50); 'flare' flickers in update.
+const POOL_N = 6;
+const POOL_KINDS = {
+  refinery: { color: 0xff9a3c, i: 22 }, // sodium orange
+  flare: { color: 0xff7a24, i: 26 },    // ragged flame, flickered
+  rig: { color: 0xfff0d0, i: 20 },      // warm white work deck
+  plant: { color: 0xd8e8ff, i: 20 },    // cool floodlight (W5)
+};
+
 // faint name sprite for constellations/planets
 function mkTextSprite(text, size = 140) {
   const c = document.createElement('canvas');
@@ -78,6 +89,23 @@ export class SkySystem {
     this.flash = 0;
 
     this.buildCelestial(scene);
+
+    // --- local light pool (Energy W4) — the one sanctioned extension of the
+    // one-light-rig law. Built ONCE at a fixed size: adding or removing a
+    // scene light recompiles every lit shader, so the pool count is constant
+    // forever and only position/color/intensity ever change. Systems register
+    // glow anchors {x, z, y, kind}; each night the nearest anchors get the
+    // lights, everything is 0-intensity by day.
+    this.glowAnchors = [];
+    this.pool = [];
+    this.poolAcc = 1; // assign on the first frame
+    this.flick = 0;   // flare-flicker clock
+    for (let i = 0; i < POOL_N; i++) {
+      const l = new THREE.PointLight(0xffffff, 0, 60, 1.5);
+      l.userData.anchor = null;
+      scene.add(l);
+      this.pool.push(l);
+    }
 
     // cloud layer — instanced flattened blobs drifting with the wind
     this.clouds = new THREE.InstancedMesh(
@@ -240,6 +268,9 @@ export class SkySystem {
     return { a, b, k };
   }
 
+  // systems register night glow anchors {x, z, y, kind} — kinds in POOL_KINDS
+  registerGlowAnchor(a) { this.glowAnchors.push(a); }
+
   update(dt, ff, px, pz, py) {
     const tAdd = (dt * (ff ? FF_SPEED : 1)) / DAY_SECONDS;
     this.t = (this.t + tAdd) % 1;
@@ -370,6 +401,39 @@ export class SkySystem {
       this.rain.setMatrixAt(this.drops.indexOf(d), this.m4);
     }
     this.rain.instanceMatrix.needsUpdate = true;
+
+    // --- local light pool: throttled nearest-anchor assignment, per-frame
+    // intensity (0 by day; flares flicker). Positions/colors only ever
+    // mutate — the pool itself never grows or shrinks (shader-recompile law).
+    this.flick += dt;
+    this.poolAcc += dt;
+    if (this.poolAcc > 0.5 && this.glowAnchors.length) {
+      this.poolAcc = 0;
+      if (ATMOS.night > 0.05) {
+        const near = this.glowAnchors
+          .map((a) => ({ a, d: Math.hypot(a.x - px, a.z - pz) }))
+          .filter((r) => r.d < 220)
+          .sort((p, q) => p.d - q.d)
+          .slice(0, POOL_N);
+        for (let i = 0; i < POOL_N; i++) {
+          const l = this.pool[i], r = near[i];
+          l.userData.anchor = r ? r.a : null;
+          if (r) {
+            l.position.set(r.a.x, r.a.y, r.a.z);
+            l.color.setHex((POOL_KINDS[r.a.kind] || POOL_KINDS.refinery).color);
+          }
+        }
+      } else for (const l of this.pool) l.userData.anchor = null;
+    }
+    for (let i = 0; i < POOL_N; i++) {
+      const l = this.pool[i], a = l.userData.anchor;
+      if (!a) { l.intensity = 0; continue; }
+      const k = POOL_KINDS[a.kind] || POOL_KINDS.refinery;
+      const flicker = a.kind === 'flare'
+        ? 0.7 + 0.3 * Math.abs(Math.sin(this.flick * 9 + i * 2.1)) + 0.1 * Math.sin(this.flick * 23 + i)
+        : 1;
+      l.intensity = ATMOS.night * k.i * flicker;
+    }
 
     // --- lightning ---
     this.flash = Math.max(0, this.flash - dt * 8);
