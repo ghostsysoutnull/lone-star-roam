@@ -10,8 +10,7 @@
   sites (Spindletop, a Permian tank farm), and the **approach
   announcer** (real name + info fragment on HUD proximity, armed/re-arm
   per site, unnamed sites silent). Wave 1 (fetch + bake + `geo.js`
-  wiring + `energy.mjs` checks) shipped 2026-07-17, commit `<fill in
-  after commit>`.
+  wiring + `energy.mjs` checks) shipped 2026-07-17, commit `1e459f9`.
 - **Recommended setup**: model **Fable 5**, effort **high** — content +
   composition. Flag it if the running model differs.
 - **Budget**: code + checks, **one shot** (Permian flares at night),
