@@ -15,28 +15,36 @@ Agriculture painted the land from census truth.
 *Expected result: `tools/build-energy.mjs` bakes `data/energy.json` from
 recorded Overpass queries; `geo.js` loads it and exports `energyAt(x,z)` +
 site lists on `__game`. `tools/checks/energy.mjs` asserts data truths:
-Permian counties dense, Roscoe wind farm present, 22 refineries, a
-Panhandle-to-metro 345 kV corridor. No visible change in game.*
+Permian counties dense, Roscoe wind farm present, 22 refineries,
+`platforms[]` tiered from the 397 real offshore sites, fairway
+snap-points present, a Panhandle-to-metro 345 kV corridor. W1 also greps
+that nothing save-referenced anchors to the old rig/scatter coords
+(clears the W2 retirements). No visible change in game.*
 *Suggested setup: Sonnet 5, effort high.*
 
 **Wave 2 — the player gets:**
-- oil country that reads where it really is: pumpjack density driven by the
-  county's real well count (Permian, Eagle Ford, Barnett, Panhandle, East
-  Texas field), not one uniform region
-- tank batteries and drilling rigs at seeded well sites
+- oil country that reads where it really is: the old uniform Permian
+  scatter **retires** — pumpjacks now stand only where the county's real
+  well count puts them (Permian denser than before; Eagle Ford, Barnett,
+  Panhandle, East Texas appear from nothing)
+- tank batteries and drilling rigs at seeded well sites, all at the new
+  poly bar (Waggoner's ranch pumpjacks stay put — story dressing — and
+  reuse the new build)
+- **the offshore rebase**: the 7 hand-laid platforms retire — rigs now
+  stand at the real mapped sites (397 off the coast, tiered at bake);
+  Far Rig's brass and the Malaquite skyline re-anchor to real platforms
 - night gas flares flickering across the basins after dark
 - the first hero energy sites + the new **Energy log** (11th collectible)
   — starting with Spindletop
-- **every pumpjack in the game upgrades to the new higher-poly build** —
-  the old Permian scatter and Waggoner's included, in place; nothing
-  moves
 
-*Expected result: driving the Permian at night reads as working oil
-country; a low-well county spawns almost nothing. Flares are night-gated
-emissive (no new lights). `save.energy` is a new additive key; the pause
-screen shows the Energy line. The shared pumpjack prototype swaps to the
-poly-bar build — geometry only, seed streams and transforms untouched, so
-old and new scatter render identically with no two-generations read.*
+*Expected result: extraction is real-placement-only, on land and water.
+Retired layers stop being drawn — their seed streams go unused, never
+re-keyed. The ship lane stays hand-laid (scarcity exception) with its
+port-approach legs snapped to the 8 real fairways. Flares are night-gated
+emissive (no new lights — the pool is W4). `save.energy` is a new
+additive key; the pause screen shows the Energy line. Shelf checks +
+tours re-anchor in-wave. The offshore rebase is the wave's
+pre-authorized split-out (a W2.5) if the session runs long.*
 *Suggested setup: Fable 5, effort high.*
 
 **Wave 3 — the player gets:**
@@ -55,8 +63,8 @@ dark panel fields from the air and rows near ground (crop idiom).*
   stacks; the Houston Ship Channel, Baytown, Port Arthur and Corpus as
   hero industrial landscapes glowing at night
 - **real light at close range**: park under a flare stack and your truck
-  catches the orange; the water under the offshore rigs glows — the
-  existing Shelf platforms upgrade for free
+  catches the orange; the water under the offshore rigs (rebased onto
+  real sites in W2) glows
 - distant sites spill light onto ground and water via night glow decals
 - refinery heroes join the Energy log with plaque facts
 
@@ -108,6 +116,17 @@ extend additively.*
   sites get true illumination via a sky.js-owned pooled system (design
   in Architecture) — the one sanctioned extension of the one-light-rig
   law. Turbine aviation beacons stay pure emissive (unison blink, W3).
+- **Realism-first replacement** (Bruno, 2026-07-17): energy-dimension
+  objects are **data-placed or absent** — old approximations coexisting
+  with real placements is worse than losing them. The uniform Permian
+  scatter and the 7 hand-laid platforms retire in W2. The **scarcity
+  exception**, measured at bake time per layer: where real data is too
+  sparse to read at game scale, hand-laid content stays — ships trigger
+  it (0 OSM separation lanes, 8 fairway fragments off Texas), so the
+  coastal lane stays hand-laid with port legs snapped to the real
+  fairways. Spatial-memory cost of moving shipped rigs/fields
+  explicitly accepted. Farm windmills are agriculture — untouched.
+  AIS-based real ship routes → BACKLOG (heavy input, poor ROI today).
 
 ## Data (verified 2026-07-17, Overpass GET, TX bbox 25.6,-107.0,36.8,-93.2)
 
@@ -142,6 +161,14 @@ stash in `~/claude-area/devel/tx-inputs/`, not the repo.
   simplified like rails.
 - **Substations** — 9,427 total; keep only voltage-tagged ≥345 kV majors,
   as dressing at line endpoints/plant sites. Not a standalone layer.
+- **Offshore platforms** — 397 (`man_made=offshore_platform`, Gulf bbox
+  25.8,-97.6,29.9,-93.2). Bake tiers/clusters (turbine idiom): majors
+  stand alone with the full rig build, minor clusters merge into lighter
+  builds → `platforms[]`. Replaces the 7 hand-laid Shelf platforms (W2).
+- **Fairways** — 8 ways (`seamark:type=fairway` / `waterway=fairway`);
+  **0 separation lanes** — the ship-lane scarcity exception in the
+  Decisions. Baked as snap-points for the hand-laid lane's port
+  approaches only.
 
 ## Architecture
 
@@ -163,13 +190,19 @@ stash in `~/claude-area/devel/tx-inputs/`, not the repo.
   (airports idiom — poly-budgeted, drape skirts on `hAt`). Towers
   instance along `lines345` arc-length (rails idiom); conductor wires
   are an in-wave judgment (thin merged segments vs none).
-- **Existing pumpjack scatter: placement untouched, prototype upgraded**
-  — seed streams and every transform ship as-is; the *added* density
-  comes from new streams gated on `energyAt`. Nothing shipped moves
-  (the crops-4.5 law). W2 swaps the **shared pumpjack prototype
-  geometry** to the poly-bar build so all generations (old scatter,
-  Waggoner's, new well sites) render one mesh — a mesh-in-place swap is
-  legal under the determinism law; placement changes are not.
+- **Old energy placements retire** (realism-first decision): the uniform
+  Permian pumpjack scatter and the hand-laid platforms stop being drawn
+  — their seed streams go unused, **never re-keyed** (the determinism
+  law bans re-keying live streams, not retiring layers). Every pumpjack
+  in the game (well sites, Waggoner's) renders the one new poly-bar
+  prototype. W1's save-reference grep clears the retirements before
+  anything moves (maritime plaques are not landmarks — expected safe).
+- **Offshore rebase** (W2, maritime.js): `platforms[]` replaces the
+  hand-laid seven — majors get the full rig build, clustered minors a
+  lighter one; `rigGlow`/`workGlow` idiom unchanged; Far Rig's brass
+  re-anchors to the farthest real major; the Malaquite-skyline check +
+  tours re-anchor rather than delete. Ship lane stays hand-laid;
+  port-approach legs snap to the baked fairway points.
 - **Lights**: every glow (flares, refinery, turbine beacons, plant
   windows) is emissive, `ATMOS.night`-gated, `fog: false` where it must
   punch through — sky.js stays the only light rig. Flicker via the
@@ -185,7 +218,7 @@ stash in `~/claude-area/devel/tx-inputs/`, not the repo.
   deck), cool flood (plant). **Spill decals** carry the far read: warm
   night-gated decals on ground/water under anchor clusters (z-fight law
   — join the deck y-stagger; the gulf stays one plane, decals float
-  above it). Existing Shelf platforms + Far Rig register anchors in
+  above it). The W2-rebased platforms + Far Rig register anchors in
   this wave.
 - **Poly bar**: every kit in this track (well site, turbine, solar,
   refinery, tower) ships at the W6b bar per the GOTCHAS standing rule —
@@ -213,8 +246,8 @@ ERCOT control room (Taylor).
 
 | Wave | Deliverable | Model + effort | Budget |
 |------|-------------|----------------|--------|
-| **1** | Fetch + `build-energy.mjs` + `data/energy.json` + `energyAt` + `__game` wiring + data-truth checks | **Sonnet 5, high** — pure fetch/bake plumbing | code + checks, **no shots**, grep-first |
-| **2** | Well sites (`wellSiteAt` + kit), density scatter, night flares, **shared pumpjack prototype swap** (all generations match), Energy log machinery + first sites | **Fable 5, high** — content + composition | code + checks, **one shot** (Permian flares at night), grep-first |
+| **1** | Fetch + `build-energy.mjs` + `data/energy.json` (incl. `platforms[]` + fairways) + `energyAt` + `__game` wiring + data-truth checks + save-reference grep | **Sonnet 5, high** — pure fetch/bake plumbing | code + checks, **no shots**, grep-first |
+| **2** | Well sites (`wellSiteAt` + kit), scatter **replacement** (old stream retired), **offshore rebase** (real platforms; Far Rig + skyline re-anchor; pre-authorized W2.5 split), night flares, Energy log machinery + first sites | **Fable 5, high** — content + composition | code + checks, **one shot** (Permian flares at night), grep-first |
 | **3** | Wind farms (instanced turbines, `ATMOS.wind` spin) + solar fields + log sites | **Sonnet 5, high** — instancing plumbing | code + checks, **one shot** (turbine row at dusk), grep-first |
 | **4** | Refinery kit at all 22 + 4 hero skylines + night glow + **local light pool + spill decals** (rigs included) + plaques + log sites | **Fable 5, high** — hero composition + plaque copy | code + checks, **two shots** (Ship Channel night; rig water glow), grep-first |
 | **5** | 345 kV tower corridors + major substations + hero plant landmarks + ERCOT radio flavor | **Sonnet 5, high** — polyline/instancing plumbing | code + checks, **one shot** (tower corridor read), grep-first |
@@ -230,17 +263,21 @@ hermetic — drive to state):
 
 - **W1 — data truth**: `energyAt` in a Permian county → high `wellKm2`;
   a Trans-Pecos/piney-woods low county → near zero; Roscoe + Horse
-  Hollow in `windFarms`; `refineries.length === 22`; `lines345`
-  non-empty with a corridor reaching the Panhandle; outside Texas →
-  null. Bake asserts county join internally.
+  Hollow in `windFarms`; `refineries.length === 22`; `platforms[]`
+  non-empty with a beyond-state-waters major; fairway snap-points
+  present; `lines345` non-empty with a corridor reaching the Panhandle;
+  outside Texas → null. Bake asserts county join internally; the
+  save-reference grep confirms no save key anchors to retiring coords.
 - **W2 — placement legality + gating**: seeded well sites respect
   road-clear/`airportClear`/brand/chapel/farmstead standoffs (placement
   math); flare emissive opacity tracks `ATMOS.night` (0 by day); a
   high-density chunk spawns sites, a zero-well chunk spawns none;
-  `logEnergy` dedups + persists; pause line updates. Prototype swap: the
-  shared pumpjack geometry's vertex count clears the poly-bar floor
-  while a known chunk's pumpjack transforms match pre-wave hardcoded
-  values (the crops-4.5 frozen-placement idiom).
+  `logEnergy` dedups + persists; pause line updates. Retirement: the old
+  scatter draws zero instances (stream unused, not re-keyed); the
+  pumpjack prototype's vertex count clears the poly-bar floor. Rebase:
+  platforms sit at baked coords, the old seven are gone; Far Rig's brass
+  reads at its new anchor at natural approach distance; the
+  Malaquite-skyline sentinel re-anchors (updated, never deleted).
 - **W3 — behavior sentinels**: a known farm chunk instances >N turbines,
   a farm-free chunk none; blade rotation rate follows `t`-driven
   `ATMOS.wind` change (real-loop sentinel — turbines join the existing
@@ -267,8 +304,9 @@ hermetic — drive to state):
 
 - **No save-format breaks**: `save.energy` + job keys are additive;
   rose/city RNG streams untouched.
-- **`seededRand` strings unchanged** — all new draws from new streams
-  (`well:`, `energy:` …). The shipped pumpjack scatter does not move.
+- **`seededRand` strings never re-keyed** — all new draws from new
+  streams (`well:`, `energy:` …); retired layers (old scatter, hand-laid
+  platforms) simply stop being drawn. Rose/city streams sacred.
 - **No new scene lights** — sky.js owns lighting; everything here is
   night-gated emissive.
 - **No runtime fetch beyond boot** — `energy.json` is one more boot

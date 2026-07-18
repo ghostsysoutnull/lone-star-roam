@@ -161,6 +161,12 @@ confirmed; silhouette axis needs the audit step):
 
 ## Later
 
+AIS-based real ship routes (marinecadastre.gov track data): the
+full-realism alternative to the hand-laid coastal lane. The Energy track
+kept the lane under its scarcity exception (0 OSM separation lanes off
+Texas; port legs snap to the 8 real fairways) — revisit only if maritime
+gets its own track; heavy input pipeline, poor ROI standalone.
+
 Placement audit follow-on (2026-07-16): coastal city-building scatter vs
 water is unaudited — `cities.js` rejects roads (<1.3u) but never `waterAt`,
 so Corpus/Galveston-class downtowns may push procedural buildings into the

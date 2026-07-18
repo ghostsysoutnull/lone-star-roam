@@ -2,9 +2,12 @@
 
 ## Session briefing
 - **This session**: Energy (`ENERGY_SPEC.md`), wave 1 of 6 — OSM fetch +
-  `tools/build-energy.mjs` bake + `data/energy.json` + geo.js
-  `energyAt`/site lists + `tools/checks/energy.mjs` data truths. Spec
-  shipped 2026-07-17.
+  `tools/build-energy.mjs` bake + `data/energy.json` (county wells, wind
+  farms, plants, refineries, 345 kV lines, **offshore `platforms[]` +
+  fairway snap-points**) + geo.js `energyAt`/site lists +
+  `tools/checks/energy.mjs` data truths + the **save-reference grep**
+  clearing W2's retirements (old scatter + hand-laid platforms retire —
+  realism-first decision in the spec). Spec shipped 2026-07-17.
 - **Recommended setup**: model **Sonnet 5**, effort **high** — pure
   fetch/bake/table plumbing, no content work. Flag it if the running
   model differs.
