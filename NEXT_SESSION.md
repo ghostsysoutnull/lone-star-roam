@@ -9,7 +9,7 @@
   flavor on the radio, `plant`-kind glow anchors into the W4 light
   pool. Wave 4 (refinery data rebake 22→33 + kit at all sites, 4 hero
   skylines, local light pool, spill decals) shipped 2026-07-18,
-  commit `TBD`.
+  commit `20a319a`.
 - **Recommended setup**: model **Sonnet 5**, effort **high** —
   polyline/instancing plumbing. Flag it if the running model differs.
 - **Budget**: code + checks, **one shot** (tower corridor read),
