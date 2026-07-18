@@ -311,33 +311,68 @@ export default async function energy(t) {
     t.ok(res.maxErr < 0.35, `solar decal strays from hAt: max err ${res.maxErr.toFixed(3)}`);
   });
 
-  await t.check('solar: no rendered decal spills onto a road or river (Blue Wing/I-37 lesson — baked footprint is an aggregate radius, not the real polygon)', async () => {
+  await t.check('solar blocks: per-block clearance law — no drawn block touches a road/river, Blue Wing keeps only far-side blocks (W4.5 rework)', async () => {
     const res = await t.ev(`(() => {
-      const CHUNK = 260, SOLAR_CLEAR = 1.5;
+      const SOLAR_CLEAR = 1.5;
       const solar = g.GEO.energy.plants.filter((p) => p.source === 'solar');
-      let violations = 0;
-      const drawn = [];
-      for (const s of solar) {
+      // mirror world.js's block math exactly (same seed stream, same order)
+      const blocksOf = (s) => {
         const baseR = Math.max(1.5, s.r);
-        const road = g.nearestAnyRoad(s.x, s.z, baseR + 20);
-        const riv = g.nearestRiver(s.x, s.z, baseR + 20);
-        const r = Math.min(baseR, (road ? road.dist : Infinity) - SOLAR_CLEAR, (riv ? riv.dist : Infinity) - SOLAR_CLEAR);
-        if (r >= SOLAR_CLEAR) {
-          drawn.push(r);
-          if (road && road.dist < r) violations++;
-          if (riv && riv.dist < r) violations++;
+        const srand = g.seededRand('solarrows' + s.x.toFixed(1) + ',' + s.z.toFixed(1));
+        const out = [];
+        for (const [qx, qz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+          const hb = baseR * (0.38 + srand() * 0.06);
+          const bx = s.x + qx * baseR * 0.52, bz = s.z + qz * baseR * 0.52;
+          const need = hb * Math.SQRT2 + SOLAR_CLEAR;
+          const road = g.nearestAnyRoad(bx, bz, need + 10);
+          const riv = g.nearestRiver(bx, bz, need + 10);
+          if ((road && road.dist < need) || (riv && riv.dist < need)) continue;
+          out.push({ hb, reach: (road?.dist ?? 99) , rreach: (riv?.dist ?? 99) });
         }
+        return out;
+      };
+      let violations = 0, drawnSites = 0;
+      for (const s of solar) {
+        const bl = blocksOf(s);
+        if (bl.length) drawnSites++;
+        for (const b of bl) if (b.reach < b.hb * Math.SQRT2 || b.rreach < b.hb * Math.SQRT2) violations++;
       }
       const blueWing = solar.find((p) => p.name === 'Blue Wing Solar Farm');
-      const bwBaseR = Math.max(1.5, blueWing.r);
-      const bwRoad = g.nearestAnyRoad(blueWing.x, blueWing.z, bwBaseR + 20);
-      const bwR = Math.min(bwBaseR, (bwRoad ? bwRoad.dist : Infinity) - SOLAR_CLEAR);
-      return { violations, drawnCount: drawn.length, total: solar.length, blueWingDraws: bwR >= SOLAR_CLEAR, blueWingRoadDist: bwRoad?.dist ?? null };
+      const bwRoad = g.nearestAnyRoad(blueWing.x, blueWing.z, 30);
+      return { violations, drawnSites, total: solar.length,
+        bwBlocks: blocksOf(blueWing).length, bwRoadDist: bwRoad?.dist ?? null };
     })()`);
-    t.ok(res.violations === 0, `${res.violations} solar decals still cross a road/river after clamping`);
-    t.ok(res.drawnCount > 400, `too many solar sites skipped entirely: only ${res.drawnCount}/${res.total} draw`);
-    t.ok(res.blueWingRoadDist !== null && res.blueWingRoadDist < 5, `Blue Wing's real site should sit near I-37 (got ${res.blueWingRoadDist})`);
-    t.ok(res.blueWingDraws === false, `Blue Wing Solar Farm (2.8u from I-37) should skip its decal, not shrink-and-draw`);
+    t.ok(res.violations === 0, `${res.violations} drawn solar blocks still reach a road/river`);
+    t.ok(res.drawnSites > 400, `too many solar sites with zero blocks: only ${res.drawnSites}/${res.total} draw`);
+    t.ok(res.bwRoadDist !== null && res.bwRoadDist < 5, `Blue Wing's real site should sit near I-37 (got ${res.bwRoadDist})`);
+    t.ok(res.bwBlocks < 4, `Blue Wing (2.8u from I-37) should drop its road-side blocks, kept ${res.bwBlocks}/4`);
+  });
+
+  await t.check('solar panels: tilted instanced kit at a live site — south-facing, on legs, never flat boxes (W4.5 rework)', async () => {
+    const site = await t.ev(`g.GEO.energy.plants.find((p) => p.source === 'solar' && p.name)`);
+    await t.tp(site.x + 3, site.z, 'FLY');
+    await t.until(`(() => {
+      for (const [, grp] of g.scenery.live) { let found = false; grp.traverse((o) => { if (o.userData.kind === 'solarfield') found = true; }); if (found) return true; }
+      return false;
+    })()`, 8000);
+    const res = await t.ev(`(() => {
+      let inst = 0, protoVerts = 0, minY = 99, maxY = -99;
+      for (const [, grp] of g.scenery.live) grp.traverse((o) => {
+        if (o.userData.kind !== 'solarfield') return;
+        for (const child of o.children) {
+          if (!child.isInstancedMesh) continue;
+          inst += child.count;
+          const pos = child.geometry.attributes.position;
+          protoVerts = pos.count;
+          for (let i = 0; i < pos.count; i++) { minY = Math.min(minY, pos.getY(i)); maxY = Math.max(maxY, pos.getY(i)); }
+        }
+      });
+      return { inst, protoVerts, minY, maxY };
+    })()`);
+    t.ok(res.inst > 20, `too few panel instances at a live named site: ${res.inst}`);
+    t.ok(res.protoVerts >= 100, `panel prototype suspiciously simple (${res.protoVerts} verts — slab + 2 legs expected)`);
+    t.ok(res.minY < 0.05, `no leg reaches the ground: minY ${res.minY.toFixed(2)}`);
+    t.ok(res.maxY > 0.6, `tilted slab's high edge missing: maxY ${res.maxY.toFixed(2)} (flat boxes were 0.22)`);
   });
 
   await t.check('wind heroes: Roscoe, Horse Hollow, and the coastal (Papalote) farm all log on arrival (road clearance covered by the generic hero sweep above)', async () => {

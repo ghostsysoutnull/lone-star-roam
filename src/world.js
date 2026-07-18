@@ -613,6 +613,38 @@ function mkCropRows(rand, fx, fz, w, d, rot, row) {
   return inst;
 }
 
+// Solar panel array — Energy W4.5 rework (Bruno, 2026-07-18): real panel
+// silhouette instead of flat crop-row boxes. One merged prototype (tilted
+// slab + two legs, ~28° facing south) instanced over the block; NO site
+// rotation ever — south-facing tilt is what makes a solar farm read from
+// the air, so rows always run east-west and every panel tips toward +z.
+function mkSolarPanels(rand, fx, fz, w, d) {
+  const slab = new THREE.BoxGeometry(1.5, 0.07, 1.0).rotateX(-0.49).translate(0, 0.68, 0).toNonIndexed();
+  const legGeo = new THREE.BoxGeometry(0.09, 0.58, 0.09);
+  const proto = mergeGeoms([
+    slab,
+    legGeo.clone().translate(-0.5, 0.29, 0).toNonIndexed(),
+    legGeo.clone().translate(0.5, 0.29, 0).toNonIndexed(),
+  ]);
+  const rows = Math.max(1, Math.floor(d / 1.7));
+  const per = Math.max(2, Math.floor(w / 1.8));
+  const count = Math.min(360, rows * per);
+  const inst = new THREE.InstancedMesh(proto, lamb(0x1e3252), count);
+  const m4 = new THREE.Matrix4();
+  let n = 0;
+  for (let r = 0; r < rows && n < count; r++) {
+    const lz = ((r + 0.5) / rows - 0.5) * d;
+    for (let i = 0; i < per && n < count; i++) {
+      const lx = ((i + 0.5) / per - 0.5) * w + (rand() - 0.5) * 0.12;
+      const x = fx + lx, z = fz + lz;
+      m4.makeTranslation(x, hAt(x, z), z);
+      inst.setMatrixAt(n++, m4);
+    }
+  }
+  inst.count = n;
+  return inst;
+}
+
 // A working farmstead for ag-country chunks — the chapelAt pattern: a pure
 // function of the chunk key on its own seed stream, so animals.js (wave 3)
 // can cluster herds at the same sites without any cross-module spawn coupling.
@@ -1214,24 +1246,30 @@ class ScenerySystem {
     // idiom) + near-ground rows (mkCropRows, crop-row idiom) — no new
     // geometry maker needed.
     for (const solar of solarSitesAt(cx, cz)) {
-      // the baked footprint is an aggregate radius, not the real polygon — a
-      // site legitimately near a highway or river (Blue Wing/I-37, Alamo 1/San
-      // Antonio River) can draw a circular decal that spills onto it. Clamp to
-      // actual clearance; if none fits, skip the decal (the real site still
-      // announces by name — realism-first: absent, not visibly wrong).
+      // the baked footprint is an aggregate radius, not the real polygon.
+      // W4.5 rework: the site splits into a 2x2 grid of rectangular blocks
+      // (solar farms are gridded rectangles, not crop circles), and the
+      // clearance law applies PER BLOCK — each block draws only if its whole
+      // rectangle clears every road/river (skip, never shrink), so a site
+      // beside I-37 (Blue Wing) keeps its far-side blocks and drops the near
+      // ones instead of vanishing or spilling. Panels are the tilted
+      // south-facing instanced kit — never rotated (the aerial read).
       const baseR = Math.max(1.5, solar.r);
-      const searchR = baseR + 20;
-      const road = nearestAnyRoad(solar.x, solar.z, searchR);
-      const riv = nearestRiver(solar.x, solar.z, searchR);
-      const r = Math.min(baseR, (road ? road.dist : Infinity) - SOLAR_CLEAR, (riv ? riv.dist : Infinity) - SOLAR_CLEAR);
-      if (r < SOLAR_CLEAR) continue;
+      const srand = seededRand(`solarrows${solar.x.toFixed(1)},${solar.z.toFixed(1)}`);
       const sg = new THREE.Group();
       sg.userData.kind = 'solarfield';
       sg.userData.site = { x: solar.x, z: solar.z };
-      sg.add(mkFieldPatch(solar.x, solar.z, r * 2, r * 2, 0, 0x1c2e44, true, 0.17));
-      const srand = seededRand(`solarrows${solar.x.toFixed(1)},${solar.z.toFixed(1)}`);
-      sg.add(mkCropRows(srand, solar.x, solar.z, r * 1.7, r * 1.7, 0, { kind: 'box', color: 0x16233a, h: 0.22 }));
-      group.add(sg);
+      for (const [qx, qz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const hb = baseR * (0.38 + srand() * 0.06); // block half-size
+        const bx = solar.x + qx * baseR * 0.52, bz = solar.z + qz * baseR * 0.52;
+        const need = hb * Math.SQRT2 + SOLAR_CLEAR; // corner reach + margin
+        const road = nearestAnyRoad(bx, bz, need + 10);
+        const riv = nearestRiver(bx, bz, need + 10);
+        if ((road && road.dist < need) || (riv && riv.dist < need)) continue;
+        sg.add(mkFieldPatch(bx, bz, hb * 2, hb * 2, 0, 0x76684e, false, 0.17)); // graded dirt pad — panels read dark against it, not into it
+        sg.add(mkSolarPanels(srand, bx, bz, hb * 2 * 0.9, hb * 2 * 0.9));
+      }
+      if (sg.children.length) group.add(sg);
     }
 
     this.scene.add(group);

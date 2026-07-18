@@ -28,7 +28,7 @@ export const TOURS = [
         S('💨 Roscoe Wind Farm — Energy log hero', [-998.5, -1792.7], { mode: 'DRIVE', note: "once the world's largest wind farm at completion (2009); drive in and the log stamps" }),
         S('💨 Horse Hollow Wind Energy Center — Energy log hero', [-524.8, -1324.7], { mode: 'DRIVE', note: '421 turbines, one of the largest wind farms on Earth at its 2006 completion' }),
         S('💨 Papalote Creek Wind Farm — Energy log hero', [1664.7, 3380.0], { mode: 'DRIVE', note: 'the coastal wind farm — steady Gulf breeze, San Patricio County' }),
-        S('☀️ Blue Wing Solar Farm — panel field', [1047.4, 1886.4], { mode: 'FLY', note: 'dark panel-field decal from the air, near-ground panel rows on approach; the announcer fires its real name' }),
+        S('☀️ Blue Wing Solar Farm — panel field', [1047.4, 1886.4], { mode: 'FLY', note: 'W4.5 rework: rectangular blocks of tilted south-facing panels on legs over dirt pads (crop circles retired); road-side blocks drop per-block, the rest stay; the announcer fires its real name' }),
       ] },
       { wave: 'W2 — wells, offshore rebase, log, announcer', spots: [
         S('🔥 Permian night flares — Loving county pad', [-4042.1, -355.1], { mode: 'DRIVE', time: 0.98, note: 'a real-density well site: pumpjack, 4-tank battery, workover derrick, gas flare flickering after dark' }),

@@ -8,7 +8,7 @@ export default async function band(t) {
   // pins that in-Texas scenery draws stay byte-identical once the island is in.
   const FROZEN = [
     { x: -2147.5, z: -3607.7, n: 6, kinds: { farmstead: 1, windmill: 1, chicken: 4 } },   // Hale chunk
-    { x: 830.2, z: 847.1, n: 14, kinds: { ranchhq: 1, hqhouse: 1, watertower: 1, windmill: 1, stocktank: 1, barn: 2, pen: 3, flagpole: 1, chicken: 3 } }, // LBJ ranch arch — a real baked solar site shares this chunk but sits 1.58u from a road, so its decal is clamped away (Energy W3 road/river clearance fix)
+    { x: 830.2, z: 847.1, n: 15, kinds: { ranchhq: 1, hqhouse: 1, watertower: 1, windmill: 1, stocktank: 1, barn: 2, pen: 3, flagpole: 1, chicken: 3, solarfield: 1 } }, // LBJ ranch arch — the chunk's real baked solar site (1.58u from a road) vanished under W3's whole-site clamp; W4.5 per-BLOCK clearance legitimately draws its road-clear blocks
     { x: -5800, z: -1200, n: 0, kinds: {} },                                              // bare west-Texas chunk
   ];
   for (const spot of FROZEN) {
