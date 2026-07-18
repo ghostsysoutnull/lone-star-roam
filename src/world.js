@@ -723,6 +723,47 @@ export function wellSiteAt(cx, cz) {
   return sites;
 }
 
+// Wind turbines — Energy W3. windFarms[] only bakes cluster aggregates
+// ({x, z, count, r} — cell-binned, no individual turbine coords, "keeps the
+// fleet honest"), so per-chunk turbine slots are derived: density =
+// count/(π·r²), expected slots = density·CHUNK², candidates drawn uniformly
+// in the chunk and rejected if outside the farm's circle — that rejection
+// alone handles farm-edge chunks correctly (no separate overlap-fraction
+// math). Own `turbine:` stream. Capped per chunk (dense Sweetwater-corridor
+// farms would otherwise draw hundreds in one chunk).
+const TURBINE_CAP = 32;
+export function windTurbinesAt(cx, cz) {
+  const baseX = cx * CHUNK, baseZ = cz * CHUNK, midX = baseX + CHUNK / 2, midZ = baseZ + CHUNK / 2;
+  const out = [];
+  for (const f of GEO.energy.windFarms) {
+    if (Math.hypot(f.x - midX, f.z - midZ) > f.r + CHUNK * 0.75) continue; // cheap farm-overlap reject
+    const density = f.count / (Math.PI * f.r * f.r);
+    const expect = Math.min(TURBINE_CAP, density * CHUNK * CHUNK);
+    if (expect < 0.05) continue;
+    const rand = seededRand(`turbine:${cx},${cz},${f.x.toFixed(1)},${f.z.toFixed(1)}`);
+    const draws = Math.ceil(expect) + 3; // a few extra draws — edge chunks reject some to the circle test
+    for (let i = 0; i < draws && out.length < TURBINE_CAP; i++) {
+      const x = baseX + rand() * CHUNK, z = baseZ + rand() * CHUNK, rot = rand() * Math.PI * 2;
+      if (Math.hypot(x - f.x, z - f.z) > f.r) continue;
+      if (!inTexas(x, z)) continue;
+      const road = nearestAnyRoad(x, z, 3);
+      if (road && road.dist < 3) continue;
+      if (!airportClear(x, z)) continue;
+      out.push({ x, z, rot });
+    }
+  }
+  return out;
+}
+
+// Solar farms — Energy W3. plants[] bakes exact real coords + footprint
+// radius for solar polygons (unlike turbines, no generation needed — direct
+// per-chunk filter of the baked list, farmsteadAt-adjacent but no RNG).
+export function solarSitesAt(cx, cz) {
+  return GEO.energy.plants.filter(
+    (p) => p.source === 'solar' && Math.floor(p.x / CHUNK) === cx && Math.floor(p.z / CHUNK) === cz
+  );
+}
+
 // Ranch headquarters compounds — wave 5. One per named gate arch (gameplay.js
 // LANDMARKS 'rancharch' / animals.js RANCH_ARCHES — same LL projections, keep
 // all three in sync). Pure seeded site pattern (chapelAt precedent): scenery
@@ -813,6 +854,13 @@ export function fieldAt(x, z) {
   return null;
 }
 
+// Reused per-frame scratch objects for the turbine blade matrix rebuild —
+// one instance for the whole system (ScenerySystem is a singleton), avoids
+// per-instance-per-frame allocation.
+const _tQYaw = new THREE.Quaternion(), _tQSpin = new THREE.Quaternion(), _tQ = new THREE.Quaternion();
+const _tM4 = new THREE.Matrix4(), _tV = new THREE.Vector3(), _tOne = new THREE.Vector3(1, 1, 1);
+const _tYAxis = new THREE.Vector3(0, 1, 0), _tZAxis = new THREE.Vector3(0, 0, 1);
+
 class ScenerySystem {
   constructor(scene) {
     this.scene = scene;
@@ -846,6 +894,19 @@ class ScenerySystem {
       if (a.kind === 'pumpjack') a.obj.rotation.x = Math.sin(this.t * 1.4 + a.phase) * 0.22; // beam nods across its x pivot
       else if (a.kind === 'chicken') a.obj.rotation.x = -Math.max(0, Math.sin(this.t * 2.6 + a.phase)) * 0.5; // beak-to-dirt peck bursts
       else if (a.kind === 'gasflare') a.obj.scale.setScalar(0.8 + 0.3 * Math.abs(Math.sin(this.t * 9 + a.phase)) + 0.1 * Math.sin(this.t * 23 + a.phase)); // ragged flame flicker
+      else if (a.kind === 'turbine') { // a.obj is {mesh, sites, spin} — not an Object3D, must not fall into the windmill else below
+        a.obj.spin += dt * (1.6 + a.phase * 0.1) * ATMOS.wind; // identical response curve to windmills — same real-loop sentinel covers both
+        const { mesh, sites, spin } = a.obj;
+        _tQSpin.setFromAxisAngle(_tZAxis, spin);
+        for (let i = 0; i < sites.length; i++) {
+          const s = sites[i];
+          _tQYaw.setFromAxisAngle(_tYAxis, s.rot);
+          _tQ.multiplyQuaternions(_tQYaw, _tQSpin);
+          _tM4.compose(_tV.set(s.x, s.y, s.z), _tQ, _tOne);
+          mesh.setMatrixAt(i, _tM4);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+      }
       else a.obj.rotation.z += dt * (1.6 + a.phase * 0.1) * ATMOS.wind; // windmills spin up when weather turns
     }
   }
@@ -1121,6 +1182,47 @@ class ScenerySystem {
       }
       group.add(wg);
     }
+
+    // wind turbines — Energy W3: sites from windTurbinesAt (density-scattered
+    // within the baked farm circle). Tower+nacelle instanced once (static);
+    // the blade hub is a second InstancedMesh whose per-instance matrix is
+    // rebuilt every frame in update() (kind 'turbine') — spin lives on the
+    // wrapper object, not the mesh, so it tracks live ATMOS.wind changes.
+    const turbines = windTurbinesAt(cx, cz);
+    if (turbines.length) {
+      const bodyI = new THREE.InstancedMesh(mkTurbineBodyGeo(), lamb(0xe4e6ea), turbines.length);
+      const bladeI = new THREE.InstancedMesh(mkTurbineBladeGeo(), lamb(0xd0d4d8), turbines.length);
+      bodyI.userData.kind = 'turbinetower';
+      bladeI.frustumCulled = false; // per-instance matrices change every frame — a stale bbox would cull live blades
+      const sites = [];
+      turbines.forEach((tb, i) => {
+        const y = hAt(tb.x, tb.z);
+        _tQYaw.setFromAxisAngle(_tYAxis, tb.rot);
+        _tM4.compose(_tV.set(tb.x, y, tb.z), _tQYaw, _tOne);
+        bodyI.setMatrixAt(i, _tM4);
+        sites.push({ x: tb.x, y: y + TURBINE_HUB_Y, z: tb.z, rot: tb.rot });
+      });
+      group.add(bodyI, bladeI);
+      const entry = { obj: { mesh: bladeI, sites, spin: 0 }, kind: 'turbine', phase: rand() * Math.PI * 2 };
+      this.animated.push(entry);
+      group.userData.animated.push(entry);
+    }
+
+    // solar farms — Energy W3: real plants[] sites (footprint radius baked at
+    // W1). Dark decal for the from-the-air read (mkFieldPatch, pivot-decal
+    // idiom) + near-ground rows (mkCropRows, crop-row idiom) — no new
+    // geometry maker needed.
+    for (const solar of solarSitesAt(cx, cz)) {
+      const r = Math.max(1.5, solar.r);
+      const sg = new THREE.Group();
+      sg.userData.kind = 'solarfield';
+      sg.userData.site = { x: solar.x, z: solar.z };
+      sg.add(mkFieldPatch(solar.x, solar.z, r * 2, r * 2, 0, 0x1c2e44, true, 0.17));
+      const srand = seededRand(`solarrows${solar.x.toFixed(1)},${solar.z.toFixed(1)}`);
+      sg.add(mkCropRows(srand, solar.x, solar.z, r * 1.7, r * 1.7, 0, { kind: 'box', color: 0x16233a, h: 0.22 }));
+      group.add(sg);
+    }
+
     this.scene.add(group);
     this.live.set(key, group);
   }
@@ -1444,6 +1546,48 @@ function mkFlareStack(flameMat) {
   g.add(stack, flame);
   g.userData.animate = flame;
   g.userData.kind = 'gasflare';
+  return g;
+}
+
+// --- Energy W3 turbine kit (mkHatchGeo merge idiom — merged raw geometry for
+// an InstancedMesh, built fresh per chunk so disposeGroup's per-instance
+// dispose never churns a shared prototype). Two pieces: a static tower+
+// nacelle body (instanced once, never touched again) and a hub+blade
+// assembly kept centered at its OWN local origin (never pre-translated to
+// hub height) so the per-frame spin quaternion rotates it in place around
+// its own axle — the instance's translation carries it up to hub height.
+// Poly bar: 8-seg cylinders, the chunked-scatter floor.
+// Deliberately chunky, not scale-real: a hairline tower/blade read as bare
+// toothpicks at normal play distance (staged-shot lesson, Energy W3) — bulked
+// well past a realistic taper so the silhouette carries at highway range,
+// same "legibility over realism" call as the poly-bar rule.
+export function mkTurbineBodyGeo() {
+  const parts = [
+    new THREE.CylinderGeometry(0.26, 0.5, 10.5, 8).translate(0, 5.25, 0).toNonIndexed(),
+    new THREE.BoxGeometry(0.9, 0.75, 1.9).translate(0, 10.8, -0.35).toNonIndexed(),
+  ];
+  return mergeGeoms(parts);
+}
+export const TURBINE_HUB_Y = 10.8;
+export function mkTurbineBladeGeo() {
+  const parts = [new THREE.CylinderGeometry(0.32, 0.32, 0.7, 8).rotateX(Math.PI / 2).translate(0, 0, -0.35).toNonIndexed()];
+  for (let i = 0; i < 3; i++) {
+    const blade = new THREE.BoxGeometry(0.22, 2.8, 0.1).translate(0, 1.42, -0.35);
+    blade.rotateZ((i / 3) * Math.PI * 2);
+    parts.push(blade.toNonIndexed());
+  }
+  return mergeGeoms(parts);
+}
+// position+normal concat, no vertex color — every part shares one flat material
+function mergeGeoms(parts) {
+  const g = new THREE.BufferGeometry();
+  const total = parts.reduce((s, p) => s + p.attributes.position.count, 0);
+  for (const name of ['position', 'normal']) {
+    const arr = new Float32Array(total * 3);
+    let o = 0;
+    for (const p of parts) { arr.set(p.attributes[name].array, o); o += p.attributes[name].array.length; }
+    g.setAttribute(name, new THREE.BufferAttribute(arr, 3));
+  }
   return g;
 }
 

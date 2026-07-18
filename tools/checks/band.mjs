@@ -8,7 +8,7 @@ export default async function band(t) {
   // pins that in-Texas scenery draws stay byte-identical once the island is in.
   const FROZEN = [
     { x: -2147.5, z: -3607.7, n: 6, kinds: { farmstead: 1, windmill: 1, chicken: 4 } },   // Hale chunk
-    { x: 830.2, z: 847.1, n: 14, kinds: { ranchhq: 1, hqhouse: 1, watertower: 1, windmill: 1, stocktank: 1, barn: 2, pen: 3, flagpole: 1, chicken: 3 } }, // LBJ ranch arch
+    { x: 830.2, z: 847.1, n: 15, kinds: { ranchhq: 1, hqhouse: 1, watertower: 1, windmill: 1, stocktank: 1, barn: 2, pen: 3, flagpole: 1, chicken: 3, solarfield: 1 } }, // LBJ ranch arch — a real baked solar site (Energy W3) shares this chunk
     { x: -5800, z: -1200, n: 0, kinds: {} },                                              // bare west-Texas chunk
   ];
   for (const spot of FROZEN) {

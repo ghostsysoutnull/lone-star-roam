@@ -22,6 +22,13 @@ export const TOURS = [
         S('📣 Approach announcer — NANSEN platform', [4801.7, 4043.8], { mode: 'FLY', note: 'fly the offshore row: every named/operated platform announces itself on approach, every visit; unnamed sites stay silent' }),
         S('⚓ Corpus fairway leg — approach tanker', [2057.9, 3551.4], { mode: 'FLY', note: 'watch: a tanker works the real Aransas Pass fairway points in and out (position varies with boot time)' }),
       ] },
+      { wave: 'W3 — wind farms, solar fields, log', spots: [
+        S('💨 Wind farm — Sweetwater/Nolan corridor', [-650, -1430], { mode: 'FLY', time: 0.79, note: 'the densest baked cluster (1336 real turbines): instanced towers, blades spinning live with ATMOS.wind' }),
+        S('💨 Roscoe Wind Farm — Energy log hero', [-998.5, -1792.7], { mode: 'DRIVE', note: "once the world's largest wind farm at completion (2009); drive in and the log stamps" }),
+        S('💨 Horse Hollow Wind Energy Center — Energy log hero', [-524.8, -1324.7], { mode: 'DRIVE', note: '421 turbines, one of the largest wind farms on Earth at its 2006 completion' }),
+        S('💨 Papalote Creek Wind Farm — Energy log hero', [1664.7, 3380.0], { mode: 'DRIVE', note: 'the coastal wind farm — steady Gulf breeze, San Patricio County' }),
+        S('☀️ Blue Wing Solar Farm — panel field', [1047.4, 1886.4], { mode: 'FLY', note: 'dark panel-field decal from the air, near-ground panel rows on approach; the announcer fires its real name' }),
+      ] },
     ],
   },
   {

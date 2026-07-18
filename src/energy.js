@@ -6,6 +6,7 @@
 // invented names). The log stays the once-per-save layer on hero sites.
 import * as THREE from 'three';
 import { GEO, hAt } from './geo.js';
+import { mkTurbineBodyGeo, mkTurbineBladeGeo, TURBINE_HUB_Y } from './world.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 
@@ -24,6 +25,24 @@ export const HEROES = [
     fact: 'Permian crude stages in these tanks before the pipelines carry it east',
     info: 'crude storage for the Permian Basin',
   },
+  // W3 wind heroes — anchored inside their real baked windFarms[] cluster
+  // (aggregate-only data, no per-turbine names), nudged off any road the
+  // Spindletop way; the real spinning fleet surrounds each marker.
+  {
+    id: 'roscoe', name: 'Roscoe Wind Farm', at: [-998.5, -1792.7], kind: 'windfarm',
+    fact: "627 turbines across five West Texas counties made this the world's largest wind farm at its 2009 completion",
+    info: "Nolan County's cotton-field turbines",
+  },
+  {
+    id: 'horsehollow', name: 'Horse Hollow Wind Energy Center', at: [-524.8, -1324.7], kind: 'windfarm',
+    fact: '421 turbines across Taylor and Nolan counties made this one of the largest wind farms on Earth at its 2006 completion',
+    info: 'a record-setting wind farm, 2006',
+  },
+  {
+    id: 'papalote', name: 'Papalote Creek Wind Farm', at: [1664.7, 3380.0], kind: 'windfarm',
+    fact: "San Patricio County's Gulf breeze blows almost every afternoon — ideal, steady wind for a coastal farm",
+    info: 'coastal wind, San Patricio County',
+  },
 ];
 export const ENERGY_TOTAL = HEROES.length;
 
@@ -39,11 +58,17 @@ export class EnergySystem {
     // W2 site tables: heroes + offshore platforms (name → operator → silent;
     // `ref` is baked but essentially never present — do not design around it)
     for (const h of HEROES)
-      this.register(h.at[0], h.at[1], 25, `🛢 ${h.name} — ${h.info}`);
+      this.register(h.at[0], h.at[1], 25, `${h.kind === 'windfarm' ? '💨' : '🛢'} ${h.name} — ${h.info}`);
     for (const p of GEO.energy.platforms) {
       const label = p.name ? `🛢 ${p.name} — ${p.operator ?? 'offshore platform'}`
         : p.operator ? `🛢 ${p.operator} platform` : null;
       if (label) this.register(p.x, p.z, p.tier === 'major' ? 22 : 14, label);
+    }
+    // W3: named solar plants (matches what this wave renders — unnamed solar
+    // sites, and every other plant source, stay silent until their wave ships)
+    for (const p of GEO.energy.plants) {
+      if (p.source !== 'solar' || !p.name) continue;
+      this.register(p.x, p.z, Math.max(10, p.r + 6), `☀️ ${p.name} — ${p.operator ?? 'solar farm'}`);
     }
   }
 
@@ -123,6 +148,27 @@ export class EnergySystem {
         const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 15, 8).rotateZ(Math.PI / 2), steel);
         pipe.position.set(0, 0.5, 8.2);
         g.add(pipe);
+      } else if (h.kind === 'windfarm') {
+        // three static hero turbines (the ScenerySystem kit, un-instanced —
+        // only 3, no per-frame spin needed) beside a granite marker; the
+        // real spinning fleet from windTurbinesAt surrounds this plot
+        const bodyGeo = mkTurbineBodyGeo(), bladeGeo = mkTurbineBladeGeo();
+        const white = new THREE.MeshLambertMaterial({ color: 0xe4e6ea, flatShading: true });
+        const light = new THREE.MeshLambertMaterial({ color: 0xd0d4d8, flatShading: true });
+        for (const [tx, tz, rot] of [[4, -3, 0.4], [7.5, 1.5, 0.9], [3, 5, -0.5]]) {
+          const body = new THREE.Mesh(bodyGeo, white);
+          body.position.set(tx, 0, tz);
+          body.rotation.y = rot;
+          const blade = new THREE.Mesh(bladeGeo, light);
+          blade.position.set(tx, TURBINE_HUB_Y, tz);
+          blade.rotation.y = rot;
+          g.add(body, blade);
+        }
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 2.0), granite);
+        plinth.position.set(-2.5, 0.25, 0);
+        const marker = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.6, 0.15), granite);
+        marker.position.set(-2.5, 1.05, 0);
+        g.add(plinth, marker);
       }
       g.position.set(x, y, z);
       scene.add(g);

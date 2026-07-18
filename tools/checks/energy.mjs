@@ -232,4 +232,83 @@ export default async function energy(t) {
       t.ok(silent === '', `unnamed site announced: "${silent}"`);
     }
   });
+
+  // --- Wave 3: wind farms (instanced turbines), solar fields, log heroes ---
+
+  await t.check('windTurbinesAt: a dense farm chunk instances many lawful turbines, a farm-free chunk none', async () => {
+    const res = await t.ev(`(() => {
+      const dense = g.windTurbinesAt(-3, -6); // chunk centered on the densest baked farm (1336-turbine cluster)
+      const empty = g.windTurbinesAt(20, 4);  // far east, >1000u from any farm's edge
+      const bad = dense.filter((s) => !g.inTexas(s.x, s.z) || (g.nearestAnyRoad(s.x, s.z, 3)?.dist ?? 99) < 3);
+      return { dense: dense.length, empty: empty.length, bad: bad.length };
+    })()`);
+    t.ok(res.dense >= 8, `dense farm chunk too sparse: ${res.dense} turbines`);
+    t.ok(res.empty === 0, `farm-free chunk grew ${res.empty} turbines`);
+    t.ok(res.bad === 0, `${res.bad} of the dense chunk's turbines sit off-Texas or on a road`);
+  });
+
+  await t.check('turbines: instanced at a live farm chunk, blade spin tracks ATMOS.wind (real loop — joins the windmill sentinel)', async () => {
+    await t.tp(-650, -1430, 'FLY'); // densest farm chunk's center
+    await t.until(`(() => {
+      for (const [, grp] of g.scenery.live) { let found = false; grp.traverse((o) => { if (o.userData.kind === 'turbinetower') found = true; }); if (found) return true; }
+      return false;
+    })()`, 8000);
+    const towers = await t.ev(`(() => {
+      let n = 0;
+      for (const [, grp] of g.scenery.live) grp.traverse((o) => { if (o.userData.kind === 'turbinetower') n += o.count; });
+      return n;
+    })()`);
+    t.ok(towers >= 8, `too few instanced turbine towers rendered: ${towers}`);
+    t.ok(await t.ev(`!!g.scenery.animated.find((a) => a.kind === 'turbine')`), 'no turbine blade-spin entry registered');
+
+    await t.setWeather('clear');
+    const spin0 = await t.ev(`g.scenery.animated.find((a) => a.kind === 'turbine').obj.spin`);
+    await t.simWait(1.5);
+    const clearDelta = (await t.ev(`g.scenery.animated.find((a) => a.kind === 'turbine').obj.spin`)) - spin0;
+    t.ok(clearDelta > 0, `blade spin did not accumulate under clear wind: ${clearDelta}`);
+
+    await t.setWeather('storm');
+    const spin2 = await t.ev(`g.scenery.animated.find((a) => a.kind === 'turbine').obj.spin`);
+    await t.simWait(1.5);
+    const stormDelta = (await t.ev(`g.scenery.animated.find((a) => a.kind === 'turbine').obj.spin`)) - spin2;
+    t.ok(stormDelta > clearDelta * 1.5, `blade spin did not speed up with storm wind: clear ${clearDelta.toFixed(3)} vs storm ${stormDelta.toFixed(3)}`);
+  });
+
+  await t.check('solar: decal geometry drapes to hAt within ε (from-the-air read stays glued to terrain)', async () => {
+    const site = await t.ev(`g.GEO.energy.plants.find((p) => p.source === 'solar' && p.name)`);
+    t.ok(site, 'no named solar plant baked');
+    await t.tp(site.x + 3, site.z, 'FLY');
+    await t.until(`(() => {
+      for (const [, grp] of g.scenery.live) { let found = false; grp.traverse((o) => { if (o.userData.kind === 'solarfield') found = true; }); if (found) return true; }
+      return false;
+    })()`, 8000);
+    const res = await t.ev(`(() => {
+      let maxErr = 0, verts = 0;
+      for (const [, grp] of g.scenery.live) grp.traverse((o) => {
+        if (o.userData.kind !== 'solarfield') return;
+        for (const child of o.children) {
+          if (child.isInstancedMesh || !child.geometry) continue;
+          const pos = child.geometry.attributes.position;
+          for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+            maxErr = Math.max(maxErr, Math.abs(y - g.hAt(x, z)));
+            verts++;
+          }
+        }
+      });
+      return { maxErr, verts };
+    })()`);
+    t.ok(res.verts > 0, 'no solar decal vertices found near the named plant');
+    t.ok(res.maxErr < 0.35, `solar decal strays from hAt: max err ${res.maxErr.toFixed(3)}`);
+  });
+
+  await t.check('wind heroes: Roscoe, Horse Hollow, and the coastal (Papalote) farm all log on arrival (road clearance covered by the generic hero sweep above)', async () => {
+    const ids = await t.ev(`g.energy.heroes.filter((h) => h.kind === 'windfarm').map((h) => h.id)`);
+    t.ok(ids.length === 3, `expected 3 wind heroes, got ${ids.length}`);
+    for (const id of ['roscoe', 'horsehollow', 'papalote']) t.ok(ids.includes(id), `missing wind hero id: ${id}`);
+    await t.ev(`g.gameplay.save.energy = []`);
+    const roscoe = await t.ev(`g.energy.heroes.find((h) => h.id === 'roscoe')`);
+    await t.tp(roscoe.at[0], roscoe.at[1]);
+    await t.until(`g.gameplay.save.energy.includes('roscoe')`, 6000);
+  });
 }
