@@ -302,6 +302,35 @@ export default async function energy(t) {
     t.ok(res.maxErr < 0.35, `solar decal strays from hAt: max err ${res.maxErr.toFixed(3)}`);
   });
 
+  await t.check('solar: no rendered decal spills onto a road or river (Blue Wing/I-37 lesson — baked footprint is an aggregate radius, not the real polygon)', async () => {
+    const res = await t.ev(`(() => {
+      const CHUNK = 260, SOLAR_CLEAR = 1.5;
+      const solar = g.GEO.energy.plants.filter((p) => p.source === 'solar');
+      let violations = 0;
+      const drawn = [];
+      for (const s of solar) {
+        const baseR = Math.max(1.5, s.r);
+        const road = g.nearestAnyRoad(s.x, s.z, baseR + 20);
+        const riv = g.nearestRiver(s.x, s.z, baseR + 20);
+        const r = Math.min(baseR, (road ? road.dist : Infinity) - SOLAR_CLEAR, (riv ? riv.dist : Infinity) - SOLAR_CLEAR);
+        if (r >= SOLAR_CLEAR) {
+          drawn.push(r);
+          if (road && road.dist < r) violations++;
+          if (riv && riv.dist < r) violations++;
+        }
+      }
+      const blueWing = solar.find((p) => p.name === 'Blue Wing Solar Farm');
+      const bwBaseR = Math.max(1.5, blueWing.r);
+      const bwRoad = g.nearestAnyRoad(blueWing.x, blueWing.z, bwBaseR + 20);
+      const bwR = Math.min(bwBaseR, (bwRoad ? bwRoad.dist : Infinity) - SOLAR_CLEAR);
+      return { violations, drawnCount: drawn.length, total: solar.length, blueWingDraws: bwR >= SOLAR_CLEAR, blueWingRoadDist: bwRoad?.dist ?? null };
+    })()`);
+    t.ok(res.violations === 0, `${res.violations} solar decals still cross a road/river after clamping`);
+    t.ok(res.drawnCount > 400, `too many solar sites skipped entirely: only ${res.drawnCount}/${res.total} draw`);
+    t.ok(res.blueWingRoadDist !== null && res.blueWingRoadDist < 5, `Blue Wing's real site should sit near I-37 (got ${res.blueWingRoadDist})`);
+    t.ok(res.blueWingDraws === false, `Blue Wing Solar Farm (2.8u from I-37) should skip its decal, not shrink-and-draw`);
+  });
+
   await t.check('wind heroes: Roscoe, Horse Hollow, and the coastal (Papalote) farm all log on arrival (road clearance covered by the generic hero sweep above)', async () => {
     const ids = await t.ev(`g.energy.heroes.filter((h) => h.kind === 'windfarm').map((h) => h.id)`);
     t.ok(ids.length === 3, `expected 3 wind heroes, got ${ids.length}`);

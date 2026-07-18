@@ -292,6 +292,27 @@ export function waterAt(x, z) {
   return best;
 }
 
+// Nearest point on any river within `radius` (nearestRoad idiom, riverGrid
+// index — a wider-radius sibling of waterAt's tight 1.4u ribbon tolerance,
+// for callers that need actual clearance distance, not just "on the water").
+export function nearestRiver(x, z, radius = 60) {
+  let best = null, bestD = radius * radius;
+  const r = Math.ceil(radius / CELL);
+  const cx = Math.floor(x / CELL), cz = Math.floor(z / CELL);
+  for (let i = -r; i <= r; i++) {
+    for (let j = -r; j <= r; j++) {
+      const segs = riverGrid.get(`${cx + i},${cz + j}`);
+      if (!segs) continue;
+      for (const s of segs) {
+        const p = closestOnSeg(x, z, s.a, s.b);
+        const d = (p[0] - x) ** 2 + (p[1] - z) ** 2;
+        if (d < bestD) { bestD = d; best = { x: p[0], z: p[1], name: s.name, dist: Math.sqrt(d) }; }
+      }
+    }
+  }
+  return best;
+}
+
 // Which county is (x,z) in? Cached: the answer rarely changes between calls.
 let lastCounty = null;
 const inRings = (x, z, rings) => {

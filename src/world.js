@@ -1,6 +1,6 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, bandAgAt, TIDELANDS_U, coastDist, neighborStateAt, inTexasOrBand, nearestAnyRoad, energyAt } from './geo.js';
+import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, bandAgAt, TIDELANDS_U, coastDist, neighborStateAt, inTexasOrBand, nearestAnyRoad, nearestRiver, energyAt } from './geo.js';
 import { ATMOS } from './sky.js';
 import { cityRadius, cityClear } from './cities.js';
 import { airportClear } from './airports.js';
@@ -758,6 +758,7 @@ export function windTurbinesAt(cx, cz) {
 // Solar farms — Energy W3. plants[] bakes exact real coords + footprint
 // radius for solar polygons (unlike turbines, no generation needed — direct
 // per-chunk filter of the baked list, farmsteadAt-adjacent but no RNG).
+const SOLAR_CLEAR = 1.5; // min road/river clearance the rendered decal must keep (see spawn()'s clamp)
 export function solarSitesAt(cx, cz) {
   return GEO.energy.plants.filter(
     (p) => p.source === 'solar' && Math.floor(p.x / CHUNK) === cx && Math.floor(p.z / CHUNK) === cz
@@ -1213,7 +1214,17 @@ class ScenerySystem {
     // idiom) + near-ground rows (mkCropRows, crop-row idiom) — no new
     // geometry maker needed.
     for (const solar of solarSitesAt(cx, cz)) {
-      const r = Math.max(1.5, solar.r);
+      // the baked footprint is an aggregate radius, not the real polygon — a
+      // site legitimately near a highway or river (Blue Wing/I-37, Alamo 1/San
+      // Antonio River) can draw a circular decal that spills onto it. Clamp to
+      // actual clearance; if none fits, skip the decal (the real site still
+      // announces by name — realism-first: absent, not visibly wrong).
+      const baseR = Math.max(1.5, solar.r);
+      const searchR = baseR + 20;
+      const road = nearestAnyRoad(solar.x, solar.z, searchR);
+      const riv = nearestRiver(solar.x, solar.z, searchR);
+      const r = Math.min(baseR, (road ? road.dist : Infinity) - SOLAR_CLEAR, (riv ? riv.dist : Infinity) - SOLAR_CLEAR);
+      if (r < SOLAR_CLEAR) continue;
       const sg = new THREE.Group();
       sg.userData.kind = 'solarfield';
       sg.userData.site = { x: solar.x, z: solar.z };
