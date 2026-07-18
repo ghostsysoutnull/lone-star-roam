@@ -1,28 +1,35 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Energy (`ENERGY_SPEC.md`), wave 1 of 6 — OSM fetch +
-  `tools/build-energy.mjs` bake + `data/energy.json` (county wells, wind
-  farms, plants, refineries, 345 kV lines, **offshore `platforms[]` +
-  fairway snap-points**, `name`/`operator`/`ref` strings for the W2
-  approach announcer) + geo.js `energyAt`/site lists +
-  `tools/checks/energy.mjs` data truths + the **save-reference grep**
-  clearing W2's retirements (old scatter + hand-laid platforms retire —
-  realism-first decision in the spec). Spec shipped 2026-07-17.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — pure
-  fetch/bake/table plumbing, no content work. Flag it if the running
-  model differs.
-- **Budget**: code + checks, no shots, grep-first. Overpass **GET** only
-  (mirror `maps.mail.ru/osm/tools/overpass` when overpass-api.de is
-  busy); raw fetches to `~/claude-area/devel/tx-inputs/`, queries
-  recorded in the script header (band-roads idiom).
-- **Then**: rewrite this briefing for W2 (extraction country, Fable 5,
-  high — one staged shot: Permian flares at night).
+- **This session**: Energy (`ENERGY_SPEC.md`), wave 2 of 6 — well sites
+  (`wellSiteAt` + pump/tank-battery/rig kit), scatter **replacement**
+  (old uniform Permian stream retired, never re-keyed), the **offshore
+  rebase** (real `platforms[]` replace the 7 hand-laid Shelf platforms;
+  Far Rig + the Malaquite-skyline sentinel **re-anchor**, not delete),
+  night gas flares, the **Energy log** (11th collectible) + first hero
+  sites (Spindletop, a Permian tank farm), and the **approach
+  announcer** (real name + info fragment on HUD proximity, armed/re-arm
+  per site, unnamed sites silent). Wave 1 (fetch + bake + `geo.js`
+  wiring + `energy.mjs` checks) shipped 2026-07-17, commit `<fill in
+  after commit>`.
+- **Recommended setup**: model **Fable 5**, effort **high** — content +
+  composition. Flag it if the running model differs.
+- **Budget**: code + checks, **one shot** (Permian flares at night),
+  grep-first.
+- **Then**: rewrite this briefing for W3 (wind farms + solar, Sonnet 5,
+  high — one staged shot: turbine row at dusk).
 
-Gotchas carried over: OSM `voltage` is multi-value (`345000;138000`) —
-match anywhere, never `split(';')[0]` (the band-roads concurrency
-defect's idiom); assert the county join at bake (ag 254/254 idiom);
-W1 must measure the filtered 345 kV volume before committing to it.
+Gotchas carried over: offshore `platforms[]` (227 sites: 153 major / 74
+minor clusters) is name-poor by real data — only 10/153 majors carry a
+real `name`, 151/153 carry `operator`, **none carry `ref`** — so the
+announcer's real fallback chain is name → operator → silent, `ref`
+essentially never fires despite being baked; design the announcer/log
+label around that, not around `ref` showing up. Far Rig
+(`maritime.js`'s `FAR_RIG` constant) and the Malaquite-skyline sentinel
+re-anchor to the **farthest real major** among those 153, not deleted.
+`wellSiteAt` reads `GEO.energy.counties[name].wellKm2` directly — county
+records are all-254-present (ag idiom); no join gotcha to carry, wells
+outside Texas were already excluded at bake.
 
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
 free-roam Texas game. Before touching code read `CLAUDE.md` (architecture +

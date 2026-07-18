@@ -20,6 +20,10 @@ export const GEO = {
   bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
   ag: {},        // county name -> {cattle, horses, goats, sheep, onFeed, irrAcres, crops, areaKm2, dominantCrop}
   bandAg: {},    // "STATE|County Name" -> same record shape as `ag`, band counties (LA/AR/OK/NM)
+  energy: { counties: {}, windFarms: [], plants: [], refineries: [], lines345: [], substations: [], platforms: [], fairways: [] },
+  // energy.counties: county name -> {wells, wellKm2} (all 254, ag idiom).
+  // Site lists read directly off GEO.energy (GEO.cities idiom) — no per-list
+  // accessor, only energyAt() for the per-county record. tools/build-energy.mjs.
 };
 
 export async function loadGeo(onStatus) {
@@ -59,6 +63,8 @@ export async function loadGeo(onStatus) {
   GEO.counties = await get('counties.json').catch(() => []);
   GEO.ag = await get('agriculture.json').catch(() => ({}));
   GEO.bandAg = await get('band-agriculture.json').catch(() => ({}));
+  onStatus?.('Mapping the energy grid…');
+  GEO.energy = await get('energy.json').catch(() => GEO.energy);
   for (const c of GEO.counties) {
     // bbox per county for cheap point-in-county prefiltering
     let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
@@ -326,6 +332,15 @@ export function neighborCountyAt(x, z) {
 export function agAt(x, z) {
   const name = countyAt(x, z);
   return name ? (GEO.ag[name] || null) : null;
+}
+
+// Energy-track well count/density for the county at (x,z), or null outside
+// Texas. Site lists (windFarms/plants/refineries/lines345/substations/
+// platforms/fairways) live directly on GEO.energy — no accessor, GEO.cities
+// idiom. tools/build-energy.mjs.
+export function energyAt(x, z) {
+  const name = countyAt(x, z);
+  return name ? (GEO.energy.counties[name] || null) : null;
 }
 
 // Band counterpart — own bake (tools/build-band-ag.mjs), own file
