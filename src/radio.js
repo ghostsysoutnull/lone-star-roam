@@ -22,7 +22,7 @@
 // get the sign and the scenery, not the stamp). A blocked runway forces a
 // go-around at ANY field with traffic
 // (physical safety, not a radio behavior) regardless of tower or tier.
-import { hAt, nearestCity, nearestRoad, seededRand, neighborDist, coastDist, borderZoneAt, inTexas, TIDELANDS_U } from './geo.js';
+import { GEO, hAt, nearestCity, nearestRoad, seededRand, neighborDist, coastDist, borderZoneAt, inTexas, TIDELANDS_U } from './geo.js';
 import { AIRPORTS, runwayInUse, rwyLabel, windFrom, onRunway, TD_AGL, TD_SPD } from './airports.js';
 import { ATMOS } from './sky.js';
 import { chatterLine, HELI_ID } from './chatter.js';
@@ -39,6 +39,9 @@ const UNICOM_RANGE = 120;  // CTAF is a shorter-range, quieter frequency
 // enough that only genuinely far-west traffic (El Paso and up the line) can
 // mention routing around Roswell; Midland, 88u further out, never qualifies.
 const NM_NEAR = 500;
+// W5: how close a baked 345 kV substation must be for the `grid` token to go
+// live — the ERCOT-island wink, same located-wink idiom as `nm`/`shelf`.
+const GRID_NEAR = 35;
 const CLEAR_DEG = 20;      // alignment cone for "cleared to land"
 // A3 chatter: the scanner's direct-range window — line-of-sight VHF to any
 // airborne source, tuned field or not (the only way the coast guard, nowhere
@@ -274,6 +277,8 @@ export class TowerRadio {
     if (neighborDist('NM', s.x, s.z) < NM_NEAR) ctx.nm = 'New Mexico';
     if (!inTexas(s.x, s.z) && borderZoneAt(s.x, s.z) === 'coast' && coastDist(s.x, s.z) > TIDELANDS_U)
       ctx.shelf = 'the shelf';
+    // W5: near a baked 345 kV substation — the ERCOT-island wink
+    if (GEO.energy.substations.some((sub) => Math.hypot(sub.x - s.x, sub.z - s.z) < GRID_NEAR)) ctx.grid = 'the ERCOT grid';
     return ctx;
   }
 

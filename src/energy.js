@@ -73,8 +73,35 @@ export const HEROES = [
     fact: "refinery row lines the Corpus ship channel — Valero runs its hometown plants a short drive from its headquarters",
     info: "Valero's hometown refinery row",
   },
+  // W5 hero plants — baked plants[] coords (already road-clear >=24u, no shove
+  // needed, unlike Spindletop); `look` picks the buildHeroes model branch.
+  {
+    id: 'stp', name: 'South Texas Project Electric Generating Station', at: [3298.2, 2451.7], kind: 'plant', look: 'nuclear',
+    fact: 'two reactors generate 2,700 megawatts, cooled by a dedicated 7,000-acre reservoir built just for the plant — no river runs through it',
+    info: 'twin reactors, a lake built to cool them',
+  },
+  {
+    id: 'comanchepeak', name: 'Comanche Peak Nuclear Power Plant', at: [1637.3, -1443.7], kind: 'plant', look: 'nuclear',
+    fact: 'two reactors on Comanche Creek Reservoir have run since 1990 and 1993, together good for about 2,400 megawatts',
+    info: 'nuclear power on a lake near Glen Rose',
+  },
+  {
+    id: 'parish', name: 'W. A. Parish Electric Generating Station', at: [3687.7, 1693.6], kind: 'plant', look: 'coal',
+    fact: "NRG's 3.65-gigawatt coal-and-gas giant once captured a third of one boiler's carbon dioxide and piped it 82 miles to an oil field — the country's largest carbon-capture retrofit, running again since 2023",
+    info: 'coal, gas, and for a while, captured carbon',
+  },
+  {
+    id: 'martinlake', name: 'Martin Lake Power Plant', at: [4694.6, -1401.8], kind: 'plant', look: 'coal',
+    fact: 'three lignite units running since the late 1970s make this the largest coal plant in Texas and the fifth-largest in the country, burning coal dug from the ground around it',
+    info: "Texas's biggest coal plant",
+  },
 ];
 export const ENERGY_TOTAL = HEROES.length;
+
+// W5: legible corridor spacing at game scale, not real 300-500m tower
+// spacing — every corridor still gets >=2 towers regardless of length.
+const TOWER_SPACING = 40;
+const SUBSTATION_THIN = 15; // runtime dedup before drawing (735 baked -> ~600)
 
 export class EnergySystem {
   constructor(scene, gameplay, sky, scenery) {
@@ -89,10 +116,12 @@ export class EnergySystem {
     this.flames = [];    // refinery flare flames, scale-flickered in update
     this.buildHeroes(scene);
     this.buildRefineries(scene);
+    this.buildTowers(scene);
+    this.buildSubstations(scene); // sets this.subSites (thinned) for the register loop below
     // W2 site tables: heroes + offshore platforms (name → operator → silent;
     // `ref` is baked but essentially never present — do not design around it)
     for (const h of HEROES)
-      this.register(h.at[0], h.at[1], 25, `${h.kind === 'windfarm' ? '💨' : h.kind === 'refinery' ? '🏭' : '🛢'} ${h.name} — ${h.info}`);
+      this.register(h.at[0], h.at[1], 25, `${h.kind === 'windfarm' ? '💨' : h.kind === 'refinery' ? '🏭' : h.kind === 'plant' ? '⚡' : '🛢'} ${h.name} — ${h.info}`);
     for (const p of GEO.energy.platforms) {
       const label = p.name ? `🛢 ${p.name} — ${p.operator ?? 'offshore platform'}`
         : p.operator ? `🛢 ${p.operator} platform` : null;
@@ -112,6 +141,17 @@ export class EnergySystem {
       if (!r.name || heroSites.has(r.name)) continue;
       this.register(r.x, r.z, 20, `🏭 ${r.name}${r.operator ? ` — ${r.operator}` : ''}`);
     }
+    // W5: named substations from the thinned draw list, further separated so
+    // a metro cluster doesn't fire toasts back to back, and kept off any hero
+    // plant's own substation (Parish's sits 10.6u from the Parish marker)
+    const subAnnounced = [];
+    for (const s of this.subSites) {
+      if (!s.name) continue;
+      if (HEROES.some((h) => Math.hypot(h.at[0] - s.x, h.at[1] - s.z) < 20)) continue;
+      if (subAnnounced.some((p) => Math.hypot(p.x - s.x, p.z - s.z) < 20)) continue;
+      subAnnounced.push(s);
+      this.register(s.x, s.z, 16, `⚡ ${s.name}`);
+    }
     // W4 brass at the hero skylines — main.js's unified plaqueNear merges this
     // list (maritime idiom: append a source, never a branch)
     this.plaques = [
@@ -130,6 +170,22 @@ export class EnergySystem {
       {
         name: 'Corpus Christi Refinery Row', at: HEROES.find((h) => h.id === 'corpus').at, hint: 'read the marker', sub: 'refinery row',
         text: "Corpus keeps its industry in a row — refineries shoulder to shoulder along the ship channel, tank farms behind them, tankers nosing up the basin in front. Valero was born here and never left; its headquarters sit up the road in San Antonio, but the crude runs through its hometown first. The row glows sodium-orange all night, every night.",
+      },
+      {
+        name: 'South Texas Project Electric Generating Station', at: HEROES.find((h) => h.id === 'stp').at, hint: 'read the marker', sub: 'twin reactors, Matagorda County',
+        text: "Two Westinghouse reactors on the Colorado River, on line since 1988 and 1989, turning out 2,700 megawatts around the clock. There's no river cooling tower here — the plant built its own lake instead, a 7,000-acre reservoir dug just to carry the heat away. Texas keeps its nuclear power quiet and out of the way; this is where the quiet happens.",
+      },
+      {
+        name: 'Comanche Peak Nuclear Power Plant', at: HEROES.find((h) => h.id === 'comanchepeak').at, hint: 'read the marker', sub: 'Glen Rose, since 1990',
+        text: "Two reactors on Comanche Creek Reservoir, forty miles southwest of Fort Worth, together good for about 2,400 megawatts since the early '90s. Luminant runs it now; the lake that cools it doubles as a fishery, which is either reassuring or isn't, depending on how you think about it.",
+      },
+      {
+        name: 'W. A. Parish Electric Generating Station', at: HEROES.find((h) => h.id === 'parish').at, hint: 'read the marker', sub: 'coal and gas, Fort Bend County',
+        text: "NRG's 3.65-gigawatt giant southwest of Houston burns coal in one plant and gas in the other, side by side since 1977. For a few years one boiler ran the country's largest carbon-capture retrofit, piping CO2 eighty-two miles to an oil field before the economics soured — it's running again since 2023.",
+      },
+      {
+        name: 'Martin Lake Power Plant', at: HEROES.find((h) => h.id === 'martinlake').at, hint: 'read the marker', sub: "Texas's biggest coal plant",
+        text: 'Three lignite units on their own East Texas lake, burning coal strip-mined from the ground around the plant since the late 1970s. Martin Lake is the largest coal-fired plant in Texas and the fifth-largest in the country — the biggest taxpayer in two counties, and the reason the lights stay on for a long way in every direction.',
       },
     ];
   }
@@ -257,6 +313,38 @@ export class EnergySystem {
         const marker = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.6, 0.15), granite);
         marker.position.set(-2.5, 1.05, 0);
         g.add(plinth, marker);
+      } else if (h.kind === 'plant') {
+        // W5: nuclear reads round (hero tier, 12-14 seg per the poly bar) — a
+        // waisted cooling-tower silhouette + reactor dome; coal/gas reads
+        // boxy — boiler block + a round stack (the refinery idiom)
+        let topY = 8;
+        if (h.look === 'nuclear') {
+          const shell = new THREE.MeshLambertMaterial({ color: 0xd8dade, flatShading: true, side: THREE.DoubleSide });
+          const low = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.2, 5, 14, 1, true), shell);
+          low.position.set(0, 2.5, 0);
+          const high = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.2, 4, 14, 1, true), shell);
+          high.position.set(0, 7, 0);
+          const domeMat = new THREE.MeshLambertMaterial({ color: 0xc8ccd2, flatShading: true });
+          const dome = new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), domeMat);
+          dome.position.set(7, 1.6, 0);
+          const domeBase = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.2, 2.2, 12), domeMat);
+          domeBase.position.set(7, 1.1, 0);
+          g.add(low, high, dome, domeBase);
+          topY = 9;
+        } else {
+          const boiler = new THREE.Mesh(new THREE.BoxGeometry(5.5, 7, 4.5), new THREE.MeshLambertMaterial({ color: 0x5c5c64, flatShading: true }));
+          boiler.position.set(-1, 3.5, 0);
+          const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1.2, 11, 12), new THREE.MeshLambertMaterial({ color: 0xb8bcc2, flatShading: true }));
+          stack.position.set(4, 5.5, 0);
+          g.add(boiler, stack);
+          topY = 11;
+        }
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.5, 2.0), granite);
+        plinth.position.set(-7, 0.25, 0);
+        const marker = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.6, 0.15), granite);
+        marker.position.set(-7, 1.05, 0);
+        g.add(plinth, marker);
+        this.sky?.registerGlowAnchor({ x, z, y: y + topY, kind: 'plant' });
       }
       g.position.set(x, y, z);
       scene.add(g);
@@ -386,5 +474,156 @@ export class EnergySystem {
       spill.name = 'refinery-spill';
       scene.add(spill);
     }
+  }
+
+  // ===================================================================
+  // W5: the ERCOT spine — box-built lattice towers (poly-bar law: boxy/
+  // lattice subjects stay box-built) instanced along each baked lines345
+  // corridor by arc length (trains.js arcInit/at idiom, reimplemented
+  // locally — corridors are static, walked once at boot, never per frame),
+  // plus a thin instanced conductor ribbon so the corridor reads as a
+  // followable line from a distance, not just a dashed trail of towers.
+  // A tower landing within 3u of a road/river nudges sideways rather than
+  // clipping through it (the wire orientation is recomputed from the
+  // actual placed points, so a nudge never kinks the conductor visibly).
+  // ===================================================================
+  buildTowers(scene) {
+    // legibility pass (staged shot, W5): members bulked well past a realistic
+    // taper — the turbine/refinery lesson repeats here, a thin true-scale
+    // lattice collapses into an unreadable pole by mid-distance; the wide
+    // double cross-arm is the silhouette cue that actually reads as "tower"
+    // at range, so it gets the biggest bump. Darker steel holds contrast
+    // against the sky longer than the original light gray.
+    const parts = [];
+    for (const [lx, lz] of [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]]) {
+      const leg = new THREE.BoxGeometry(0.26, 9, 0.26);
+      leg.translate(0, 4.5, 0); // base at local origin, top at y=9
+      leg.rotateX(lz * 0.07);   // lean inward — top converges toward the axis
+      leg.rotateZ(-lx * 0.07);
+      leg.translate(lx, 0, lz);
+      parts.push(leg.toNonIndexed());
+    }
+    for (const y of [2, 5]) { // waist ties, both faces (+ cross, not diagonal bracing — box-built, cheap)
+      parts.push(new THREE.BoxGeometry(2.2, 0.2, 0.2).translate(0, y, 0).toNonIndexed());
+      parts.push(new THREE.BoxGeometry(0.2, 0.2, 2.2).translate(0, y, 0).toNonIndexed());
+    }
+    for (const y of [6.4, 7.5]) // double-circuit cross-arms, perpendicular to the line (local X)
+      parts.push(new THREE.BoxGeometry(4.4, 0.28, 0.28).translate(0, y, 0).toNonIndexed());
+    parts.push(new THREE.BoxGeometry(1.8, 0.2, 0.2).translate(0, 8.6, 0).toNonIndexed()); // shield-wire peak
+    const towerGeo = mergeGeoms(parts);
+    const towerMat = new THREE.MeshLambertMaterial({ color: 0x686c74, flatShading: true });
+    const wireGeo = new THREE.BoxGeometry(1, 1, 1); // unit box, scaled per-instance to the span
+    const wireMat = new THREE.MeshBasicMaterial({ color: 0x2c2c30 });
+
+    const towerM = [], wireM = [];
+    const towerRanges = []; // {len, count} per lines345 entry, same order — verify's corridor-math check
+    const up = new THREE.Vector3(0, 1, 0), unitScale = new THREE.Vector3(1, 1, 1);
+    for (const line of GEO.energy.lines345) {
+      const pts = line.pts;
+      if (pts.length < 2) { towerRanges.push({ len: 0, count: 0 }); continue; }
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i - 1], b = pts[i];
+        cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]));
+      }
+      const len = cum[cum.length - 1];
+      if (len <= 0) { towerRanges.push({ len: 0, count: 0 }); continue; }
+      const at = (s) => {
+        let lo = 0, hi = cum.length - 1;
+        while (lo < hi - 1) { const mid = (lo + hi) >> 1; (cum[mid] <= s ? (lo = mid) : (hi = mid)); }
+        const a = pts[lo], b = pts[lo + 1];
+        const seg = cum[lo + 1] - cum[lo] || 1;
+        const t = (s - cum[lo]) / seg;
+        return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / seg, (b[1] - a[1]) / seg];
+      };
+      const n = Math.max(1, Math.round(len / TOWER_SPACING));
+      const startCount = towerM.length;
+      let prev = null;
+      for (let i = 0; i <= n; i++) {
+        const [ax, az, tx, tz] = at((len * i) / n);
+        let x = ax, z = az;
+        const rd = Math.min(nearestAnyRoad(x, z, 6)?.dist ?? 99, nearestRiver(x, z, 6)?.dist ?? 99);
+        if (rd < 3) {
+          const nx = x - tz * 4, nz = z + tx * 4; // sideways off the tangent
+          const rd2 = Math.min(nearestAnyRoad(nx, nz, 6)?.dist ?? 99, nearestRiver(nx, nz, 6)?.dist ?? 99);
+          if (rd2 > rd) { x = nx; z = nz; }
+        }
+        const y = hAt(x, z);
+        const q = new THREE.Quaternion().setFromAxisAngle(up, Math.atan2(tx, tz));
+        towerM.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), q, unitScale));
+        if (prev) {
+          const segLen = Math.hypot(x - prev.x, z - prev.z);
+          if (segLen > 0.5) {
+            const wq = new THREE.Quaternion().setFromAxisAngle(up, Math.atan2(x - prev.x, z - prev.z));
+            wireM.push(new THREE.Matrix4().compose(
+              new THREE.Vector3((prev.x + x) / 2, (prev.y + y) / 2 + 7.2, (prev.z + z) / 2),
+              wq, new THREE.Vector3(0.1, 0.1, segLen)));
+          }
+        }
+        prev = { x, y, z };
+      }
+      towerRanges.push({ len, count: towerM.length - startCount });
+    }
+    this.towerRanges = towerRanges;
+    if (!towerM.length) return;
+    const towers = new THREE.InstancedMesh(towerGeo, towerMat, towerM.length);
+    towerM.forEach((m, i) => towers.setMatrixAt(i, m));
+    towers.instanceMatrix.needsUpdate = true;
+    towers.name = 'transmission-towers';
+    scene.add(towers);
+    this.towerMesh = towers; // exposed for the verify corridor-math check
+    if (wireM.length) {
+      const wires = new THREE.InstancedMesh(wireGeo, wireMat, wireM.length);
+      wireM.forEach((m, i) => wires.setMatrixAt(i, m));
+      wires.instanceMatrix.needsUpdate = true;
+      wires.name = 'transmission-wires';
+      scene.add(wires);
+    }
+  }
+
+  // ===================================================================
+  // W5: 735 baked >=345kV majors, runtime-thinned to a minimum separation
+  // (735 -> ~600) before drawing — one vertex-color-baked box-built kit
+  // (gravel pad + transformer boxes + a gantry, traffic.js's tinted-box
+  // idiom) instanced once. this.subSites is the thinned list the
+  // constructor's announcer loop reads right after this call returns.
+  // ===================================================================
+  buildSubstations(scene) {
+    const kept = [];
+    for (const s of GEO.energy.substations) {
+      if (kept.some((k) => Math.hypot(k.x - s.x, k.z - s.z) < SUBSTATION_THIN)) continue;
+      kept.push(s);
+    }
+    this.subSites = kept;
+
+    const tinted = (geo, hex) => {
+      const c = new THREE.Color(hex);
+      const n = geo.attributes.position.count;
+      const col = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+      geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return geo;
+    };
+    const parts = [
+      tinted(new THREE.BoxGeometry(4.4, 0.06, 4.4).translate(0, 0.03, 0).toNonIndexed(), 0x8a8a82), // gravel pad
+      tinted(new THREE.BoxGeometry(0.9, 1.6, 1.3).translate(-1.2, 0.8, -1.2).toNonIndexed(), 0xc8ccd2), // transformer
+      tinted(new THREE.BoxGeometry(0.9, 1.6, 1.3).translate(0.6, 0.8, -1.2).toNonIndexed(), 0xb8bcc2),
+      tinted(new THREE.BoxGeometry(0.14, 2.2, 0.14).translate(-1.2, 1.1, 1.2).toNonIndexed(), 0x9498a0), // gantry posts
+      tinted(new THREE.BoxGeometry(0.14, 2.2, 0.14).translate(1.2, 1.1, 1.2).toNonIndexed(), 0x9498a0),
+      tinted(new THREE.BoxGeometry(2.6, 0.1, 0.1).translate(0, 2.2, 1.2).toNonIndexed(), 0x9498a0), // gantry crossbar
+    ];
+    const subGeo = mergeGeoms(parts);
+    const subMat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+    const inst = new THREE.InstancedMesh(subGeo, subMat, kept.length);
+    const up = new THREE.Vector3(0, 1, 0), unitScale = new THREE.Vector3(1, 1, 1);
+    kept.forEach((s, i) => {
+      const rnd = seededRand(`substation:${s.x},${s.z}`);
+      const q = new THREE.Quaternion().setFromAxisAngle(up, rnd() * Math.PI * 2);
+      inst.setMatrixAt(i, new THREE.Matrix4().compose(new THREE.Vector3(s.x, hAt(s.x, s.z), s.z), q, unitScale));
+    });
+    inst.instanceMatrix.needsUpdate = true;
+    inst.name = 'substations';
+    scene.add(inst);
+    this.subMesh = inst; // exposed for the verify count-matches-thin check
   }
 }

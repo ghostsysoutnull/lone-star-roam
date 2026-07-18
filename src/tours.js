@@ -15,6 +15,15 @@ export const TOURS = [
   {
     track: 'Energy (2026-07)',
     waves: [
+      { wave: 'W5 — 345 kV tower corridors, substations, hero plants, ERCOT radio', spots: [
+        S('⚡ ERCOT tower corridor — Hill Country spine', [-128.4, 179.5], { mode: 'DRIVE', time: 0.35, note: 'a real 345 kV corridor, box-built lattice towers instanced along its arc length every ~40u, conductor ribbon strung between them' }),
+        S('⚡ South Texas Project — Energy log hero', [3298.2, 2451.7], { mode: 'DRIVE', time: 0.35, note: 'twin reactors, waisted cooling-tower silhouette + reactor dome; drive in and the log stamps' }),
+        S('⚡ Comanche Peak Nuclear Power Plant — Energy log hero', [1637.3, -1443.7], { mode: 'DRIVE', time: 0.35, note: 'the second nuclear hero, Comanche Creek Reservoir near Glen Rose' }),
+        S('⚡ W. A. Parish Electric Generating Station — Energy log hero', [3687.7, 1693.6], { mode: 'DRIVE', time: 0.35, note: 'coal/gas boiler-and-stack hero; a real 345 kV corridor passes within 2u of the plant — its own substation sits 11u away (hero-excluded from the announcer, no double toast)' }),
+        S('⚡ Martin Lake Power Plant — Energy log hero', [4694.6, -1401.8], { mode: 'DRIVE', time: 0.35, note: "Texas's biggest coal plant, East Texas lignite country" }),
+        S('⚡ Substation kit — a thinned, named 345 kV major', [1479.2, 1366.3], { mode: 'DRIVE', note: 'Zorn Substation: gravel pad, transformer boxes, gantry — one of ~600 kept after the runtime thin (735 baked majors); named and far from any hero, so it joins the announcer' }),
+        S('📻 ERCOT grid wink — DFW scanner', [2393.1, -2123.9], { mode: 'FLY', note: "watch: tune the scanner near DFW traffic — an enroute GA or jet source passing within 35u of the substation below may roll the ERCOT-island line (position/odds vary with boot time)" }),
+      ] },
       { wave: 'W4 — refineries, hero skylines, light pool, spill decals', spots: [
         S('🏭 Ship Channel at night — Deer Park hero', [4174.9, 1421.1], { mode: 'DRIVE', time: 0.98, note: 'the hero skyline glowing: cracker towers, tank farm, twin flares; park under a flare and the truck catches real orange light (the W4 pool)' }),
         S('🏭 Baytown Refinery — hero + log', [4285.7, 1390.3], { mode: 'DRIVE', time: 0.98, note: 'hand-placed at the real ExxonMobil complex (OSM has no polygon — scarcity exception); the log stamps, brass at the marker' }),

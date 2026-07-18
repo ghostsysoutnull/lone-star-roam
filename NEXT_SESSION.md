@@ -1,38 +1,37 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Energy (`ENERGY_SPEC.md`), wave 5 of 6 — the ERCOT
-  spine: 345 kV lattice-tower corridors along the baked `lines345`
-  polylines (box-built towers, poly-bar law), major substations, hero
-  plant landmarks (South Texas Project + Comanche Peak nuclear,
-  W.A. Parish, Martin Lake) with plaques + Energy log entries, ERCOT
-  flavor on the radio, `plant`-kind glow anchors into the W4 light
-  pool. Wave 4 (refinery data rebake 22→33 + kit at all sites, 4 hero
-  skylines, local light pool, spill decals) shipped 2026-07-18,
-  commit `20a319a`.
-- **Recommended setup**: model **Sonnet 5**, effort **high** —
-  polyline/instancing plumbing. Flag it if the running model differs.
-- **Budget**: code + checks, **one shot** (tower corridor read),
-  grep-first.
-- **Then**: rewrite this briefing for W6 (energy jobs + oversize-load
-  rule + track close: ROADMAP fold-in, gotchas graduated, briefing
-  deleted — Fable 5, high, no shots).
+- **This session**: Energy (`ENERGY_SPEC.md`), wave 6 of 6 (last) —
+  energy jobs: crude hauls basin→refinery, fuel runs, and wind-blade
+  **oversize loads** (a slow-haul job type — staying under a speed
+  cap earns the bonus, the inverse of every other haul). Track close:
+  fold the whole track into one `ROADMAP.md` entry, graduate
+  surviving gotchas (voltage multi-value match, farm clustering,
+  flare gating) into `GOTCHAS.md`, sweep `BACKLOG.md` + doc headers,
+  delete this briefing block. Wave 5 (345 kV tower corridors +
+  conductor ribbon, ~600 thinned substations, 4 hero plants — South
+  Texas Project + Comanche Peak nuclear, W.A. Parish, Martin Lake —
+  ERCOT radio flavor via a `{grid}` chatter token) shipped 2026-07-18,
+  commit TBD (fill in next session, W4's-hash-backfill precedent).
+- **Recommended setup**: model **Fable 5**, effort **high** — offer
+  copy + rules, not plumbing. Flag it if the running model differs.
+- **Budget**: code + checks, **no shots**, grep-first.
+- **Then**: this is the last wave — nothing to rewrite. Delete this
+  whole briefing block once the track-close commit lands.
 
-Gotchas carried over: announcer + log machinery is DONE — W5 only
-calls `energy.register(...)`/appends `HEROES` entries (id is the save
-key, never rename). **Light pool is DONE** (sky.js `POOL_KINDS`,
-`registerGlowAnchor({x,z,y,kind})`): W5 hero plants register
-`kind: 'plant'` (cool flood, already in the table) — never resize the
-pool, count is constant forever (shader-recompile law). `lines345` is
-945 stitched corridors — instance towers by arc-length (trains
-`arcInit` idiom); substations: 735 baked ≥345 kV majors, thin before
-drawing (the announcer already covers named ones only). A new radio
-chatter kind needs THREE rows (`POOLS` + `VOICES` + `ROLL_OK`) or it
-never speaks. Hero markers need road clearance ≥8 (the sweep in
-`energy.mjs` enforces it — probe offline against `data/highways.json`
-before hardcoding coords, the W4 method). Any footprint radius at a
-real coordinate clamps to `nearestAnyRoad`/`nearestRiver` clearance
-with a skip floor (GOTCHAS law).
+Gotchas carried over: reference shipped sites **by id**, not name —
+`HEROES` ids (`stp`, `comanchepeak`, `parish`, `martinlake`,
+`shipchannel`, `baytown`, `motiva`, `corpus`, wind/gusher/tank ids)
+are stable save keys; the city-rename lesson applies the same way
+(resolve at use, an orphaned reference self-clears, never hardcode a
+site's coords into a job — read `energy.heroes`/`GEO.energy.*` at
+offer-generation time). Oversize-load bonus is a **speed-over-time**
+rule (max speed under cap for the whole haul → bonus; one burst over
+cap → no bonus — the charging-deer shape), belongs in
+`mission-rules.js` so `tools/test.mjs rules` covers it pre-browser.
+Fast-travel lock during an active haul already exists (missions.js
+`job.phase === 'haul'`) — extend it, don't refork it. No new
+announcer/log/light-pool machinery needed anywhere in this wave.
 
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
 free-roam Texas game. Before touching code read `CLAUDE.md` (architecture +

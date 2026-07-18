@@ -118,6 +118,9 @@ export const POOLS = {
       { t: 'Center, {cs}, out of {origin}, looking direct {dest}.' },
       { t: 'Center, {cs}, painting {fc} on the radar ahead.' },
       { t: 'Center, {cs} — folks, if you look out the right side, that’s Texas. All of it.', funny: true },
+      // W5 — {grid} goes live only near a baked 345 kV substation (radio.js
+      // GRID_NEAR), the located-wink idiom shared with {nm}/{shelf}
+      { t: 'Center, {cs}, towers off the wingtip — that’s {grid}. Texas keeps its own lights on, no help from anybody.' },
     ],
   },
   military: {
@@ -153,6 +156,8 @@ export const POOLS = {
       // only place either line is true
       { t: '{cs}, out over {nm} shortly — and we’ll be goin’ around Roswell. No reason. Just — no reason.', funny: true },
       { t: '{cs}, {nm} line off the left wing. Prettiest nothing you ever saw.' },
+      // W5 — {grid} wink, see the jet pool above for the token's live window
+      { t: '{cs}, {grid} runs right under us — whole state’s its own island, no cord to anywhere else.', funny: true },
     ],
   },
 };

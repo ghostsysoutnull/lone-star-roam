@@ -520,4 +520,92 @@ export default async function energy(t) {
     t.ok(res.rigAnchors === res.majors - 1, `rig anchors (${res.rigAnchors}) != major platforms - farRig (${res.majors - 1})`);
     t.ok(res.farFlare, 'the Far Rig has no flare-kind anchor');
   });
+
+  // --- Wave 5: 345 kV tower corridors, substations, hero plants, ERCOT radio flavor ---
+
+  await t.check('towers: corridor tower count matches arc-length/spacing rounding', async () => {
+    const res = await t.ev(`(() => {
+      const r = g.energy.towerRanges.find((r) => r.len > 800);
+      const expected = Math.max(1, Math.round(r.len / 40)) + 1;
+      return { len: r.len, count: r.count, expected };
+    })()`);
+    t.ok(res.count === res.expected, `corridor tower count ${res.count} != expected ${res.expected} (len ${res.len})`);
+  });
+
+  await t.check('towers: instances sit on hAt (draped, not floating/buried)', async () => {
+    // matrixWorld.constructor idiom (shoulder.mjs) avoids needing a THREE global
+    const out = await t.ev(`(() => {
+      const mesh = g.energy.towerMesh;
+      const m = new (mesh.matrixWorld.constructor)();
+      const n = mesh.count;
+      const idxs = [0, (n / 2) | 0, n - 1];
+      return idxs.map((i) => {
+        mesh.getMatrixAt(i, m);
+        const x = m.elements[12], y = m.elements[13], z = m.elements[14];
+        return Math.abs(y - g.hAt(x, z));
+      });
+    })()`);
+    t.ok(out.every((dy) => dy < 0.05), `tower not seated on hAt: ${JSON.stringify(out)}`);
+  });
+
+  await t.check('plant heroes: all four log on arrival', async () => {
+    const ids = await t.ev(`g.energy.heroes.filter((h) => h.kind === 'plant').map((h) => h.id)`);
+    t.ok(ids.length === 4, `expected 4 plant heroes, got ${ids.length}`);
+    for (const id of ['stp', 'comanchepeak', 'parish', 'martinlake']) t.ok(ids.includes(id), `missing plant hero id: ${id}`);
+    await t.ev(`g.gameplay.save.energy = []`);
+    const stp = await t.ev(`g.energy.heroes.find((h) => h.id === 'stp')`);
+    await t.tp(stp.at[0], stp.at[1]);
+    await t.until(`g.gameplay.save.energy.includes('stp')`, 6000);
+  });
+
+  await t.check('hero plaque: South Texas Project brass reads at parked-truck distance on an ugly heading', async () => {
+    const at = await t.ev(`g.energy.heroes.find((h) => h.id === 'stp').at`);
+    await t.tp(at[0] + 8, at[1] - 6); // parked distance, off-axis approach
+    await t.ev('g.player.heading = 2.31');
+    await t.wait(0.4); // hint rides the ~12 Hz hud tick
+    const hint = await t.ev('g.hud.els.interact.textContent');
+    t.ok(hint === 'E — read the marker', `expected the marker hint, got "${hint}"`);
+    await t.key('KeyE');
+    const dlg = await t.ev(`({
+      name: g.hud.els.dialog.querySelector('.npc-name').textContent,
+      text: g.hud.els.dialog.querySelector('.npc-text').textContent,
+    })`);
+    t.ok(dlg.name.includes('South Texas Project'), `dialog name is "${dlg.name}"`);
+    t.ok(dlg.text.includes('7,000-acre reservoir'), `STP plaque copy drifted: "${dlg.text.slice(0, 60)}…"`);
+    await t.key('KeyE');
+  });
+
+  await t.check('plant heroes: all four register cool-flood glow anchors', async () => {
+    const n = await t.ev(`g.sky.glowAnchors.filter((a) => a.kind === 'plant').length`);
+    t.ok(n === 4, `expected 4 plant glow anchors, got ${n}`);
+  });
+
+  await t.check('substations: thinned before drawing, kit instanced once per kept site', async () => {
+    const res = await t.ev(`({ thinned: g.energy.subSites.length, instCount: g.energy.subMesh.count })`);
+    t.ok(res.thinned > 300 && res.thinned < 735, `substation thin count implausible: ${res.thinned}`);
+    t.ok(res.instCount === res.thinned, `instanced count (${res.instCount}) != thinned site count (${res.thinned})`);
+  });
+
+  await t.check('substations: named+separated sites join the announcer; the Parish substation stays excluded (hero-adjacent, no double toast)', async () => {
+    const res = await t.ev(`(() => {
+      const parishSub = g.energy.subSites.find((s) => s.name && s.name.includes('W. A. Parish Station'));
+      const registered = g.energy.sites.some((s) => s.label.includes('W. A. Parish Station'));
+      const anyNamedRegistered = g.energy.sites.some((s) => s.label.startsWith('⚡'));
+      return { drawnHasParishSub: !!parishSub, parishSubRegistered: registered, anyNamedRegistered };
+    })()`);
+    t.ok(res.drawnHasParishSub, 'Parish substation missing from the thinned draw list');
+    t.ok(!res.parishSubRegistered, 'Parish substation double-registered with the announcer (hero-exclusion failed)');
+    t.ok(res.anyNamedRegistered, 'no substation ever joined the announcer');
+  });
+
+  await t.check('ERCOT radio flavor: {grid} token lights up near a baked substation, stays dark far from the grid', async () => {
+    const res = await t.ev(`(() => {
+      const parish = g.energy.subSites.find((s) => s.name && s.name.includes('W. A. Parish Station'));
+      const near = g.radio.ctxFor({ x: parish.x, z: parish.z, cs: 'TEST' }, g.sky).grid;
+      const far = g.radio.ctxFor({ x: -3578.2, z: 1948.1, cs: 'TEST' }, g.sky).grid; // Big Bend — 1448u from the nearest substation
+      return { near, far };
+    })()`);
+    t.ok(res.near === 'the ERCOT grid', `grid token not live near a substation: ${JSON.stringify(res)}`);
+    t.ok(!res.far, `grid token live 1448u from the nearest substation: ${JSON.stringify(res)}`);
+  });
 }
