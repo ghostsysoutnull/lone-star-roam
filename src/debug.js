@@ -25,7 +25,7 @@ const AIRPORT_TAG = {
 };
 const AIRPORT_STATE = { SHV: 'LA', TXK: 'AR', CVN: 'NM', HOB: 'NM', CVS: 'NM', BAD: 'LA' };
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -244,8 +244,9 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     const el = document.createElement('div');
     el.id = 'debug';
     el.innerHTML = '<h2>🔧 Debug</h2><div id="debug-state"></div>' +
-      '<div id="debug-tabs"><button class="active" data-tab="actions">⚡ Actions</button><button data-tab="tours">🗺️ Tours</button></div>' +
-      `<div data-pane="actions">${actionsHtml}${airportsHtml}</div><div data-pane="tours" style="display:none">${toursHtml}</div>`;
+      '<div id="debug-tabs"><button class="active" data-tab="actions">⚡ Actions</button><button data-tab="tours">🗺️ Tours</button><button data-tab="perf">📈 Perf</button></div>' +
+      `<div data-pane="actions">${actionsHtml}${airportsHtml}</div><div data-pane="tours" style="display:none">${toursHtml}</div>` +
+      '<div data-pane="perf" style="display:none"><div id="debug-perf"></div><button id="debug-perf-reset">↺ Reset max</button></div>';
     el.style.display = 'none';
     document.body.appendChild(el);
     const stateEl = el.querySelector('#debug-state');
@@ -274,6 +275,24 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     addEventListener('keydown', (e) => {
       if (e.code === 'Backquote') { el.style.display = el.style.display === 'none' ? 'grid' : 'none'; refreshState(); }
     });
+    // Perf tab: live snapshot at 2 Hz while the pane is showing. Systems sorted
+    // by avg cost; ms are meaningless under the harness fake clock (see perf.js)
+    // — this readout is for a real browser, the suite asserts the data layer.
+    const perfEl = el.querySelector('#debug-perf');
+    const perfPane = el.querySelector('[data-pane="perf"]');
+    const refreshPerf = () => {
+      if (el.style.display === 'none' || perfPane.style.display === 'none') return;
+      const s = perf.snapshot();
+      const rows = Object.entries(s.laps).sort((a, b) => b[1].avg - a[1].avg)
+        .map(([k, L]) => `<tr><td>${k}</td><td>${L.avg.toFixed(2)}</td><td>${L.max.toFixed(1)}</td></tr>`).join('');
+      perfEl.innerHTML =
+        `<div>${s.fps.toFixed(0)} fps · frame ${s.frameMs.avg.toFixed(1)} ms avg / ${s.frameMs.max.toFixed(0)} max` +
+        (s.memoryMB != null ? ` · heap ${s.memoryMB} MB` : '') + '</div>' +
+        `<div>draws ${s.render.calls} · tris ${(s.render.triangles / 1000).toFixed(0)}k · geo ${s.render.geometries} · tex ${s.render.textures} · prog ${s.render.programs}</div>` +
+        `<table><tr><th>system</th><th>avg ms</th><th>max</th></tr>${rows}</table>`;
+    };
+    el.querySelector('#debug-perf-reset').addEventListener('click', () => { perf.resetMax(); refreshPerf(); });
+    setInterval(refreshPerf, 500);
     setInterval(refreshState, 500);
   }
 

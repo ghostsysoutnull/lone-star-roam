@@ -13,6 +13,16 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'Performance (2026-07)',
+    waves: [
+      { wave: 'W1 — instrumentation + baseline', spots: [
+        S('📈 Worst case — downtown Houston, night storm', LL(29.7604, -95.3698), { mode: 'DRIVE', time: 0.98, weather: 'storm', note: 'the heaviest honest frame: downtown instancing + rain + lightning + headlights + night traffic — open the Perf tab (backquote) and read frame avg/max and the top systems' }),
+        S('📈 Floor — empty I-10 west, clear day', [-2767, 334], { heading: Math.PI / 2, mode: 'DRIVE', time: 0.35, weather: 'clear', note: 'the cheapest honest frame: open desert, no city, no weather — the baseline floor for the spec table' }),
+        S('📈 Dense ambient — Sweetwater wind corridor, dusk', [-650, -1430], { mode: 'FLY', time: 0.79, note: 'the instancing-heavy middle case: the densest turbine cluster spinning — compare draws/tris against the floor spot' }),
+      ] },
+    ],
+  },
+  {
     track: 'West Texas massifs (2026-07)',
     waves: [
       { wave: 'W1 — the Guadalupe wall', spots: [

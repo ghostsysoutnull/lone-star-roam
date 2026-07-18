@@ -7,8 +7,27 @@ you're changing. `MODULES.md` has per-module grep anchors — prefer grep + a
 targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
-No active track — Energy shipped in full 2026-07-18 (folded into
-`ROADMAP.md`). Next work comes from `BACKLOG.md` or a new spec session.
+## Session briefing
+- **This session**: Performance (`PERFORMANCE_SPEC.md`), wave 2 of ~3 —
+  verify guardrails + budgets from the W1 baseline. Wave 1 (instrumentation:
+  perf laps, Perf tab, tour spots, perf suite) shipped 2026-07-18.
+- **Blocked until the baseline lands**: W2 thresholds derive from real
+  numbers. Bruno reads the Perf tab (`?debug=1`, backquote, 📈 Perf) at the
+  three Performance tour spots on his machine and the numbers go into the
+  spec's Baseline table first. If the baseline isn't recorded yet, do that
+  (or pick other work) before W2.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — executing
+  settled design (threshold plumbing in `tools/checks/perf.mjs`, CLAUDE.md
+  protocol line). Flag it if the running model differs.
+- **Budget**: code + checks, no shots, grep-first.
+- **Then**: W3 scope (targeted optimizations) is decided by the data; if the
+  data shows no work worth doing, close the track instead.
+
+Gotchas carried over:
+- The harness fake clock (Playwright) fakes `performance.now` — headless lap
+  ms are all ~0. Guardrail thresholds must be count-based (draw calls, tris,
+  tick counts) or come from the recorded real-hardware baseline; never assert
+  nonzero ms headless (see `tools/checks/perf.mjs` header).
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to

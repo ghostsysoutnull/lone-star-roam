@@ -6,6 +6,7 @@ const NEIGHBOR_STATE_NAME = { LA: 'Louisiana', AR: 'Arkansas', OK: 'Oklahoma', N
 import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, wellSiteAt, windTurbinesAt, solarSitesAt, CAUSEWAY, padreSites, bandTint } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { initDebug } from './debug.js';
+import { PerfMonitor } from './perf.js';
 import { CitySystem, cityClear, cityRadius } from './cities.js';
 import { BrandSystem, groundYAt as brandGroundYAt, brandNear } from './brands.js';
 import { Player } from './vehicle.js';
@@ -175,7 +176,8 @@ async function boot() {
   settings.mount(document.getElementById('title'));
   title.onShow = () => settings.refresh();
   buildGuide();
-  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial }); // panel only with ?debug=1; actions drive the verify suite
+  const perf = new PerfMonitor(); // lap timing for every system in the render loop below
+  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf }); // panel only with ?debug=1; actions drive the verify suite
   player.flares = flares; // hud reads the rack count off the player
 
   // Harness/boot spawn on I-35 just south of Austin (suites depend on it);
@@ -314,7 +316,7 @@ async function boot() {
   // ride the 12 Hz hud block (their inputs live there). Stale-by-80ms is fine —
   // every trigger is a lingering state, not an edge.
   const hintSig = { npc: false, cityEdge: false, dusk: false, apron: false, band: false };
-  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, energy, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRiver, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, energyAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, wellSiteAt, windTurbinesAt, solarSitesAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, controlsBar, settings, slots, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, energy, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, perf, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRiver, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, energyAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, wellSiteAt, windTurbinesAt, solarSitesAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, controlsBar, settings, slots, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -322,6 +324,7 @@ async function boot() {
   // crossing ceremony (W6a): which land the player last stood on ('tx'/'band');
   // water and the shelf are null so ferries and the Gulf never trigger it
   let lastSide = 'tx', lastCrossT = -Infinity, returnCount = 0;
+  perf.drawFrame = () => { renderer.render(scene, camera); perf.captureRender(renderer); }; // renderProbe: one true frame even under __skipRender
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
     // Title/attract: the world lives, the player doesn't. Camera drifts around
@@ -349,45 +352,46 @@ async function boot() {
       if (!window.__skipRender) renderer.render(scene, camera);
       return;
     }
+    perf.frame(); // each perf.lap(name) below charges the span since the previous lap to that system
     // ferries drive player.pos/heading directly while aboard — must run before
     // player.update() so its avatar/camera stamp picks up the fresh position
-    ferries.update(dt, clock.elapsedTime);
-    dolphins.update(dt, clock.elapsedTime);
-    player.update(dt);
-    sky.update(dt, player.keys['KeyT'], player.pos.x, player.pos.z, player.pos.y);
-    scenery.update(dt, player.pos.x, player.pos.z);
-    airports.update(dt, sky.days);
-    aviation.update(dt, player.pos.x, player.pos.z, sky.days);
+    ferries.update(dt, clock.elapsedTime); perf.lap('ferries');
+    dolphins.update(dt, clock.elapsedTime); perf.lap('dolphins');
+    player.update(dt); perf.lap('player');
+    sky.update(dt, player.keys['KeyT'], player.pos.x, player.pos.z, player.pos.y); perf.lap('sky');
+    scenery.update(dt, player.pos.x, player.pos.z); perf.lap('scenery');
+    airports.update(dt, sky.days); perf.lap('airports');
+    aviation.update(dt, player.pos.x, player.pos.z, sky.days); perf.lap('aviation');
     cities.update(player.pos.x, player.pos.z);
-    cities.setNight(ATMOS.night);
-    brands.update(player.pos.x, player.pos.z, dt);
+    cities.setNight(ATMOS.night); perf.lap('cities');
+    brands.update(player.pos.x, player.pos.z, dt); perf.lap('brands');
     traffic.update(dt, player.pos.x, player.pos.z, player.pos.y);
-    traffic.setNight(ATMOS.night);
-    trains.update(dt, player.pos.x, player.pos.z);
-    maritime.update(dt, clock.elapsedTime);
-    energy.update(dt, player.pos.x, player.pos.z);
-    heli.update(dt, player.pos.x, player.pos.z, sky.days);
-    blimp.update(dt, sky.days);
+    traffic.setNight(ATMOS.night); perf.lap('traffic');
+    trains.update(dt, player.pos.x, player.pos.z); perf.lap('trains');
+    maritime.update(dt, clock.elapsedTime); perf.lap('maritime');
+    energy.update(dt, player.pos.x, player.pos.z); perf.lap('energy');
+    heli.update(dt, player.pos.x, player.pos.z, sky.days); perf.lap('heli');
+    blimp.update(dt, sky.days); perf.lap('blimp');
     military.update(dt, player.pos.x, player.pos.z, aviation);
-    audio.heli(heli.nearestAirborneDist(player.pos.x, player.pos.z));
-    ufo.update(dt, player.pos.x, player.pos.z, player.pos.y);
-    haunts.update(dt, player.pos.x, player.pos.z, sky.t, sky.days);
-    shoulder.update(dt, player.pos.x, player.pos.z);
-    flares.update(dt);
-    dog.update(dt);
-    springer.update(dt, player.pos);
-    rabbits.update(dt, player.pos, player.mode);
+    audio.heli(heli.nearestAirborneDist(player.pos.x, player.pos.z)); perf.lap('military');
+    ufo.update(dt, player.pos.x, player.pos.z, player.pos.y); perf.lap('ufo');
+    haunts.update(dt, player.pos.x, player.pos.z, sky.t, sky.days); perf.lap('haunts');
+    shoulder.update(dt, player.pos.x, player.pos.z); perf.lap('shoulder');
+    flares.update(dt); perf.lap('flares');
+    dog.update(dt); perf.lap('dog');
+    springer.update(dt, player.pos); perf.lap('springer');
+    rabbits.update(dt, player.pos, player.mode); perf.lap('rabbits');
     ATMOS.ufo = ufo.near;
-    radio.update(dt, player, aviation, sky);
-    animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
-    bats.update(dt, player.pos.x, player.pos.z, sky.t);
-    turtles.update(dt, player.pos.x, player.pos.z, sky.t, sky.days);
-    audio.update(player, ATMOS);
+    radio.update(dt, player, aviation, sky); perf.lap('radio');
+    animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z)); perf.lap('animals');
+    bats.update(dt, player.pos.x, player.pos.z, sky.t); perf.lap('bats');
+    turtles.update(dt, player.pos.x, player.pos.z, sky.t, sky.days); perf.lap('turtles');
+    audio.update(player, ATMOS); perf.lap('audio');
     gameplay.update(dt, player.pos, ATMOS.night, player.speed, player, sky);
-    gameplay.checkTouchdown(player, missions.job?.kind === 'charter');
-    missions.update(dt, player.pos, player.mode, player.pos.y - hAt(player.pos.x, player.pos.z));
+    gameplay.checkTouchdown(player, missions.job?.kind === 'charter'); perf.lap('gameplay');
+    missions.update(dt, player.pos, player.mode, player.pos.y - hAt(player.pos.x, player.pos.z)); perf.lap('missions');
     hud.animateShield(player, dt); // per-frame sway/float — headless too, not gated by __skipRender
-    const npcName = npcs.update(dt, player.pos);
+    const npcName = npcs.update(dt, player.pos); perf.lap('npcs');
     hintSig.npc = !!npcName;
     hintSig.dusk = ATMOS.night >= 0.5;
     tutorial.update(dt, hintSig);
@@ -409,6 +413,7 @@ async function boot() {
       hud.dialog(null);
       plaqueOpen = false;
     }
+    perf.lap('hints'); // tutorial + controls bar + interact/nature hint scans since the npcs lap
     // HUD text/minimap at ~12 Hz — nearestCity/nearestRoad every frame is wasteful
     hudTick += dt;
     if (hudTick > 0.08) {
@@ -472,11 +477,12 @@ async function boot() {
       hud.update(player, gameplay.counts(), road, rail, waterAt(player.pos.x, player.pos.z), sky.clockString(), sky.weatherIcon(), gameplay.save.stats, sky.skyReport(player.heading), county, player.perks.radio ? sky.forecastLine() : null);
       hud.updateTags(radio.sources, camera); // A5: aircraft tags share the scanner's enumeration
       hudTick = 0;
+      perf.lap('hud'); // 12 Hz block only — n ticks slower than per-frame laps by design
     }
     // headless verify sets __skipRender: every system above still ticks at full
     // rAF speed, only the SwiftShader draw (~300 ms/frame) is skipped; t.shot
     // clears it for one frame when a screenshot genuinely needs pixels
-    if (!window.__skipRender) renderer.render(scene, camera);
+    if (!window.__skipRender) { renderer.render(scene, camera); perf.captureRender(renderer); perf.lap('render'); }
   });
 }
 
