@@ -27,11 +27,16 @@ Panhandle-to-metro 345 kV corridor. No visible change in game.*
 - night gas flares flickering across the basins after dark
 - the first hero energy sites + the new **Energy log** (11th collectible)
   — starting with Spindletop
+- **every pumpjack in the game upgrades to the new higher-poly build** —
+  the old Permian scatter and Waggoner's included, in place; nothing
+  moves
 
 *Expected result: driving the Permian at night reads as working oil
 country; a low-well county spawns almost nothing. Flares are night-gated
 emissive (no new lights). `save.energy` is a new additive key; the pause
-screen shows the Energy line.*
+screen shows the Energy line. The shared pumpjack prototype swaps to the
+poly-bar build — geometry only, seed streams and transforms untouched, so
+old and new scatter render identically with no two-generations read.*
 *Suggested setup: Fable 5, effort high.*
 
 **Wave 3 — the player gets:**
@@ -158,9 +163,13 @@ stash in `~/claude-area/devel/tx-inputs/`, not the repo.
   (airports idiom — poly-budgeted, drape skirts on `hAt`). Towers
   instance along `lines345` arc-length (rails idiom); conductor wires
   are an in-wave judgment (thin merged segments vs none).
-- **Existing pumpjack scatter untouched** — its seed stream and placement
-  ship as-is; the *added* density comes from new streams gated on
-  `energyAt`. Nothing shipped moves (the crops-4.5 law).
+- **Existing pumpjack scatter: placement untouched, prototype upgraded**
+  — seed streams and every transform ship as-is; the *added* density
+  comes from new streams gated on `energyAt`. Nothing shipped moves
+  (the crops-4.5 law). W2 swaps the **shared pumpjack prototype
+  geometry** to the poly-bar build so all generations (old scatter,
+  Waggoner's, new well sites) render one mesh — a mesh-in-place swap is
+  legal under the determinism law; placement changes are not.
 - **Lights**: every glow (flares, refinery, turbine beacons, plant
   windows) is emissive, `ATMOS.night`-gated, `fog: false` where it must
   punch through — sky.js stays the only light rig. Flicker via the
@@ -205,7 +214,7 @@ ERCOT control room (Taylor).
 | Wave | Deliverable | Model + effort | Budget |
 |------|-------------|----------------|--------|
 | **1** | Fetch + `build-energy.mjs` + `data/energy.json` + `energyAt` + `__game` wiring + data-truth checks | **Sonnet 5, high** — pure fetch/bake plumbing | code + checks, **no shots**, grep-first |
-| **2** | Well sites (`wellSiteAt` + kit), density scatter, night flares, Energy log machinery + first sites | **Fable 5, high** — content + composition | code + checks, **one shot** (Permian flares at night), grep-first |
+| **2** | Well sites (`wellSiteAt` + kit), density scatter, night flares, **shared pumpjack prototype swap** (all generations match), Energy log machinery + first sites | **Fable 5, high** — content + composition | code + checks, **one shot** (Permian flares at night), grep-first |
 | **3** | Wind farms (instanced turbines, `ATMOS.wind` spin) + solar fields + log sites | **Sonnet 5, high** — instancing plumbing | code + checks, **one shot** (turbine row at dusk), grep-first |
 | **4** | Refinery kit at all 22 + 4 hero skylines + night glow + **local light pool + spill decals** (rigs included) + plaques + log sites | **Fable 5, high** — hero composition + plaque copy | code + checks, **two shots** (Ship Channel night; rig water glow), grep-first |
 | **5** | 345 kV tower corridors + major substations + hero plant landmarks + ERCOT radio flavor | **Sonnet 5, high** — polyline/instancing plumbing | code + checks, **one shot** (tower corridor read), grep-first |
@@ -228,7 +237,10 @@ hermetic — drive to state):
   road-clear/`airportClear`/brand/chapel/farmstead standoffs (placement
   math); flare emissive opacity tracks `ATMOS.night` (0 by day); a
   high-density chunk spawns sites, a zero-well chunk spawns none;
-  `logEnergy` dedups + persists; pause line updates.
+  `logEnergy` dedups + persists; pause line updates. Prototype swap: the
+  shared pumpjack geometry's vertex count clears the poly-bar floor
+  while a known chunk's pumpjack transforms match pre-wave hardcoded
+  values (the crops-4.5 frozen-placement idiom).
 - **W3 — behavior sentinels**: a known farm chunk instances >N turbines,
   a farm-free chunk none; blade rotation rate follows `t`-driven
   `ATMOS.wind` change (real-loop sentinel — turbines join the existing
