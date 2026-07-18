@@ -11,6 +11,23 @@ const LAPS = ['ferries', 'dolphins', 'player', 'sky', 'scenery', 'airports',
   'springer', 'rabbits', 'radio', 'animals', 'bats', 'turtles', 'audio',
   'gameplay', 'missions', 'npcs', 'hints'];
 
+const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100, -(lat - 31) * 111320 / 100];
+
+// Wave 2 guardrails (PERFORMANCE_SPEC.md Findings #5): the W1 baseline maxed
+// at 2037 draws / 1.75 M triangles (empty I-10, the "floor" that's actually
+// the ceiling — cost is location-independent). Caps = baseline + the spec's
+// stated headroom margin. Count-based only: per-system/total ms thresholds
+// are pointless per the same finding (all tiny, machine-bound).
+const CAPS = { draws: 2500, triangles: 2.5e6 };
+
+// the W1 tour spots (src/tours.js "Performance" track) — same staging so the
+// numbers here track the recorded baseline table
+const PERF_SPOTS = [
+  { label: 'Houston downtown, night storm', xz: LL(29.7604, -95.3698), mode: 'DRIVE', time: 0.98, weather: 'storm' },
+  { label: 'I-10 west floor, clear day', xz: [-2767, 334], mode: 'DRIVE', time: 0.35, weather: 'clear' },
+  { label: 'Sweetwater wind corridor, dusk', xz: [-650, -1430], mode: 'FLY', time: 0.79, weather: 'clear' },
+];
+
 export default async function perf(t) {
   await t.check('lap table is complete: every render-loop system reports a sane record', async () => {
     await t.tp(-2767, 334, 'DRIVE'); // empty I-10 west — road-free run not needed, just a cheap known spot
@@ -72,6 +89,21 @@ export default async function perf(t) {
     for (const name of ['player', 'traffic', 'animals', 'hud']) {
       t.ok(new RegExp(`\\n${name} \\d+\\.\\d+/\\d+(\\.\\d+)? n\\d+`).test(text), `export missing the '${name}' lap line`);
     }
+  });
+
+  await t.check('draw-call and triangle guardrails hold at the baseline tour spots (Wave 2)', async () => {
+    for (const s of PERF_SPOTS) {
+      const [x, z] = s.xz;
+      await t.tp(x, z, s.mode);
+      await t.setTime(s.time);
+      await t.setWeather(s.weather);
+      if (s.mode === 'FLY') await t.ev(`g.player.pos.y = Math.max(g.hAt(${x}, ${z}) + 6, 6)`);
+      await t.wait(0.6); // let cities/scenery spawn for this position before probing
+      const r = await t.ev('g.perf.renderProbe()');
+      t.ok(r.calls <= CAPS.draws, `${s.label}: ${r.calls} draw calls exceeds the ${CAPS.draws} cap (W1 baseline max was 2037) — new content or a regression, see PERFORMANCE_SPEC.md`);
+      t.ok(r.triangles <= CAPS.triangles, `${s.label}: ${r.triangles} triangles exceeds the ${CAPS.triangles} cap (W1 baseline max was 1.75M) — new content or a regression, see PERFORMANCE_SPEC.md`);
+    }
+    await t.setWeather('clear'); // hermetic: don't leak storm into a sibling suite
   });
 
   await t.check('resetMax clears the peaks without touching counters', async () => {
