@@ -36,8 +36,12 @@ that nothing save-referenced anchors to the old rig/scatter coords
 - night gas flares flickering across the basins after dark
 - the first hero energy sites + the new **Energy log** (11th collectible)
   — starting with Spindletop
+- **approach announcements**: nearing a named site shows its real name
+  on the HUD, every visit — platforms by their real block designations
 
 *Expected result: extraction is real-placement-only, on land and water.
+The announcer ships here (armed per site, re-arms on exit, unnamed
+sites silent) and later waves only register their site tables into it.
 Retired layers stop being drawn — their seed streams go unused, never
 re-keyed. The ship lane stays hand-laid (scarcity exception) with its
 port-approach legs snapped to the 8 real fairways. Flares are night-gated
@@ -127,6 +131,14 @@ extend additively.*
   fairways. Spatial-memory cost of moving shipped rigs/fields
   explicitly accepted. Farm windmills are agriculture — untouched.
   AIS-based real ship routes → BACKLOG (heavy input, poor ROI today).
+- **Approach announcements** (Bruno, 2026-07-17): nearing any *named*
+  energy site fires a one-line HUD toast with its **real name** + one
+  info fragment — every approach, not once per save (the `ufoSighting`
+  cadence; the Energy log stays the once-per-save layer on heroes).
+  Coverage measured: ~80% of plants named, 17/22 refineries, 539 grid
+  substations; offshore platforms are name-poor (18/397) so W1 also
+  bakes `ref`/`operator` (real block designations); **unnamed sites
+  stay silent — no invented names** (realism-first).
 
 ## Data (verified 2026-07-17, Overpass GET, TX bbox 25.6,-107.0,36.8,-93.2)
 
@@ -146,10 +158,13 @@ stash in `~/claude-area/devel/tx-inputs/`, not the repo.
   turbines inside the radius from a seeded stream. Keeps the JSON small
   and the fleet honest. W1 asserts Roscoe (~32.45 −100.54) and Horse
   Hollow (~32.19 −100.05) survive clustering.
-- **Power plants** — 1,422 polygons (`power=plant`, 547 solar). Bake
-  keeps source-tagged plants as `{x, z, source, name?}`; solar polygons
-  additionally keep a footprint radius for the panel-field decal. Hero
-  set hand-authored with real coords (airports idiom).
+- **Power plants** — 1,422 polygons (`power=plant`, 547 solar; 1,131
+  carry `name`). Bake keeps source-tagged plants as `{x, z, source,
+  name?}`; solar polygons additionally keep a footprint radius for the
+  panel-field decal. Hero set hand-authored with real coords (airports
+  idiom). **All layers bake `name` (+ `operator`/`ref` where present)**
+  for the approach announcer — short strings, rounded coords, inside
+  the size budget.
 - **Refineries** — 22 (`industrial=refinery` + `man_made=works` with
   oil/petroleum/fuel product tags). All 22 get skylines; 4 heroes
   (Ship Channel, Baytown, Port Arthur, Corpus) get extra dressing.
@@ -228,6 +243,14 @@ stash in `~/claude-area/devel/tx-inputs/`, not the repo.
 - **Energy log**: `gameplay.js` grows `logEnergy(site)` + `save.energy`
   (additive key, site-id array) + pause-screen line; machinery ships in
   W2 with the first sites, later waves append site tables only.
+- **Approach announcer** (W2, with the log): proximity check at HUD
+  cadence over the baked named-site lists; entering a site's radius
+  fires `onToast` (wired to `hud.toast` in main.js — the shoulder
+  idiom) with emoji + real name + info fragment. **Armed per site**
+  (ferries `armed`-gate idiom): fires once per approach, re-arms on
+  exit; dense rows spam-guarded (one active toast, nearest named site
+  wins, short cooldown). Unnamed sites are skipped. W3/W4/W5 register
+  their site tables as they ship — no new machinery after W2.
 - **Jobs (W6)**: `missions.js` `genOffers` grows energy offer types
   referencing shipped sites *by id* (city-rename lesson — resolve at
   use, orphan self-clears). Oversize load: speed-cap bonus rule lives in
@@ -247,7 +270,7 @@ ERCOT control room (Taylor).
 | Wave | Deliverable | Model + effort | Budget |
 |------|-------------|----------------|--------|
 | **1** | Fetch + `build-energy.mjs` + `data/energy.json` (incl. `platforms[]` + fairways) + `energyAt` + `__game` wiring + data-truth checks + save-reference grep | **Sonnet 5, high** — pure fetch/bake plumbing | code + checks, **no shots**, grep-first |
-| **2** | Well sites (`wellSiteAt` + kit), scatter **replacement** (old stream retired), **offshore rebase** (real platforms; Far Rig + skyline re-anchor; pre-authorized W2.5 split), night flares, Energy log machinery + first sites | **Fable 5, high** — content + composition | code + checks, **one shot** (Permian flares at night), grep-first |
+| **2** | Well sites (`wellSiteAt` + kit), scatter **replacement** (old stream retired), **offshore rebase** (real platforms; Far Rig + skyline re-anchor; pre-authorized W2.5 split), night flares, Energy log machinery + first sites, **approach announcer** | **Fable 5, high** — content + composition | code + checks, **one shot** (Permian flares at night), grep-first |
 | **3** | Wind farms (instanced turbines, `ATMOS.wind` spin) + solar fields + log sites | **Sonnet 5, high** — instancing plumbing | code + checks, **one shot** (turbine row at dusk), grep-first |
 | **4** | Refinery kit at all 22 + 4 hero skylines + night glow + **local light pool + spill decals** (rigs included) + plaques + log sites | **Fable 5, high** — hero composition + plaque copy | code + checks, **two shots** (Ship Channel night; rig water glow), grep-first |
 | **5** | 345 kV tower corridors + major substations + hero plant landmarks + ERCOT radio flavor | **Sonnet 5, high** — polyline/instancing plumbing | code + checks, **one shot** (tower corridor read), grep-first |
@@ -278,6 +301,10 @@ hermetic — drive to state):
   platforms sit at baked coords, the old seven are gone; Far Rig's brass
   reads at its new anchor at natural approach distance; the
   Malaquite-skyline sentinel re-anchors (updated, never deleted).
+  Announcer: drive-by of a named site fires exactly one toast whose text
+  equals the baked name, re-fires after leaving + returning, stays
+  silent for an unnamed site, and never stacks toasts in a dense row
+  (assert on DOM text — the npcs idiom).
 - **W3 — behavior sentinels**: a known farm chunk instances >N turbines,
   a farm-free chunk none; blade rotation rate follows `t`-driven
   `ATMOS.wind` change (real-loop sentinel — turbines join the existing
