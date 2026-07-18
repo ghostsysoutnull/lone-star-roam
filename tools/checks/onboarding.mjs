@@ -338,6 +338,52 @@ export default async function onboarding(t) {
     t.near(at.skyT, 0.42, 0.0001, 'persisted clock');
   });
 
+  // ---- Controls Bar (Esc/P/H legend, first 6 starts) + repeat tips ----
+
+  await t.check('controlsBar shows on begin(), auto-hides after 3 min, caps at 6 starts', async () => {
+    await t.ev(`(g.gameplay.save.seen = {}, g.controlsBar.begin())`);
+    const shown = await t.ev(`({ display: document.getElementById('controls-bar').style.display,
+      starts: g.gameplay.save.seen.barStarts, persisted: JSON.parse(localStorage.getItem('lonestar-roam-save-v1:1')).seen.barStarts })`);
+    t.ok(shown.display === 'flex', `controls-bar not shown on begin() (display: ${shown.display})`);
+    t.ok(shown.starts === 1, `barStarts after first begin(): ${shown.starts}`);
+    t.ok(shown.persisted === 1, 'barStarts not persisted');
+    await t.step(181, 'g.controlsBar.update(dt)');
+    t.ok((await t.ev(`document.getElementById('controls-bar').style.display`)) === 'none',
+      'controls-bar still shown after 181s of session time');
+    // 6-start cap: 7th begin() must not show it, even fresh
+    await t.ev(`g.gameplay.save.seen.barStarts = 6`);
+    await t.ev(`g.controlsBar.begin()`);
+    t.ok((await t.ev(`document.getElementById('controls-bar').style.display`)) === 'none', '7th start still shows the bar');
+    t.ok((await t.ev('g.gameplay.save.seen.barStarts')) === 7, `barStarts after 7th begin(): ${await t.ev('g.gameplay.save.seen.barStarts')}`);
+    await t.ev(`g.gameplay.save.seen = {}`);
+  });
+
+  await t.check('controlsBar dismiss() hides for the session, close button wired', async () => {
+    await t.ev(`(g.gameplay.save.seen = {}, g.controlsBar.begin())`);
+    await t.ev(`document.getElementById('controls-bar-close').click()`);
+    t.ok((await t.ev(`document.getElementById('controls-bar').style.display`)) === 'none', 'close button did not hide the bar');
+    t.ok(await t.ev('g.controlsBar.dismissed'), 'dismiss() did not set dismissed');
+    t.ok((await t.ev('g.gameplay.save.seen.barStarts')) === 1, 'dismiss() consumed an extra start');
+    await t.ev(`g.gameplay.save.seen = {}`);
+  });
+
+  await t.check('tip cooldown shortened to 4s; tipCollect2/tipHelp2 repeat the P/H lesson later', async () => {
+    await t.ev(`(g.gameplay.save.seen = {}, g.tutorial.fired.length = 0, g.tutorial.begin())`);
+    await t.step(11, 'g.tutorial.update(dt)'); // fires tipV (t > 10)
+    t.ok(await t.ev(`g.gameplay.save.seen.tipV === true`), 'tipV not fired after 11s');
+    const cd = await t.ev('g.tutorial.cd');
+    t.ok(cd <= 4.01, `cooldown after a fire still looks like the old 8s value (cd=${cd})`);
+    // repeats: a find makes tipCollect/tipCollect2 eligible; run well past both
+    // repeat thresholds (240s, 480s) and confirm each repeat key gets marked
+    await t.ev(`g.gameplay.save.landmarks.push('Test Marker 2')`);
+    await t.step(490, 'g.tutorial.update(dt)');
+    const seen = await t.ev('g.gameplay.save.seen');
+    t.ok(seen.tipCollect2, 'tipCollect2 never repeated');
+    t.ok(seen.tipHelp2, 'tipHelp2 never repeated');
+    // undo the find so the W4 slot-emptiness checks below aren't polluted
+    await t.ev(`(g.gameplay.save.landmarks.pop(), g.gameplay.save.seen = { all: true }, g.tutorial.active = false, g.gameplay.persist())`);
+  });
+
   // ---- W4: named save slots, per-slot settings ----
 
   await t.check('migrateLegacy copies unsuffixed keys to slot 1 once, without clobbering', async () => {

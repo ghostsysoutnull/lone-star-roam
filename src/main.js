@@ -38,7 +38,7 @@ import { MilitaryAirSystem } from './military.js';
 import { applyGear } from './shop.js';
 import { HUD } from './hud.js';
 import { TitleScreen } from './title.js';
-import { Tutorial, buildGuide } from './onboarding.js';
+import { Tutorial, buildGuide, ControlsBar } from './onboarding.js';
 import { initSettings } from './settings.js';
 import * as slots from './slots.js';
 
@@ -162,6 +162,8 @@ async function boot() {
     player.speed = 0; player.vy = 0;
   }, SA_START, { hud, brands, missions, dog });
   const tutorial = new Tutorial(gameplay, (m) => hud.toast(m));
+  const controlsBar = new ControlsBar(gameplay, hud);
+  document.getElementById('controls-bar-close').addEventListener('click', () => controlsBar.dismiss());
   // W3: Settings panel (pause + title) drives the same functions the keybinds
   // call; Guide (inside help) replays the intro card + every tip and hint.
   const settings = initSettings({ audio, hud, missions, brands });
@@ -295,6 +297,7 @@ async function boot() {
   title.onEnter = () => {
     hud.toast('🤠 Welcome to Texas! Press H for controls.');
     tutorial.begin();
+    controlsBar.begin();
   };
   if (!window.__harness) title.awaitChoice();
   else hud.toast('🤠 Welcome to Texas! Press H for controls.');
@@ -305,7 +308,7 @@ async function boot() {
   // ride the 12 Hz hud block (their inputs live there). Stale-by-80ms is fine —
   // every trigger is a lingering state, not an edge.
   const hintSig = { npc: false, cityEdge: false, dusk: false, apron: false, band: false };
-  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, nearestAnyRoad, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, settings, slots, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, nearestAnyRoad, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, controlsBar, settings, slots, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -381,6 +384,7 @@ async function boot() {
     hintSig.npc = !!npcName;
     hintSig.dusk = ATMOS.night >= 0.5;
     tutorial.update(dt, hintSig);
+    controlsBar.update(dt);
     const skyHint = npcName ? null : springer.nearHint(player.pos);
     const pNear = (npcName || skyHint) ? null : plaqueNear(player.pos, 28);
     hud.interactHint(npcName ? `talk to ${npcName}` : skyHint ? skyHint

@@ -67,6 +67,7 @@ export class HUD {
       dialog: document.getElementById('dialog'),
       interact: document.getElementById('interact-hint'),
       brandSize: document.getElementById('brand-size-hint'),
+      controlsBar: document.getElementById('controls-bar'),
       natureBox: document.getElementById('hud-nature'),
       crop: document.getElementById('hud-crop'),
       wildlife: document.getElementById('hud-wildlife'),
@@ -763,6 +764,10 @@ export class HUD {
 
   brandSizeHint(on) {
     this.els.brandSize.style.display = on ? 'block' : 'none';
+  }
+
+  controlsBar(show) {
+    this.els.controlsBar.style.display = show ? 'flex' : 'none';
   }
 
   // Crop and wildlife each own one slot. Re-appending only on the hidden→shown edge

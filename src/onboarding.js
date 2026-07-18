@@ -15,6 +15,12 @@ export const TIPS = [
     msg: '💡 First find! Press P — travel, jobs and the shop live there' },
   { key: 'tipHelp', when: (t) => t > 120,
     msg: '💡 Press H anytime for the full controls and your scorecard' },
+  // repeats (Controls Bar wave): same lesson, once more, later — for players
+  // who missed or ignored the first showing
+  { key: 'tipCollect2', when: (t, c) => t > 240 && c.landmarks + c.roses + c.species > 0,
+    msg: '💡 Reminder: press P for travel, jobs and the shop' },
+  { key: 'tipHelp2', when: (t) => t > 480,
+    msg: '💡 Still finding your way? Press H for the full controls and your scorecard' },
 ];
 
 // Contextual first-encounter hints (W3): event-driven where TIPS are
@@ -69,7 +75,7 @@ export class Tutorial {
     this.gameplay.persist();
     this.fired.push(entry.key);
     this.toast(entry.msg);
-    this.cd = 8;
+    this.cd = 4;
   }
 
   update(dt, sig = null) {
@@ -88,6 +94,46 @@ export class Tutorial {
       if (this.seen[tip.key] || !tip.when(this.t, c)) continue;
       return this.fire(tip);
     }
+  }
+}
+
+const BAR_STARTS_MAX = 6;   // shows on this many game starts, then never again
+const BAR_SECONDS = 180;    // visible for this long into each of those sessions
+
+// Controls bar: a bottom-center Esc/P/H legend for a player's first few
+// sessions — separate from Tutorial above since it's session-count/real-time
+// driven chrome, not a one-shot per-save tip. begin() arms it at the same
+// title.onEnter site as Tutorial.begin(); update() ticks alongside
+// tutorial.update() in main.js's loop. Dismiss is session-only: closing it
+// still counts that start toward BAR_STARTS_MAX, so it returns next session.
+export class ControlsBar {
+  constructor(gameplay, hud) {
+    this.gameplay = gameplay;
+    this.hud = hud;
+    this.t = 0;
+    this.dismissed = false;
+  }
+
+  get save() { return this.gameplay.save.seen; }
+  get eligible() { return (this.save.barStarts ?? 0) <= BAR_STARTS_MAX; }
+
+  begin() {
+    this.save.barStarts = (this.save.barStarts ?? 0) + 1;
+    this.gameplay.persist();
+    this.t = 0;
+    this.dismissed = false;
+    this.hud.controlsBar(this.eligible);
+  }
+
+  dismiss() {
+    this.dismissed = true;
+    this.hud.controlsBar(false);
+  }
+
+  update(dt) {
+    if (this.dismissed || !this.eligible) return;
+    this.t += dt;
+    if (this.t > BAR_SECONDS) { this.dismissed = true; this.hud.controlsBar(false); }
   }
 }
 
