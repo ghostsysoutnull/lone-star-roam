@@ -1,6 +1,6 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, bandAgAt, TIDELANDS_U, coastDist, neighborStateAt, inTexasOrBand, nearestAnyRoad } from './geo.js';
+import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, bandAgAt, TIDELANDS_U, coastDist, neighborStateAt, inTexasOrBand, nearestAnyRoad, energyAt } from './geo.js';
 import { ATMOS } from './sky.js';
 import { cityRadius, cityClear } from './cities.js';
 import { airportClear } from './airports.js';
@@ -687,6 +687,42 @@ export function feedlotAt(cx, cz) {
   return null;
 }
 
+// Well sites — Energy W2. Pure seeded chunk function (chapelAt pattern, own
+// `well:` stream): odds come straight from the county's real OSM well density
+// (energyAt), so the Permian runs thick, Eagle Ford/Barnett/East Texas appear,
+// and zero-well counties stay empty — the old uniform Permian scatter is
+// retired (realism-first), never re-keyed. Returns an array (dense counties
+// pack several pads per chunk); scenery dresses each site with the
+// pumpjack/tank-battery/derrick kit, night flares included.
+export function wellSiteAt(cx, cz) {
+  const midX = cx * CHUNK + CHUNK / 2, midZ = cz * CHUNK + CHUNK / 2;
+  const en = energyAt(midX, midZ);
+  if (!en || !en.wellKm2) return [];
+  const rand = seededRand(`well:${cx},${cz}`);
+  const sites = [];
+  for (let s = 0; s < 3; s++) { // up to 3 pads/chunk — Loving-county density saturates this
+    const roll = rand();                       // drawn every slot — failures can't shift the stream
+    const sx = cx * CHUNK + rand() * CHUNK, sz = cz * CHUNK + rand() * CHUNK;
+    const jacks = 1 + ((rand() * 3) | 0);      // 1–3 jacks on the pad
+    const tanks = 2 + ((rand() * 3) | 0);      // tank battery, 2–4 tanks
+    const rig = rand() < 0.18;                 // the odd workover derrick
+    const flare = rand() < 0.4;                // basin gas flare, night-gated
+    const rot = rand() * Math.PI * 2;
+    if (roll >= Math.min(0.85, en.wellKm2 * 1.1)) continue;
+    if (!inTexas(sx, sz) || !airportClear(sx, sz) || brandNear(sx, sz, 30)) continue;
+    const near = nearestAnyRoad(sx, sz, 6);    // pads keep the farmstead road clearance
+    if (near && near.dist < 5) continue;
+    if (!cityClear(sx, sz, 20)) continue;
+    const ch = chapelAt(cx, cz);
+    if (ch && Math.hypot(ch.x - sx, ch.z - sz) < 15) continue;
+    const farm = farmsteadAt(cx, cz);
+    if (farm && Math.hypot(farm.x - sx, farm.z - sz) < 15) continue;
+    if (sites.some((o) => Math.hypot(o.x - sx, o.z - sz) < 18)) continue; // pads don't overlap
+    sites.push({ x: sx, z: sz, rot, jacks, tanks, rig, flare, key: `${cx},${cz}` });
+  }
+  return sites;
+}
+
 // Ranch headquarters compounds — wave 5. One per named gate arch (gameplay.js
 // LANDMARKS 'rancharch' / animals.js RANCH_ARCHES — same LL projections, keep
 // all three in sync). Pure seeded site pattern (chapelAt precedent): scenery
@@ -783,6 +819,10 @@ class ScenerySystem {
     this.live = new Map(); // "cx,cz" -> THREE.Group
     this.t = 0;
     this.animated = []; // {obj, kind, phase} — pumpjack arms, windmill fans
+    // shared gas-flare flame material — one material for every well-site flare,
+    // opacity gated on ATMOS.night in update (maritime rigGlow idiom); the
+    // per-flare flicker is a scale pulse via the animated registry
+    this.flareMat = new THREE.MeshBasicMaterial({ color: 0xff9030, transparent: true, opacity: 0, fog: false, blending: THREE.AdditiveBlending, depthWrite: false });
   }
 
   update(dt, px, pz) {
@@ -801,9 +841,11 @@ class ScenerySystem {
 
     // animate pumpjacks (nodding), windmills (spinning), chickens (pecking)
     this.t += dt;
+    this.flareMat.opacity = ATMOS.night; // gas flares punch through after dark
     for (const a of this.animated) {
       if (a.kind === 'pumpjack') a.obj.rotation.x = Math.sin(this.t * 1.4 + a.phase) * 0.22; // beam nods across its x pivot
       else if (a.kind === 'chicken') a.obj.rotation.x = -Math.max(0, Math.sin(this.t * 2.6 + a.phase)) * 0.5; // beak-to-dirt peck bursts
+      else if (a.kind === 'gasflare') a.obj.scale.setScalar(0.8 + 0.3 * Math.abs(Math.sin(this.t * 9 + a.phase)) + 0.1 * Math.sin(this.t * 23 + a.phase)); // ragged flame flicker
       else a.obj.rotation.z += dt * (1.6 + a.phase * 0.1) * ATMOS.wind; // windmills spin up when weather turns
     }
   }
@@ -825,7 +867,9 @@ class ScenerySystem {
     if (islandChunk) {
       table.push([mkDune, 6], [mkSeaOats, 8], [mkDriftwood, 3], [mkBeachSign, 1]);
     } else if (inPermian(midX, midZ)) {
-      table.push([mkPumpjack, 5], [mkYucca, 3], [mkRock, 2], [mkMesquite, 2]);
+      // Energy W2: the uniform pumpjack stream retired (realism-first) — jacks
+      // now come only from wellSiteAt's real county density, below
+      table.push([mkYucca, 3], [mkRock, 2], [mkMesquite, 2]);
     } else if (midX < -2200) { // far west desert
       table.push([mkCactus, 4], [mkYucca, 4], [mkRock, 4], [mkMesquite, 2]);
     } else if (midX > 3400) { // east piney woods
@@ -1043,6 +1087,39 @@ class ScenerySystem {
       for (let c = 0, cn = 3 + ((hr() * 3) | 0); c < cn; c++)
         anim(at(mkChicken(), 'chicken', -4.5 + (hr() - 0.5) * 4, 3.2 + (hr() - 0.5) * 3, hr() * Math.PI * 2));
       group.add(hg);
+    }
+
+    // well pads — Energy W2: sites from wellSiteAt (real county density), each
+    // dressed with pumpjacks + tank battery + the odd derrick; gas flares are
+    // night-gated site props on the shared flareMat. Own `wellprops` stream.
+    for (const well of wellSiteAt(cx, cz)) {
+      const wr = seededRand(`wellprops${well.x.toFixed(0)},${well.z.toFixed(0)}`);
+      const wg = new THREE.Group();
+      wg.userData.kind = 'wellsite';
+      const cr = Math.cos(well.rot), sr = Math.sin(well.rot);
+      const at = (obj, lx, lz, ry = 0) => {
+        const x = well.x + lx * cr + lz * sr, z = well.z - lx * sr + lz * cr;
+        obj.position.set(x, hAt(x, z), z);
+        obj.rotation.y = well.rot + ry;
+        wg.add(obj);
+        return obj;
+      };
+      at(mkWellPad(), 0, 0);
+      for (let j = 0; j < well.jacks; j++) {
+        const jack = at(mkPumpjack(wr), -3 + j * 3.2, -1.5 + (wr() - 0.5), (wr() - 0.5) * 0.5);
+        const entry = { obj: jack.userData.animate, kind: 'pumpjack', phase: wr() * Math.PI * 2 };
+        this.animated.push(entry);
+        group.userData.animated.push(entry);
+      }
+      at(mkTankBattery(wr, well.tanks), 2.5, 3.2);
+      if (well.rig) at(mkDerrick(), -4.2, 3.5, wr() * 0.4);
+      if (well.flare) {
+        const stack = at(mkFlareStack(this.flareMat), 5.8, -2.2);
+        const flame = { obj: stack.userData.animate, kind: 'gasflare', phase: wr() * Math.PI * 2 };
+        this.animated.push(flame);
+        group.userData.animated.push(flame);
+      }
+      group.add(wg);
     }
     this.scene.add(group);
     this.live.set(key, group);
@@ -1307,6 +1384,66 @@ function mkPumpjack(rand) {
   g.add(beam);
   g.userData.animate = beam;
   g.userData.kind = 'pumpjack';
+  return g;
+}
+
+// --- Energy W2 well-site kit (poly bar: round forms 8+ radial segments) ---
+
+function mkWellPad() {
+  // bare caliche pad under the equipment — reads as worked ground
+  const g = new THREE.Group();
+  const pad = new THREE.Mesh(new THREE.CylinderGeometry(6.5, 6.5, 0.08, 10), new THREE.MeshLambertMaterial({ color: 0xb5a684, flatShading: true }));
+  pad.position.y = 0.08;
+  g.add(pad);
+  return g;
+}
+
+function mkTankBattery(rand, n) {
+  // the row of stock tanks every producing lease has
+  const g = new THREE.Group();
+  const shell = new THREE.MeshLambertMaterial({ color: 0x9aa4a8, flatShading: true });
+  const rusted = new THREE.MeshLambertMaterial({ color: 0x8a5a34, flatShading: true });
+  for (let i = 0; i < n; i++) {
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 1.5, 10), rand() < 0.3 ? rusted : shell);
+    tank.position.set(i * 1.7, 0.75, 0);
+    g.add(tank);
+  }
+  const manifold = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, n * 1.7, 6).rotateZ(Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0x3a3a40 }));
+  manifold.position.set((n - 1) * 0.85, 0.25, 0.8);
+  g.add(manifold);
+  return g;
+}
+
+function mkDerrick() {
+  // steel workover derrick — tapered lattice read, solid at mini-world scale
+  const g = new THREE.Group();
+  const steel = new THREE.MeshLambertMaterial({ color: 0x8a8f98, flatShading: true });
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.85, 7, 8), steel);
+  mast.position.y = 3.5;
+  const crown = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.4, 0.7), steel);
+  crown.position.y = 7.1;
+  const floor = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.5, 2.2), new THREE.MeshLambertMaterial({ color: 0x4a4a52, flatShading: true }));
+  floor.position.y = 0.25;
+  g.add(mast, crown, floor);
+  return g;
+}
+
+function mkFlareStack(flameMat) {
+  // basin gas flare: dark stack, additive flame ball on the shared night-gated
+  // material — the flame is the animate target (gasflare scale flicker)
+  const g = new THREE.Group();
+  const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.3, 3.4, 8), new THREE.MeshLambertMaterial({ color: 0x3a3a40, flatShading: true }));
+  stack.position.y = 1.7;
+  // scene lights don't reach a Lambert stack at night — the top segment is
+  // basic-material "flame-lit" steel so the tongue visibly connects to a stack
+  const tip = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 1.2, 8), new THREE.MeshBasicMaterial({ color: 0x6a4026 }));
+  tip.position.y = 2.9;
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6).scale(1, 1.6, 1), flameMat); // stretched — a tongue of flame, not a ball
+  flame.position.y = 3.4; // seated on the stack tip
+  g.add(tip);
+  g.add(stack, flame);
+  g.userData.animate = flame;
+  g.userData.kind = 'gasflare';
   return g;
 }
 

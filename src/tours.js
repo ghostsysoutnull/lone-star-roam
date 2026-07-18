@@ -13,6 +13,18 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'Energy (2026-07)',
+    waves: [
+      { wave: 'W2 — wells, offshore rebase, log, announcer', spots: [
+        S('🔥 Permian night flares — Loving county pad', [-4042.1, -355.1], { mode: 'DRIVE', time: 0.98, note: 'a real-density well site: pumpjack, 4-tank battery, workover derrick, gas flare flickering after dark' }),
+        S('🛢️ Spindletop — Energy log hero', [5191.6, 1096.9], { mode: 'DRIVE', note: 'the 1901 gusher: granite obelisk + timber derrick; drive in and the log stamps (11th collectible)' }),
+        S('🛢️ Midland Tank Farm — Energy log hero', LL(31.943, -102.03), { mode: 'DRIVE', note: 'Permian crude staging — nine bermed tanks; the log stamps on arrival' }),
+        S('📣 Approach announcer — NANSEN platform', [4801.7, 4043.8], { mode: 'FLY', note: 'fly the offshore row: every named/operated platform announces itself on approach, every visit; unnamed sites stay silent' }),
+        S('⚓ Corpus fairway leg — approach tanker', [2057.9, 3551.4], { mode: 'FLY', note: 'watch: a tanker works the real Aransas Pass fairway points in and out (position varies with boot time)' }),
+      ] },
+    ],
+  },
+  {
     track: 'New Player (2026-07)',
     waves: [
       { wave: 'W4 — named save slots', spots: [
@@ -93,7 +105,7 @@ export const TOURS = [
       { wave: 'W5 — the Shelf', spots: [
         S('🌃 Rig skyline from Malaquite', LL(27.4326, -97.2968), { mode: 'WALK', time: 0.98, heading: -Math.PI / 2, note: 'look east over the water' }),
         S('🛟 Tidelands Buoy plaque', [4762.2, 1851.5], { mode: 'FLY', note: 'settle by the red nun — the plaque reads afloat' }),
-        S('🛢️ The Far Rig plaque', LL(28.0, -95.0), { mode: 'FLY', note: '64.1 miles out — brass on the platform' }),
+        S('🛢️ The Far Rig plaque', [4542, 3160.6], { mode: 'FLY', note: 're-anchored (Energy W2) to the farthest reachable real major (Peregrine Oil & Gas) — 61.9 miles out, brass on the platform' }),
         S('✨ 1554 treasure light', [2130, 4942.6], { mode: 'WALK', heading: -Math.PI / 2, act: 'treasureNight', note: 'forced for tonight — naturally a new-moon event, off the Mansfield Cut' }),
         S('🐦 Aransas whooping cranes', LL(28.26, -96.83), { mode: 'DRIVE', time: 0.35, note: 'the wintering flock on Blackjack Peninsula' }),
       ] },

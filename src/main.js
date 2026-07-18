@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { loadGeo, GEO, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRail, nearestCity, waterAt, countyAt, neighborCountyAt, hAt, inTexas, onIsland, beachAt, inWorld, borderZoneAt, outsideAt, seededRand, agAt, bandAgAt, energyAt, inStateWater, coastDist, TIDELANDS_U, neighborStateAt, inTexasOrBand } from './geo.js';
 
 const NEIGHBOR_STATE_NAME = { LA: 'Louisiana', AR: 'Arkansas', OK: 'Oklahoma', NM: 'New Mexico' };
-import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, CAUSEWAY, padreSites, bandTint } from './world.js';
+import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, wellSiteAt, CAUSEWAY, padreSites, bandTint } from './world.js';
 import { HauntSystem, LEGENDS, LEGEND_COUNT } from './haunts.js';
 import { initDebug } from './debug.js';
 import { CitySystem, cityClear, cityRadius } from './cities.js';
@@ -23,6 +23,7 @@ import { AudioSystem } from './audio.js';
 import { NPCSystem } from './npcs.js';
 import { TrainSystem } from './trains.js';
 import { MaritimeSystem } from './maritime.js';
+import { EnergySystem, ENERGY_TOTAL } from './energy.js';
 import { ShoulderSystem, swampAt, shoulderClear } from './shoulder.js';
 import { UFOSystem } from './ufo.js';
 import { FlareSystem } from './flares.js';
@@ -85,6 +86,7 @@ async function boot() {
   document.getElementById('total-landmarks').textContent = LANDMARK_COUNT;
   document.getElementById('total-critters').textContent = SPECIES_COUNT;
   document.getElementById('total-legends').textContent = LEGEND_COUNT;
+  document.getElementById('total-energy').textContent = ENERGY_TOTAL;
 
   gameplay.onToast = (m) => hud.toast(m);
   turtles.onEvent = (m) => hud.toast(m);
@@ -121,6 +123,8 @@ async function boot() {
     (on) => setPause(on ? 'menu' : null));
   const trains = new TrainSystem(scene);
   const maritime = new MaritimeSystem(scene);
+  const energy = new EnergySystem(scene, gameplay);
+  energy.onToast = (m) => hud.toast(m); // approach announcer — real names on the HUD
   const shoulder = new ShoulderSystem(scene);
   shoulder.onToast = (m) => hud.toast(m);
   shoulder.onStone = (key, label) => gameplay.stampStone(key, label);
@@ -308,7 +312,7 @@ async function boot() {
   // ride the 12 Hz hud block (their inputs live there). Stale-by-80ms is fine —
   // every trigger is a lingering state, not an edge.
   const hintSig = { npc: false, cityEdge: false, dusk: false, apron: false, band: false };
-  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, nearestAnyRoad, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, energyAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, controlsBar, settings, slots, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, energy, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, nearestRoad, nearestBandRoad, nearestAnyRoad, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, energyAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, wellSiteAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, controlsBar, settings, slots, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -359,6 +363,7 @@ async function boot() {
     traffic.setNight(ATMOS.night);
     trains.update(dt, player.pos.x, player.pos.z);
     maritime.update(dt, clock.elapsedTime);
+    energy.update(dt, player.pos.x, player.pos.z);
     heli.update(dt, player.pos.x, player.pos.z, sky.days);
     blimp.update(dt, sky.days);
     military.update(dt, player.pos.x, player.pos.z, aviation);

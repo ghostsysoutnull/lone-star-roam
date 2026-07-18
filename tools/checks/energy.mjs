@@ -76,4 +76,160 @@ export default async function energy(t) {
     t.ok(found.n > 0, 'no 345kV corridors baked');
     t.ok(found.reachesPanhandle, 'no corridor reaches the Panhandle (z < -4000)');
   });
+
+  // --- Wave 2: well sites, scatter retirement, flares, rebase, log, announcer ---
+
+  await t.check('wellSiteAt: Permian chunks spawn lawful pads, a zero-well county spawns none', async () => {
+    const res = await t.ev(`(() => {
+      const out = { sites: 0, bad: [], terrell: 0 };
+      for (let cx = -16; cx <= -9; cx++) for (let cz = -6; cz <= -3; cz++) {
+        for (const s of g.wellSiteAt(cx, cz)) {
+          out.sites++;
+          const road = g.nearestAnyRoad(s.x, s.z, 6);
+          if (road && road.dist < 5) out.bad.push(['road', s.x, s.z, road.dist]);
+          if (!g.airportClear(s.x, s.z)) out.bad.push(['airport', s.x, s.z]);
+          if (g.brandNear(s.x, s.z, 30)) out.bad.push(['brand', s.x, s.z]);
+          if (!g.cityClear(s.x, s.z, 20)) out.bad.push(['city', s.x, s.z]);
+          for (const ch of g.chapelSitesNear(s.x, s.z, 0))
+            if (Math.hypot(ch.x - s.x, ch.z - s.z) < 15) out.bad.push(['chapel', s.x, s.z]);
+          const farm = g.farmsteadAt(cx, cz);
+          if (farm && Math.hypot(farm.x - s.x, farm.z - s.z) < 15) out.bad.push(['farm', s.x, s.z]);
+        }
+      }
+      for (let cx = -12; cx <= -10; cx++) for (let cz = 3; cz <= 4; cz++) out.terrell += g.wellSiteAt(cx, cz).length;
+      return out;
+    })()`);
+    t.ok(res.sites > 10, `Permian/Midland grid too sparse: ${res.sites} sites over 32 chunks`);
+    t.ok(res.bad.length === 0, `unlawful well sites: ${JSON.stringify(res.bad.slice(0, 4))}`);
+    t.ok(res.terrell === 0, `Terrell (zero wells) grew ${res.terrell} sites`);
+  });
+
+  await t.check('scatter retired: every rendered pumpjack belongs to a well site (or the Waggoner story pair)', async () => {
+    // park in the Midland-area basin and let scenery chunks spawn around a real site
+    const at = await t.ev(`(() => {
+      for (let cx = -12; cx <= -9; cx++) for (let cz = -6; cz <= -3; cz++) {
+        const s = g.wellSiteAt(cx, cz);
+        if (s.length) return { x: s[0].x, z: s[0].z };
+      }
+      return null;
+    })()`);
+    t.ok(at, 'no well site found in the Midland grid to park at');
+    await t.tp(at.x + 8, at.z);
+    await t.until(`(() => {
+      let found = false;
+      for (const [, grp] of g.scenery.live) grp.traverse((o) => { if (o.userData.kind === 'wellsite') found = true; });
+      return found;
+    })()`, 8000);
+    const res = await t.ev(`(() => {
+      let jacks = 0, orphans = 0, minVerts = Infinity;
+      for (const [, grp] of g.scenery.live) grp.traverse((o) => {
+        if (o.userData.kind !== 'pumpjack') return;
+        jacks++;
+        let p = o, ok = false;
+        while (p) { if (p.userData && (p.userData.kind === 'wellsite' || p.userData.kind === 'ranchhq')) { ok = true; break; } p = p.parent; }
+        if (!ok) orphans++;
+        let v = 0;
+        o.traverse((m) => { if (m.geometry) v += m.geometry.attributes.position.count; });
+        minVerts = Math.min(minVerts, v);
+      });
+      return { jacks, orphans, minVerts };
+    })()`);
+    t.ok(res.jacks > 0, 'no pumpjacks rendered at a live well site');
+    t.ok(res.orphans === 0, `${res.orphans} pumpjacks outside well sites — the uniform scatter is not retired`);
+    t.ok(res.minVerts > 100, `pumpjack prototype under the poly bar: ${res.minVerts} verts`);
+  });
+
+  await t.check('gas flares: shared flame material gates on ATMOS.night (0 by day)', async () => {
+    await t.setDay();
+    await t.wait(0.4); // scenery.update drives the gate in the real loop
+    const day = await t.ev('g.scenery.flareMat.opacity');
+    t.ok(day < 0.15, `flare flame lit in daylight: ${day}`);
+    await t.setNight();
+    await t.wait(0.4);
+    const night = await t.ev('({ o: g.scenery.flareMat.opacity, fog: g.scenery.flareMat.fog })');
+    t.ok(night.o > 0.6, `flare flame dark at night: ${night.o}`);
+    t.ok(night.fog === false, 'flare flame must ignore scene fog (basin skyline)');
+  });
+
+  await t.check('offshore rebase: 227 real platforms drawn instanced, the hand-laid seven gone', async () => {
+    const res = await t.ev(`(() => {
+      const LLc = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
+      const old = [[28.9, -94.7], [28.4, -95.3], [29.3, -93.9], [27.9, -96.3], [28.0, -95.0], [29.0, -93.6], [27.2, -96.9]].map(([a, b]) => LLc(a, b));
+      const sites = g.maritime.platforms;
+      const oldAlive = old.filter(([x, z]) => sites.some((p) => Math.hypot(p.x - x, p.z - z) < 0.5)).length;
+      return { n: sites.length, sameAsBaked: sites === g.GEO.energy.platforms, oldAlive, far: !!g.maritime.farRig };
+    })()`);
+    t.ok(res.n === 227 && res.sameAsBaked, `platforms must be the 227 baked records (got ${res.n})`);
+    t.ok(res.oldAlive === 0, `${res.oldAlive} of the old hand-laid seven still present`);
+    t.ok(res.far, 'no bespoke Far Rig group after the rebase');
+  });
+
+  await t.check('fairway legs: port approaches snap to the baked points, an approach tanker works one', async () => {
+    const res = await t.ev(`(() => {
+      const baked = g.GEO.energy.fairways.flatMap((f) => f.pts);
+      const legs = g.maritime.fairwayLegs;
+      // every leg point past the lane-join head must be a real baked point
+      const stray = legs.flatMap((l) => l.slice(1)).filter(([x, z]) => !baked.some(([bx, bz]) => Math.hypot(bx - x, bz - z) < 0.01));
+      const tanker = g.maritime.ships.find((s) => s.leg);
+      return { legs: legs.length, stray: stray.length, tanker: !!tanker, s0: tanker?.s ?? -1 };
+    })()`);
+    t.ok(res.legs > 0, 'no fairway approach legs built');
+    t.ok(res.stray === 0, `${res.stray} leg points are not baked fairway points`);
+    t.ok(res.tanker, 'no approach tanker assigned to a fairway leg');
+    const s1 = await t.ev('g.maritime.ships.find((s) => s.leg).s');
+    await t.wait(1.2);
+    const s2 = await t.ev('g.maritime.ships.find((s) => s.leg).s');
+    t.ok(s2 !== s1, 'approach tanker not moving along its leg');
+  });
+
+  await t.check('hero sites: every Energy hero stands clear of roads (the Spindletop lesson)', async () => {
+    const bad = await t.ev(`g.energy.heroes
+      .map((h) => ({ id: h.id, d: g.nearestAnyRoad(h.at[0], h.at[1], 12)?.dist ?? 99 }))
+      .filter((h) => h.d < 8)`);
+    t.ok(bad.length === 0, `hero sites on/near a road: ${JSON.stringify(bad)}`);
+  });
+
+  await t.check('Energy log: hero visit logs once, dedups, and the pause line counts it', async () => {
+    await t.ev(`g.gameplay.save.energy = []`);
+    await t.tp(5191.6, 1096.9); // Spindletop hero plot (shoved off the road)
+    await t.until(`g.gameplay.save.energy.includes('spindletop')`, 6000);
+    await t.ev(`g.gameplay.logEnergy('spindletop', 'Spindletop', 2, 'dup try')`);
+    const res = await t.ev(`({ n: g.gameplay.save.energy.length, counts: g.gameplay.counts().energy })`);
+    t.ok(res.n === 1, `hero log did not dedup: ${res.n}`);
+    t.ok(res.counts === 1, `counts().energy wrong: ${res.counts}`);
+    await t.wait(0.5);
+    const dom = await t.ev(`document.getElementById('score-energy').textContent`);
+    t.ok(dom === '1', `pause line not updated: "${dom}"`);
+  });
+
+  await t.check('announcer: named platform fires one toast, re-arms on exit, unnamed stays silent', async () => {
+    const nansen = await t.ev(`g.GEO.energy.platforms.find((p) => p.name === 'NANSEN')`);
+    t.ok(nansen, 'NANSEN not in the baked platforms');
+    await t.ev(`(() => { g.hud.toast(''); g.energy.cooldown = 0; })()`);
+    await t.tp(nansen.x + 5, nansen.z);
+    await t.until(`document.getElementById('toast').textContent.includes('NANSEN')`, 4000);
+    const first = await t.ev(`document.getElementById('toast').textContent`);
+    t.ok(first.includes('NANSEN'), `toast is not the baked name: "${first}"`);
+    // dense-row guard: hop straight to another named site — cooldown holds one toast
+    const other = await t.ev(`g.GEO.energy.platforms.find((p) => p.name && p.name !== 'NANSEN')`);
+    await t.tp(other.x + 5, other.z);
+    await t.wait(1.0);
+    const held = await t.ev(`document.getElementById('toast').textContent`);
+    t.ok(held.includes('NANSEN'), `cooldown broken — a second toast stacked: "${held}"`);
+    // leave far (re-arm), return with cooldown cleared — fires again (every visit)
+    await t.tp(nansen.x + 200, nansen.z);
+    await t.wait(0.8);
+    await t.ev(`(() => { g.hud.toast(''); g.energy.cooldown = 0; })()`);
+    await t.tp(nansen.x + 5, nansen.z);
+    await t.until(`document.getElementById('toast').textContent.includes('NANSEN')`, 4000);
+    // unnamed minor: silent — no announcer entry at all
+    const dark = await t.ev(`g.GEO.energy.platforms.find((p) => !p.name && !p.operator)`);
+    if (dark) {
+      await t.ev(`(() => { g.hud.toast(''); g.energy.cooldown = 0; })()`);
+      await t.tp(dark.x + 3, dark.z);
+      await t.wait(1.2);
+      const silent = await t.ev(`document.getElementById('toast').textContent`);
+      t.ok(silent === '', `unnamed site announced: "${silent}"`);
+    }
+  });
 }

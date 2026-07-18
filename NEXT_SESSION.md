@@ -1,34 +1,37 @@
 # Lone Star Roam — next session kickoff
 
 ## Session briefing
-- **This session**: Energy (`ENERGY_SPEC.md`), wave 2 of 6 — well sites
-  (`wellSiteAt` + pump/tank-battery/rig kit), scatter **replacement**
-  (old uniform Permian stream retired, never re-keyed), the **offshore
-  rebase** (real `platforms[]` replace the 7 hand-laid Shelf platforms;
-  Far Rig + the Malaquite-skyline sentinel **re-anchor**, not delete),
-  night gas flares, the **Energy log** (11th collectible) + first hero
-  sites (Spindletop, a Permian tank farm), and the **approach
-  announcer** (real name + info fragment on HUD proximity, armed/re-arm
-  per site, unnamed sites silent). Wave 1 (fetch + bake + `geo.js`
-  wiring + `energy.mjs` checks) shipped 2026-07-17, commit `1e459f9`.
-- **Recommended setup**: model **Fable 5**, effort **high** — content +
-  composition. Flag it if the running model differs.
-- **Budget**: code + checks, **one shot** (Permian flares at night),
+- **This session**: Energy (`ENERGY_SPEC.md`), wave 3 of 6 — real wind
+  farms (turbine rows instanced at the baked `windFarms[]` sites,
+  blades spinning with live `ATMOS.wind` — the windmill idiom), solar
+  farms as panel fields at the real `plants[]` solar sites (crop-decal
+  idiom from the air, rows near ground), and the W3 hero sites joining
+  the Energy log (Roscoe, Horse Hollow, a coastal farm — Papalote
+  Creek area) + their tables registered into the W2 announcer. Wave 2
+  (well sites + scatter retirement, offshore rebase, night flares,
+  Energy log + Spindletop/Midland Tank Farm, approach announcer)
+  shipped 2026-07-17, commit `<W2 hash>`.
+- **Recommended setup**: model **Sonnet 5**, effort **high** —
+  instancing plumbing. Flag it if the running model differs.
+- **Budget**: code + checks, **one shot** (turbine row at dusk),
   grep-first.
-- **Then**: rewrite this briefing for W3 (wind farms + solar, Sonnet 5,
-  high — one staged shot: turbine row at dusk).
+- **Then**: rewrite this briefing for W4 (refinery skylines + night
+  glow + the local light pool + spill decals, Fable 5, high — two
+  shots: Ship Channel night, rig water glow).
 
-Gotchas carried over: offshore `platforms[]` (227 sites: 153 major / 74
-minor clusters) is name-poor by real data — only 10/153 majors carry a
-real `name`, 151/153 carry `operator`, **none carry `ref`** — so the
-announcer's real fallback chain is name → operator → silent, `ref`
-essentially never fires despite being baked; design the announcer/log
-label around that, not around `ref` showing up. Far Rig
-(`maritime.js`'s `FAR_RIG` constant) and the Malaquite-skyline sentinel
-re-anchor to the **farthest real major** among those 153, not deleted.
-`wellSiteAt` reads `GEO.energy.counties[name].wellKm2` directly — county
-records are all-254-present (ag idiom); no join gotcha to carry, wells
-outside Texas were already excluded at bake.
+Gotchas carried over: the announcer machinery is DONE (energy.js) —
+W3 only calls `energy.register(x, z, r, label)` per named site; no new
+toast code. Turbines join the existing windmill animate coverage
+(`userData.animated`, kind drives `ATMOS.wind` spin) — don't duplicate
+the real-loop sentinel, the spec's W3 verify note says extend it. The
+world wall caps the shelf at 1127u (`SHELF_U`): W2 re-anchored the Far
+Rig to the farthest *reachable* (`inWorld`) real major (a Peregrine
+Oil & Gas platform, 61.9 mi out) because the true farthest majors
+(Gunnison Spar, 153 mi) sit beyond the wall as horizon dressing —
+any future "farthest X" feature must filter on `inWorld` first.
+`scenery.flareMat` is the shared night-gate for well flares; W4's
+refinery flares should reuse the pattern (or the material) rather than
+fork a new gate.
 
 Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
 free-roam Texas game. Before touching code read `CLAUDE.md` (architecture +

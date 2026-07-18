@@ -14,7 +14,7 @@ export default async function shelf(t) {
       mansfield: g.inStateWater(2227.9, 4942.6),     // 99u from PADRE's shore, 220u from the mainland
       mansfieldD: g.coastDist(2227.9, 4942.6),
       land: g.inStateWater(830.2, 847.1),            // LBJ ranch — Texas, not water
-      farRig: g.inStateWater(4293.9, 3339.6),        // 64.1 mi out — long past the line
+      farRig: g.inStateWater(g.maritime.farSite.x, g.maritime.farSite.z), // farthest real major — long past the line
     })`);
     t.ok(res.buoy, 'the buoy point (coastDist 166.66) should be state water');
     t.ok(!res.pastBuoy, '40u seaward of the buoy should be federal shelf');
@@ -78,20 +78,27 @@ export default async function shelf(t) {
     await t.key('KeyE'); // close it — later checks share the session
   });
 
-  await t.check('the Far Rig: farthest platform, upgraded prop, its own plaque', async () => {
+  await t.check('the Far Rig: re-anchored to the farthest real major, upgraded prop, its own plaque', async () => {
+    // Energy W2 rebase: platforms are the 227 baked records; the Far Rig is a
+    // bespoke group at the farthest-from-coast real major (maritime.farSite)
     const res = await t.ev(`(() => {
-      const rigs = g.maritime.platforms.map((p) => ({
-        far: !!p.userData.far, kids: p.children.length,
-        d: g.coastDist(p.position.x, p.position.z),
-      }));
-      const far = rigs.find((r) => r.far);
-      return { far, maxD: Math.max(...rigs.map((r) => r.d)), others: rigs.filter((r) => !r.far) };
+      const far = g.maritime.farRig, site = g.maritime.farSite;
+      // farthest among REACHABLE platforms — the world wall caps the shelf at
+      // 1127u; deepwater spars beyond it are horizon dressing, not destinations
+      const ds = g.maritime.platforms.filter((p) => g.inWorld(p.x, p.z)).map((p) => g.coastDist(p.x, p.z));
+      return { site, kids: far?.children.length ?? 0,
+        atSite: !!far && far.position.x === site.x && far.position.z === site.z,
+        reachable: g.inWorld(site.x, site.z),
+        d: g.coastDist(site.x, site.z), maxD: Math.max(...ds), miles: g.maritime.farMiles,
+        n: g.maritime.platforms.length };
     })()`);
-    t.ok(res.far, 'no platform flagged as the Far Rig');
-    t.near(res.far.d / 16.09, 64.1, 0.5, 'Far Rig is not 64.1 mi off the coast');
-    t.ok(res.far.d === res.maxD, 'the Far Rig must be the farthest platform out');
-    t.ok(res.others.every((r) => r.kids < res.far.kids), 'Far Rig prop not visibly upgraded (needs more parts than its siblings)');
-    await t.tp(4293.9 + 10, 3339.6);
+    t.ok(res.site && res.atSite, 'Far Rig group not anchored at maritime.farSite');
+    t.ok(res.reachable, 'the Far Rig must sit inside the world wall — brass no one can reach is dead content');
+    t.ok(res.n === 227, `platforms must be the 227 baked records, got ${res.n}`);
+    t.ok(Math.abs(res.d - res.maxD) < 1e-6, `Far Rig must be the farthest reachable platform: ${res.d.toFixed(1)} vs max ${res.maxD.toFixed(1)}`);
+    t.near(res.d / 16.09, res.miles, 0.2, 'plaque miles disagree with the anchor distance');
+    t.ok(res.kids >= 12, `Far Rig prop not visibly upgraded (${res.kids} parts)`);
+    await t.tp(res.site.x + 10, res.site.z);
     const plq = await t.ev('g.maritime.plaqueNear(g.player.pos, 28)?.name');
     t.ok(plq === 'The Far Rig', `Far Rig plaque not readable from parked distance: ${plq}`);
   });

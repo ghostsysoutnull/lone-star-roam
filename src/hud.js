@@ -61,6 +61,7 @@ export class HUD {
       legends: document.getElementById('score-legends'),
       counties: document.getElementById('score-counties'),
       airports: document.getElementById('score-airports'),
+      energy: document.getElementById('score-energy'),
       bank: document.getElementById('score-bank'),
       job: document.getElementById('hud-job'),
       toast: document.getElementById('toast'),
@@ -822,6 +823,7 @@ export class HUD {
     this.els.legends.textContent = counts.legends ?? 0;
     this.els.counties.textContent = counts.counties;
     this.els.airports.textContent = counts.airports ?? 0;
+    this.els.energy.textContent = counts.energy ?? 0;
     this.els.bank.textContent = (counts.bank ?? 0).toLocaleString();
     // active delivery line (set by main from missions.hudInfo)
     this.els.job.textContent = this.mission?.text ?? '';
