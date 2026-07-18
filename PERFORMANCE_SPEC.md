@@ -108,15 +108,50 @@ dressed as optimization) gets called out per the standing rule.
 
 ## Baseline (recorded from real hardware, Wave 1)
 
-*Pending. Protocol: visit each Performance tour spot → `↺ Reset max` → play
-~10 s → `📋 Record`. Each click stashes the full snapshot + context; the last
-click puts every record on the clipboard as paste-ready text — paste it in
-chat and the table below gets filled from it.*
+Recorded 2026-07-18, two rounds. Round 2 (canonical, below) followed the
+full protocol — teleport → settle 3 s → `↺ Reset max` → 15–20 s of *moving*
+play → `📋 Record` — so max columns are per-spot play values. Round 1
+(reset skipped; session-wide maxes) agreed on all averages and counts;
+its one extra datum: the teleport-arrival spike class reaches frame
+347 ms / scenery 121 ms / cities 34 ms. Round 1 also read 66–79 fps where
+round 2 capped at ~60 — likely a display/window difference; counts and ms
+were consistent across both.
 
-| Spot | fps | frame avg/max ms | top systems | draw calls | triangles |
-| ---- | --- | ---------------- | ----------- | ---------- | --------- |
-| Houston night storm | — | — | — | — | — |
-| I-10 west floor | — | — | — | — | — |
-| Sweetwater dusk | — | — | — | — | — |
+| Spot | fps | frame avg/max ms | render avg/max | scenery max | draw calls | triangles |
+| ---- | --- | ---------------- | -------------- | ----------- | ---------- | --------- |
+| Houston night storm (DRIVE) | 59.4 | 12.39 / 46.4 | 10.76 / 38.7 | 23.1 | 1461 | 1.75 M |
+| I-10 west floor (DRIVE) | 60.4 | 13.34 / 37.9 | 12.03 / 22.0 | 14.8 | 2037 | 1.61 M |
+| Sweetwater dusk (FLY) | 57.5 | 14.17 / 53.1 | 12.72 / 27.9 | 30.4 | 1432 | 1.66 M |
 
-Hardware: —
+Heap 116–126 MB steady. Hardware: Bruno's dev machine, 60 Hz vsync in
+round 2.
+
+### Findings (what W2/W3 must know)
+
+1. **The frame is the render call.** `render` is 10.8–12.7 ms of the
+   12.4–14.2 ms frame everywhere; all ~34 game systems together cost
+   1.5–2 ms. System `update()` optimization is a non-target — draw
+   submission is the game.
+2. **Cost is location-independent and the "floor" is the ceiling.** The
+   empty desert submits the *most* draw calls of the three spots (2037 vs
+   1461 downtown Houston in a storm) and triangles are ~1.6–1.7 M
+   everywhere; render avg tracks draw calls, not scene "busyness". A large
+   distance-insensitive base of draws dominates. Prime suspect: per-chunk
+   scenery props as individual meshes (open land runs more chunks at full
+   density; cities suppress them). W3's first job is a draw audit, not a
+   fix.
+3. **Hitch class is mild in normal play; teleports are the outlier.** With
+   per-spot resets, worst frames are 38–53 ms (2–3 dropped vsync frames);
+   scenery chunk builds reach 15–30 ms, worst while FLYing (faster chunk
+   streaming). The 120 ms+ spikes only occur on teleport arrival. Chunk
+   amortization is polish, not urgent — FLY at speed is its stress case.
+4. **Steady-state logic is healthy.** hud 12 Hz block ~0.6–0.7 ms per
+   tick, traffic/npcs/player/animals 0.1–0.35 ms, everything else < 0.1.
+   Margin at 60 Hz vsync is thin though: Sweetwater-FLY averages 14.2 ms
+   against a 16.7 ms budget and drops frames (57.5 fps) — a weaker GPU
+   sits below 60 everywhere.
+5. **Guardrail consequence (W2)**: per-system ms thresholds are pointless
+   (all tiny) and machine-bound; the meaningful ceilings are **count-based
+   and headless-honest** — draw calls and triangles via `renderProbe()`
+   (baseline ≈ 1.4–2.0 k / 1.7 M), plus lap-table completeness. Set caps
+   with headroom (~2.5 k / 2.5 M) and revisit after any W3 work.

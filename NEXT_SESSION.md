@@ -11,11 +11,14 @@ queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 - **This session**: Performance (`PERFORMANCE_SPEC.md`), wave 2 of ~3 —
   verify guardrails + budgets from the W1 baseline. Wave 1 (instrumentation:
   perf laps, Perf tab, tour spots, perf suite) shipped 2026-07-18.
-- **Blocked until the baseline lands**: W2 thresholds derive from real
-  numbers. Bruno reads the Perf tab (`?debug=1`, backquote, 📈 Perf) at the
-  three Performance tour spots on his machine and the numbers go into the
-  spec's Baseline table first. If the baseline isn't recorded yet, do that
-  (or pick other work) before W2.
+- **Baseline recorded 2026-07-18** (two rounds, round 2 canonical) — read the
+  spec's Baseline + Findings before planning. Headline: the frame is the
+  render call (10.8–12.7 of 12.4–14.2 ms; all game systems together 1.5–2 ms),
+  draw cost is location-independent with the desert highest (2037 draws >
+  downtown 1461 — suspect: per-chunk scenery props as individual meshes),
+  normal-play hitches are mild (worst 53 ms; 120 ms+ only on teleport). W2
+  guardrails must be count-based (draw calls/triangles via `renderProbe`,
+  caps ≈ 2.5 k / 2.5 M), never ms-based.
 - **Recommended setup**: model **Sonnet 5**, effort **high** — executing
   settled design (threshold plumbing in `tools/checks/perf.mjs`, CLAUDE.md
   protocol line). Flag it if the running model differs.
