@@ -246,7 +246,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     el.innerHTML = '<h2>🔧 Debug</h2><div id="debug-state"></div>' +
       '<div id="debug-tabs"><button class="active" data-tab="actions">⚡ Actions</button><button data-tab="tours">🗺️ Tours</button><button data-tab="perf">📈 Perf</button></div>' +
       `<div data-pane="actions">${actionsHtml}${airportsHtml}</div><div data-pane="tours" style="display:none">${toursHtml}</div>` +
-      '<div data-pane="perf" style="display:none"><div id="debug-perf"></div><button id="debug-perf-reset">↺ Reset max</button></div>';
+      '<div data-pane="perf" style="display:none"><div id="debug-perf"></div><button id="debug-perf-reset">↺ Reset max</button> <button id="debug-perf-record">📋 Record (0)</button></div>';
     el.style.display = 'none';
     document.body.appendChild(el);
     const stateEl = el.querySelector('#debug-state');
@@ -292,6 +292,15 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
         `<table><tr><th>system</th><th>avg ms</th><th>max</th></tr>${rows}</table>`;
     };
     el.querySelector('#debug-perf-reset').addEventListener('click', () => { perf.resetMax(); refreshPerf(); });
+    // baseline capture: each click stashes a snapshot + context and puts ALL
+    // records so far on the clipboard — record at every spot, paste once
+    const recBtn = el.querySelector('#debug-perf-record');
+    recBtn.addEventListener('click', () => {
+      const n = perf.record({ x: player.pos.x, z: player.pos.z, mode: player.mode, t: sky.t, weather: sky.weatherName() });
+      recBtn.textContent = `📋 Record (${n})`;
+      navigator.clipboard?.writeText(perf.formatRecords());
+      hud.toast(`📋 Perf record ${n} saved — all ${n} on the clipboard`);
+    });
     setInterval(refreshPerf, 500);
     setInterval(refreshState, 500);
   }

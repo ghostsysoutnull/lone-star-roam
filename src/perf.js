@@ -18,6 +18,7 @@ export class PerfMonitor {
     this.frames = 0; // main-branch frames since boot (title/pause untimed)
     this.render = { calls: 0, triangles: 0, geometries: 0, textures: 0, programs: 0 };
     this.drawFrame = null; // set by main.js: renders one real frame + captures info
+    this.records = []; // record() stash — baseline captures for formatRecords()
     this._t0 = 0; // current frame's start
     this._tl = 0; // last lap point
   }
@@ -88,5 +89,24 @@ export class PerfMonitor {
       laps[k] = { avg: L.avg, max: L.max, last: L.last, n: L.n };
     }
     return { fps: this.fps, frames: this.frames, frameMs: { ...this.frameMs }, laps, render: { ...this.render }, memoryMB: this.memoryMB() };
+  }
+
+  // baseline capture: stash the current snapshot with play context (position,
+  // mode, time, weather — the debug Perf tab's Record button supplies it) and
+  // export every stashed record as paste-ready text for analysis in chat
+  record(ctx) {
+    this.records.push({ ctx, snap: this.snapshot() });
+    return this.records.length;
+  }
+
+  formatRecords() {
+    return this.records.map(({ ctx: c, snap: s }, i) => [
+      `=== perf record ${i + 1} — pos ${c.x.toFixed(0)},${c.z.toFixed(0)} · ${c.mode} · t ${c.t.toFixed(2)} · ${c.weather}`,
+      `fps ${s.fps.toFixed(1)} · frame ${s.frameMs.avg.toFixed(2)} avg / ${s.frameMs.max.toFixed(1)} max ms` +
+        (s.memoryMB != null ? ` · heap ${s.memoryMB} MB` : ''),
+      `draws ${s.render.calls} · tris ${s.render.triangles} · geo ${s.render.geometries} · tex ${s.render.textures} · prog ${s.render.programs}`,
+      ...Object.entries(s.laps).sort((a, b) => b[1].avg - a[1].avg)
+        .map(([k, L]) => `${k} ${L.avg.toFixed(3)}/${L.max.toFixed(1)} n${L.n}`),
+    ].join('\n')).join('\n\n');
   }
 }

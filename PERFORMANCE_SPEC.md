@@ -108,7 +108,10 @@ dressed as optimization) gets called out per the standing rule.
 
 ## Baseline (recorded from real hardware, Wave 1)
 
-*Pending — filled after Bruno reads the Perf tab at the three tour spots.*
+*Pending. Protocol: visit each Performance tour spot → `↺ Reset max` → play
+~10 s → `📋 Record`. Each click stashes the full snapshot + context; the last
+click puts every record on the clipboard as paste-ready text — paste it in
+chat and the table below gets filled from it.*
 
 | Spot | fps | frame avg/max ms | top systems | draw calls | triangles |
 | ---- | --- | ---------------- | ----------- | ---------- | --------- |

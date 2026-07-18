@@ -62,6 +62,18 @@ export default async function perf(t) {
     t.ok(mirrored === r.calls, `probe result (${r.calls}) not mirrored into perf.render (${mirrored})`);
   });
 
+  await t.check('record + formatRecords: paste-ready export carries context and every lap', async () => {
+    const n = await t.ev("g.perf.record({ x: g.player.pos.x, z: g.player.pos.z, mode: g.player.mode, t: g.sky.t, weather: 'clear' })");
+    t.ok(n === 1, `expected first record in a fresh context, got count ${n}`);
+    const text = await t.ev('g.perf.formatRecords()');
+    t.ok(text.startsWith('=== perf record 1'), `export missing the record header: "${text.slice(0, 60)}"`);
+    t.ok(/·\sDRIVE\s·/.test(text), 'export missing the mode context');
+    t.ok(/\ndraws \d+ · tris \d+/.test(text), 'export missing the render-counts line');
+    for (const name of ['player', 'traffic', 'animals', 'hud']) {
+      t.ok(new RegExp(`\\n${name} \\d+\\.\\d+/\\d+(\\.\\d+)? n\\d+`).test(text), `export missing the '${name}' lap line`);
+    }
+  });
+
   await t.check('resetMax clears the peaks without touching counters', async () => {
     const before = await t.ev('({ max: g.perf.frameMs.max, n: g.perf.laps.player.n })');
     const after = await t.ev('(g.perf.resetMax(), { max: g.perf.frameMs.max, scen: g.perf.laps.scenery.max, n: g.perf.laps.player.n })');
