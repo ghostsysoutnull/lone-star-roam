@@ -10,7 +10,7 @@
   Creek area) + their tables registered into the W2 announcer. Wave 2
   (well sites + scatter retirement, offshore rebase, night flares,
   Energy log + Spindletop/Midland Tank Farm, approach announcer)
-  shipped 2026-07-17, commit `<W2 hash>`.
+  shipped 2026-07-17, commit `6463587`.
 - **Recommended setup**: model **Sonnet 5**, effort **high** —
   instancing plumbing. Flag it if the running model differs.
 - **Budget**: code + checks, **one shot** (turbine row at dusk),
