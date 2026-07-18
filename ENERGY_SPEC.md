@@ -49,11 +49,19 @@ dark panel fields from the air and rows near ground (crop idiom).*
 - refinery skylines at all 22 real refineries — columns, tank farms, flare
   stacks; the Houston Ship Channel, Baytown, Port Arthur and Corpus as
   hero industrial landscapes glowing at night
+- **real light at close range**: park under a flare stack and your truck
+  catches the orange; the water under the offshore rigs glows — the
+  existing Shelf platforms upgrade for free
+- distant sites spill light onto ground and water via night glow decals
 - refinery heroes join the Energy log with plaque facts
 
-*Expected result: the Ship Channel at night is a destination. Glow is
-`ATMOS.night`-gated emissive (`rigGlow` idiom). Geometry merges like
-airports; poly-budgeted.*
+*Expected result: the Ship Channel at night is a destination. Far glow is
+`ATMOS.night`-gated emissive + spill decals; close glow is a sky.js-owned
+**fixed-size pool of real lights** (~6, created at boot — light count
+never changes, so no shader recompiles) assigned to the nearest
+registered anchors at night, intensity 0 by day. Sodium orange for
+refineries, flicker orange at flares, warm white on rig decks. Geometry
+merges like airports; poly-budgeted.*
 *Suggested setup: Fable 5, effort high.*
 
 **Wave 5 — the player gets:**
@@ -91,6 +99,10 @@ extend additively.*
   with energy work, not just energy scenery.
 - **Grid depth**: **345 kV spine only**. No 230/138 kV regional layer —
   revisit post-track only if the spine reads too sparse.
+- **Real lights** (added 2026-07-17, folded into W4): night industrial
+  sites get true illumination via a sky.js-owned pooled system (design
+  in Architecture) — the one sanctioned extension of the one-light-rig
+  law. Turbine aviation beacons stay pure emissive (unison blink, W3).
 
 ## Data (verified 2026-07-17, Overpass GET, TX bbox 25.6,-107.0,36.8,-93.2)
 
@@ -153,6 +165,19 @@ stash in `~/claude-area/devel/tx-inputs/`, not the repo.
   windows) is emissive, `ATMOS.night`-gated, `fog: false` where it must
   punch through — sky.js stays the only light rig. Flicker via the
   animate-loop kind registry (`userData.animated`, pumpjack idiom).
+- **Local light pool** (W4): sky.js gains a **fixed-size pool** of
+  PointLights (~6, built at boot — count is constant forever; adding or
+  removing lights recompiles every lit shader, so the pool only ever
+  changes *intensity/position*). Systems register **glow anchors**
+  (`{x, z, y, kind}` — refinery flare stacks, rig decks in maritime.js,
+  hero plant floods in W5); each night frame-throttled sky.js assigns
+  the pool to the nearest anchors, 0-intensity by day. Colors by kind:
+  sodium orange (refinery), flicker orange (flare), warm white (rig
+  deck), cool flood (plant). **Spill decals** carry the far read: warm
+  night-gated decals on ground/water under anchor clusters (z-fight law
+  — join the deck y-stagger; the gulf stays one plane, decals float
+  above it). Existing Shelf platforms + Far Rig register anchors in
+  this wave.
 - **Poly bar**: every kit in this track (well site, turbine, solar,
   refinery, tower) ships at the W6b bar per the GOTCHAS standing rule —
   round forms 8–14 radial segments (turbine towers, tanks, columns are
@@ -182,7 +207,7 @@ ERCOT control room (Taylor).
 | **1** | Fetch + `build-energy.mjs` + `data/energy.json` + `energyAt` + `__game` wiring + data-truth checks | **Sonnet 5, high** — pure fetch/bake plumbing | code + checks, **no shots**, grep-first |
 | **2** | Well sites (`wellSiteAt` + kit), density scatter, night flares, Energy log machinery + first sites | **Fable 5, high** — content + composition | code + checks, **one shot** (Permian flares at night), grep-first |
 | **3** | Wind farms (instanced turbines, `ATMOS.wind` spin) + solar fields + log sites | **Sonnet 5, high** — instancing plumbing | code + checks, **one shot** (turbine row at dusk), grep-first |
-| **4** | Refinery kit at all 22 + 4 hero skylines + night glow + plaques + log sites | **Fable 5, high** — hero composition + plaque copy | code + checks, **one shot** (Ship Channel night), grep-first |
+| **4** | Refinery kit at all 22 + 4 hero skylines + night glow + **local light pool + spill decals** (rigs included) + plaques + log sites | **Fable 5, high** — hero composition + plaque copy | code + checks, **two shots** (Ship Channel night; rig water glow), grep-first |
 | **5** | 345 kV tower corridors + major substations + hero plant landmarks + ERCOT radio flavor | **Sonnet 5, high** — polyline/instancing plumbing | code + checks, **one shot** (tower corridor read), grep-first |
 | **6** | Energy job types + oversize-load rule + balance + **track close** (ROADMAP fold-in, gotchas, briefing deletion) | **Fable 5, high** — offer copy + rules | code + checks, no shots, grep-first |
 
@@ -211,7 +236,12 @@ hermetic — drive to state):
   within ε of `hAt`.
 - **W4 — sites as numbers**: all 22 refineries have geometry at their
   baked coords; hero plaques read at parked-truck distance + ugly
-  headings (compass/plaque lesson); glow gated on night.
+  headings (compass/plaque lesson); glow gated on night. **Light pool**:
+  scene light count identical before/after night falls and while driving
+  between two sites (the recompile guard as an assertion); pool
+  intensities 0 by day, >0 near an anchor at night; nearest-assignment
+  flips to the closer site mid-drive; spill decal opacity tracks
+  `ATMOS.night`.
 - **W5 — corridor math**: tower spacing along a sampled `lines345`
   polyline within tolerance; towers sit on `hAt`; hero plants collect +
   plaque; radio wink line present in the pool.
