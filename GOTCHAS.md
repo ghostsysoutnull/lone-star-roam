@@ -213,6 +213,20 @@ graduate here (and out of `NEXT_SESSION.md`).
 - **Hand-placed coordinate pairs get a check before you trust them.** Real-world
   coordinates once put two ferry docks closer together than the boat was long.
   `ferries.mjs` asserts the gap; the Turtle Lady's SPI spot asserts `onIsland`.
+- **A real baked coordinate is not a real footprint — check the rendered
+  geometry, not just the point.** Every other site-placement function
+  (`wellSiteAt`, `windTurbinesAt`) checks road/city/airport clearance before
+  drawing; `solarSitesAt` skipped it on the reasoning "exact real coordinates
+  need no generation checks" — true for the point, false for the footprint
+  drawn around it. Blue Wing Solar Farm's baked center sits 2.8u from I-37;
+  its unclamped decal (an aggregate radius, not the real polygon) drew
+  straight across the highway, and a neighbor did the same to the San
+  Antonio River (Bruno caught both by eye, Energy W3 post-ship). Any object
+  rendered at a real coordinate *with a footprint radius* must clamp that
+  radius to actual clearance (`nearestAnyRoad`/`nearestRiver`/etc.) and skip
+  drawing below a floor rather than shrink to nothing — a real point doesn't
+  excuse an unchecked footprint. `nearestRiver(x, z, radius)` (geo.js,
+  `nearestRoad` idiom) is the sibling query for river clearance.
 - **Screenshot analysis goes to Copilot CLI, never into Claude's context**
   (validated 2026-07-16 on a real band shot). Stage with
   `node tools/stage-shot.mjs <out.png> <x> <z> [heading°] [mode] [agl] [skyT]`,
