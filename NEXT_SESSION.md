@@ -12,7 +12,9 @@
   conductor ribbon, ~600 thinned substations, 4 hero plants — South
   Texas Project + Comanche Peak nuclear, W.A. Parish, Martin Lake —
   ERCOT radio flavor via a `{grid}` chatter token) shipped 2026-07-18,
-  commit TBD (fill in next session, W4's-hash-backfill precedent).
+  commit `102901f` (H-frame swap + tower-rotation fix, prompted by a
+  post-shot Bruno review of the tower look, in follow-up commit
+  `8021248`).
 - **Recommended setup**: model **Fable 5**, effort **high** — offer
   copy + rules, not plumbing. Flag it if the running model differs.
 - **Budget**: code + checks, **no shots**, grep-first.
