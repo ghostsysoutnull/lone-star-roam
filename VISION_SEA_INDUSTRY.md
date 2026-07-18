@@ -20,10 +20,15 @@ sea patrol, and the Gulf fishing fleet.
 ambient, watchable realism is first-class value in this game, not filler
 awaiting gameplay justification — the shipped identity is exactly this
 (freight consists, lane ships, the bat emergence, haunts, the rig skyline).
-A working Gulf you watch and roam earns its waves on its own. Water hauls
-through the existing missions pipeline (port-to-port cargo, the
-charter-jobs precedent) ship as a **complement** — ports become
-destinations too — not as the track's justification.
+A working Gulf you watch and roam earns its waves on its own. **And
+gameplay is the other first-class axis, not a junior partner** (Bruno,
+same date): creative cargo jobs are part of the game's current spirit —
+water hauls get full investment, not a token pass. Port-to-port cargo via
+the missions pipeline (the charter-jobs precedent), with creative
+port-true cargo variety (containers out of Houston, crude to the
+refineries, shrimp catch landed at the fishing ports) and its own
+pay/deadline character. Neither axis justifies, caps, or goes light
+because of the other.
 
 ## Player payoff
 

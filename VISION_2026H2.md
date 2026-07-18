@@ -32,8 +32,10 @@ real split and may change them.
 - **Umbrella review decisions** (2026-07-18): **the diorama is the point**
   — ambient, watchable realism is first-class value in this game (Bruno's
   standing design principle); sea-industry earns its waves as a working
-  Gulf you watch and roam, with water hauls via the missions pipeline as a
-  complement, not a justification. Sea's default route source is
+  Gulf you watch and roam. **Gameplay is the other first-class axis**:
+  creative cargo jobs are part of the game's spirit — water hauls get full
+  investment; neither axis justifies, caps, or goes light because of the
+  other. Sea's default route source is
   AIS-informed hand lanes, full bake only on scout numbers. Mexico carries
   a dedicated **south-side visual register wave** (building
   kit/palette/plaza layout) so the twin cities don't read as recolored
