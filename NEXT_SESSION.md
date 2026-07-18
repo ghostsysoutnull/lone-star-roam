@@ -10,7 +10,7 @@
   too), plaques at the hero skylines, and W4 log sites. Wave 3 (real
   wind farms — instanced turbines + `ATMOS.wind` blade spin, solar
   panel fields, Roscoe/Horse Hollow/Papalote Creek log heroes)
-  shipped 2026-07-18, commit `<W3 hash>`.
+  shipped 2026-07-18, commit `5f560fe`.
 - **Recommended setup**: model **Fable 5**, effort **high** — hero
   composition + plaque copy. Flag it if the running model differs.
 - **Budget**: code + checks, **two shots** (Ship Channel night, rig
