@@ -477,39 +477,33 @@ export class EnergySystem {
   }
 
   // ===================================================================
-  // W5: the ERCOT spine — box-built lattice towers (poly-bar law: boxy/
-  // lattice subjects stay box-built) instanced along each baked lines345
+  // W5: the ERCOT spine — box-built H-frame structures (poly-bar law:
+  // boxy subjects stay box-built) instanced along each baked lines345
   // corridor by arc length (trains.js arcInit/at idiom, reimplemented
   // locally — corridors are static, walked once at boot, never per frame),
   // plus a thin instanced conductor ribbon so the corridor reads as a
-  // followable line from a distance, not just a dashed trail of towers.
+  // followable line from a distance, not just a dashed trail of poles.
   // A tower landing within 3u of a road/river nudges sideways rather than
   // clipping through it (the wire orientation is recomputed from the
   // actual placed points, so a nudge never kinks the conductor visibly).
   // ===================================================================
   buildTowers(scene) {
-    // legibility pass (staged shot, W5): members bulked well past a realistic
-    // taper — the turbine/refinery lesson repeats here, a thin true-scale
-    // lattice collapses into an unreadable pole by mid-distance; the wide
-    // double cross-arm is the silhouette cue that actually reads as "tower"
-    // at range, so it gets the biggest bump. Darker steel holds contrast
-    // against the sky longer than the original light gray.
+    // Bruno call (2026-07-18, post-shot): the 4-leg lattice read as too tall
+    // and too busy for a repeated background element — swapped for a 2-pole
+    // H-frame, which is also the more common real 345 kV structure on the
+    // Texas plains (lattice towers are the exception: river crossings, dense
+    // corridors). Fewer, bolder members hold a readable silhouette at range
+    // where the lattice collapsed to a blur regardless of member thickness.
+    // crossbar shortened (post-shot, 2026-07-18): a real corridor bends a few
+    // degrees every ~40u span, so a rigid crossbar can only ever bisect its
+    // two neighbor directions, not sit dead-parallel to both — the residual
+    // jog at the tip scales with crossbar half-length, so a shorter arm keeps
+    // that jog visually small without changing the underlying angle math.
     const parts = [];
-    for (const [lx, lz] of [[-1.1, -1.1], [1.1, -1.1], [-1.1, 1.1], [1.1, 1.1]]) {
-      const leg = new THREE.BoxGeometry(0.26, 9, 0.26);
-      leg.translate(0, 4.5, 0); // base at local origin, top at y=9
-      leg.rotateX(lz * 0.07);   // lean inward — top converges toward the axis
-      leg.rotateZ(-lx * 0.07);
-      leg.translate(lx, 0, lz);
-      parts.push(leg.toNonIndexed());
-    }
-    for (const y of [2, 5]) { // waist ties, both faces (+ cross, not diagonal bracing — box-built, cheap)
-      parts.push(new THREE.BoxGeometry(2.2, 0.2, 0.2).translate(0, y, 0).toNonIndexed());
-      parts.push(new THREE.BoxGeometry(0.2, 0.2, 2.2).translate(0, y, 0).toNonIndexed());
-    }
-    for (const y of [6.4, 7.5]) // double-circuit cross-arms, perpendicular to the line (local X)
-      parts.push(new THREE.BoxGeometry(4.4, 0.28, 0.28).translate(0, y, 0).toNonIndexed());
-    parts.push(new THREE.BoxGeometry(1.8, 0.2, 0.2).translate(0, 8.6, 0).toNonIndexed()); // shield-wire peak
+    for (const lx of [-1.3, 1.3]) // 2 straight poles, no lean — an H-frame stands upright
+      parts.push(new THREE.BoxGeometry(0.32, 8, 0.32).translate(lx, 4, 0).toNonIndexed());
+    for (const y of [5.6, 7.0]) // double-circuit crossbars — the "H" rungs, and the conductor mounts
+      parts.push(new THREE.BoxGeometry(2.8, 0.26, 0.26).translate(0, y, 0).toNonIndexed());
     const towerGeo = mergeGeoms(parts);
     const towerMat = new THREE.MeshLambertMaterial({ color: 0x686c74, flatShading: true });
     const wireGeo = new THREE.BoxGeometry(1, 1, 1); // unit box, scaled per-instance to the span
@@ -537,8 +531,12 @@ export class EnergySystem {
         return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / seg, (b[1] - a[1]) / seg];
       };
       const n = Math.max(1, Math.round(len / TOWER_SPACING));
-      const startCount = towerM.length;
-      let prev = null;
+      // pass 1: place points (nudged off roads/rivers) before any rotation is
+      // decided, so a tower's own orientation can be derived from its ACTUAL
+      // neighbors rather than the raw polyline's local tangent — the two
+      // diverge wherever the corridor curves between samples or a nudge
+      // fires, which read as the crossbar sitting off-axis from the wire.
+      const placed = [];
       for (let i = 0; i <= n; i++) {
         const [ax, az, tx, tz] = at((len * i) / n);
         let x = ax, z = az;
@@ -548,19 +546,28 @@ export class EnergySystem {
           const rd2 = Math.min(nearestAnyRoad(nx, nz, 6)?.dist ?? 99, nearestRiver(nx, nz, 6)?.dist ?? 99);
           if (rd2 > rd) { x = nx; z = nz; }
         }
-        const y = hAt(x, z);
-        const q = new THREE.Quaternion().setFromAxisAngle(up, Math.atan2(tx, tz));
-        towerM.push(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), q, unitScale));
-        if (prev) {
-          const segLen = Math.hypot(x - prev.x, z - prev.z);
+        placed.push({ x, z, y: hAt(x, z) });
+      }
+      // pass 2: each tower's rotation is the (summed, unnormalized) direction
+      // to its neighbor(s) — exactly what the wire segments on either side
+      // use, so crossbar and conductor always stay parallel.
+      const startCount = towerM.length;
+      for (let i = 0; i < placed.length; i++) {
+        const cur = placed[i], prv = placed[i - 1], nxt = placed[i + 1];
+        let dx = 0, dz = 0;
+        if (prv) { dx += cur.x - prv.x; dz += cur.z - prv.z; }
+        if (nxt) { dx += nxt.x - cur.x; dz += nxt.z - cur.z; }
+        const q = new THREE.Quaternion().setFromAxisAngle(up, Math.atan2(dx, dz));
+        towerM.push(new THREE.Matrix4().compose(new THREE.Vector3(cur.x, cur.y, cur.z), q, unitScale));
+        if (prv) {
+          const segLen = Math.hypot(cur.x - prv.x, cur.z - prv.z);
           if (segLen > 0.5) {
-            const wq = new THREE.Quaternion().setFromAxisAngle(up, Math.atan2(x - prev.x, z - prev.z));
+            const wq = new THREE.Quaternion().setFromAxisAngle(up, Math.atan2(cur.x - prv.x, cur.z - prv.z));
             wireM.push(new THREE.Matrix4().compose(
-              new THREE.Vector3((prev.x + x) / 2, (prev.y + y) / 2 + 7.2, (prev.z + z) / 2),
+              new THREE.Vector3((prv.x + cur.x) / 2, (prv.y + cur.y) / 2 + 6.3, (prv.z + cur.z) / 2),
               wq, new THREE.Vector3(0.1, 0.1, segLen)));
           }
         }
-        prev = { x, y, z };
       }
       towerRanges.push({ len, count: towerM.length - startCount });
     }

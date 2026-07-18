@@ -16,7 +16,7 @@ export const TOURS = [
     track: 'Energy (2026-07)',
     waves: [
       { wave: 'W5 — 345 kV tower corridors, substations, hero plants, ERCOT radio', spots: [
-        S('⚡ ERCOT tower corridor — Hill Country spine', [-128.4, 179.5], { mode: 'DRIVE', time: 0.35, note: 'a real 345 kV corridor, box-built lattice towers instanced along its arc length every ~40u, conductor ribbon strung between them' }),
+        S('⚡ ERCOT tower corridor — Hill Country spine', [-128.4, 179.5], { mode: 'DRIVE', time: 0.35, note: 'a real 345 kV corridor, box-built H-frame poles instanced along its arc length every ~40u, conductor ribbon strung between them' }),
         S('⚡ South Texas Project — Energy log hero', [3298.2, 2451.7], { mode: 'DRIVE', time: 0.35, note: 'twin reactors, waisted cooling-tower silhouette + reactor dome; drive in and the log stamps' }),
         S('⚡ Comanche Peak Nuclear Power Plant — Energy log hero', [1637.3, -1443.7], { mode: 'DRIVE', time: 0.35, note: 'the second nuclear hero, Comanche Creek Reservoir near Glen Rose' }),
         S('⚡ W. A. Parish Electric Generating Station — Energy log hero', [3687.7, 1693.6], { mode: 'DRIVE', time: 0.35, note: 'coal/gas boiler-and-stack hero; a real 345 kV corridor passes within 2u of the plant — its own substation sits 11u away (hero-excluded from the announcer, no double toast)' }),
