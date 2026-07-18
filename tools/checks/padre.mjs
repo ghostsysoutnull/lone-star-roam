@@ -94,7 +94,7 @@ export default async function padre(t) {
       total: document.getElementById('total-landmarks').textContent,
     })`);
     t.ok(res.got, 'lighthouse did not collect from parked distance (14u, radius 20)');
-    t.ok(res.total === '38', `landmark total in HUD is ${res.total}, expected 38 (36 + lighthouse + W4's SS Selma)`);
+    t.ok(res.total === '39', `landmark total in HUD is ${res.total}, expected 39 (36 + lighthouse + W4's SS Selma + Guadalupe Peak)`);
   });
 
   await t.check('collectible totals in the DOM come from the live tables', async () => {

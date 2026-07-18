@@ -13,6 +13,16 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'West Texas massifs (2026-07)',
+    waves: [
+      { wave: 'W1 — the Guadalupe wall', spots: [
+        S('🏔 El Capitan wall — US 62/180 approach', LL(31.860, -104.808), { heading: 1.2, mode: 'DRIVE', time: 0.35, note: 'the sheer prow rising over the salt flat — the missing far-west skyline, now a wall on the horizon all the way from the basin floor' }),
+        S('🏔 Guadalupe Peak — top of Texas', LL(31.8914, -104.8607), { mode: 'WALK', time: 0.35, note: 'the summit saddle: cairn, stainless pyramid, historical marker — collect the landmark on foot at 8,751 ft' }),
+        S('🏔 Brokeoff ridge — the range crosses into NM', LL(32.050, -105.020), { heading: -1.2, mode: 'FLY', time: 0.35, note: 'the escarpment does not stop at the state line: Brokeoff tents taper north while the reef arm runs toward Carlsbad' }),
+      ] },
+    ],
+  },
+  {
     track: 'Energy (2026-07)',
     waves: [
       { wave: 'W6 — energy jobs: crude, fuel, oversize blades', spots: [

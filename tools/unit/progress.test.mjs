@@ -11,7 +11,7 @@ function namesInTable(text, declaration) {
 test('collectible tables retain their documented totals and unique labels', async () => {
   const gameplay = await source('gameplay.js');
   const landmarks = namesInTable(gameplay, 'LANDMARKS');
-  assert.equal(landmarks.length, 38, 'landmark count');
+  assert.equal(landmarks.length, 39, 'landmark count');
   unique(landmarks, 'landmark names');
 
   const animals = await source('animals.js');

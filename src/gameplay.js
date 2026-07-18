@@ -64,6 +64,9 @@ export const LANDMARKS = [
   { name: 'XIT Ranch', at: LL(35.684, -102.345), kind: 'rancharch', fact: 'Three million acres traded for building the Texas Capitol — 6,000 miles of barbed wire around the biggest fenced range on Earth.' },
   { name: 'Matador Ranch', at: LL(33.99, -100.84), kind: 'rancharch', fact: 'Founded 1879, run for decades from Dundee, Scotland — Scottish money, Texas grass, and Herefords by the tens of thousands.' },
   { name: 'LBJ Ranch', at: LL(30.2431, -98.6320), kind: 'rancharch', fact: 'The Texas White House — LBJ ran the country from the Pedernales, landing on his own strip. The Park Service still runs his registered Herefords.' }, // held 5u off the Pedernales ribbon
+  // West Texas massifs (2026-07): the marker sits in the saddle south of the
+  // summit tent — world.js GUADALUPE_SPINE keeps this site mesh-free
+  { name: 'Guadalupe Peak', at: LL(31.8914, -104.8607), kind: 'summit', fact: 'Top of Texas — 8,751 ft. The stainless pyramid up here was raised by American Airlines in 1958 to honor the Butterfield stage route that passed below.' },
 ];
 export const LANDMARK_COUNT = LANDMARKS.length;
 
@@ -389,6 +392,10 @@ export class Gameplay {
     for (const lm of LANDMARKS) {
       const g = mkLandmarkMesh(lm.kind, lm.name);
       g.position.set(lm.at[0], hAt(lm.at[0], lm.at[1]), lm.at[1]);
+      // the historical marker sits 5.5u off-center — on sloped sites (summit
+      // saddle, mountain flanks) re-drape it onto its own patch of ground
+      const mdy = hAt(lm.at[0] + 5.5, lm.at[1] + 5.5) - g.position.y;
+      for (const c of g.userData.marker) c.position.y += mdy;
       // beacon: tall thin light column, dimmed if collected
       const done = this.save.landmarks.includes(lm.name);
       const beam = new THREE.Mesh(
@@ -1102,6 +1109,15 @@ function mkLandmarkMesh(kind, name) {
       rib.rotation.z = -0.3;
       break;
     }
+    case 'summit': {
+      // cairn base + the 1958 American Airlines three-sided stainless pyramid
+      const rock = new THREE.MeshLambertMaterial({ color: 0x8f7f66, flatShading: true });
+      box(2.2, 0.5, 2.2, 0, 0.25, 0, rock);
+      const steelMat = new THREE.MeshLambertMaterial({ color: 0xd8dde2, emissive: 0x8899aa, emissiveIntensity: 0.15, flatShading: true });
+      const pyr = add(new THREE.Mesh(new THREE.ConeGeometry(0.75, 2.2, 3), steelMat));
+      pyr.position.y = 1.6;
+      break;
+    }
   }
   // every landmark gets its Texas historical marker
   const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.3, 5), new THREE.MeshLambertMaterial({ color: 0x555555 }));
@@ -1109,6 +1125,7 @@ function mkLandmarkMesh(kind, name) {
   const plaque = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.06), new THREE.MeshLambertMaterial({ color: 0x6a4a2f }));
   plaque.position.set(5.5, 1.5, 5.5);
   g.add(post, plaque);
+  g.userData.marker = [post, plaque]; // mkLandmarks re-drapes these onto local terrain
   return g;
 }
 

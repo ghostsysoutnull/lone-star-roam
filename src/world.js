@@ -12,7 +12,9 @@ export function buildWorld(scene) {
   buildHighways(scene);
   buildBandHighways(scene);
   if (!ELEV.data) buildMountains(scene); // decorative cones only when no real terrain
-  return new ScenerySystem(scene);
+  const sys = new ScenerySystem(scene);
+  if (ELEV.data) sys.massif = buildGuadalupes(scene); // hero ridge over the smoothed DEM
+  return sys;
 }
 
 function buildGround(scene) {
@@ -408,6 +410,106 @@ function buildMountains(scene) {
   }
   mesh.count = i;
   scene.add(mesh);
+}
+
+// West Texas massifs (2026-07): the 30u elevation grid rounds El Capitan's
+// 300 m cliff into a smooth ramp, so the range gets hero ridge meshes over
+// the real terrain — Texas escarpment, the Brokeoff ridge into NM, and the
+// reef arm toward Carlsbad. Anchors are real coordinates; heights are above
+// local hAt. The saddle at Guadalupe Peak's true summit (31.8914, −104.8607)
+// stays mesh-free — gameplay.js parks the summit landmark there.
+const GLL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
+// [lat, lon, height, along-ridge length, across width, yaw rad (0 = ridge runs north)]
+const GUADALUPE_SPINE = [
+  [31.876, -104.860, 22, 10, 6, 0.10],  // El Capitan — the sheer prow
+  [31.902, -104.864, 26, 18, 10, 0.15], // Guadalupe Peak massif — tallest tent
+  [31.917, -104.874, 20, 20, 11, 0.30], // Shumard/Bartlett
+  [31.937, -104.890, 18, 20, 11, 0.45], // Bush Mountain
+  [31.962, -104.908, 15, 22, 10, 0.40], // Blue Ridge
+  [31.990, -104.925, 13, 20, 9, 0.35],  // state-line ridge
+  [32.025, -104.945, 12, 22, 9, 0.35],  // Brokeoff Mountains — NM
+  [32.060, -104.970, 10, 20, 8, 0.40],  // NM
+  [32.095, -104.995, 8, 18, 8, 0.45],   // NM taper
+  [31.899, -104.838, 14, 12, 7, -0.35], // Hunter Peak — reef arm starts
+  [31.940, -104.800, 11, 22, 8, -0.70],
+  [31.985, -104.755, 9, 24, 8, -0.75],
+  [32.030, -104.710, 8, 22, 7, -0.80],  // NM — Guadalupe Ridge toward the Caverns
+  [32.080, -104.650, 7, 20, 7, -0.85],  // NM taper at Carlsbad's doorstep
+];
+
+// deterministic per-position jitter — duplicated (non-indexed) vertices at
+// the same position hash alike, so craggy displacement never tears a face
+const vjit = (vx, vy, vz, salt) => {
+  const s = Math.sin(vx * 127.1 + vy * 311.7 + vz * 74.7 + salt * 53.1) * 43758.5453;
+  return (s - Math.floor(s)) - 0.5; // -0.5..0.5
+};
+
+function buildGuadalupes(scene) {
+  const mat = new THREE.MeshLambertMaterial({ color: 0x9d8a6e, flatShading: true }); // pale limestone
+  const spine = [];
+  const parts = [];
+  // one craggy tent: 10 radial × 4 height segments, jittered above the base
+  // ring (the skirt stays put so grounding holds); apex duplicates share one
+  // hash. Base sinks to the LOWEST terrain sample around the rotated base
+  // ring, not the center — slopes here drop several units across a footprint
+  const tent = (x, z, h, len, w, yaw, salt) => {
+    let base = hAt(x, z);
+    for (let k = 0; k < 12; k++) {
+      const a = (k / 12) * Math.PI * 2;
+      const lx = Math.cos(a) * w, lz = Math.sin(a) * len;
+      const rx = x + lx * Math.cos(yaw) + lz * Math.sin(yaw);
+      const rz = z - lx * Math.sin(yaw) + lz * Math.cos(yaw);
+      base = Math.min(base, hAt(rx, rz));
+    }
+    base -= 0.5;
+    const geo = new THREE.ConeGeometry(1, 1, 10, 4, true).toNonIndexed();
+    const pos = geo.attributes.position;
+    for (let v = 0; v < pos.count; v++) {
+      const vx = pos.getX(v), vy = pos.getY(v), vz = pos.getZ(v);
+      const t = vy + 0.5; // 0 at base ring, 1 at apex
+      if (t < 0.05) continue;
+      pos.setX(v, vx + vjit(vx, vy, vz, salt) * 0.5 * t);
+      pos.setZ(v, vz + vjit(vx, vy, vz, salt + 40) * 0.5 * t);
+      pos.setY(v, vy + vjit(vx, vy, vz, salt + 80) * 0.28 * t);
+    }
+    geo.scale(w, h, len);
+    geo.rotateY(yaw);
+    geo.translate(x, base + h / 2, z);
+    geo.computeVertexNormals();
+    parts.push(geo);
+    return base;
+  };
+  // sync with gameplay.js's Guadalupe Peak landmark — the saddle stays clear
+  const SUMMIT = GLL(31.8914, -104.8607);
+  const knobs = [];
+  GUADALUPE_SPINE.forEach(([lat, lon, h, len, w, yaw], i) => {
+    const [x, z] = GLL(lat, lon);
+    const base = tent(x, z, h, len, w, yaw, i);
+    spine.push({ x, z, h, len, w, yaw, baseY: base, apexY: base + h });
+    // satellite knobs break the one-apex-per-tent silhouette: two smaller
+    // peaks offset along the ridge axis (seeded — same range every session).
+    // rand() draws stay unconditional so the stream never shifts under skips
+    const rand = seededRand('guadalupe:' + i);
+    for (let sk = 0; sk < 2; sk++) {
+      const along = (sk === 0 ? 1 : -1) * (0.35 + rand() * 0.25) * len;
+      const across = (rand() - 0.5) * 0.5 * w;
+      const kh = h * (0.45 + rand() * 0.25), kl = len * 0.45, kw = w * (0.55 + rand() * 0.2);
+      const kyaw = yaw + (rand() - 0.5) * 0.6;
+      const kx = x + across * Math.cos(yaw) + along * Math.sin(yaw);
+      const kz = z - across * Math.sin(yaw) + along * Math.cos(yaw);
+      const foot = Math.max(kl, kw) / 2;
+      if (Math.hypot(kx - SUMMIT[0], kz - SUMMIT[1]) < foot + 8) continue; // marker saddle stays walkable
+      if ((nearestAnyRoad(kx, kz, 30)?.dist ?? 99) < foot + 4) continue;   // US 62/180 threads the pass
+      const kBase = tent(kx, kz, kh, kl, kw, kyaw, i * 7 + sk + 200);
+      knobs.push({ x: kx, z: kz, h: kh, len: kl, w: kw, yaw: kyaw, baseY: kBase, apexY: kBase + kh });
+    }
+  });
+  const mesh = new THREE.Mesh(mergeGeoms(parts), mat);
+  mesh.name = 'guadalupes';
+  mesh.userData.spine = spine; // checks sample these against hAt/nearestRoad
+  mesh.userData.knobs = knobs; // satellite peaks — same ground/clearance laws
+  scene.add(mesh);
+  return mesh;
 }
 
 // --- Chunked scenery: regional flora + props spawned near the player ---

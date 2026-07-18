@@ -42,12 +42,13 @@ already shipped as `54b3511` — these are the remaining items)
   geo.js `neighborStateAt`), strengths ≤0.5 so the height ramp reads; Mexico
   keeps the full 0.75 `cOut` wash deliberately. Verified by `band.mjs` +
   Bruno-approved screenshot batch.
-- **NM band mountain silhouettes read flat** (found in W3, 2026-07-16): the
-  Brokeoff/Guadalupe NM side has real 780 m local DEM gradients but at 30u
-  grid cells that's ~3° of apparent slope — no paint change can dramatize it
-  (true inside Texas too). Texas's dramatic peaks are hand-built mountain
-  meshes in world.js; extending that kit to the Guadalupes' NM side is the
-  fix if wanted. Visual judgment — Bruno's call whether it's worth a slot.
+- ~~**NM band mountain silhouettes read flat**~~ → **Shipped by West Texas
+  massifs W1** (2026-07-18): 14 hero ridge tents over the real DEM
+  (`GUADALUPE_SPINE` in world.js — El Capitan prow, Guadalupe Peak massif,
+  Brokeoff ridge into NM, reef arm toward Carlsbad) + the Guadalupe Peak
+  summit landmark (39th). The old premise was wrong: `buildMountains` cones
+  were a no-DEM fallback, never live — this is a new always-on overlay.
+  Verified by `massif.mjs` + Copilot-judged staged shot.
 - **Band roads: the concurrency defect** (diagnosed 2026-07-15) — distinct
   from the known "arterials only" scope limit below. A route is only matched
   when it's listed FIRST: the bake's Overpass regex is `^(<routes>)($|;)` and
