@@ -29,6 +29,16 @@ real split and may change them.
   artificial-fill policy: real-or-absent identity, shipped procedural
   idioms, baked provenance, fill permanent once shipped (skeleton must be
   real before W1).
+- **Umbrella review decisions** (2026-07-18): **the diorama is the point**
+  — ambient, watchable realism is first-class value in this game (Bruno's
+  standing design principle); sea-industry earns its waves as a working
+  Gulf you watch and roam, with water hauls via the missions pipeline as a
+  complement, not a justification. Sea's default route source is
+  AIS-informed hand lanes, full bake only on scout numbers. Mexico carries
+  a dedicated **south-side visual register wave** (building
+  kit/palette/plaza layout) so the twin cities don't read as recolored
+  Texas. No interludes: the program runs track to track; backlog items
+  stay queued in `BACKLOG.md` as usual.
 
 ## Estimated waves — model/effort
 
@@ -44,19 +54,21 @@ structural/plumbing waves; effort high unless noted.
 | 2 | Boat | W1 — BOAT mode: physics branch, avatar, transitions, docks | structural | Sonnet 5 | high |
 | 2 | Boat | W2 — water feel: chop/wake/ambience + lakes/Intracoastal scope | content | Fable 5 | high |
 | 2 | Boat | W3 — announcer wiring, marina dressing, polish + close | content | Fable 5 | high |
-| 3 | Sea | W1 — AIS bake + real-route plumbing (lane retirement) | structural | Sonnet 5 | high |
-| 3 | Sea | W2 — the eight ports as dressed named sites | content | Fable 5 | high |
-| 3 | Sea | W3 — fleets: transport, fishing, patrol behaviors | structural | Sonnet 5 | high |
-| 3 | Sea | W4 — VHF chatter + collectible surface + track close | content | Fable 5 | high |
+| 3 | Sea | W1 — route lanes (AIS-informed, scout-gated) + lane retirement | structural | Sonnet 5 | high |
+| 3 | Sea | W2 — the eight ports as dressed named sites + water hauls (missions) | content | Fable 5 | high |
+| 3 | Sea | W3 — fleets (transport/fishing/patrol) + VHF chatter + close | content | Fable 5 | high |
 | 4 | Mexico | W0 — data scout: OSM vs INEGI memo + sample bake (gates spec) | research | Sonnet 5 | medium |
 | 4 | Mexico | W1 — bake + ground/tint + the law-repeal sweep | structural | Sonnet 5 | high |
 | 4 | Mexico | W2 — roads + international bridges as crossing monuments | structural | Sonnet 5 | high |
-| 4 | Mexico | W3 — the six twin cities | content | Fable 5 | high |
-| 4 | Mexico | W4 — artificial-fill application + scenery south of the line | content | Fable 5 | high |
-| 4 | Mexico | W5 — NPC/radio flavor, passport extension + track close | content | Fable 5 | high |
+| 4 | Mexico | W3 — south-side visual register: building kit, palette, plaza layout | content | Fable 5 | high |
+| 4 | Mexico | W4 — the six twin cities (on the W3 register) | content | Fable 5 | high |
+| 4 | Mexico | W5 — artificial-fill application + scenery south of the line | content | Fable 5 | high |
+| 4 | Mexico | W6 — NPC/radio flavor, passport extension + track close | content | Fable 5 | high |
 
-**Total: ~16 waves** (10 firm-ish + Mexico's 5–6 including scout) — roughly
-16 sessions at the one-wave-per-session protocol. Backlog riders folded in
-along the way: shields for railways (Rails W2), band railroads (Rails spec
-call), water offsets/ambience + gulf-plane-beyond-DEM (Boat W2 or earlier),
-AIS "Later" item (Sea W1).
+**Total: 16 waves ≈ 17–18 sessions.** The wave count says 16; history says
+plan for the higher number — Energy ran 6 waves + a W4.5 rework, Shoulder
+& Shelf ran 7 waves in 8 sessions. The 17–18 figure *is* the plan, not the
+overrun. Backlog riders folded in along the way: shields
+for railways (Rails W2), band railroads (Rails spec call), water
+offsets/ambience + gulf-plane-beyond-DEM (Boat W2 or earlier), the AIS
+"Later" item (Sea W1, scout-gated).

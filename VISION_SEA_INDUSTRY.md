@@ -16,6 +16,15 @@ track's opening bake.
 A working Gulf: real named Texas ports, real ship traffic, transport ships,
 sea patrol, and the Gulf fishing fleet.
 
+**Design principle — the diorama is the point** (Bruno, 2026-07-18):
+ambient, watchable realism is first-class value in this game, not filler
+awaiting gameplay justification — the shipped identity is exactly this
+(freight consists, lane ships, the bat emergence, haunts, the rig skyline).
+A working Gulf you watch and roam earns its waves on its own. Water hauls
+through the existing missions pipeline (port-to-port cargo, the
+charter-jobs precedent) ship as a **complement** — ports become
+destinations too — not as the track's justification.
+
 ## Player payoff
 
 - Real ports as dressed, named sites: Houston (the #1 US port by tonnage),
@@ -42,13 +51,21 @@ sea patrol, and the Gulf fishing fleet.
 
 ## Data needs
 
-- AIS track extracts: marinecadastre.gov — the heavy bake, W1 of the spec.
+- Routes: **default is AIS-informed hand lanes** — a small AIS sample read
+  once to shape waypoints, not a full track-data pipeline. Likely ~80% of
+  the visible value at ~20% of the cost. The full marinecadastre.gov bake
+  is the *fallback*, adopted only if the spec's scout shows the cheap
+  version reads wrong (ships off the shelf, implausible port approaches) —
+  the scout must produce numbers, not vibes, before the heavy pipeline is
+  approved.
 - Port geometry/berths: OSM (Overpass GET, per the standing rule).
 
 ## Open calls (for the spec session)
 
-- AIS-derived lanes vs upgrading the hand-laid lane with AIS-informed
-  waypoints (full bake vs cheap approximation — decide on scout results).
+- Scout verdict: AIS-informed lanes (default) vs the full bake (fallback,
+  needs numbers).
+- Water-haul shape: cargo types per port, pay/deadline knobs, FLY-lockout
+  parity with truck hauls.
 - Collectible surface: a Ports log vs folding into `save.energy` /
   `save.passport` (new keys only, by law).
 - Fishing depth: ambient fleet only (lean) vs player fishing gameplay
@@ -58,5 +75,5 @@ sea patrol, and the Gulf fishing fleet.
 
 ## Rough size
 
-3–4 waves. Depends on the boat track (program order); the AIS scout/bake
-can start as soon as the spec opens.
+3 waves. Depends on the boat track (program order); the route scout can
+start as soon as the spec opens.

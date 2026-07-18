@@ -24,6 +24,15 @@ exist, researched gap-fill where they don't.
 - Band-style ground, tint, and road parity south of the line.
 - Passport progress extends across the river (additive, new keys only).
 
+**Named risk — the recolored-Texas trap** (umbrella review, 2026-07-18):
+the payoff is Juárez and Nuevo Laredo, but the shipped procedural
+downtowns are generic Texas blocks — the same grid across the river reads
+as more Texas and the track falls emotionally flat. Making the south side
+*read as Mexico* is therefore a **first-class wave, not polish**: a
+distinct south-side build register (building kit, palette, plaza-centered
+layout instead of the courthouse-square grid, scenery kit). Counted in
+the wave table below and in the umbrella.
+
 ## This repeals shipped law — count it in the budget
 
 "Mexico is out" is deliberate in at least four places; reversing it is a
@@ -80,4 +89,6 @@ Mandate: a data-scout session **before** the spec, Band-Parity style.
 
 ## Rough size
 
-Scout session + 4–6 waves. Codes last; scout runs whenever convenient.
+Scout session + 5–6 waves, one of them the dedicated south-side visual
+register wave (see the named risk above). Codes last; scout runs whenever
+convenient.
