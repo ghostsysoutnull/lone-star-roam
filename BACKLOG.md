@@ -88,6 +88,15 @@ already shipped as `54b3511` — these are the remaining items)
   buoy, monuments, WinBig, fed building — plus older landmarks for the
   same treatment.
 
+## Rails Operations (vision: `VISION_RAILS_OPS.md`, 2026-07-19)
+
+Bruno's playtest of the Rails tours: trains run one polyline and stop dead
+at its end (only named trains hop junctions), no per-train HUD identity or
+trip info, no radio chatter, and opposing trains on one line pass through
+each other (no occupancy model). Full courses + identity + chatter + meets
+— ~3 waves, spec session when the track opens; open calls listed in the
+vision doc.
+
 ## Next in line (in order)
 
 1. **Slot export/import** (deferred from New Player W4, 2026-07-17): back up
