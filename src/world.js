@@ -424,12 +424,15 @@ function buildBandRails(scene) {
   buildRibbons(scene, railPts, 0.55, 0x8a8a90, 0.11);
 }
 
-// Rivers as blue ribbons, lakes as polygons — real geometry
+// Rivers as blue ribbons, lakes as polygons — real geometry. Ribbons ride
+// hAt + RIVER_OFFSET — retuned by the W2 look-pass (0.07 read sunken where
+// bank terrain crossed the ribbon); boat.mjs asserts the value.
+export const RIVER_OFFSET = 0.12;
 function buildWater(scene) {
   const WATER = 0x2e6f9e;
   const major = /Rio Grande|Red River/;
-  buildRibbons(scene, GEO.rivers.filter((r) => major.test(r.name)).map((r) => r.pts), 2.4, WATER, 0.07);
-  buildRibbons(scene, GEO.rivers.filter((r) => !major.test(r.name)).map((r) => r.pts), 1.3, WATER, 0.07);
+  buildRibbons(scene, GEO.rivers.filter((r) => major.test(r.name)).map((r) => r.pts), 2.4, WATER, RIVER_OFFSET);
+  buildRibbons(scene, GEO.rivers.filter((r) => !major.test(r.name)).map((r) => r.pts), 1.3, WATER, RIVER_OFFSET);
   for (const lake of GEO.lakes) {
     const shape = new THREE.Shape();
     lake.pts.forEach(([x, z], i) => (i ? shape.lineTo(x, -z) : shape.moveTo(x, -z)));

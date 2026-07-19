@@ -21,7 +21,8 @@ export default async function boat(t) {
         lakeLevels: g.GEO.lakes.map((l) => l.level).filter((v) => typeof v === 'number').length,
         nLakes: g.GEO.lakes.length,
         falconLevel: falcon.level,
-        expected: Math.min(...falcon.pts.map(([x, z]) => g.hAt(x, z))) + 0.15,
+        expected: Math.min(...falcon.pts.map(([x, z]) => g.hAt(x, z))) + g.LAKE_OFFSET,
+        lakeOffset: g.LAKE_OFFSET, riverOffset: g.RIVER_OFFSET,
       };
     })()`);
     t.ok(res.gulf?.kind === 'gulf', `open Gulf not boatable: ${JSON.stringify(res.gulf)}`);
@@ -31,6 +32,9 @@ export default async function boat(t) {
     t.ok(res.inland === null, 'downtown Austin reads as navigable water');
     t.ok(res.lakeLevels === res.nLakes && res.nLakes >= 6, `baked lake levels missing: ${res.lakeLevels}/${res.nLakes}`);
     t.near(res.falconLevel, res.expected, 0.001, 'Falcon level drifted from the lowest-shoreline formula');
+    // W2 look-pass values — a retune must land here and in the source together
+    t.near(res.lakeOffset, 0.3, 0.001, 'LAKE_OFFSET drifted from the W2 look-pass');
+    t.near(res.riverOffset, 0.12, 0.001, 'RIVER_OFFSET drifted from the W2 look-pass');
   });
 
   await t.check('V cycle skips BOAT inland (I-10 west)', async () => {
@@ -137,7 +141,9 @@ export default async function boat(t) {
   await t.check('Falcon Lake: boat rides the baked lake level', async () => {
     await t.tp(224, 4649, 'BOAT');
     const level = await t.ev(`g.GEO.lakes.find((l) => l.name === 'Falcon Lake').level`);
-    await t.ev(`g.player.heading = 0.6`); // up the long axis, natural value
+    // SE down the long axis — the spot sits ~10u off the west bank, and the
+    // old world-edge wall used to mask that by dragging the boat NE (W2 fix)
+    await t.ev(`g.player.heading = -2.36`);
     await t.hold('KeyW');
     await t.simStep(3);
     await t.release();
@@ -145,6 +151,154 @@ export default async function boat(t) {
     t.ok(res.kind === 'lake', `left the lake mid-run (kind ${res.kind})`);
     t.near(res.y, level, 0.01, 'boat not riding the baked lake level');
     t.ok(res.v > 8, `lake boating never got under way: ${res.v.toFixed(1)}`);
+  });
+
+  await t.check('chop (W2): calm rocks a little, storm a lot, planing flattens, y pinned', async () => {
+    await t.tp(GULF.x, GULF.z, 'BOAT');
+    await t.ev(`(g.player.heading = -1.97, g.player.speed = 0)`);
+    await t.setWeather('clear');
+    // measured over sim time, not a snapshot: skiff pitch + bob range at idle
+    const calm = await t.ev(`(() => {
+      let pLo = Infinity, pHi = -Infinity, bLo = Infinity, bHi = -Infinity;
+      for (let i = 0; i < 80; i++) {
+        g.player.update(0.05);
+        pLo = Math.min(pLo, g.player.skiff.rotation.x); pHi = Math.max(pHi, g.player.skiff.rotation.x);
+        const b = g.player.skiff.position.y - g.player.pos.y;
+        bLo = Math.min(bLo, b); bHi = Math.max(bHi, b);
+      }
+      return { amp: g.player.chopAmp, pitch: pHi - pLo, bob: bHi - bLo, wind: g.ATMOS.wind };
+    })()`);
+    t.ok(calm.amp > 0, `no chop on calm water: ${calm.amp}`);
+    t.ok(calm.pitch > 0.015, `skiff never pitched at idle: range ${calm.pitch.toFixed(4)} rad`);
+    t.ok(calm.bob > 0.03, `no bob at idle: range ${calm.bob.toFixed(3)}u`);
+    await t.setWeather('storm');
+    const storm = await t.ev(`(g.player.update(0.05), g.player.chopAmp)`);
+    t.ok(storm > calm.amp * 1.8, `storm barely rocks: ${storm.toFixed(4)} vs calm ${calm.amp.toFixed(4)}`);
+    await t.hold('KeyW');
+    await t.simStep(4);
+    await t.release();
+    const res = await t.ev(`({ amp: g.player.chopAmp, y: g.player.pos.y, v: g.player.speed })`);
+    t.ok(res.v > 20, `never got on plane: ${res.v.toFixed(1)}`);
+    t.ok(res.amp < storm * 0.55, `planing did not flatten the chop: ${res.amp.toFixed(4)} vs idle ${storm.toFixed(4)}`);
+    t.near(res.y, -2.5, 0.01, 'chop moved pos.y off the water plane');
+    await t.setWeather('clear');
+  });
+
+  await t.check('wake (W2): fills behind the stern under way, capped, dissolves at idle', async () => {
+    await t.tp(GULF.x, GULF.z, 'BOAT');
+    await t.ev(`g.player.heading = -1.97`);
+    await t.hold('KeyW');
+    await t.simStep(4);
+    await t.release();
+    const run = await t.ev(`(() => {
+      const p = g.player, alive = p.wakeSlots.filter((w) => w.age < w.life);
+      return { n: alive.length, cap: p.wakeSlots.length,
+               above: alive.every((w) => w.y > p._water.y + 0.03),
+               near: alive.every((w) => Math.hypot(w.x - p.pos.x, w.z - p.pos.z) < 120) };
+    })()`);
+    t.ok(run.n >= 8, `wake thin after a 4s run: ${run.n} discs`);
+    t.ok(run.n <= run.cap, `wake pool exceeded its cap: ${run.n}/${run.cap}`);
+    t.ok(run.above, 'wake discs not y-staggered above the one water plane');
+    t.ok(run.near, 'wake discs scattered far from the run line');
+    await t.ev(`g.player.speed = 0`);
+    await t.simStep(3); // life is 2.4s — everything ages out once the spawns stop
+    const idle = await t.ev(`g.player.wakeSlots.filter((w) => w.age < w.life).length`);
+    t.ok(idle === 0, `wake persisted at idle: ${idle} discs`);
+  });
+
+  await t.check('outboard wash trails the stern, not a flank (spawnPuff mirror regression)', async () => {
+    await t.tp(GULF.x, GULF.z, 'BOAT');
+    await t.ev(`g.player.heading = -1.97`); // diagonal heading — the mirror bug hid at N/S
+    await t.hold('KeyW');
+    await t.simStep(3);
+    await t.release();
+    const res = await t.ev(`(() => {
+      const p = g.player, sin = Math.sin(p.heading), cos = Math.cos(p.heading);
+      const rels = [];
+      for (const puff of p.puffs) {
+        if (puff.age >= puff.life || !puff.m.visible) continue;
+        const rx = puff.m.position.x - p.pos.x, rz = puff.m.position.z - p.pos.z;
+        rels.push({ along: rx * sin + rz * cos, lateral: rx * cos - rz * sin });
+      }
+      return rels;
+    })()`);
+    t.ok(res.length >= 3, `no live wash puffs after a throttle run: ${res.length}`);
+    t.ok(res.every((r) => r.along > 0.5), `wash ahead of the boat: ${JSON.stringify(res.map((r) => +r.along.toFixed(1)))}`);
+    t.ok(res.every((r) => Math.abs(r.lateral) < 1.2), `wash off a flank (the old mirror put it at ±1.6): ${JSON.stringify(res.map((r) => +r.lateral.toFixed(1)))}`);
+  });
+
+  await t.check('Falcon: the border channel is open water — no world-edge wall mid-lake', async () => {
+    // Falcon straddles the Rio Grande: find genuinely Mexico-side lake water
+    // (boatable, outside Texas AND outside inWorld) with a clear run ahead
+    const spot = await t.ev(`(() => {
+      const lake = g.GEO.lakes.find((l) => l.name === 'Falcon Lake');
+      const bb = lake.pts.reduce((a, [px, pz]) => ({
+        minX: Math.min(a.minX, px), maxX: Math.max(a.maxX, px),
+        minZ: Math.min(a.minZ, pz), maxZ: Math.max(a.maxZ, pz) }),
+        { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+      const fx = -Math.sin(0.6), fz = -Math.cos(0.6);
+      for (let x = bb.minX; x < bb.maxX; x += 5) for (let z = bb.minZ; z < bb.maxZ; z += 5) {
+        if (g.boatableAt(x, z)?.kind !== 'lake' || g.inTexas(x, z) || g.inWorld(x, z)) continue;
+        if (g.boatableAt(x + fx * 8, z + fz * 8) && g.boatableAt(x + fx * 16, z + fz * 16)) return { x, z };
+      }
+      return null;
+    })()`);
+    t.ok(spot, 'no Mexico-side water found in Falcon — the straddle premise changed, re-diagnose');
+    await t.tp(spot.x, spot.z, 'BOAT');
+    const res = await t.ev(`(() => {
+      const p = g.player;
+      p.heading = 0.6; p.speed = 15;
+      for (let i = 0; i < 20; i++) p.update(0.05); // 1s: the wall would crush 15 → ~1.5
+      return { v: p.speed, kind: g.boatableAt(p.pos.x, p.pos.z)?.kind, y: p.pos.y,
+               level: g.GEO.lakes.find((l) => l.name === 'Falcon Lake').level };
+    })()`);
+    t.ok(res.v > 10, `world-edge wall still active mid-lake: speed ${res.v.toFixed(1)} after 1s coast from 15`);
+    t.ok(res.kind === 'lake', `ran out of lake water (kind ${res.kind}) — scan picked a bad spot`);
+    t.near(res.y, res.level, 0.01, 'left the baked lake level crossing the border channel');
+  });
+
+  await t.check('sparkle (W2): glints on daylight water, dim at night, BOAT-only', async () => {
+    await t.tp(GULF.x, GULF.z, 'BOAT');
+    await t.setWeather('clear');
+    await t.setDay();
+    const day = await t.ev(`(() => {
+      for (let i = 0; i < 14; i++) g.player.update(0.05); // several reseed ticks
+      const s = g.player.sparkle;
+      let sum = 0;
+      for (let i = 0; i < g.player.sparkSlots.length; i++) sum += s.instanceColor.getX(i);
+      return { visible: s.visible, sum, seeded: g.player.sparkSlots.filter((x) => x.on).length };
+    })()`);
+    t.ok(day.visible, 'sparkle hidden in BOAT');
+    t.ok(day.seeded > 20, `few sparkle slots found water on the open Gulf: ${day.seeded}`);
+    t.ok(day.sum > 1, `no daylight glint: intensity sum ${day.sum.toFixed(2)}`);
+    await t.setNight();
+    const night = await t.ev(`(() => {
+      for (let i = 0; i < 14; i++) g.player.update(0.05);
+      let sum = 0;
+      for (let i = 0; i < g.player.sparkSlots.length; i++) sum += g.player.sparkle.instanceColor.getX(i);
+      return sum;
+    })()`);
+    t.ok(night < day.sum * 0.7, `night glint too bright: ${night.toFixed(2)} vs day ${day.sum.toFixed(2)}`);
+    await t.setDay();
+    const fly = await t.ev(`(g.player.setMode('FLY'), g.player.update(0.05), g.player.sparkle.visible)`);
+    t.ok(!fly, 'sparkle stayed visible outside BOAT');
+  });
+
+  await t.check('audio (W2): lap target — boat idle, fades with way on, shore wired', async () => {
+    await t.tp(GULF.x, GULF.z, 'BOAT');
+    await t.ev(`g.player.speed = 0`);
+    const idle = await t.ev(`(g.audio.update(g.player, g.ATMOS), g.audio.lapTarget)`);
+    t.ok(idle > 0.04, `no lap at boat idle: ${idle}`);
+    await t.ev(`g.player.speed = 20`);
+    const fast = await t.ev(`(g.audio.update(g.player, g.ATMOS), g.audio.lapTarget)`);
+    t.ok(fast < idle, `lap did not fade with way on: ${fast} vs ${idle}`);
+    t.ok(fast > 0, 'lap fully cut while under way — the hull still touches water');
+    // main.js wiring: the shore term comes from beachAt on real frames
+    await t.tp(2104, 3971.2, 'WALK'); // Padre wet sand (padre.mjs beachEdge)
+    await t.wait(0.4);
+    const shore = await t.ev(`({ fed: g.audio.lapShore, target: g.audio.lapTarget })`);
+    t.ok(shore.fed === 1, `main.js shore feed not wired: lapShore ${shore.fed}`);
+    t.ok(shore.target > 0.02, `beach shore-lap silent: ${shore.target}`);
   });
 
   await t.check('real-loop sentinel: BOAT moves under main.js frames', async () => {

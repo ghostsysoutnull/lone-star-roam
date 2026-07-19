@@ -8,39 +8,41 @@ targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
 ## Session briefing
-- **This session**: Water Vehicles (`WATER_VEHICLES_SPEC.md`), wave 2 of 3 —
-  water feel: ATMOS-driven chop (pitch/roll + y bob, planing flattens it),
-  wake fade-pool behind the stern, sparkle patch, water-lap/engine audio,
-  and the river/lake offset look-pass (backlog fold-in). Wave 1 (BOAT mode)
-  shipped 2026-07-19.
-- **Recommended setup**: model **Fable 5**, effort **high** — feel-tuning
-  wave with a new visible water surface treatment. Flag it if the running
-  model differs.
-- **Budget**: code + boat.mjs chop/wake checks + one staged water-surface
-  shot (Copilot-judged), grep-first. Perf delta +≤20 draw calls (wake +
-  sparkle pools); caps hold at the perf baseline spots.
-- **Then**: rewrite this briefing for W3 (fairways/marinas/ICW buoys, dog
-  bow perch, world-edge map lines, boat identity + track close).
+- **This session**: Water Vehicles (`WATER_VEHICLES_SPEC.md`), wave 3 of 3 —
+  the sea opens up: fairway/marina announcer entries (energy.js `register()`
+  only), marina dressing at the 8 ports + one per lake, ICW channel-marker
+  buoys, Lacy's bow perch, world-edge iso-lines on the big map
+  (SHELF_U/SHOULDER_U, Tidelands dash-pass idiom), boat HUD/map identity +
+  first-boat hint, and the track close (ROADMAP fold, doc sweep, briefing
+  delete). Wave 2 (water feel + playtest fixes) shipped 2026-07-19.
+- **Recommended setup**: model **Fable 5**, effort **high** — new visible
+  surfaces (marinas, buoys, map lines) + track close. Flag it if the
+  running model differs.
+- **Budget**: code + checks + one staged marina shot (Copilot-judged) +
+  the track-close doc sweep, grep-first. Perf: marina/buoy dressing
+  instanced or merged, +≤30 draw calls coastal, ~0 inland.
+- **Then**: this is the last wave — delete this briefing block, fold the
+  track into one `ROADMAP.md` entry, sweep BACKLOG/GOTCHAS/CLAUDE.md, and
+  graduate surviving gotchas into `GOTCHAS.md`.
 
 Gotchas carried over:
-- One-gulf-plane law: every effect (wake, sparkle, chop) floats ABOVE the
-  plane with a y-stagger — never a second water surface. The plane is now
-  RGBA (itemSize-4 color attr, `transparent: true`) fading past the DEM
-  edge; effects must not disturb the fade, and the boat.mjs plane-edge
-  probe asserts it.
-- Chop reads live `ATMOS` every frame, never cached; amplitude =
-  f(wind, weather), storm multiplies, attitude flattens as speed rises.
-  BOAT skips the slope-pitch block in vehicle.js (`mode !== 'BOAT'`
-  guard) — chop attitude goes exactly there. `pos.y` in BOAT comes from
-  `player._water.y` each frame; bob should offset the avatar, not fight
-  the legality/y source.
-- River offset 0.07 lives in world.js `buildWater`'s buildRibbons calls;
-  the lake offset is geo.js `LAKE_OFFSET` (0.15, baked into
-  `lake.level`). Retuning must update boat.mjs's Falcon
-  lowest-shoreline+0.15 assertion in the same pass.
-- Real-loop suites (aviation — in GOTCHAS — plus shop's dog-yip and
-  springer's hint-priority) flake under parallel `-j`, pass solo `-j 1`:
-  same class, don't chase them as boat regressions.
+- Announcer: energy.js `register()` calls ONLY — platforms already
+  announce; no new announcer machinery (standing Energy law).
+- One-gulf-plane law: marina/buoy dressing floats above the plane with a
+  y-stagger; the RGBA edge fade must stay untouched (boat.mjs probe
+  asserts it). W2's wake/sparkle pools live in vehicle.js — reuse
+  `fadeDisc`, don't add new water surfaces.
+- The world-edge wall (vehicle.js `inW`) now exempts `boatableAt` kind
+  `'lake'` — border reservoirs are open across the Rio Grande channel.
+  W3's map iso-lines are display-only; do not re-wall lake water.
+- Big-map iso-lines: Tidelands dash-pass idiom in `renderMapLayer`
+  (distance-field sampling, 80u bands, two-level refinement), boot-time
+  only, styled fainter than the Tidelands dashes; big map only.
+- W2 retunes now asserted in boat.mjs: `LAKE_OFFSET` 0.3 (geo.js, baked
+  into `lake.level`), `RIVER_OFFSET` 0.12 (world.js export).
+- Real-loop checks flake as a CLASS under parallel `-j` (this session:
+  onboarding continue-restore, boat waterline-hint) — one solo `-j 1`
+  confirm, never chased as regressions.
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to

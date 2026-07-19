@@ -274,7 +274,11 @@ graduate here (and out of `NEXT_SESSION.md`).
   `| tail`. (2) *batch the flake tax* — collect flaked suites across the
   session and confirm them in ONE `-j 1` pass at the end, not one confirm
   cycle per full run. (3) full runs are for the protocol points (wave end,
-  pre-push); mid-wave iteration stays on named suites.
+  pre-push); mid-wave iteration stays on named suites. (4) a mid-wave
+  named-suite run must gate a decision — something done differently on FAIL
+  before the wave-end full run; assurance-only runs wait for the full run,
+  which covers them anyway (W2 2026-07-19: a 4-suite "thoroughness" run
+  double-paid perf+ferries for no decision).
 - **Score-row DOM reads must `until()` the DOM, not race it** — the score spans
   ride the 12 Hz HUD tick.
 - **The ceremony state machine is land-to-land** with an 8 s cooldown on

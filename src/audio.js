@@ -6,6 +6,8 @@ export class AudioSystem {
     this.ctx = null;
     this.muted = false;
     this.swamp = 0; // 0..1 frog country factor, fed by main.js (shoulder.swampAt)
+    this.lapShore = 0;  // 0..1 beach proximity, fed by main.js (geo beachAt)
+    this.lapTarget = 0; // last commanded water-lap gain (verify reads this, not the ramping param)
     const boot = () => { this.init(); removeEventListener('keydown', boot); };
     addEventListener('keydown', boot);
   }
@@ -101,6 +103,20 @@ export class AudioSystem {
     this.jetTarget = 0; // last commanded gain target (verify reads this, not the ramping param)
     noiseSrc('bandpass', 1400, 0.9).connect(this.jetGain);
 
+    // --- water lap (Water Vehicles W2): low filtered noise swelled by a slow
+    // LFO — the rhythm of small waves against the hull or the beach ---
+    this.lapGain = chan();
+    const lapBed = ctx.createGain();
+    lapBed.gain.value = 0.55; // LFO swings ±0.45 around this
+    noiseSrc('lowpass', 340, 0.7).connect(lapBed).connect(this.lapGain);
+    const lapLfo = ctx.createOscillator();
+    lapLfo.type = 'sine';
+    lapLfo.frequency.value = 0.45;
+    const lapDepth = ctx.createGain();
+    lapDepth.gain.value = 0.45;
+    lapLfo.connect(lapDepth).connect(lapBed.gain);
+    lapLfo.start();
+
     // --- crickets: pulsed high tone at night ---
     this.cricketGain = chan();
     const cricket = ctx.createOscillator();
@@ -177,9 +193,14 @@ export class AudioSystem {
     const dry = atmos.night * (1 - Math.min(1, atmos.rain || 0));
     this.cricketTarget = dry * 0.012 * (1 - this.swamp * 0.85);
     this.frogTarget = dry * 0.02 * this.swamp;
+    // water lap (W2): full when the boat sits idle/slow, plus a shore term fed
+    // by main.js near beaches — computed unconditionally (jetTarget idiom)
+    const spd = Math.abs(player.speed);
+    this.lapTarget = Math.max(
+      player.mode === 'BOAT' ? 0.05 * Math.max(0.35, 1 - spd / 10) : 0,
+      this.lapShore * 0.028);
     if (!this.ctx || this.muted) return;
     const t = this.ctx.currentTime;
-    const spd = Math.abs(player.speed);
     const set = (param, v, tc = 0.08) => param.setTargetAtTime(v, t, tc);
     set(this.jetGain.gain, this.jetTarget, 0.12);
 
@@ -206,6 +227,16 @@ export class AudioSystem {
       set(this.engSub.frequency, 47 + spd * 0.25);
       set(this.engineFilter.frequency, 500 + spd * 3);
       set(this.engineGain.gain, (0.07 + (spd / 150) * 0.05) * sputter, 0.03); // the Levelland effect grounds planes too
+    } else if (player.mode === 'BOAT') {
+      // outboard (W2): round tone with a slow putt-putt AM — the prop stage at
+      // trolling rate; pitch and gain follow throttle
+      if (this.engOsc.type !== 'triangle') this.engOsc.type = 'triangle';
+      set(this.propDepth.gain, 0.55, 0.15);
+      set(this.propLfo.frequency, 6 + spd * 0.8);
+      set(this.engOsc.frequency, 55 + spd * 1.7);
+      set(this.engSub.frequency, 27 + spd * 0.85);
+      set(this.engineFilter.frequency, 300 + spd * 9);
+      set(this.engineGain.gain, (spd > 0.5 ? 0.045 + (spd / 24) * 0.055 : 0.028) * sputter, 0.03);
     } else {
       set(this.engineGain.gain, 0);
     }
@@ -215,7 +246,11 @@ export class AudioSystem {
     set(this.rainGain.gain, (atmos.rain || 0) * 0.05, 0.5);
     set(this.cricketGain.gain, this.cricketTarget, 0.5);
     set(this.frogGain.gain, this.frogTarget, 0.5);
+    set(this.lapGain.gain, this.lapTarget, 0.4);
   }
+
+  // shore-lap proximity 0..1 — fed by main.js (beachAt) each frame, mirrors heli()
+  lap(shore = 0) { this.lapShore = shore; }
 
   // rotorcraft ambience: nearest-airborne-heli distance -> gain, faded like
   // bell(d). Called every frame from main.js with rotors.nearestAirborneDist().

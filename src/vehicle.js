@@ -5,6 +5,7 @@ import { nearestRoad, nearestCity, inWorld, borderZoneAt, hAt, beachAt, boatable
 import { ATMOS } from './sky.js';
 import { groundYAt as airportGroundYAt } from './airports.js';
 import { groundYAt as brandGroundYAt } from './brands.js';
+import { fadeDisc } from './maritime.js';
 
 // flat-pad ground height (airport runway pad or a Bucky's/H-E-Buddy
 // foundation slab), else null so callers fall back to raw hAt — without this
@@ -43,6 +44,8 @@ const BOAT_ACCEL = 10;
 const BOAT_REV = -3.5;
 const BOAT_COAST = 0.85; // per-second speed retention while coasting (DRIVE keeps 0.35)
 const BOAT_TURN = 1.5;   // rad/s at full authority (DRIVE turns at 1.9)
+const WAKE_N = 40;       // wake pool cap — fixed at birth, zero steady-state allocation
+const SPARK_N = 48;      // sparkle pool
 
 const WALK_SPEED = 6;
 const SPRINT_SPEED = 12;
@@ -139,6 +142,31 @@ export class Player {
       this.puffs.push({ m, age: 1, life: 1 });
     }
     this.puffTimer = 0;
+
+    // Water Vehicles W2: chop clock + player-local water effects. One-gulf-plane
+    // law: both pools float ABOVE the water with a y-stagger — never a second
+    // surface. Additive blending: black instanceColor contributes nothing, and
+    // dead slots collapse to zero scale.
+    this.chopT = 0;
+    this.chopAmp = 0;   // live chop amplitude (radians) — checks read this
+    this.wakeTimer = 0;
+    this.sparkTimer = 0;
+    const fxMat = () => new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, vertexColors: true,
+    });
+    this.wake = new THREE.InstancedMesh(fadeDisc(new THREE.CircleGeometry(1, 14).rotateX(-Math.PI / 2), 1), fxMat(), WAKE_N);
+    this.sparkle = new THREE.InstancedMesh(fadeDisc(new THREE.CircleGeometry(0.22, 6).rotateX(-Math.PI / 2), 0.22), fxMat(), SPARK_N);
+    this.wake.frustumCulled = this.sparkle.frustumCulled = false; // instance matrices roam; geometry bounds don't
+    this.wakeSlots = Array.from({ length: WAKE_N }, () => ({ age: 1, life: 1, x: 0, y: 0, z: 0, s: 1 }));
+    this.sparkSlots = Array.from({ length: SPARK_N }, () => ({ x: 0, z: 0, phase: 0, rate: 2, on: false }));
+    this._fxM = new THREE.Matrix4();
+    this._fxC = new THREE.Color();
+    const dead = this._fxM.makeScale(0, 0, 0), black = this._fxC.setScalar(0);
+    for (let i = 0; i < WAKE_N; i++) { this.wake.setMatrixAt(i, dead); this.wake.setColorAt(i, black); }
+    for (let i = 0; i < SPARK_N; i++) { this.sparkle.setMatrixAt(i, dead); this.sparkle.setColorAt(i, black); }
+    this.sparkle.visible = false;
+    scene.add(this.wake, this.sparkle);
 
     this.camPos = new THREE.Vector3(0, 8, 12);
     this.getObstacles = null; // set by main: building meshes for camera occlusion
@@ -259,11 +287,14 @@ export class Player {
   spawnPuff(localX, localY, localZ, color, size, life, riseY) {
     const p = this.puffs.find((p) => p.age >= p.life);
     if (!p) return;
+    // heading convention: forward = (-sin, -cos), so back = (+sin, +cos) and
+    // right = (+cos, -sin) — the old transform mirrored the offset east/west
+    // (exhaust/contrail/wash trailed off one flank at diagonal headings)
     const cos = Math.cos(this.heading), sin = Math.sin(this.heading);
     p.m.position.set(
-      this.pos.x + localX * cos - localZ * sin,
+      this.pos.x + localX * cos + localZ * sin,
       this.pos.y + localY,
-      this.pos.z + localX * sin + localZ * cos
+      this.pos.z - localX * sin + localZ * cos
     );
     p.m.material.color.set(color);
     p.m.visible = true;
@@ -370,7 +401,13 @@ export class Player {
     // shoulder (land) / shelf (Gulf); Mexico gets no dilation (settled as out).
     // Skipped aboard a ferry: channel crossings are well inside the shelf
     // allowance anyway, but a directly-driven pos shouldn't fight the wall.
-    const inW = this.aboardFerry || inWorld(this.pos.x, this.pos.z);
+    // Border reservoirs (Falcon, Amistad) straddle the Rio Grande: their
+    // Mexico-side water is boatable but not inWorld, and the soft wall read
+    // as an invisible line mid-lake (W2 playtest). Lake water counts as
+    // in-world — the far bank still beaches/walls like any Mexico land, and
+    // the gulf's beyond-shelf wall is untouched (kind 'gulf' stays inWorld-gated).
+    const inW = this.aboardFerry || inWorld(this.pos.x, this.pos.z)
+      || boatableAt(this.pos.x, this.pos.z)?.kind === 'lake';
     if (!inW) {
       if (this._wasInWorld) {
         const zone = borderZoneAt(this.pos.x, this.pos.z);
@@ -400,7 +437,19 @@ export class Player {
     avatar.rotation.set(0, this.heading, 0);
     avatar.rotateZ(this.tilt || 0);
     if (this.mode === 'FLY') avatar.rotateX(THREE.MathUtils.clamp(-this.vy * 0.012, -0.35, 0.35));
-    else if (!this.aboardFerry && this.mode !== 'BOAT') { // water is flat (W2 adds chop)
+    else if (this.mode === 'BOAT') {
+      // chop (W2): live ATMOS every frame — wind sets the base, rain/storm
+      // multiply, planing flattens as the hull climbs onto its own wake.
+      // Attitude and bob live on the avatar only: pos.y stays _water.y (the
+      // legality/y source, and what the wake/sparkle pools ride).
+      const planing = 1 - 0.7 * Math.min(1, Math.abs(this.speed) / BOAT_SPEED);
+      this.chopAmp = 0.016 * ATMOS.wind * (1 + Math.min(1.6, ATMOS.rain) * 0.6) * planing;
+      this.chopT += dt * (0.8 + ATMOS.wind * 0.5);
+      avatar.rotateX(Math.sin(this.chopT * 1.7) * this.chopAmp);
+      avatar.rotateZ(Math.sin(this.chopT * 1.25 + 1.1) * this.chopAmp * 0.8);
+      avatar.position.y += Math.sin(this.chopT * 2.1) * this.chopAmp * 3;
+    }
+    else if (!this.aboardFerry) {
       // pitch with the slope (sample fore/aft along heading) — flat on the ferry deck
       const fx = -Math.sin(this.heading), fz = -Math.cos(this.heading);
       const gAt = (x, z) => groundYAt(x, z) ?? hAt(x, z);
@@ -547,6 +596,22 @@ export class Player {
         this.puffTimer = 0.1;
         this.spawnPuff(0, 0.15, 2.4, 0xe8f2f6, 1.5, 0.7, 0.15);
       }
+      // wake (W2): drop a foam disc off the stern while under way — capped
+      // pool, spawn skipped when no slot is free (never grows past WAKE_N)
+      this.wakeTimer -= dt;
+      if (Math.abs(this.speed) > 4 && this.wakeTimer <= 0) {
+        this.wakeTimer = 0.11;
+        for (let i = 0; i < this.wakeSlots.length; i++) {
+          const w = this.wakeSlots[i];
+          if (w.age < w.life) continue;
+          w.age = 0; w.life = 2.4;
+          w.x = this.pos.x + Math.sin(this.heading) * 2.3;
+          w.z = this.pos.z + Math.cos(this.heading) * 2.3;
+          w.y = this.pos.y + 0.05 + i * 0.0015; // y-stagger above the one water plane
+          w.s = 0.9 + Math.min(1, Math.abs(this.speed) / BOAT_SPEED) * 1.3;
+          break;
+        }
+      }
     } else { // WALK
       const c = this.cowboy.userData;
       const moving = Math.abs(this.speed) > 0.4;
@@ -606,6 +671,47 @@ export class Player {
       const f = p.age / p.life;
       p.m.scale.setScalar(0.6 + f * p.size);
       p.m.material.opacity = 0.4 * (1 - f);
+    }
+
+    // wake pool (W2): expand + fade — updated in every mode so leftovers
+    // dissolve after beaching or a mode switch
+    const m = this._fxM, col = this._fxC;
+    for (let i = 0; i < this.wakeSlots.length; i++) {
+      const w = this.wakeSlots[i];
+      if (w.age >= w.life) { this.wake.setMatrixAt(i, m.makeScale(0, 0, 0)); continue; }
+      w.age += dt;
+      const f = Math.min(1, w.age / w.life);
+      const s = w.s * (0.55 + f * 1.9);
+      this.wake.setMatrixAt(i, m.makeScale(s, 1, s).setPosition(w.x, w.y, w.z));
+      this.wake.setColorAt(i, col.setScalar(0.5 * (1 - f)));
+    }
+    this.wake.instanceMatrix.needsUpdate = true;
+    if (this.wake.instanceColor) this.wake.instanceColor.needsUpdate = true;
+
+    // sparkle (W2): sun glints scattered on the water around the boat —
+    // world-anchored slots re-seeded when left behind, twinkle via
+    // instanceColor; daylight and clear skies drive the intensity
+    this.sparkle.visible = this.mode === 'BOAT';
+    if (this.sparkle.visible) {
+      this.sparkTimer -= dt;
+      const reseed = this.sparkTimer <= 0;
+      if (reseed) this.sparkTimer = 0.12;
+      const glint = (1 - ATMOS.night) * ({ clear: 1, clouds: 0.35, dust: 0.4 }[ATMOS.weather] ?? 0.12);
+      const wy = this._water?.y ?? this.pos.y;
+      for (let i = 0; i < this.sparkSlots.length; i++) {
+        const s = this.sparkSlots[i];
+        if (reseed && (!s.on || Math.hypot(s.x - this.pos.x, s.z - this.pos.z) > 30)) {
+          const a = Math.random() * Math.PI * 2, r = 4 + Math.sqrt(Math.random()) * 24;
+          const x = this.pos.x + Math.sin(a) * r, z = this.pos.z + Math.cos(a) * r;
+          s.on = !!boatableAt(x, z); // glints stay off land near the banks
+          if (s.on) { s.x = x; s.z = z; s.phase = Math.random() * 6.28; s.rate = 1.5 + Math.random() * 3; }
+        }
+        const tw = s.on ? Math.max(0, Math.sin(this.chopT * s.rate + s.phase)) ** 3 * glint : 0;
+        this.sparkle.setMatrixAt(i, m.makeScale(1, 1, 1).setPosition(s.x, wy + 0.03 + i * 0.0008, s.z));
+        this.sparkle.setColorAt(i, col.setScalar(tw * 0.9));
+      }
+      this.sparkle.instanceMatrix.needsUpdate = true;
+      if (this.sparkle.instanceColor) this.sparkle.instanceColor.needsUpdate = true;
     }
   }
 

@@ -15,9 +15,14 @@ export const TOURS = [
   {
     track: 'Water Vehicles (2026-07)',
     waves: [
+      { wave: 'W2 — water feel', spots: [
+        S('⛈️ storm chop — open Gulf', [4700, 2150], { heading: -1.97, mode: 'BOAT', time: 0.35, weather: 'storm', note: 'storm rocking at rest — pitch, roll and bob follow the wind; throttle up and the hull flattens onto plane' }),
+        S('🌊 wake + sparkle run', [4700, 2150], { heading: -1.97, mode: 'BOAT', time: 0.35, weather: 'clear', note: 'hold W: a foam wake trails and fades off the stern, sun glints sparkle on the water around the hull' }),
+        S('🏞️ Falcon banks look-pass', [224, 4649], { heading: -2.36, mode: 'BOAT', time: 0.35, weather: 'clear', note: 'the W2 offset retune — the lake sits at lowest-shoreline + 0.3 so it reads seated in its banks, not sunken; open water runs SE' }),
+      ] },
       { wave: 'W1 — BOAT mode', spots: [
         S('🚤 Gulf skiff — off Galveston', [4700, 2150], { heading: Math.PI, mode: 'BOAT', time: 0.35, note: 'the fourth mode — open Gulf southeast of Galveston; W to throttle, boats coast long and only steer with way on' }),
-        S('🚤 Falcon Lake', [224, 4649], { mode: 'BOAT', time: 0.35, note: 'lake boating — the border reservoir; the boat rides the baked lake level, and beaches at the banks' }),
+        S('🚤 Falcon Lake', [224, 4649], { heading: -2.36, mode: 'BOAT', time: 0.35, note: 'lake boating — the border reservoir; the boat rides the baked lake level, and beaches at the banks; open water runs SE' }),
         S('🚤 Laguna Madre', [2100, 4500], { mode: 'BOAT', time: 0.35, note: 'the lagoon behind Padre — navigable water between the mainland and the island' }),
         S('🛻 waterline stop — Galveston shore', [4470, 1891], { heading: -Math.PI / 2, mode: 'DRIVE', time: 0.35, note: 'drive east toward the Gulf: the truck soft-stops at the waterline and hints the boat (V)' }),
       ] },

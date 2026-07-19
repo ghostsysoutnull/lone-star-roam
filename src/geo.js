@@ -103,9 +103,10 @@ export async function loadGeo(onStatus) {
 // The one gulf water plane's height (GOTCHAS: never a second surface) —
 // world.js builds the mesh here, maritime hulls float relative to it, and
 // BOAT (vehicle.js) rides it. Lakes instead sit at lowest-shoreline +
-// LAKE_OFFSET, baked per lake in loadGeo (W2 retunes the look there).
+// LAKE_OFFSET, baked per lake in loadGeo (retuned by the W2 look-pass: 0.15
+// read sunken at most banks; boat.mjs asserts the Falcon formula).
 export const SEA_Y = -2.5;
-export const LAKE_OFFSET = 0.15;
+export const LAKE_OFFSET = 0.3;
 
 // --- Real elevation (baked from AWS Terrarium DEM; constants mirror tools/build-elevation.mjs) ---
 export const ELEV = { data: null, w: 448, h: 414, minX: -7330, maxX: 6230, minZ: -6630, maxZ: 5800 };
