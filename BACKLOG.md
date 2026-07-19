@@ -1,8 +1,9 @@
 # Backlog — queued work
 
-No active track — Railroads Realism (`RAILS_SPEC.md`, 3 waves, first track
-of the 2026-H2 program) shipped 2026-07-19 and is folded into `ROADMAP.md`.
-Items below are the queue.
+Active track: **Water Vehicles** (`WATER_VEHICLES_SPEC.md`, 3 waves,
+second track of the 2026-H2 program; spec 2026-07-19). Railroads Realism
+shipped 2026-07-19 and is folded into `ROADMAP.md`. Items below are the
+queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
@@ -19,14 +20,16 @@ Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 ## Playtest findings 2026-07-15 (Bruno's tx-urgent notes; ocean-zone fix
 already shipped as `54b3511` — these are the remaining items)
 
-- **Gulf plane pokes past the terrain grid** ("ocean after dry land on the
+- **Gulf plane pokes past the terrain grid** → **folded into Water
+  Vehicles W1** (spec 2026-07-19) — ("ocean after dry land on the
   US states"): the 14000×9000 gulf plane (world.js `buildWater`) extends
   beyond the DEM rectangle (`ELEV` maxX 6230 / maxZ 5800), so east of the
   Louisiana band the world turns to open water with no seafloor under it.
   Fix direction: clip or fade the plane outside the terrain grid (or extend
   a dry skirt) — diagnosis in the 2026-07-15 session, geometry all in
   `buildWater`/`buildTerrain`.
-- **Water sits a touch below terrain + wants effects and sound**: river
+- **Water sits a touch below terrain + wants effects and sound** →
+  **folded into Water Vehicles W2** (spec 2026-07-19): river
   ribbons ride `hAt + 0.07` and lakes sit at lowest-shoreline +0.15, which
   reads sunken at some banks; wants a look at the offsets, plus water
   ambience (river/lakeshore loop in audio.js) and a cheap surface effect
