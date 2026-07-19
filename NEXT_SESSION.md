@@ -8,36 +8,43 @@ targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
 ## Session briefing
-- **This session**: Railroads Realism (`RAILS_SPEC.md`), wave 2 of 3 —
-  the border show: south-of-river spur bake (Overpass GET), seeded
-  `railxing:` crossing schedules at Laredo + Eagle Pass, named trains
-  (Tex-Mex Interchange / Eagle Pass Manifest / the Z double-stack), rail
-  bridges. W1 (liveries + commuter sets + map rails + force hook)
-  shipped 2026-07-18.
-- **Recommended setup**: model **Fable 5**, effort **high** — new
-  visible surface + content wave. Flag it if the running model differs.
-- **Budget**: code + checks (extend `tools/checks/rails.mjs`) + the spur
-  bake + **one** staged crossing shot (Copilot + Bruno gate), grep-first.
-  Perf delta: +1 InstancedMesh (well car) + two small merged bridges.
-- **Then**: rewrite this block for W3 (band railroads, Sonnet 5 high —
-  bake + ribbons + spawn extension; design settled in the spec).
+- **This session**: Railroads Realism (`RAILS_SPEC.md`), wave 3 of 3 —
+  band railroads: bake `railway=rail` + `usage=main` for the 4
+  neighbor-state strips (band-roads precedent) → `data/band-rails.json`,
+  load + append to the rail index with `band: true`, band ribbons + map
+  strokes, band rails join the train spawn list. Closes the deferred
+  Band Parity rider. W2 (border show: spurs, seeded `railxing:`
+  schedules, named trains, bridges, junction hop) shipped 2026-07-19.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — pure
+  execution of settled design (bake + ribbons + spawn extension; the
+  spec's W3 design-settled section has the contracts). Flag it if the
+  running model differs.
+- **Budget**: code + checks, **no shots**, grep-first. Perf delta: a few
+  merged band ribbons, no cap retune expected.
+- **Then**: this is the last wave — **track close**: fold the track into
+  one `ROADMAP.md` entry, graduate surviving gotchas into `GOTCHAS.md`
+  (spur-spawn exclusion, `railxing:` seed streams forever, livery-table
+  normalization, junction-hop contracts), sweep `BACKLOG.md`
+  (shields-for-railways / band-railroads / lights-forcing riders close),
+  update satellite docs, and delete this briefing block.
 
 Gotchas carried over:
-- **W2's bake session must also fix commuter fragmentation** (Bruno,
-  2026-07-18): the commuter corridors are shredded (TRE 17 pieces,
-  longest 164 u) because `build-rails.mjs` chains only exact-key endpoint
-  matches within (operator,name) identity groups. Join by endpoint
-  proximity while the bake is open for the spurs; gate on reproducing the
-  shipped `rails.json` unfixed first (prefer-true-source rule). W1 ships
-  commuter sets on the fragments meanwhile.
-- Spur lines must be excluded from random spawn (scheduled trains only)
-  — `RAILS_SPEC.md` W2 design-settled section has the contract + seed
-  strings (`railxing:<site>:<day>`, forever once shipped).
-- DART is dropped deliberately (light rail — real-or-absent), asserted
-  by `rails.mjs`; don't "fix" it back in W2.
-- Tour/shot staging: game heading convention — 90° faces west, 270°
-  east; forced trains keep rolling at 16 u/s on the real loop, so staged
-  shots must pin `tr.s` via interval before shooting.
+- The dormant random-livery fallback (`LOCO_COLORS`) wakes with band
+  rails — band operators come from OSM tags; unknown ones fall back.
+  The rails.mjs header comment documents this on purpose.
+- Rail polyline counts are post-defrag now (171 for Texas): the data
+  unit test asserts `> 150` and `rails.mjs` `> 150 && === mapStats`;
+  band rails go in `GEO.bandRails`/own file, NOT `GEO.rails` — check
+  how band-roads kept `GEO.highways` clean (rose-scatter determinism)
+  and mirror it, then decide whether `mapStats.rails` counts both.
+- Named-train laws shipped in W2 (don't regress in the spawn
+  extension): spur rails never random-spawn; `hopAt` needs ≥ train
+  length + 20 of onward run, 15 u radius, tangent cone; an open
+  schedule window never replaces a live named train.
+- DART stays real-or-absent (light rail), asserted by `rails.mjs`.
+- Tour staging: heading 0 = north, PI/2 faces west; forced trains roll
+  at 16 u/s on the real loop — staged shots must pin `tr.s` (none
+  planned for W3).
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to

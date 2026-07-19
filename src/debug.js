@@ -71,6 +71,19 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       const tr = trains.force(player.pos.x, player.pos.z);
       hud.toast(tr ? `🚂 ${tr.rail.operator ?? 'freight'} inbound` : '🚂 no eligible rail near here');
     },
+    // Rails W2: named trains forced onto their routes, schedule bypassed
+    'railCrossing:laredo'() {
+      const tr = trains.startNamed('laredo');
+      hud.toast(tr ? '🚂 the Tex-Mex Interchange is on the bridge approach' : '🚂 no Laredo spur baked');
+    },
+    'railCrossing:eaglepass'() {
+      const tr = trains.startNamed('eaglepass');
+      hud.toast(tr ? '🚂 the Eagle Pass Manifest is on the bridge approach' : '🚂 no Eagle Pass spur baked');
+    },
+    ztrain() {
+      const tr = trains.startNamed('ztrain', 0, player.pos.x, player.pos.z);
+      hud.toast(tr ? '🚂 the Z is rolling — double-stacks on the BNSF main' : '🚂 no BNSF mainline found');
+    },
     midnight() { sky.t = 0.998; }, // the bell tolls on the wrap — park near a chapel first
     hauntCemetery() {
       let best = null, bd = Infinity;

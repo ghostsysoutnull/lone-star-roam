@@ -354,6 +354,45 @@ function buildHighways(scene) {
   const railPts = GEO.rails.map((r) => r.pts);
   buildRibbons(scene, railPts, 1.5, 0x4a4440, 0.07);
   buildRibbons(scene, railPts, 0.55, 0x8a8a90, 0.11);
+  buildRailBridges(scene);
+}
+
+// International rail bridges (Rails W2): one merged steel through-truss per
+// baked spur crossing (`bridge: {x, z, ang}` in rails.json). Deck top sits at
+// the *lowest* rail height across the span so the draped rail ribbon and the
+// train always ride above it — the channel dip is shallow at this scale.
+function buildRailBridges(scene) {
+  const mat = new THREE.MeshLambertMaterial({ color: 0x2f3338, flatShading: true });
+  const L = 14, W = 3.4, H = 3.0; // wide enough that a curving consist clears the trusses
+  for (const r of GEO.rails) {
+    if (!r.bridge) continue;
+    const { x, z, ang } = r.bridge;
+    let minH = Infinity;
+    for (let i = -4; i <= 4; i++) {
+      const t = (i / 8) * L;
+      minH = Math.min(minH, hAt(x + Math.sin(ang) * t, z + Math.cos(ang) * t));
+    }
+    const parts = [];
+    const box = (w, h, d, bx, by, bz) => parts.push(new THREE.BoxGeometry(w, h, d).translate(bx, by, bz).toNonIndexed());
+    box(W, 0.25, L, 0, -0.125, 0);                       // deck — top flush with the lowest rail point
+    for (const side of [-1, 1]) {
+      box(0.16, 0.16, L, side * W / 2, 0.1, 0);          // bottom chord
+      box(0.16, 0.16, L, side * W / 2, H, 0);            // top chord
+      for (let i = -2; i <= 2; i++) box(0.13, H, 0.13, side * W / 2, H / 2, i * (L / 4)); // verticals
+      for (let i = -2; i < 2; i++) {                      // diagonals
+        const d = new THREE.BoxGeometry(0.1, Math.hypot(H, L / 4), 0.1)
+          .rotateX((i % 2 ? -1 : 1) * Math.atan2(L / 4, H))
+          .translate(side * W / 2, H / 2, (i + 0.5) * (L / 4));
+        parts.push(d.toNonIndexed());
+      }
+      box(0.6, 3, 0.9, side * (W / 2 - 0.2), -1.6, 0);   // piers under midspan
+    }
+    for (let i = -2; i <= 2; i++) box(W, 0.14, 0.14, 0, H, i * (L / 4)); // portal cross-beams
+    const mesh = new THREE.Mesh(mergeGeoms(parts), mat);
+    mesh.position.set(x, minH, z);
+    mesh.rotation.y = ang;
+    scene.add(mesh);
+  }
 }
 
 // Band highways — the shoulder's through-route arterials, real OSM geometry,

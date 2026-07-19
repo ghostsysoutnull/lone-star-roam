@@ -1,9 +1,12 @@
 // Freight trains: locomotive + long consists of instanced cars following the
 // real rail network near the player. Horns blast when one passes close.
+// Rails W2: named border crossings — on a seeded daily schedule the Tex-Mex
+// Interchange (Laredo) and Eagle Pass Manifest cross the Rio Grande on their
+// baked spur routes, and the Z double-stack runs the longest BNSF line.
 import * as THREE from 'three';
-import { GEO, hAt } from './geo.js';
+import { GEO, hAt, seededRand } from './geo.js';
 import { merge, tinted } from './traffic.js';
-import { ATMOS } from './sky.js';
+import { ATMOS, DAY_SECONDS } from './sky.js';
 
 const MAX_TRAINS = 3;
 const SPAWN_R = 350, DESPAWN_R = 1200; // despawn only beyond fog — never in plain sight
@@ -36,6 +39,14 @@ const mkTanker = () => merge([
   tinted(new THREE.BoxGeometry(1.8, 0.35, 3.1).translate(0, 0.5, 0), DARK),
   wheelPair(-1.1), wheelPair(1.1),
 ]);
+// double-stack well car: lower container baked weathered brown, upper takes
+// the instance tint — one tint, two-tone stack, silhouette taller than anything
+const mkWellCar = () => merge([
+  tinted(new THREE.BoxGeometry(1.7, 1.1, 2.9).translate(0, 1.0, 0), 0x8a5a3a),
+  tinted(new THREE.BoxGeometry(1.7, 1.1, 2.6).translate(0, 2.1, 0), 0xffffff),
+  tinted(new THREE.BoxGeometry(1.85, 0.3, 3.1).translate(0, 0.45, 0), DARK),
+  wheelPair(-1.15), wheelPair(1.15),
+]);
 const mkCoach = () => merge([
   tinted(new THREE.BoxGeometry(1.7, 1.3, 3.1).translate(0, 1.15, 0), 0xffffff),
   tinted(new THREE.BoxGeometry(1.74, 0.4, 2.5).translate(0, 1.45, 0), 0x2e3640), // window band
@@ -63,16 +74,33 @@ const COMMUTER = new Set(['Trinity Railway Express', 'TEXRail']);
 // short urban lines the freight mainline filter exists to reject.
 const FREIGHT_EXT = 350, FREIGHT_LEN = 500, COMMUTER_EXT = 40, COMMUTER_LEN = 60;
 
+// Named trains (Rails W2). Border crossings run their baked spur route; the Z
+// runs the longest BNSF mainline. 3 runs per site per game day, times from the
+// railxing: seed streams (forever once shipped) — one per third of the day.
+// A run only spawns if the player is inside the ring when its window is open.
+const NAMED = {
+  laredo: { name: 'the Tex-Mex Interchange', operator: 'CPKC', wagons: 'mixed' },
+  eaglepass: { name: 'the Eagle Pass Manifest', operator: 'Union Pacific Railroad', wagons: 'mixed' },
+  ztrain: { name: 'the Z', operator: 'BNSF Railway', wagons: 'well' },
+};
+const NAMED_CARS = 18, NAMED_LOCOS = 2, TOAST_R = 60, TOAST_REARM_R = 90;
+export const crossingTimes = (site, day) => {
+  const rnd = seededRand(`railxing:${site}:${Math.floor(day)}`);
+  return Array.from({ length: 3 }, (_, i) => (i + rnd()) / 3);
+};
+
 export class TrainSystem {
   constructor(scene) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
-    const POOL = MAX_TRAINS * 30;
+    // pools cover MAX_TRAINS random consists + all three named trains at once
+    const POOL = (MAX_TRAINS + 2) * 30;
     this.meshes = {
-      loco: new THREE.InstancedMesh(mkLoco(), mat, MAX_TRAINS),
+      loco: new THREE.InstancedMesh(mkLoco(), mat, MAX_TRAINS + 3 * NAMED_LOCOS),
       boxcar: new THREE.InstancedMesh(mkBoxcar(), mat, POOL),
       hopper: new THREE.InstancedMesh(mkHopper(), mat, POOL),
       tanker: new THREE.InstancedMesh(mkTanker(), mat, POOL),
       coach: new THREE.InstancedMesh(mkCoach(), mat, MAX_TRAINS * 6),
+      well: new THREE.InstancedMesh(mkWellCar(), mat, NAMED_CARS + 2),
     };
     for (const m of Object.values(this.meshes)) {
       m.frustumCulled = false;
@@ -84,7 +112,7 @@ export class TrainSystem {
       color: 0xfff3cc, transparent: true, opacity: 0.09, blending: THREE.AdditiveBlending,
       depthWrite: false, side: THREE.DoubleSide,
     });
-    this.beams = Array.from({ length: MAX_TRAINS }, () => {
+    this.beams = Array.from({ length: this.meshes.loco.count }, () => {
       const b = new THREE.Mesh(beamGeo, beamMat);
       b.visible = false;
       scene.add(b);
@@ -102,9 +130,23 @@ export class TrainSystem {
         operator: r.operator ?? null,
         livery: LIVERY[r.operator] ?? null,
         commuter: COMMUTER.has(r.operator),
+        spur: r.spur ?? null, // border spurs: scheduled named trains only, never random spawn
+        bridge: r.bridge ?? null,
       };
     });
     this.LIVERY = LIVERY; // checks assert chosen colors against the same table
+    this.crossingTimes = crossingTimes; // checks assert schedule determinism against the same stream
+    // named-train routes: the two baked spurs + the longest BNSF mainline (the Z)
+    this.namedRails = {};
+    for (const r of this.rails) if (r.spur) this.namedRails[r.spur] = r;
+    let z = null, zd = 0;
+    for (const r of this.rails) {
+      if (r.spur || r.operator !== 'BNSF Railway') continue;
+      const d = Math.hypot(r.maxX - r.minX, r.maxZ - r.minZ);
+      if (d > zd) { zd = d; z = r; }
+    }
+    this.namedRails.ztrain = z;
+    this.crossingsRun = new Set(); // one spawn per (site, day, slot)
     this.trains = [];
     this.m4 = new THREE.Matrix4();
     this.q = new THREE.Quaternion();
@@ -112,6 +154,7 @@ export class TrainSystem {
     this.col = new THREE.Color();
     this.spawnT = 0;
     this.onHorn = null;
+    this.onNamed = null;
     this.hornT = 0;
   }
 
@@ -138,7 +181,7 @@ export class TrainSystem {
   }
 
   spawn(px, pz) {
-    const near = this.rails.filter((r) =>
+    const near = this.rails.filter((r) => !r.spur &&
       px > r.minX - SPAWN_R && px < r.maxX + SPAWN_R && pz > r.minZ - SPAWN_R && pz < r.maxZ + SPAWN_R &&
       // freight mainlines only — no 14-car trains on 200-unit yard spurs;
       // short commuter sets accept the short urban lines
@@ -173,6 +216,7 @@ export class TrainSystem {
   force(x, z) {
     let best = null, bestD = Infinity;
     for (const r of this.rails) {
+      if (r.spur) continue; // border spurs are the named trains' turf
       if (Math.max(r.maxX - r.minX, r.maxZ - r.minZ) <= (r.commuter ? COMMUTER_EXT : FREIGHT_EXT)) continue;
       this.arcInit(r);
       if (r.len < (r.commuter ? COMMUTER_LEN : FREIGHT_LEN)) continue;
@@ -199,19 +243,119 @@ export class TrainSystem {
     return tr;
   }
 
-  update(dt, px, pz) {
+  // Deterministic named-train spawn on its route (debug actions + the daily
+  // schedule). sOffset places a mid-window arrival mid-run; (nx, nz) instead
+  // starts the run at the arc point nearest that spot (the Z's mainline is
+  // long — the forced Z appears where the player is). One instance per name;
+  // no Math.random on any path. Returns the train.
+  startNamed(key, sOffset = 0, nx, nz) {
+    const def = NAMED[key], rail = this.namedRails[key];
+    if (!def || !rail) return null;
+    this.arcInit(rail);
+    this.trains = this.trains.filter((t) => t.named !== def.name);
+    const types = ['boxcar', 'hopper', 'tanker'];
+    const cars = [];
+    for (let i = 1; i < NAMED_LOCOS; i++) cars.push({ type: 'loco', color: LIVERY[def.operator] });
+    for (let i = 0; i < NAMED_CARS; i++) cars.push(def.wagons === 'well'
+      ? { type: 'well', color: CAR_COLORS[i % CAR_COLORS.length] }
+      : { type: types[i % types.length], color: CAR_COLORS[i % CAR_COLORS.length] });
+    const total = (cars.length + 1) * CAR_LEN;
+    let s = total + 2 + sOffset;
+    if (nx !== undefined) {
+      let bd = Infinity;
+      for (let i = 0; i < rail.pts.length; i++) {
+        const d = Math.hypot(rail.pts[i][0] - nx, rail.pts[i][1] - nz);
+        if (d < bd) { bd = d; s = rail.cum[i]; }
+      }
+    }
+    const tr = {
+      rail, dir: 1, named: def.name,
+      s: Math.min(Math.max(s, total + 2), rail.len - 2),
+      locoColor: LIVERY[def.operator],
+      cars,
+    };
+    this.trains.push(tr);
+    return tr;
+  }
+
+  // Named trains don't brake at a junction: find the connecting rail at this
+  // one's outbound end and keep rolling into the network — the spur is only
+  // the border approach, and a through train stopping dead in Laredo reads
+  // broken. Picks the candidate whose tangent best continues the heading
+  // (≥ ~72° cone); returns null at a true dead end (the hold law applies).
+  hopAt(rail, dir, minRun = 0) {
+    const [ex, ez] = rail.pts[dir > 0 ? rail.pts.length - 1 : 0];
+    const [, , tdx, tdz] = this.at(rail, dir > 0 ? rail.len : 0);
+    const fx = tdx * dir, fz = tdz * dir;
+    let best = null, bestDot = 0.3;
+    for (const r of this.rails) {
+      if (r === rail || r.spur) continue;
+      if (ex < r.minX - 17 || ex > r.maxX + 17 || ez < r.minZ - 17 || ez > r.maxZ + 17) continue;
+      let bd = 1e9, bi = 0;
+      for (let i = 0; i < r.pts.length; i++) {
+        const d = Math.hypot(r.pts[i][0] - ex, r.pts[i][1] - ez);
+        if (d < bd) { bd = d; bi = i; }
+      }
+      // 15 u ≈ 1.5 km: junction nodes in the bake sit up to ~1 km off the
+      // connecting sub's nearest vertex (Eagle Pass → Del Rio Sub is 10.4)
+      if (bd > 15) continue;
+      this.arcInit(r);
+      const s0 = r.cum[bi];
+      const [, , dx2, dz2] = this.at(r, s0);
+      const dot = fx * dx2 + fz * dz2;
+      const dir2 = dot >= 0 ? 1 : -1;
+      // a hop must buy real onward track — landing a train-length from the
+      // target's own end ping-pongs at the junction instead of rolling on
+      if ((dir2 > 0 ? r.len - s0 : s0) < minRun) continue;
+      if (Math.abs(dot) > bestDot) { bestDot = Math.abs(dot); best = { rail: r, s: s0, dir: dir2 }; }
+    }
+    return best;
+  }
+
+  // seeded daily crossing schedule — spawn only while the player is inside the
+  // ring, mid-window arrivals join mid-run, one run per (site, day, slot).
+  // A slot never replaces a still-running train of the same name (a window
+  // opening mid-watch must not teleport the one the player is following).
+  updateCrossings(px, pz, day) {
+    const d = Math.floor(day), f = day - d;
+    for (const key of Object.keys(NAMED)) {
+      const rail = this.namedRails[key];
+      if (!rail) continue;
+      if (this.trains.some((t) => t.named === NAMED[key].name)) continue;
+      if (px < rail.minX - SPAWN_R || px > rail.maxX + SPAWN_R ||
+          pz < rail.minZ - SPAWN_R || pz > rail.maxZ + SPAWN_R) continue;
+      this.arcInit(rail);
+      const dur = rail.len / SPEED / DAY_SECONDS; // window length as a day fraction
+      const times = crossingTimes(key, d);
+      for (let slot = 0; slot < times.length; slot++) {
+        if (f < times[slot] || f > times[slot] + dur) continue;
+        const id = `${key}:${d}:${slot}`;
+        if (this.crossingsRun.has(id)) continue;
+        this.crossingsRun.add(id);
+        this.startNamed(key, (f - times[slot]) * DAY_SECONDS * SPEED);
+      }
+    }
+  }
+
+  update(dt, px, pz, day) {
     this.spawnT -= dt;
     this.hornT -= dt;
-    if (this.trains.length < MAX_TRAINS && this.spawnT <= 0) {
+    if (this.trains.filter((t) => !t.named).length < MAX_TRAINS && this.spawnT <= 0) {
       this.spawnT = 4;
       this.spawn(px, pz);
     }
+    if (day !== undefined) this.updateCrossings(px, pz, day);
 
-    const counts = { loco: 0, boxcar: 0, hopper: 0, tanker: 0, coach: 0 };
+    const counts = { loco: 0, boxcar: 0, hopper: 0, tanker: 0, coach: 0, well: 0 };
+    let beamI = 0; // beams belong to lead locos only — trailing units hold no light
     for (const tr of this.trains) {
       const total = (tr.cars.length + 1) * CAR_LEN;
       // end of line: hold at the buffer if the player is watching, retire otherwise
-      const atEnd = (tr.dir > 0 && tr.s >= tr.rail.len) || (tr.dir < 0 && tr.s <= total);
+      let atEnd = (tr.dir > 0 && tr.s >= tr.rail.len) || (tr.dir < 0 && tr.s <= total);
+      if (atEnd && tr.named) {
+        const hop = this.hopAt(tr.rail, tr.dir, total + 20);
+        if (hop) { tr.rail = hop.rail; tr.s = hop.s; tr.dir = hop.dir; atEnd = false; }
+      }
       if (!atEnd) tr.s += SPEED * tr.dir * dt;
       else {
         tr.s = tr.dir > 0 ? tr.rail.len : total;
@@ -227,6 +371,11 @@ export class TrainSystem {
         if (d < DESPAWN_R) tr.dead = false;
         // horn when the locomotive passes near
         if (c === 0 && d < 55 && this.hornT <= 0) { this.hornT = 25; this.onHorn?.(); }
+        // named train announces itself once per approach, re-arms on exit
+        if (c === 0 && tr.named) {
+          if (d < TOAST_R && !tr.toasted) { tr.toasted = true; this.onNamed?.(tr.named); }
+          else if (d > TOAST_REARM_R) tr.toasted = false;
+        }
         const type = c === 0 ? 'loco' : tr.cars[c - 1].type;
         const mesh = this.meshes[type];
         const i = counts[type]++;
@@ -239,7 +388,7 @@ export class TrainSystem {
         mesh.setColorAt(i, this.col.set(c === 0 ? tr.locoColor : tr.cars[c - 1].color));
         // loco headlight: beam cone ahead of the nose after dark
         if (c === 0) {
-          const beam = this.beams[i];
+          const beam = this.beams[beamI++];
           beam.visible = ATMOS.night > 0.45;
           if (beam.visible) {
             const L = Math.hypot(dx, dz) || 1;
@@ -252,7 +401,7 @@ export class TrainSystem {
     }
     this.trains = this.trains.filter((t) => !t.dead);
 
-    for (let j = counts.loco; j < this.beams.length; j++) this.beams[j].visible = false;
+    for (let j = beamI; j < this.beams.length; j++) this.beams[j].visible = false;
     this.m4.makeScale(0, 0, 0);
     for (const [type, mesh] of Object.entries(this.meshes)) {
       for (let j = counts[type]; j < mesh.instanceMatrix.count; j++) mesh.setMatrixAt(j, this.m4);

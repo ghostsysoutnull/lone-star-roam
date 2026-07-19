@@ -15,6 +15,11 @@ export const TOURS = [
   {
     track: 'Railroads (2026-07)',
     waves: [
+      { wave: 'W2 — the border show', spots: [
+        S('🌉 Laredo gateway — Tex-Mex Interchange', [-5.5, 3897], { heading: Math.PI / 2, mode: 'DRIVE', time: 0.35, act: 'railCrossing:laredo', note: 'the international rail bridge over the Rio Grande — the Tex-Mex Interchange (CPKC, 2 locos) is forced onto the approach and crosses into Texas in a few seconds; it also runs on its own seeded schedule, 3 crossings a game day' }),
+        S('🌉 Eagle Pass gateway — the Manifest', [-962, 2554], { heading: Math.PI, mode: 'DRIVE', time: 0.35, act: 'railCrossing:eaglepass', note: 'the UP bridge from Piedras Negras — the Eagle Pass Manifest forced onto the approach, crossing north; same seeded 3-a-day schedule as Laredo' }),
+        S('📦 the Z — Red River Valley Sub', [-892, -3981], { mode: 'DRIVE', time: 0.35, act: 'ztrain', note: 'the BNSF hotshot intermodal forced in next to you — double-stack well cars, a silhouette no other train has; watch the two-tone container stacks' }),
+      ] },
       { wave: 'W1 — liveries + commuter sets', spots: [
         S('🚂 UP armour yellow — Brownsville Sub', [1797.6, 3498.7], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'a Union Pacific freight forced onto the sub next to you — the loco wears armour yellow; the mixed car colors are real interchange practice' }),
         S('🚂 BNSF orange — Dalhart Sub', [-2465.3, -4942.9], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'BNSF Panhandle country — the loco comes up in BNSF orange' }),

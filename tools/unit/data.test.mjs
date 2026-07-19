@@ -40,7 +40,15 @@ test('highway data retains valid tiers and geometry', async () => {
 
 test('rail data retains valid geometry and OSM identity when available', async () => {
   const rails = await json('rails.json');
-  assert.equal(rails.length > 400, true, 'rail count');
+  // W2's defrag bake chains reversed/head-side ways too: 560 fragments → ~187 real polylines
+  assert.equal(rails.length > 150, true, 'rail count');
+  const spurs = rails.filter((rail) => rail.spur);
+  assert.equal(spurs.map((s) => s.spur).sort().join(), 'eaglepass,laredo', 'both border spurs baked');
+  for (const s of spurs) {
+    finite(s.bridge?.x, `${s.spur} bridge.x`);
+    finite(s.bridge?.z, `${s.spur} bridge.z`);
+    finite(s.bridge?.ang, `${s.spur} bridge.ang`);
+  }
   for (const [index, rail] of rails.entries()) {
     assert.equal(rail.pts.length >= 2, true, `rails[${index}].pts needs two coordinates`);
     for (const [point, [x, z]] of rail.pts.entries()) {
