@@ -1,9 +1,9 @@
 # Backlog — queued work
 
-No active track. Water Vehicles (`WATER_VEHICLES_SPEC.md`, 3 waves) shipped
-2026-07-19 and is folded into `ROADMAP.md`; the next 2026-H2 candidate is
-sea-industry (`VISION_SEA_INDUSTRY.md`), which builds on the boat. Items
-below are the queue.
+Active track: **Rails Operations** (`RAILS_OPS_SPEC.md`, 3 waves, spec
+2026-07-19) — slotted before sea-industry (`VISION_SEA_INDUSTRY.md`), which
+follows it. Water Vehicles shipped 2026-07-19 (folded into `ROADMAP.md`).
+Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)

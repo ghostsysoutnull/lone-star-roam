@@ -11,6 +11,7 @@ real split and may change them.
 |---|---|---|---|
 | 1 | Railroads Realism | `VISION_RAILROADS.md` | Surface the real rail network already baked: liveries, subdivision names, Laredo/Eagle Pass live crossings |
 | 2 | Water Vehicles | `VISION_WATER_VEHICLES.md` | BOAT as the 4th player mode — Gulf, big lakes, Intracoastal; light dynamics |
+| 2.5 | Rails Operations | `VISION_RAILS_OPS.md` | Journeys, per-train identity, radio chatter, real meets — playtest successor to track 1; slotted 2026-07-19 (`RAILS_OPS_SPEC.md`) |
 | 3 | Sea-Industry Realism | `VISION_SEA_INDUSTRY.md` | Real ports, AIS ship routes, transport/fishing/patrol fleets, VHF chatter |
 | 4 | Mexico Shoulder | `VISION_MEXICO_SHOULDER.md` | Real 25-mi strip south of the Rio Grande; twin cities the payoff; sets the data bar for all shoulders |
 
