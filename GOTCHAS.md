@@ -261,12 +261,20 @@ graduate here (and out of `NEXT_SESSION.md`).
   2026-07-16: 6 of the first 30 spots violated this — three needed forcing,
   two needed staged time (night thins traffic; cranes dim after dark), one
   staged the wrong mode entirely (flares fire only in FLY).
-- **Aviation.mjs flakes under any parallel `-j`** (real-loop-timing checks; seen
-  at -j4 and -j6, always clean standalone) — one standalone rerun before assuming
-  a regression. Same policy for the shop suite's Lacy-yip check, and for the
-  lights suite's Levelland lantern-flicker check (`lights.mjs:254`) — the flicker
-  is a per-frame random roll, and under `-j` the wall-clock sampler can miss the
-  rare zero; clean standalone.
+- **Real-loop-timing checks flake as a CLASS under any parallel `-j`, not as a
+  fixed list** — each loaded full run flakes a *different* random 2–5 of them
+  (2026-07-19, four runs: aviation, shop's Lacy-yip, springer's hint/hop,
+  lights' flashlight-timer + Levelland flicker, ferries' ramp-arrival ±0.6u,
+  onboarding's tip order — all clean standalone). Policy: one standalone rerun
+  before assuming a regression, and never treat "a new suite flaked" as news.
+- **Full-verify run discipline** (2026-07-19 — a quarter of a wave session went
+  to avoidable reruns): (1) *capture-once* — pipe every full run to a file
+  (`node tools/verify.mjs > /tmp/verify-run.log 2>&1`), then `tail`/`rg FAIL`
+  the file; NEVER re-run the suite just to re-see failures that scrolled past a
+  `| tail`. (2) *batch the flake tax* — collect flaked suites across the
+  session and confirm them in ONE `-j 1` pass at the end, not one confirm
+  cycle per full run. (3) full runs are for the protocol points (wave end,
+  pre-push); mid-wave iteration stays on named suites.
 - **Score-row DOM reads must `until()` the DOM, not race it** — the score spans
   ride the 12 Hz HUD tick.
 - **The ceremony state machine is land-to-land** with an 8 s cooldown on
