@@ -47,6 +47,8 @@ wind; one staged water-surface shot judged before commit.*
 - the sea opens up: fairway names on the HUD as you cross them, marinas at
   the ports and lakes, channel markers down the Laguna Madre
 - Lacy rides the bow
+- cruise hold: release the throttle and the boat keeps way on — set a
+  course and watch the coast; brake to drift down and stop
 - the big map shows where the world ends — a boundary line at sea (the
   shelf edge the boat stops at) and one on land (the shoulder edge)
 - first-boat hint, boat HUD/map identity, and the track closed out
@@ -179,6 +181,16 @@ Design settled:
 - Lacy: bow perch when `gear.dog` (crate-perch idiom, dog.js).
 - Identity: HUD mode icon, boat marker on both maps, first-boat
   `save.seen` hint (New Player idiom).
+- Cruise hold (rider, Bruno 2026-07-19, W2 session): hands-off cruising
+  like the plane, but NOT the plane's min-speed clamp (a floor fights
+  beaching's hard stop, the idle chop/lap ambience, and the momentum
+  identity). Settled design: above ~2 u/s the glide stops decaying
+  (`BOAT_COAST` → 1.0 in that band) — release W and she holds way on; S
+  bleeds speed to a stop; beaching still hard-stops; below the band the
+  old decay reclaims the drift-to-rest feel. Check updates: the W1
+  coast-retention assertion inverts (speed holds ≥0.95 over 2 s), wake/
+  audio idle checks already stage speed directly. No new visible
+  surface — shot-free.
 - World-edge map lines (rider, Bruno 2026-07-19): two iso-lines on the
   big map — the sea world edge (`SHELF_U` from the coastal border, where
   W1's boat wall is) and the land world edge (`SHOULDER_U` from the

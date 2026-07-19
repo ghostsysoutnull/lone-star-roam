@@ -13,8 +13,10 @@ queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
   only), marina dressing at the 8 ports + one per lake, ICW channel-marker
   buoys, Lacy's bow perch, world-edge iso-lines on the big map
   (SHELF_U/SHOULDER_U, Tidelands dash-pass idiom), boat HUD/map identity +
-  first-boat hint, and the track close (ROADMAP fold, doc sweep, briefing
-  delete). Wave 2 (water feel + playtest fixes) shipped 2026-07-19.
+  first-boat hint, the cruise-hold rider (release W, boat keeps way on —
+  settled design in the spec's W3 section), and the track close (ROADMAP
+  fold, doc sweep, briefing delete). Wave 2 (water feel + playtest fixes)
+  shipped 2026-07-19, commit fa57fc6.
 - **Recommended setup**: model **Fable 5**, effort **high** — new visible
   surfaces (marinas, buoys, map lines) + track close. Flag it if the
   running model differs.
