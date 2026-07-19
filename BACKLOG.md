@@ -1,8 +1,8 @@
 # Backlog — queued work
 
-No active track — Energy (`ENERGY_SPEC.md`, 6 waves + the W4.5 solar
-rework) and Performance (`PERFORMANCE_SPEC.md`, 4 waves) both shipped
-2026-07-18 and are folded into `ROADMAP.md`. Items below are the queue.
+Active track: **Railroads Realism** (`RAILS_SPEC.md`, 3 waves, spec
+2026-07-18) — first track of the 2026-H2 program (`VISION_2026H2.md`).
+Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
@@ -18,6 +18,7 @@ Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
   Revisit only if aviation grows substantially or concurrency flakes appear.
 - **lights `until(trains>0, 45000)`**: drive/force a train to a known spot
   instead of waiting on the real spawn, so lights can't become the pole.
+  → **Scheduled: Rails W1** (`trains.force(x,z)` hook, `RAILS_SPEC.md`).
 
 ## Playtest findings 2026-07-15 (Bruno's tx-urgent notes; ocean-zone fix
 already shipped as `54b3511` — these are the remaining items)
@@ -32,6 +33,8 @@ already shipped as `54b3511` — these are the remaining items)
 - **Shields for railways**: give rail lines a presence in the HUD the way
   roads get shields (interpretation to confirm with Bruno — crossing signs
   at grade crossings vs a rail glyph/name line in the HUD when near track).
+  → **Resolved 2026-07-18**: the HUD half shipped 2026-07-15 (`03fc0d7`,
+  🚂 placard); rails-on-maps **scheduled: Rails W1**; crossbucks declined.
 - **Water sits a touch below terrain + wants effects and sound**: river
   ribbons ride `hAt + 0.07` and lakes sit at lowest-shoreline +0.15, which
   reads sunken at some banks; wants a look at the offsets, plus water
@@ -82,7 +85,7 @@ already shipped as `54b3511` — these are the remaining items)
   width/color/texture upgrade candidates; no direction settled yet.
 - **Band railroads** (deferred from Band Parity, 2026-07-16): OSM rail fetch
   for the 4 neighbor strips + trains.js extension — own bake, build-rails
-  idiom.
+  idiom. → **Scheduled: Rails W3** (`RAILS_SPEC.md`, Sonnet 5).
 - **Band airports beyond the 25-mile line** (deferred from Band Parity W6,
   2026-07-17): Roswell/Lawton/Lake Charles (and Carlsbad/Alamogordo) are
   currently glow + radio-wink only — GOTCHAS' exclusion law, `band.mjs`

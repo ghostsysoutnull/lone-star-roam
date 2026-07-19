@@ -7,19 +7,28 @@ you're changing. `MODULES.md` has per-module grep anchors — prefer grep + a
 targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
-**This session: the Railroads spec session** — first track of the 2026-H2
-program (`VISION_2026H2.md`, build order rails → water vehicles →
-sea-industry → Mexico shoulder, decided 2026-07-18). Read
-`VISION_RAILROADS.md` + the umbrella, then write `RAILS_SPEC.md` (goals,
-wave split, per-wave design-settled sections, model/effort per the
-risk-based grading rule) and the first `## Session briefing` block here.
-Specs are always **Fable 5, effort high**. Open calls to resolve in the
-spec: HUD form for rail identity, crossing schedule (seeded `windFrom`
-idiom vs probability), whether "band railroads" folds in, livery palette
-shot. Backlog riders to sweep: shields for railways, lights-suite
-`until(trains>0)` forcing hook. Previous track: Performance
-(`PERFORMANCE_SPEC.md`, 4 waves) shipped 2026-07-18, folded into
-`ROADMAP.md`.
+## Session briefing
+- **This session**: Railroads Realism (`RAILS_SPEC.md`), wave 1 of 3 —
+  operator liveries + commuter passenger sets + rails on both maps +
+  `trains.force` hook. The spec session shipped 2026-07-18.
+- **Recommended setup**: model **Fable 5**, effort **high** — the
+  deliverable is a look (livery palette, regraded from the umbrella's
+  Sonnet estimate per the Energy-W3 lesson). Flag it if the running model
+  differs.
+- **Budget**: code + checks (`tools/checks/rails.mjs`, new) + **one**
+  staged livery-lineup shot (Copilot + Bruno gate before commit),
+  grep-first. Perf delta: +1 InstancedMesh (coach); no cap retune.
+- **Then**: rewrite this block for W2 (the border show — spur bake +
+  seeded crossings + named trains, Fable 5 high).
+
+Gotchas carried over:
+- Design is settled in `RAILS_SPEC.md` W1 — livery table hexes, commuter
+  set, `mapStats.rails` assertion, `force(x,z)` contract. Execute, don't
+  re-decide; the shot may retune hexes.
+- The 🚂 rail placard already ships (`nearestRail`, hud.js) — W1 adds no
+  HUD placard work, only the map layer.
+- `lights.mjs:144` must switch from `until(trains>0, 45000)` to the new
+  force hook — that's a W1 deliverable, not a rider.
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to
