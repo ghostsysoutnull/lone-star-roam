@@ -198,6 +198,14 @@ graduate here (and out of `NEXT_SESSION.md`).
   entry, *and* a `ROLL_OK` row in radio.js. Miss the last one and the aircraft
   enters `radio.sources`, fills lines on demand, and is never picked — silent,
   with nothing failing. (Cost W7 a real bug; the wiring sentinel caught it.)
+- **`FogGate` (sky.js) is the one way to hide world-spanning boot decoration
+  beyond the fog wall** — wired into shoulder.js and gameplay.js (Performance
+  W3). Hides a root's direct children once their whole world footprint sits
+  beyond `GATE_R` (1500 = max fog.far 1400 + margin). Children with any
+  `fog: false` material are auto-exempt (horizon glows are designed to beat
+  fog). Pure visibility — interaction logic must stay distance-based and
+  never read `.visible`. A rebuilt root (e.g. a gameplay save-slot switch)
+  needs a fresh gate.
 - **New props/buildings ship at the W6b poly bar** (standing rule, Bruno
   2026-07-17). Round/turned forms use 8–14 radial segments — hero/landmark
   one-offs at the top (12–14, merged vertex-colored geometry per the
@@ -272,3 +280,18 @@ graduate here (and out of `NEXT_SESSION.md`).
   (2026-07-17): one shot per new or changed visible surface by default,
   judged before commit; logic/data/physics work stays shot-free; never the
   pass/fail signal.
+- **The harness fake clock zeroes lap ms** (`perf.mjs`'s `PerfMonitor`
+  timing) — `performance.now()` doesn't advance under it, so real
+  millisecond values only exist on Bruno's browser. Checks assert structure,
+  tick counts, and draw/triangle counts (`renderProbe()`), never ms
+  thresholds.
+- **Draw-call probes run hot for ~0.6 s after a teleport** (Performance W3
+  Finding 8): the prior spot's scenery chunks are still live in the camera
+  wedge, reading ~+300 calls over the settled value. The W2 guardrail probes
+  at that cadence, so its cap (1600 draws) is pinned against that hot
+  context — never re-tune it from a settled-state number, and state which
+  context (settled vs post-teleport) any new draw-call reading came from.
+- **The band suite's frozen chunk baseline counts flora, not just
+  buildings** (Performance W3 tagged every scenery prop with
+  `userData.kind` for the draw audit) — a new prop kind or a tag rename
+  re-pins the three chunks the band suite freezes.

@@ -213,3 +213,38 @@ stars (~600 meshes). Roses are instanced (2 calls) and innocent.
 Open for W4 (close-out): re-record the real-hardware baseline (the spec's
 protocol) to confirm the render-ms drop on Bruno's machine, then fold the
 track into ROADMAP.md.
+
+### W4 — real-hardware re-record (2026-07-18)
+
+Same protocol, same three spots, post fog-wall-gate fix. W1 baseline (pre-fix)
+vs this record (post-fix):
+
+| Spot | fps (W1→W4) | frame avg ms (W1→W4) | render avg ms (W1→W4) | draw calls (W1→W4) | triangles (W1→W4) |
+| ---- | ----------- | --------------------- | ----------------------- | -------------------- | -------------------- |
+| Houston night storm (DRIVE) | 59.4 → 54.7 | 12.39 → 10.27 | 10.76 → 8.62 | 1461 → 1044 | 1.75 M → 1.64 M |
+| I-10 west floor (DRIVE) | 60.4 → 60.4 | 13.34 → 7.06 | 12.03 → 5.52 | 2037 → 547 | 1.61 M → 1.52 M |
+| Sweetwater dusk (FLY) | 57.5 → 60.4 | 14.17 → 10.59 | 12.72 → 9.19 | 1432 → 1259 | 1.66 M → 1.61 M |
+
+9. **The fix confirmed on real hardware, floor spot hit hardest.** Render avg
+   drops 20–54% across all three spots; frame avg follows. I-10 floor —
+   the spot Finding 2 flagged as counter-intuitively the most expensive —
+   sees the largest win (draws −73%, render avg −54%, matching W3's
+   diagnosis that its `shoulder` share of the pre-fix total was the
+   biggest of the three, 566/1579 ≈ 36%). Sweetwater now holds full 60 fps
+   (was 57.5, the spec's thin-margin spot in Finding 4). Draw counts read
+   lower than W3's headless post-teleport probes (934/675/866) because
+   these are settled mid-play snapshots, not the hot post-teleport context
+   Finding 8 describes — expected, not a discrepancy.
+10. **One outlier, not chased.** Houston's max frame hit 224.0 ms (render
+    max 105.6 ms) during the 15–20 s play window, well above every other
+    max in this or the W1 table (next-highest is 53.1 ms) — the ~118 ms gap
+    between frame-max and render-max means most of it sat outside the
+    instrumented calls entirely (browser/OS stall, not game work), and
+    fps's independent wall-clock EMA reads 54.7 vs frame avg's 10.27 ms
+    because a stall that recent skews the fast-recency-weighted fps EMA
+    more than the slower-windowed frame avg. Single-sample; no fix per
+    the W4 budget (re-record + confirm only). Flag for a future session
+    if it recurs.
+
+Track closed 2026-07-18 (4 waves). Folded into `ROADMAP.md`; this spec stays
+as history.

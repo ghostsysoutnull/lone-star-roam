@@ -5,8 +5,8 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 
 No active priority track (aviation shipped in full 2026-07-12; Brands,
 Jetpack, Agriculture, the Shoulder & the Shelf, Band Parity, New Player
-Experience, and Energy followed and are folded in below). Queued work lives
-in `BACKLOG.md`.
+Experience, Energy, and Performance followed and are folded in below). Queued
+work lives in `BACKLOG.md`.
 
 - [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
   tools/test.mjs` runs four sub-second Node-only groups (`aviation`, `data`,
@@ -653,6 +653,31 @@ in `BACKLOG.md`.
   under `tools/test.mjs rules`). Job endpoints reference hero *ids* resolved
   at use; an orphaned id self-clears. Fast-travel lock inherited from the
   existing haul gate; zero new announcer/log machinery after W2, as specced.
+- [x] ~~Performance~~ — done 2026-07-18 (4 waves, `PERFORMANCE_SPEC.md` kept
+  as history): no gameplay change — the render loop got a readout, guardrails,
+  and a fix. **W1 — instrumentation + baseline**: `src/perf.js` `PerfMonitor`
+  (EMA avg/max per system, zero steady-state allocation, `renderProbe()` for
+  true draw counts under `__skipRender`), ~35 lap points wired through
+  main.js, a debug 📈 Perf tab, 3 Performance tour spots (Houston night storm
+  worst case / I-10 west floor / Sweetwater dusk dense ambient). Real-hardware
+  baseline: render is 10.8–12.7 ms of a 12.4–14.2 ms frame everywhere; all
+  ~34 game systems together cost 1.5–2 ms — draw submission is the game, not
+  system logic. **W2 — guardrails**: count-based draw-call/triangle ceilings
+  via `renderProbe()` (2500 draws / 2.5 M triangles with headroom) at the
+  3 baseline spots; no per-system ms thresholds (machine-bound, all tiny per
+  W1). **W3 — draw audit + fog-wall gate**: `perf.drawAudit()` differential
+  probing overturned the standing suspicion (per-chunk scenery was uniform,
+  380–650 calls, NOT the desert-vs-downtown differentiator) and found the
+  real cause — world-spanning boot decoration (border vignettes, landmark
+  props, city stars) that fog hides but the 30000-unit camera far plane never
+  culls. Same-session fix: `FogGate` (sky.js, wired into shoulder.js and
+  gameplay.js) hides a root's children once their footprint clears the fog
+  wall; `fog: false` materials auto-exempt. Measured (headless): draw base
+  roughly halved everywhere (Houston 2041→934, I-10 floor 1579→675,
+  Sweetwater 1510→866). Guardrail cap retuned 2500→1600 against the harness's
+  post-teleport hot context. **W4 — close-out**: real-hardware re-record
+  confirmed the drop (render avg −20% to −54% across the three spots, I-10
+  floor hit hardest at −54%; Sweetwater now holds a steady 60 fps, was 57.5).
 
 ## Known limitations (v1)
 
