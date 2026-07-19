@@ -152,6 +152,16 @@ export class EnergySystem {
       subAnnounced.push(s);
       this.register(s.x, s.z, 16, `⚡ ${s.name}`);
     }
+    // Water Vehicles W3: named fairways — one site per baked polyline, centroid
+    // + bounding radius so a boat crossing anywhere in the channel announces it
+    // (unnamed fairways stay silent — the standing announcer law)
+    for (const f of GEO.energy.fairways) {
+      if (!f.name) continue;
+      const cx = f.pts.reduce((s, p) => s + p[0], 0) / f.pts.length;
+      const cz = f.pts.reduce((s, p) => s + p[1], 0) / f.pts.length;
+      const r = Math.max(16, ...f.pts.map((p) => Math.hypot(p[0] - cx, p[1] - cz))) + 6;
+      this.register(cx, cz, r, `⚓ ${f.name}`);
+    }
     // W4 brass at the hero skylines — main.js's unified plaqueNear merges this
     // list (maritime idiom: append a source, never a branch)
     this.plaques = [

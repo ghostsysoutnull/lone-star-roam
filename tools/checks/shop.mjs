@@ -172,6 +172,22 @@ export default async function shop(t) {
     await t.ev(`g.player.setMode('DRIVE')`);
   });
 
+  await t.check('Lacy bow perch (W3): she rides the skiff foredeck in BOAT, back to the bed ashore', async () => {
+    await t.tp(4700, 2150, 'BOAT'); // open Gulf SE of Galveston (boat.mjs spot)
+    await t.simStep(0.2); // a few dog ticks on the new mount
+    const bow = await t.ev(`({ onSkiff: g.dog.g.parent === g.player.skiff,
+      z: g.dog.g.position.z, yaw: g.dog.g.rotation.y })`);
+    t.ok(bow.onSkiff, 'dog not mounted on the skiff in BOAT');
+    t.ok(bow.z < -1, `dog aft of the foredeck: z ${bow.z.toFixed(2)}`);
+    t.near(bow.yaw, 0, 0.01, 'dog not facing the bow');
+    await t.ev(`g.player.setMode('FLY')`); // boat → plane mid-water: back to the bed, facing aft
+    await t.simStep(0.2);
+    const bed = await t.ev(`({ onTruck: g.dog.g.parent === g.player.truck, yaw: g.dog.g.rotation.y })`);
+    t.ok(bed.onTruck, 'dog stayed on the hidden skiff after leaving BOAT');
+    t.near(Math.abs(bed.yaw), Math.PI, 0.01, 'bed ride not facing backward');
+    await t.tp(0, 0); // back on land in the truck for the checks below
+  });
+
   await t.check('weather radio: forecast on the HUD, then the weather arrives', async () => {
     await t.setWeather('clear');
     // a pending forecast means nothing without the radio

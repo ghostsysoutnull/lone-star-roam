@@ -37,6 +37,44 @@ export default async function shelf(t) {
       `line points stray off the 166.7u distance: ${res.min.toFixed(1)}..${res.max.toFixed(1)}`);
   });
 
+  await t.check('big map (W3): world-edge iso-lines hug the shelf + shoulder walls, inked on the wide layer', async () => {
+    const res = await t.ev(`(() => {
+      const we = g.hud.worldEdge ?? { sea: [], land: [] };
+      const seaD = [], landD = [];
+      for (let i = 0; i < we.sea.length; i += 7) seaD.push(g.borderDist(we.sea[i][0], we.sea[i][1]));
+      for (let i = 0; i < we.land.length; i += 7) landD.push(g.borderDist(we.land[i][0], we.land[i][1]));
+      const zones = { sea: we.sea.every(([x, z]) => g.borderZoneAt(x, z) === 'coast'),
+                      land: we.land.every(([x, z]) => g.borderZoneAt(x, z) === 'land') };
+      // canvas-pixel probe (the rail-ink idiom): find a midpoint inside a
+      // drawn dash band and look for the #47535e ink in a window around it
+      const probe = (pts) => {
+        const ctx = g.hud.mapLayer.getContext('2d');
+        for (const [x, z] of pts) {
+          if (((Math.floor(x / 80) + Math.floor(z / 80)) & 1) === 0) continue;
+          const [px, pz] = g.hud.mapT(x, z);
+          const d = ctx.getImageData(Math.round(px) - 3, Math.round(pz) - 3, 7, 7).data;
+          for (let i = 0; i < d.length; i += 4)
+            if (Math.abs(d[i] - 71) < 30 && Math.abs(d[i + 1] - 83) < 30 && Math.abs(d[i + 2] - 94) < 30) return true;
+        }
+        return false;
+      };
+      return { nSea: we.sea.length, nLand: we.land.length,
+        seaMin: Math.min(...seaD), seaMax: Math.max(...seaD),
+        landMin: Math.min(...landD), landMax: Math.max(...landD),
+        zones, seaInk: probe(we.sea), landInk: probe(we.land) };
+    })()`);
+    t.ok(res.nSea > 40, `sea world-edge line has only ${res.nSea} points`);
+    t.ok(res.nLand > 40, `land world-edge line has only ${res.nLand} points`);
+    t.ok(Math.abs(res.seaMin - 1127) < 6 && Math.abs(res.seaMax - 1127) < 6,
+      `sea line strays off SHELF_U 1127: ${res.seaMin.toFixed(1)}..${res.seaMax.toFixed(1)}`);
+    t.ok(Math.abs(res.landMin - 402) < 6 && Math.abs(res.landMax - 402) < 6,
+      `land line strays off SHOULDER_U 402: ${res.landMin.toFixed(1)}..${res.landMax.toFixed(1)}`);
+    t.ok(res.zones.sea, 'sea line has points off the coast zone (the inland twin leaked)');
+    t.ok(res.zones.land, 'land line has points off US-neighbor ground (Mexico or the twin leaked)');
+    t.ok(res.seaInk, 'no world-edge ink found on the wide layer at a sea dash');
+    t.ok(res.landInk, 'no world-edge ink found on the wide layer at a land dash');
+  });
+
   await t.check('gulf plane: state water keeps the teal, blue water past the line reads darker', async () => {
     const res = await t.ev(`(() => {
       const gulf = g.maritime.buoy.parent.getObjectByName('gulf');

@@ -15,6 +15,15 @@ export const TOURS = [
   {
     track: 'Water Vehicles (2026-07)',
     waves: [
+      { wave: 'W3 — the sea opens up', spots: [
+        S('⚓ Galveston marina', [4537.7, 1899.3], { heading: 1.18, mode: 'BOAT', time: 0.35, weather: 'clear', note: 'small-craft docks off the seawall — pier, slips, moored hulls, bait shack; idle in and the announcer names it' }),
+        S('⚓ Toledo Bend marina', [5636.2, -316.8], { heading: -2.54, mode: 'BOAT', time: 0.35, weather: 'clear', note: 'every baked lake got one marina at a seeded shore site — this one on the Sabine border water' }),
+        S('🔴 ICW channel markers — Land Cut', [2024.5, 4812], { heading: 0, mode: 'BOAT', time: 0.35, note: 'red/green buoy pairs run the Intracoastal down the Laguna Madre — red rides the mainland side; follow them north up the Land Cut' }),
+        S('⚓ Corpus Christi Ship Channel', [2088, 3551], { heading: Math.PI / 2, mode: 'BOAT', time: 0.35, note: 'hold W west into the channel: the fairway announces its real name as you cross in — 5 named fairways off the OSM bake' }),
+        S('🐕 Lacy rides the bow', [4700, 2150], { heading: -1.97, mode: 'BOAT', time: 0.35, act: 'lacy', note: 'the bow perch — she stands the foredeck nose to the wind; throttle up and watch her ride' }),
+        S('🚤 cruise hold', [4700, 2150], { heading: -1.97, mode: 'BOAT', time: 0.35, note: 'throttle to speed, release W: the boat keeps way on — set a course and watch the coast; S bleeds her down, and below steerage the drift dies to rest' }),
+        S('🗺️ where the world ends', [4762, 1851], { mode: 'BOAT', time: 0.5, note: 'press M: two faint dashed lines mark the world edge — the shelf wall at sea, the shoulder edge on land (the brighter blue dashes stay the Tidelands line); marker reads water-blue while afloat' }),
+      ] },
       { wave: 'W2 — water feel', spots: [
         S('⛈️ storm chop — open Gulf', [4700, 2150], { heading: -1.97, mode: 'BOAT', time: 0.35, weather: 'storm', note: 'storm rocking at rest — pitch, roll and bob follow the wind; throttle up and the hull flattens onto plane' }),
         S('🌊 wake + sparkle run', [4700, 2150], { heading: -1.97, mode: 'BOAT', time: 0.35, weather: 'clear', note: 'hold W: a foam wake trails and fades off the stern, sun glints sparkle on the water around the hull' }),

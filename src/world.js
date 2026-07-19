@@ -232,7 +232,7 @@ function buildTerrain(scene) {
       // Padre bbox: the 30-unit grid can't resolve a 10–40-unit island — hide
       // these cells under water and let buildIslands' fine sand mesh own it
       const padre = x > 2000 && x < 2350 && z > 3510 && z < 5500;
-      if (out && (m <= 2 || padre)) y = -4; // offshore: dip *below* the gulf water plane (-2.5)
+      if (out && (m <= 2 || padre)) y = -4; // offshore: dip *below* the gulf water plane (-2.5) — geo.js terrainMeshY duplicates this rule (boat legality); change one, change both
       const k = (j * W + i) * 3;
       pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
       // color: height ramp, then region/outside tint

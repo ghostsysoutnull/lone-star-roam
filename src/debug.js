@@ -25,7 +25,7 @@ const AIRPORT_TAG = {
 };
 const AIRPORT_STATE = { SHV: 'LA', TXK: 'AR', CVN: 'NM', HOB: 'NM', CVS: 'NM', BAD: 'LA' };
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf, trains }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf, trains, dog }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -153,6 +153,12 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       haunts.force = true; // the treasure gate honors force (haunts.js); day() clears it
       actions.night();
       hud.toast('✨ The gold light rides the swell tonight');
+    },
+    // Water Vehicles W3: transient Lacy for the bow-perch tour spot — owned
+    // for this session only, the save (and the shop purchase) untouched
+    lacy() {
+      dog.setOwned(true);
+      hud.toast('🐕 Lacy aboard for this session — the shop purchase is the real path');
     },
     bear() {
       // debug-only conjure through the real animal machinery — the natural

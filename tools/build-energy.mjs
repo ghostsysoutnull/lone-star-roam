@@ -412,10 +412,12 @@ console.log(`platforms: ${platRaw.length} raw -> ${platforms.length} sites (${pl
 // =================================================================
 const fairRaw = load('fairways').filter((el) => el.type === 'way' && el.geometry);
 const fairways = fairRaw
-  .map((el) => simplify(el.geometry.filter(Boolean).map((p) => proj(p.lon, p.lat))))
-  .filter((pts) => pts.length > 0)
-  .map((pts) => ({ pts }));
-console.log(`fairways: ${fairRaw.length} raw ways -> ${fairways.length} kept`);
+  .map((el) => ({
+    name: el.tags?.name ?? null,
+    pts: simplify(el.geometry.filter(Boolean).map((p) => proj(p.lon, p.lat))),
+  }))
+  .filter((f) => f.pts.length > 0);
+console.log(`fairways: ${fairRaw.length} raw ways -> ${fairways.length} kept (${fairways.filter((f) => f.name).length} named)`);
 
 // =================================================================
 // Write

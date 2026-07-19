@@ -1,6 +1,6 @@
 // HUD: minimap + fullscreen map (border/highways pre-rendered once), text readouts, toasts, dialog.
 import { Vector3 } from 'three';
-import { GEO, nearestCity, inTexas, borderZoneAt, SHOULDER_U, SHELF_U, TIDELANDS_U, coastDist } from './geo.js';
+import { GEO, nearestCity, inTexas, borderZoneAt, SHOULDER_U, SHELF_U, TIDELANDS_U, coastDist, borderDist } from './geo.js';
 import { AIRPORTS, fieldNear } from './airports.js';
 import { ATMOS } from './sky.js';
 import { KEYS, slotKey } from './slots.js';
@@ -206,6 +206,62 @@ export class HUD {
         }
       }
       ctx.stroke();
+      ctx.restore();
+    }
+    // World-edge iso-lines (Water Vehicles W3) — big map only, the Tidelands
+    // dash-pass idiom on the borderDist field: the shelf wall the boat stops
+    // at (SHELF_U past the coast) and the shoulder edge on US-neighbor land
+    // (SHOULDER_U; Mexico's edge is the river itself, already inked). Styled
+    // fainter than the Tidelands dashes — the legal line outranks the world
+    // line. Display only: the wall lives in geo.js inWorld, never here.
+    // Drawn-segment midpoints stay on `this.worldEdge` for the verify suite.
+    if (isWide && GEO.borderZones?.length) {
+      this.worldEdge = { sea: [], land: [] };
+      ctx.save();
+      ctx.strokeStyle = '#47535e'; ctx.lineWidth = 1; ctx.lineCap = 'round';
+      const FINE = 20, COARSE = 160;
+      const X0 = minX, X1 = maxX, Z0 = minZ, Z1 = maxZ;
+      const cache = new Map();
+      const bd = (x, z) => {
+        const k = x * 131072 + z;
+        let v = cache.get(k);
+        if (v === undefined) { v = borderDist(x, z); cache.set(k, v); }
+        return v;
+      };
+      for (const [LIMIT, zone, out] of [[SHELF_U, 'coast', 'sea'], [SHOULDER_U, 'land', 'land']]) {
+        const f = (x, z) => bd(x, z) - LIMIT;
+        ctx.beginPath();
+        for (let cx = X0; cx < X1; cx += COARSE) {
+          for (let cz = Z0; cz < Z1; cz += COARSE) {
+            const near = [[cx, cz], [cx + COARSE, cz], [cx, cz + COARSE], [cx + COARSE, cz + COARSE]]
+              .some(([x, z]) => Math.abs(f(x, z)) <= COARSE * 1.45);
+            if (!near) continue;
+            for (let x = cx; x < cx + COARSE; x += FINE) {
+              for (let z = cz; z < cz + COARSE; z += FINE) {
+                const v = [f(x, z), f(x + FINE, z), f(x + FINE, z + FINE), f(x, z + FINE)];
+                const E = [[x, z, x + FINE, z, v[0], v[1]], [x + FINE, z, x + FINE, z + FINE, v[1], v[2]],
+                  [x + FINE, z + FINE, x, z + FINE, v[2], v[3]], [x, z + FINE, x, z, v[3], v[0]]];
+                const hits = [];
+                for (const [ax, az, bx, bz, fa, fb] of E) {
+                  if (fa < 0 === fb < 0) continue;
+                  const t = fa / (fa - fb);
+                  hits.push([ax + (bx - ax) * t, az + (bz - az) * t]);
+                }
+                if (hits.length < 2) continue;
+                const mx = (hits[0][0] + hits[1][0]) / 2, mz = (hits[0][1] + hits[1][1]) / 2;
+                // keep the outside contour only — the field has a twin LIMIT
+                // units inside Texas, and each line owns one border zone
+                if (inTexas(mx, mz) || borderZoneAt(mx, mz) !== zone) continue;
+                this.worldEdge[out].push([mx, mz]);
+                if (((Math.floor(x / 80) + Math.floor(z / 80)) & 1) === 0) continue; // the dash gaps
+                const [p1x, p1z] = T(hits[0][0], hits[0][1]), [p2x, p2z] = T(hits[1][0], hits[1][1]);
+                ctx.moveTo(p1x, p1z); ctx.lineTo(p2x, p2z);
+              }
+            }
+          }
+        }
+        ctx.stroke();
+      }
       ctx.restore();
     }
     // county lines beneath everything
@@ -879,7 +935,8 @@ export class HUD {
     ctx.save();
     ctx.translate(W / 2, H / 2);
     ctx.rotate(-player.heading + Math.PI);
-    ctx.fillStyle = '#ffd35c';
+    // boat identity (W3): the marker reads water-blue while afloat, both maps
+    ctx.fillStyle = player.mode === 'BOAT' ? '#5cc8ff' : '#ffd35c';
     ctx.strokeStyle = '#000';
     ctx.lineWidth = 1;
     // notched chevron: sharp nose leads the heading, concave V-cut tail
@@ -907,7 +964,7 @@ export class HUD {
       const [lx, lz] = this.mapT(l.x, l.z);
       ctx.fillText(l.id, lx * sx, lz * sy + 15);
     }
-    ctx.fillStyle = '#ffd35c';
+    ctx.fillStyle = player.mode === 'BOAT' ? '#5cc8ff' : '#ffd35c';
     ctx.strokeStyle = '#000';
     ctx.beginPath(); ctx.arc(px * sx, pz * sy, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
   }

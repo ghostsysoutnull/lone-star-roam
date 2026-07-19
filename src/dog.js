@@ -60,13 +60,20 @@ export class DogSystem {
     if (hovering && !this._hoveringPrev) this.honked(); // liftoff — she stays grounded but yips
     this._hoveringPrev = hovering;
     if (p.mode !== 'WALK') {
-      // ride in the bed facing backward; mid-haul she sits up on the crates
-      if (this.g.parent !== p.truck) {
-        p.truck.add(this.g);
-        this.g.rotation.set(0, Math.PI, 0);
+      // ride in the bed facing backward; mid-haul she sits up on the crates.
+      // BOAT (Water Vehicles W3): bow perch on the foredeck, nose to the wind
+      const boat = p.mode === 'BOAT';
+      const mount = boat ? p.skiff : p.truck;
+      if (this.g.parent !== mount) {
+        mount.add(this.g);
+        this.g.rotation.set(0, boat ? 0 : Math.PI, 0);
       }
-      const crates = p.truck.userData.cargo.visible;
-      this.g.position.set(crates ? -0.35 : 0, crates ? 1.48 : 0.93, crates ? 1.27 : 1.3);
+      if (boat) {
+        this.g.position.set(0, 0.55, -1.5);
+      } else {
+        const crates = p.truck.userData.cargo.visible;
+        this.g.position.set(crates ? -0.35 : 0, crates ? 1.48 : 0.93, crates ? 1.27 : 1.3);
+      }
       for (const l of this.legs) l.rotation.x *= Math.pow(0.005, dt);
     } else {
       // hops out where the bed was (attach keeps the world transform) and follows

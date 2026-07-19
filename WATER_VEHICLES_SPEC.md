@@ -1,9 +1,10 @@
 # Water Vehicles — track spec
 
-Second track of the 2026-H2 program (`VISION_2026H2.md`; macro vision
-`VISION_WATER_VEHICLES.md`). Spec session 2026-07-19. First half of the
-sea program: this track ships the boat and the water it rides on;
-`VISION_SEA_INDUSTRY.md` lands on top of it.
+**Shipped in full 2026-07-19** (3 waves; folded into `ROADMAP.md` — this
+file stays as history). Second track of the 2026-H2 program
+(`VISION_2026H2.md`; macro vision `VISION_WATER_VEHICLES.md`). Spec session
+2026-07-19. First half of the sea program: this track ships the boat and
+the water it rides on; `VISION_SEA_INDUSTRY.md` lands on top of it.
 
 ## Executive summary
 

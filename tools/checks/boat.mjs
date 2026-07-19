@@ -84,10 +84,125 @@ export default async function boat(t) {
       return Math.abs(g.player.heading - h0);
     })()`);
     t.ok(turning > 0.8, `full-speed rudder barely turned: ${turning.toFixed(2)} rad`);
-    await t.simStep(2); // hands off: the glide carries (DRIVE would bleed to ~12%)
+    await t.simStep(2); // hands off above the band: cruise hold keeps way on (W3 — the W1 decay assertion inverted)
     const res = await t.ev(`({ v: g.player.speed, y: g.player.pos.y })`);
-    t.ok(res.v > v0 * 0.6 && res.v < v0 * 0.85, `coast retention off: ${res.v.toFixed(1)} of ${v0.toFixed(1)} after 2s`);
+    t.ok(res.v >= v0 * 0.95, `cruise hold bled the glide: ${res.v.toFixed(1)} of ${v0.toFixed(1)} after 2s`);
     t.near(res.y, -2.5, 0.01, 'y left the water plane during the run');
+  });
+
+  await t.check('cruise hold (W3): S bleeds the way off, below-band drift still dies to rest', async () => {
+    await t.tp(GULF.x, GULF.z, 'BOAT');
+    await t.ev(`(g.player.heading = -1.97, g.player.speed = 12)`);
+    await t.hold('KeyS');
+    await t.simStep(1.6); // 12 u/s ÷ 10 decel — through the band to a stop, no clamp floor
+    await t.release();
+    const bled = await t.ev('g.player.speed');
+    t.ok(bled <= 0.01, `S never bled the way off: ${bled.toFixed(2)}`);
+    // below the band the W1 decay owns the drift-to-rest feel (0.85/s)
+    await t.ev(`g.player.speed = 1.5`);
+    await t.simStep(3);
+    const drift = await t.ev('g.player.speed');
+    t.ok(drift < 1.05, `below-band drift not decaying — the hold leaked under the band: ${drift.toFixed(2)}`);
+    t.ok(drift > 0.2, `drift died too hard (a clamp or hard stop crept in): ${drift.toFixed(2)}`);
+  });
+
+  await t.check('marinas (W3): all six lakes + coastal ports, decks over water, announcer wired', async () => {
+    const res = await t.ev(`(() => {
+      const ms = g.maritime.marinas;
+      return { n: ms.length,
+        ports: ms.filter((m) => m.kind === 'port').length,
+        lakes: ms.filter((m) => m.kind === 'lake').length,
+        wet: ms.filter((m) => !!g.boatableAt(m.x, m.z)).length,
+        clear: ms.filter((m) => g.airportClear(m.x, m.z)).length,
+        levels: ms.filter((m) => Math.abs((g.boatableAt(m.x, m.z)?.y ?? 1e9) - m.y) < 0.001).length,
+        announced: ms.filter((m) => g.energy.sites.some((s) => s.label === '⚓ ' + m.name)).length,
+        lmFar: ms.filter((m) => g.LANDMARKS.every((l) => Math.hypot(l.at[0] - m.x, l.at[1] - m.z) > 32)).length,
+        names: ms.map((m) => m.name + '@' + m.x.toFixed(1) + ',' + m.z.toFixed(1)) };
+    })()`);
+    t.ok(res.lakes === 6, `lake marinas: ${res.lakes}/6 — ${res.names.join('; ')}`);
+    t.ok(res.ports >= 2, `coastal port marinas: ${res.ports} (Galveston + Corpus at minimum) — ${res.names.join('; ')}`);
+    t.ok(res.wet === res.n, `marina piers on dry ground: ${res.n - res.wet} of ${res.n}`);
+    t.ok(res.clear === res.n, `marina on an airport footprint: ${res.n - res.clear}`);
+    t.ok(res.levels === res.n, `marina deck level off its water body: ${res.n - res.levels}`);
+    t.ok(res.announced === res.n, `marinas missing from the announcer: ${res.n - res.announced}`);
+    t.ok(res.lmFar === res.n, `marina inside a landmark's 32u standoff: ${res.names.join('; ')}`);
+  });
+
+  await t.check('ICW (W3): red/green pairs down the Laguna Madre, afloat, red on the mainland side', async () => {
+    const res = await t.ev(`(() => {
+      const icw = g.maritime.icw;
+      return { pairs: icw.pairs,
+        wet: icw.spots.filter((p) => g.boatableAt(p.red.x, p.red.z) && g.boatableAt(p.green.x, p.green.z)).length,
+        redWest: icw.spots.filter((p) => p.red.x < p.green.x).length };
+    })()`);
+    t.ok(res.pairs >= 30 && res.pairs <= 90, `ICW pair count out of range: ${res.pairs}`);
+    t.ok(res.wet === res.pairs, `buoys aground: ${res.pairs - res.wet}`);
+    t.ok(res.redWest === res.pairs, `red buoy east of green on ${res.pairs - res.redWest} pairs`);
+  });
+
+  await t.check('invisible-wall fix (W3.1): the Corpus wall sits at the visible waterline, islands stay land', async () => {
+    const res = await t.ev(`(() => {
+      // find a real sliver of the class: official Texas that renders sunken —
+      // the bay's NE exit shoals are riddled with them (the playtest wall)
+      let sliver = null;
+      for (let x = 2100; x <= 2260 && !sliver; x += 6)
+        for (let z = 3480; z <= 3560 && !sliver; z += 6)
+          if (g.inTexas(x, z) && !g.onIsland(x, z) && !g.beachAt(x, z) && g.terrainMeshY(x, z) <= g.SEA_Y) sliver = { x, z };
+      // the tour run west: the hull must ground at risen terrain, not mid-water
+      const p = g.player;
+      p.pos.set(2088, 0, 3551); p.setMode('BOAT'); p.speed = 0;
+      p.heading = Math.PI / 2;
+      p.keys['KeyW'] = true;
+      for (let i = 0; i < 400 && !(p.speed === 0 && i > 20); i++) p.update(0.05);
+      p.keys = {};
+      const fx = -Math.sin(p.heading), fz = -Math.cos(p.heading);
+      // padre.mjs membership points: Malaquite beach (north ring) + SPI spit
+      const island = [[2102.3, 3971.2], [2225.2, 5449.1]]
+        .map(([x, z]) => ({ x, z, on: g.onIsland(x, z), w: g.boatableAt(x, z) }));
+      return { sliver, sliverWet: sliver ? !!g.boatableAt(sliver.x, sliver.z) : null,
+        grounded: p.speed === 0, groundX: p.pos.x,
+        aheadMeshY: g.terrainMeshY(p.pos.x + fx * 1.5, p.pos.z + fz * 1.5), island };
+    })()`);
+    t.ok(res.sliver, 'premise drifted: no sunken border-Texas sliver left in the Corpus window — re-diagnose this check');
+    t.ok(res.sliverWet, `sunken bay-front sliver still reads as land at ${res.sliver?.x},${res.sliver?.z} (the invisible wall is back)`);
+    t.ok(res.grounded, 'westward tour run never grounded — the inner-harbor wall vanished entirely');
+    t.ok(res.aheadMeshY > (await t.ev('g.SEA_Y')) - 0.05, `grounded with sunken terrain still ahead (mesh y ${res.aheadMeshY.toFixed(2)} at x ${res.groundX.toFixed(1)}) — wall not at the visible waterline`);
+    t.ok(res.island.every((p) => p.on && p.w === null), `island points became navigable (${JSON.stringify(res.island)}) — the onIsland guard is not holding`);
+  });
+
+  await t.check('fairway announce (W3): 5 real names registered; a boat crossing the Ship Channel toasts it', async () => {
+    const reg = await t.ev(`(() => {
+      const named = g.GEO.energy.fairways.filter((f) => f.name);
+      return { named: named.length,
+        regd: named.filter((f) => g.energy.sites.some((s) => s.label === '⚓ ' + f.name)).length };
+    })()`);
+    t.ok(reg.named === 5, `baked named fairways: ${reg.named}, expected 5 (bake drifted)`);
+    t.ok(reg.regd === 5, `named fairways registered: ${reg.regd}/5`);
+    const res = await t.ev(`(() => {
+      const s = g.energy.sites.find((x) => x.label === '⚓ Corpus Christi Ship Channel');
+      if (!s) return { err: 'ship channel not registered' };
+      let start = null;
+      for (let a = 0; a < 16 && !start; a++) {
+        const dx = Math.sin((a / 16) * Math.PI * 2), dz = Math.cos((a / 16) * Math.PI * 2);
+        const x = s.x + dx * (s.r + 12), z = s.z + dz * (s.r + 12);
+        if (g.boatableAt(x, z) && g.boatableAt(s.x + dx * s.r * 0.5, s.z + dz * s.r * 0.5)) start = { x, z };
+      }
+      if (!start) return { err: 'no boatable approach radial found', r: s.r };
+      const p = g.player;
+      p.pos.set(start.x, 0, start.z); p.setMode('BOAT'); p.speed = 0; p.vy = 0;
+      p.heading = Math.atan2(-(s.x - start.x), -(s.z - start.z));
+      const old = g.energy.onToast, got = [];
+      g.energy.onToast = (m) => got.push(m);
+      g.energy.cooldown = 0; s.armed = true;
+      p.keys['KeyW'] = true;
+      for (let i = 0; i < 400 && !got.includes(s.label); i++) { p.update(0.05); g.energy.update(0.05, p.pos.x, p.pos.z); }
+      p.keys = {};
+      g.energy.onToast = old;
+      return { got, r: s.r, mode: p.mode };
+    })()`);
+    t.ok(!res.err, `${res.err} (r=${res.r})`);
+    t.ok(res.mode === 'BOAT', `approach fell out of BOAT: ${res.mode}`);
+    t.ok(res.got.includes('⚓ Corpus Christi Ship Channel'), `20s boat run never announced the channel (toasts: ${res.got.join(' | ') || 'none'}, r=${res.r?.toFixed(0)})`);
   });
 
   await t.check('beaches at the Laguna shore: stops, hull stays on water', async () => {

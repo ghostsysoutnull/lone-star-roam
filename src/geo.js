@@ -128,6 +128,34 @@ export function hAt(x, z) {
   return v * VSCALE;
 }
 
+// The terrain mesh's RENDERED height at (x,z) — hAt clamps low and never
+// dips, but world.js buildTerrain sinks out-flagged sea-level cells (and the
+// whole Padre bbox) to -4, below the gulf plane. Same bilinear as hAt over
+// the dip-applied vertex heights; the dip rule is duplicated from
+// buildTerrain — change one, change both. Consumed by boatableAt so the
+// beaching wall sits at the waterline the EYE sees: the fine border polygon
+// claims 30u DEM slivers of bay front that render underwater, and the boat
+// used to ground on them mid-"open water" (the Corpus Ship Channel playtest,
+// 2026-07-19).
+export function terrainMeshY(x, z) {
+  const e = ELEV;
+  if (!e.data) return 0;
+  const fx = ((x - e.minX) / (e.maxX - e.minX)) * (e.w - 1);
+  const fz = ((z - e.minZ) / (e.maxZ - e.minZ)) * (e.h - 1);
+  const i = Math.max(0, Math.min(e.w - 2, Math.floor(fx)));
+  const j = Math.max(0, Math.min(e.h - 2, Math.floor(fz)));
+  const dx = Math.max(0, Math.min(1, fx - i)), dz = Math.max(0, Math.min(1, fz - j));
+  const y = (jj, ii) => {
+    const raw = e.data[jj * e.w + ii], m = raw & 0x7fff;
+    const vx = e.minX + ((e.maxX - e.minX) * ii) / (e.w - 1);
+    const vz = e.minZ + ((e.maxZ - e.minZ) * jj) / (e.h - 1);
+    const padre = vx > 2000 && vx < 2350 && vz > 3510 && vz < 5500;
+    return (raw & 0x8000) && (m <= 2 || padre) ? -4 : m * VSCALE;
+  };
+  return y(j, i) * (1 - dx) * (1 - dz) + y(j, i + 1) * dx * (1 - dz) +
+    y(j + 1, i) * (1 - dx) * dz + y(j + 1, i + 1) * dx * dz;
+}
+
 // outside-Texas mask at grid nodes (nearest neighbour is fine for tinting)
 export function outsideAt(x, z) {
   const e = ELEV;
@@ -543,6 +571,12 @@ export function borderZoneAt(x, z) {
   return classify(x, z);
 }
 
+// Water Vehicles W3: raw distance to the border polygon — sampled by the big
+// map's world-edge iso-lines (display only; the wall itself stays inWorld's).
+export function borderDist(x, z) {
+  return nearestDist(x, z, GEO.border);
+}
+
 // Navigable water for BOAT (Water Vehicles W1) — {kind:'gulf'|'lake', y} or
 // null. Gulf legality is the zone classifier, NOT depth: hAt clamps at the
 // DEM edge and never returns negative (the -4 offshore dip is mesh-only), so
@@ -558,7 +592,12 @@ export function boatableAt(x, z) {
     if (x < bb.minX || x > bb.maxX || z < bb.minZ || z > bb.maxZ) continue;
     if (inPoly(x, z, lake.pts)) return { kind: 'lake', y: lake.level };
   }
-  if (inTexas(x, z) || beachAt(x, z)) return null; // land or wet-sand shore (islands are inTexas)
+  if (beachAt(x, z)) return null; // wet-sand shore
+  // Land is what the eye sees, not the border polygon: fine-polygon slivers
+  // of bay front render sunken (terrainMeshY ≤ SEA_Y) and must stay navigable
+  // — the invisible-wall class (Corpus Ship Channel). Islands render via the
+  // fine sand mesh instead of the DEM, so they stay land regardless.
+  if (inTexas(x, z) && (onIsland(x, z) || terrainMeshY(x, z) > SEA_Y)) return null;
   if (classify(x, z) !== 'coast') return null;
   if (nearestDist(x, z, GEO.border) > SHELF_U) return null; // past the shelf wall
   return { kind: 'gulf', y: SEA_Y };

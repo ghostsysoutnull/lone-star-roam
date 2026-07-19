@@ -5,8 +5,8 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 
 No active priority track (aviation shipped in full 2026-07-12; Brands,
 Jetpack, Agriculture, the Shoulder & the Shelf, Band Parity, New Player
-Experience, Energy, Performance, and Railroads Realism followed and are
-folded in below). Queued work lives in `BACKLOG.md`.
+Experience, Energy, Performance, Railroads Realism, and Water Vehicles
+followed and are folded in below). Queued work lives in `BACKLOG.md`.
 
 - [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
   tools/test.mjs` runs four sub-second Node-only groups (`aviation`, `data`,
@@ -704,6 +704,32 @@ folded in below). Queued work lives in `BACKLOG.md`.
   `GEO.rails` — the placard crosses the state line for free), same ribbon
   styling as Texas track, band rails join the train spawn candidate list
   (liveries free from OSM tags), one `trainHere` tour spot per strip.
+- [x] ~~Water Vehicles~~ — done 2026-07-19 (3 waves, `WATER_VEHICLES_SPEC.md`
+  kept as history; second track of the 2026-H2 program): the boat and the
+  water it rides on. **W1 — BOAT mode**: the skiff joins the V cycle as a
+  free core mode, position-gated (`boatableAt` in geo.js: gulf by zone
+  classifier ∩ shelf, all 6 baked lakes by polygon + baked per-lake level);
+  momentum physics (slow spool, long glide, rudder needs way on, beaches at
+  the waterline); DRIVE soft-stops at the water's edge and hints the boat;
+  gulf plane gets an RGBA fade past the DEM grid (closes the
+  ocean-after-dry-land playtest item). **W2 — water feel**: wind-driven chop
+  (pitch/bob off live ATMOS, flattens on plane), stern wake + sun-sparkle
+  instanced pools y-staggered above the one gulf plane, water ambience +
+  boat engine in audio.js, river/lake offsets retuned (`LAKE_OFFSET` 0.3 /
+  `RIVER_OFFSET` 0.12, asserted); border reservoirs un-walled across the Rio
+  Grande channel; `spawnPuff` mirror fix (every trail had flanked at
+  diagonal headings). **W3 — the sea opens up**: 5 real named fairways
+  announce by `energy.register()` (names carried through the bake); marinas
+  at 3 coastal ports + all 6 lakes (merged vertex-colored kit, seeded lake
+  shore sites, road/airport/landmark standoffs); 55 red/green ICW buoy pairs
+  down the Laguna Madre (lagoon-only scope); Lacy rides the bow; cruise hold
+  (release W above ~2 u/s and the boat keeps way on — no min-speed clamp, so
+  beaching and drift-to-rest survive); big-map world-edge iso-lines
+  (`SHELF_U`/`SHOULDER_U` on the `borderDist` field, Tidelands dash-pass
+  idiom, fainter than the legal line); boat-blue map marker; `lacy` debug
+  action for the perch tour spot. Playtest fix (W3.1): gulf legality follows
+  the *visible* waterline (`terrainMeshY` vs the border polygon) — sunken
+  bay-front slivers no longer make invisible walls (Corpus Ship Channel).
 
 ## Known limitations (v1)
 

@@ -43,6 +43,7 @@ const BOAT_SPEED = 24;
 const BOAT_ACCEL = 10;
 const BOAT_REV = -3.5;
 const BOAT_COAST = 0.85; // per-second speed retention while coasting (DRIVE keeps 0.35)
+const BOAT_HOLD = 2;     // cruise-hold band (W3): coasting above this holds way on; below it, drift-to-rest
 const BOAT_TURN = 1.5;   // rad/s at full authority (DRIVE turns at 1.9)
 const WAKE_N = 40;       // wake pool cap — fixed at birth, zero steady-state allocation
 const SPARK_N = 48;      // sparkle pool
@@ -333,7 +334,10 @@ export class Player {
       // momentum-heavy: slow spool-up, a glide that carries, rudder needs way on
       if (fwd) this.speed += BOAT_ACCEL * dt;
       else if (back) this.speed -= (this.speed > 0 ? 10 : 5) * dt;
-      else this.speed *= Math.pow(BOAT_COAST, dt);
+      // cruise hold (W3): above the band the glide stops decaying — release W
+      // and she holds way on; below it the old decay reclaims drift-to-rest.
+      // No min-speed clamp (a floor would fight beaching's hard stop).
+      else if (this.speed <= BOAT_HOLD) this.speed *= Math.pow(BOAT_COAST, dt);
       this.speed = THREE.MathUtils.clamp(this.speed, BOAT_REV, BOAT_SPEED);
       this.heading += steer * dt * BOAT_TURN * Math.min(1, Math.abs(this.speed) / 8) * Math.sign(this.speed || 1);
       const nx = this.pos.x - Math.sin(this.heading) * this.speed * dt;

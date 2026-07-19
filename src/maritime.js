@@ -1,8 +1,10 @@
 // The working Gulf: container ports at real locations, cargo ships and tankers
 // on coastal lanes, shrimp boats off Padre, oil platforms offshore.
 import * as THREE from 'three';
-import { GEO, hAt, coastDist, seededRand, inWorld, SEA_Y } from './geo.js';
+import { GEO, hAt, coastDist, seededRand, inWorld, SEA_Y, nearestRoad, boatableAt } from './geo.js';
 import { ATMOS } from './sky.js';
+import { mergeGeoms } from './world.js';
+import { airportClear } from './airports.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const SEA = SEA_Y + 0.4; // hulls sit slightly proud of the gulf water plane
@@ -39,8 +41,17 @@ const LANE = [
 // border + island rings offline), off the Bolivar Roads entrance channel
 const BUOY_AT = [4762.2, 1851.5];
 
+// Gulf Intracoastal Waterway through the Laguna Madre — hand-laid (the lane's
+// scarcity exception), Brownsville channel → Port Isabel → the Land Cut.
+// Lagoon-only scope (W3 call): the marker line stops at Baffin Bay's mouth.
+const ICW = [
+  LL(25.96, -97.33), LL(25.97, -97.24), LL(26.06, -97.21), LL(26.26, -97.28),
+  LL(26.56, -97.34), LL(26.84, -97.43), LL(27.06, -97.45), LL(27.28, -97.42),
+];
+
 export class MaritimeSystem {
-  constructor(scene, sky) {
+  constructor(scene, sky, landmarks = []) {
+    this.landmarks = landmarks; // W3 marina standoff (passed in — importing gameplay.js here would cycle via vehicle.js)
     this.sky = sky; // Energy W4: rig decks register into sky's local light pool
     // emissive glow materials (rig flares, work lights, buoy lamp) — opacity
     // driven by ATMOS.night in update; fog:false so the horizon skyline
@@ -65,6 +76,9 @@ export class MaritimeSystem {
     this.fairwayLegs = this.buildFairwayLegs();
     this.ships = this.buildShips(scene);
     this.buoy = this.buildBuoy(scene);
+    // Water Vehicles W3: small-craft marinas + ICW channel markers
+    this.marinas = this.buildMarinas(scene);
+    this.icw = this.buildICW(scene);
     // shelf plaques — readable brass, NOT landmarks (the counters stay sacred);
     // main.js's unified plaqueNear consults this list as its third source
     const fs = this.farSite;
@@ -278,6 +292,133 @@ export class MaritimeSystem {
     g.position.set(BUOY_AT[0], 0, BUOY_AT[1]);
     scene.add(g);
     return g;
+  }
+
+  // Water Vehicles W3: small-craft marinas — dock dressing at the real ports
+  // and one seeded shoreline site per baked lake. Flavor sites, never gates
+  // (the V cycle stays position-gated). One merged vertex-colored mesh for all
+  // sites; decks float above the water plane on a y-stagger (one-gulf-plane
+  // law — never a second water surface).
+  buildMarinas(scene) {
+    const sites = [];
+    // 32u landmark standoff — the Galveston south march once parked the docks
+    // under the Pleasure Pier wheel and the kit read as ride clutter
+    const lmClear = (x, z) => this.landmarks.every((l) => Math.hypot(l.at[0] - x, l.at[1] - z) > 32);
+    // ports: march the compass out from the wharf until open water takes over.
+    // 30u minimum standoff — closer in, the kit merges into the crane/wharf
+    // dressing and reads as port clutter, not its own small-craft site
+    for (const port of PORTS) {
+      const [px, pz] = port.at;
+      let best = null;
+      for (let a = 0; a < 16; a++) {
+        const dx = Math.sin((a / 16) * Math.PI * 2), dz = Math.cos((a / 16) * Math.PI * 2);
+        for (let d = 30; d <= 60; d += 2) {
+          const x = px + dx * d, z = pz + dz * d;
+          if (!boatableAt(x, z) || !boatableAt(x + dx * 5, z + dz * 5)) continue;
+          if (!lmClear(x + dx * 5, z + dz * 5)) break; // this radial ends at a landmark — try the next
+          if (!best || d < best.d) best = { d, x: x + dx * 5, z: z + dz * 5, dx, dz };
+          break;
+        }
+      }
+      if (best) sites.push({ name: `${port.name} marina`, x: best.x, z: best.z, y: SEA_Y, heading: Math.atan2(-best.dx, -best.dz), kind: 'port' });
+    }
+    // lakes: seeded shore vertex, chapelAt-pattern legality (road-clear ≥5,
+    // airport-clear), nudged inward until the pier head floats over water
+    for (const lake of GEO.lakes) {
+      const rnd = seededRand('marina:' + lake.name);
+      const n = lake.pts.length, start = Math.floor(rnd() * n);
+      let cx = 0, cz = 0;
+      for (const [x, z] of lake.pts) { cx += x / n; cz += z / n; }
+      for (let i = 0; i < n; i++) {
+        const [sx, sz] = lake.pts[(start + i) % n];
+        if (nearestRoad(sx, sz, 5) || !airportClear(sx, sz) || !lmClear(sx, sz)) continue;
+        const dd = Math.hypot(cx - sx, cz - sz) || 1;
+        const dx = (cx - sx) / dd, dz = (cz - sz) / dd;
+        const x = sx + dx * 3.5, z = sz + dz * 3.5;
+        if (!boatableAt(x, z) || !boatableAt(x + dx * 5, z + dz * 5)) continue;
+        sites.push({ name: `${lake.name} marina`, x, z, y: lake.level, heading: Math.atan2(-dx, -dz), kind: 'lake' });
+        break;
+      }
+    }
+    // the kit: pier + T-head + finger slips, pilings, moored hulls, bait shack
+    const tint = (geo, hex) => {
+      const g = geo.toNonIndexed(), c = new THREE.Color(hex);
+      const m = g.attributes.position.count, arr = new Float32Array(m * 3);
+      for (let i = 0; i < m; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+      return g;
+    };
+    const parts = [];
+    const KIT = [
+      // [w, h, d, x, y, z, color] — local frame: -z seaward, y 0 at water level
+      [1.1, 0.22, 7.6, 0, 0.42, 0, 0x9a7a55],       // main pier (reaches the shore platform)
+      [4.6, 0.22, 1.1, 0, 0.42, -3.9, 0x9a7a55],    // T-head
+      [1.6, 0.18, 0.5, -1.35, 0.40, -1.2, 0x9a7a55], // finger slips
+      [1.6, 0.18, 0.5, 1.35, 0.40, -1.2, 0x9a7a55],
+      [1.6, 0.18, 0.5, -1.35, 0.40, 0.8, 0x9a7a55],
+      [1.6, 0.18, 0.5, 1.35, 0.40, 0.8, 0x9a7a55],
+      // pilings poke above the deck so the pier reads as standing on posts
+      [0.22, 1.0, 0.22, -2.2, 0.35, -3.9, 0x4a4038],
+      [0.22, 1.0, 0.22, 2.2, 0.35, -3.9, 0x4a4038],
+      [0.22, 1.0, 0.22, -0.66, 0.35, -1.2, 0x4a4038],
+      [0.22, 1.0, 0.22, 0.66, 0.35, 0.8, 0x4a4038],
+      [0.22, 1.0, 0.22, -0.66, 0.35, 3.3, 0x4a4038],
+      [0.22, 1.0, 0.22, 0.66, 0.35, 3.3, 0x4a4038],
+      [0.7, 0.3, 1.7, -1.15, 0.18, -0.2, 0xeef0ea],  // moored small craft
+      [0.7, 0.3, 1.7, 1.15, 0.18, -0.2, 0xeef0ea],
+      [0.7, 0.3, 1.7, -1.15, 0.18, 1.8, 0xeef0ea],
+      [0.5, 0.35, 0.6, -1.15, 0.45, -0.4, 0x2563b0], // a cabin or two
+      [0.5, 0.35, 0.6, 1.15, 0.45, 1.6, 0x3f7a3f],
+      [0.7, 0.3, 1.7, 1.15, 0.18, 1.8, 0xeef0ea],
+      [1.8, 0.26, 2.0, 0, 0.36, 4.3, 0x8a6c49],      // shore platform — a step below the pier deck (no coplanar tops)
+      [1.3, 0.9, 1.0, 0, 0.94, 4.3, 0xe8e0cc],       // bait shack
+      [1.5, 0.2, 1.2, 0, 1.46, 4.3, 0x8a3b2e],       // its red roof
+    ];
+    for (const s of sites) {
+      for (const [w, h, d, x, y, z, col] of KIT) {
+        const g = tint(new THREE.BoxGeometry(w, h, d), col);
+        g.translate(x, y, z);
+        g.rotateY(s.heading);
+        g.translate(s.x, s.y, s.z);
+        parts.push(g);
+      }
+    }
+    if (parts.length) {
+      const mesh = new THREE.Mesh(mergeGeoms(parts), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+      scene.add(mesh);
+    }
+    return sites;
+  }
+
+  // Water Vehicles W3: ICW channel markers — red/green pairs every ~25u down
+  // the lagoon, instanced (2 draw calls). Red rides the mainland (west) side,
+  // "red right returning"; pairs that would sit on land or spoil drop out.
+  buildICW(scene) {
+    const spots = [];
+    for (let i = 1; i < ICW.length; i++) {
+      const [ax, az] = ICW[i - 1], [bx, bz] = ICW[i];
+      const len = Math.hypot(bx - ax, bz - az), tx = (bx - ax) / len, tz = (bz - az) / len;
+      for (let s = i === 1 ? 0 : 12.5; s < len; s += 25) {
+        const x = ax + tx * s, z = az + tz * s;
+        const l = { x: x + tz * 1.6, z: z - tx * 1.6 }, r = { x: x - tz * 1.6, z: z + tx * 1.6 };
+        const red = l.x < r.x ? l : r, green = l.x < r.x ? r : l;
+        if (boatableAt(red.x, red.z) && boatableAt(green.x, green.z)) spots.push({ red, green });
+      }
+    }
+    const mk = (geo, color) => {
+      const m = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color, flatShading: true }), spots.length);
+      m.frustumCulled = false; // one instance run spans the whole lagoon
+      scene.add(m);
+      return m;
+    };
+    const nuns = mk(new THREE.ConeGeometry(0.28, 0.8, 6), 0xc23b30);
+    const cans = mk(new THREE.CylinderGeometry(0.26, 0.26, 0.65, 6), 0x2f8a4a);
+    const M = new THREE.Matrix4();
+    spots.forEach(({ red, green }, i) => {
+      nuns.setMatrixAt(i, M.makeTranslation(red.x, SEA_Y + 0.38, red.z));
+      cans.setMatrixAt(i, M.makeTranslation(green.x, SEA_Y + 0.35, green.z));
+    });
+    return { pairs: spots.length, spots, pts: ICW };
   }
 
   // shelf plaques (buoy + Far Rig) for main.js's unified plaque lookup

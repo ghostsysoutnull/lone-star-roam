@@ -174,7 +174,27 @@ graduate here (and out of `NEXT_SESSION.md`).
   them, and the drive cap there is the offroad/beach path.
 - **Gulf is ONE vertex-colored plane** (`name: 'gulf'`) — never add a second
   near-coplanar water plane. THREE.Color stores linear-sRGB: checks compare
-  linear values, not the hex you typed.
+  linear values, not the hex you typed. Everything on the water floats above
+  the plane on a y-stagger (wake/sparkle pools in vehicle.js, marina decks +
+  ICW buoys in maritime.js — Water Vehicles); the plane's RGBA edge fade past
+  the DEM grid is asserted by `boat.mjs` and must stay.
+- **Water offsets are asserted pairs** (Water Vehicles W2): `LAKE_OFFSET`
+  0.3 (geo.js, baked into every `lake.level`) and `RIVER_OFFSET` 0.12
+  (world.js export) are asserted in `boat.mjs` — a look-pass retune must
+  land in the source and the check together.
+- **Boat legality is what the eye sees, not the border polygon** (Water
+  Vehicles W3.1, Corpus playtest): the fine border claims 30u DEM slivers of
+  bay front that render underwater (out-flagged sea-level cells + the whole
+  Padre bbox dip to -4) — those slivers are navigable. `boatableAt` gulf
+  land test = `inTexas ∧ (onIsland ∨ terrainMeshY > SEA_Y)`; geo.js
+  `terrainMeshY` duplicates buildTerrain's vertex dip rule — change one,
+  change both. Islands stay land via `onIsland` (they render through the
+  fine sand mesh, their DEM is deliberately dipped).
+- **Lake water is un-walled** (Water Vehicles W2/W3): the world-edge wall
+  (vehicle.js `inW`) exempts `boatableAt` kind `'lake'` so border reservoirs
+  stay open across the Rio Grande channel. The big map's world-edge
+  iso-lines (`hud.worldEdge`, `borderDist` field) are display-only — never
+  re-wall water from the map pass; the wall lives in geo.js `inWorld` alone.
 - **sky.js owns every light.** Night glows are shared materials with `fog: false`
   and opacity driven off `ATMOS.night` — reuse them, never mint per-prop glow mats.
 - **Every gas/refinery flame shares ScenerySystem's one `flareMat`** — its
