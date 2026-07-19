@@ -177,7 +177,7 @@ async function boot() {
   title.onShow = () => settings.refresh();
   buildGuide();
   const perf = new PerfMonitor(); // lap timing for every system in the render loop below
-  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf }); // panel only with ?debug=1; actions drive the verify suite
+  const debug = initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf, trains }); // panel only with ?debug=1; actions drive the verify suite
   player.flares = flares; // hud reads the rack count off the player
 
   // Harness/boot spawn on I-35 just south of Austin (suites depend on it);

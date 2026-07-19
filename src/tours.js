@@ -13,6 +13,17 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'Railroads (2026-07)',
+    waves: [
+      { wave: 'W1 — liveries + commuter sets', spots: [
+        S('🚂 UP armour yellow — Brownsville Sub', [1797.6, 3498.7], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'a Union Pacific freight forced onto the sub next to you — the loco wears armour yellow; the mixed car colors are real interchange practice' }),
+        S('🚂 BNSF orange — Dalhart Sub', [-2465.3, -4942.9], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'BNSF Panhandle country — the loco comes up in BNSF orange' }),
+        S('🚂 CPKC red — Laredo Sub', [843.2, 4097.7], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'the #1 US–Mexico rail gateway line, CPKC red — W2 stages the actual river crossing at Laredo' }),
+        S('🚆 TRE commuter — DFW Subdivision', [2413.1, -2020.9], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'a short Trinity Railway Express passenger set (loco + coaches) instead of freight — commuter lines run commuter trains now' }),
+      ] },
+    ],
+  },
+  {
     track: 'Performance (2026-07)',
     waves: [
       { wave: 'W1 — instrumentation + baseline', spots: [

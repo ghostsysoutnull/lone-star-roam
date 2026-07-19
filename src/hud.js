@@ -232,6 +232,19 @@ export class HUD {
       l.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
       ctx.closePath(); ctx.fill();
     }
+    // rail lines under the roads — dashed, dark neutral (cartographic rail ink)
+    ctx.strokeStyle = '#6a6258';
+    ctx.lineWidth = 0.8;
+    ctx.setLineDash([3, 3]);
+    let nRails = 0;
+    for (const r of GEO.rails ?? []) {
+      nRails++;
+      ctx.beginPath();
+      r.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    this.mapStats = { rails: nRails }; // numeric layer assertion for the rails suite
     const roadStyle = {
       motorway: ['#c05040', 1.6], trunk: ['#907048', 0.8],
       primary: ['#6a6a52', 0.5], street: ['#4c5258', 0.4],

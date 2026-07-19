@@ -36,9 +36,32 @@ const mkTanker = () => merge([
   tinted(new THREE.BoxGeometry(1.8, 0.35, 3.1).translate(0, 0.5, 0), DARK),
   wheelPair(-1.1), wheelPair(1.1),
 ]);
+const mkCoach = () => merge([
+  tinted(new THREE.BoxGeometry(1.7, 1.3, 3.1).translate(0, 1.15, 0), 0xffffff),
+  tinted(new THREE.BoxGeometry(1.74, 0.4, 2.5).translate(0, 1.45, 0), 0x2e3640), // window band
+  tinted(new THREE.BoxGeometry(1.8, 0.35, 3.1).translate(0, 0.5, 0), DARK),
+  wheelPair(-1.1), wheelPair(1.1),
+]);
 
 const LOCO_COLORS = [0xd8a13b, 0x3b62c2, 0xc23b3b, 0x3f7a3f];
 const CAR_COLORS = [0x8a5a3a, 0x5a6a72, 0x7a3b3b, 0x4a6a4a, 0x9a8a4a, 0x555a66, 0xb05a2a];
+
+// Real operator liveries: instance tint on the white bodywork only — the
+// frame stays baked DARK. Both UP spellings appear in the OSM bake. DART is
+// deliberately absent (light rail, near-absent from the usage=main bake —
+// real-or-absent). Freight cars stay CAR_COLORS: interchange practice.
+const LIVERY = {
+  'Union Pacific Railroad': 0xffc21e, 'Union Pacific': 0xffc21e,
+  'BNSF Railway': 0xff5a14,
+  'CPKC': 0xcc1f33,
+  'Rio Grande Pacific Corporation': 0x6e3042,
+  'Trinity Railway Express': 0xe8eaf0,
+  'TEXRail': 0xc9ced6,
+};
+const COMMUTER = new Set(['Trinity Railway Express', 'TEXRail']);
+// Commuter sets are short (loco + 3–5 coaches ≈ 20 units), so they accept the
+// short urban lines the freight mainline filter exists to reject.
+const FREIGHT_EXT = 350, FREIGHT_LEN = 500, COMMUTER_EXT = 40, COMMUTER_LEN = 60;
 
 export class TrainSystem {
   constructor(scene) {
@@ -49,6 +72,7 @@ export class TrainSystem {
       boxcar: new THREE.InstancedMesh(mkBoxcar(), mat, POOL),
       hopper: new THREE.InstancedMesh(mkHopper(), mat, POOL),
       tanker: new THREE.InstancedMesh(mkTanker(), mat, POOL),
+      coach: new THREE.InstancedMesh(mkCoach(), mat, MAX_TRAINS * 6),
     };
     for (const m of Object.values(this.meshes)) {
       m.frustumCulled = false;
@@ -73,8 +97,14 @@ export class TrainSystem {
         if (x < minX) minX = x; if (x > maxX) maxX = x;
         if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
       }
-      return { pts: r.pts, minX, maxX, minZ, maxZ, cum: null, len: 0 };
+      return {
+        pts: r.pts, minX, maxX, minZ, maxZ, cum: null, len: 0,
+        operator: r.operator ?? null,
+        livery: LIVERY[r.operator] ?? null,
+        commuter: COMMUTER.has(r.operator),
+      };
     });
+    this.LIVERY = LIVERY; // checks assert chosen colors against the same table
     this.trains = [];
     this.m4 = new THREE.Matrix4();
     this.q = new THREE.Quaternion();
@@ -110,14 +140,15 @@ export class TrainSystem {
   spawn(px, pz) {
     const near = this.rails.filter((r) =>
       px > r.minX - SPAWN_R && px < r.maxX + SPAWN_R && pz > r.minZ - SPAWN_R && pz < r.maxZ + SPAWN_R &&
-      // mainlines only — no freight trains on 200-unit yard spurs
-      Math.max(r.maxX - r.minX, r.maxZ - r.minZ) > 350);
+      // freight mainlines only — no 14-car trains on 200-unit yard spurs;
+      // short commuter sets accept the short urban lines
+      Math.max(r.maxX - r.minX, r.maxZ - r.minZ) > (r.commuter ? COMMUTER_EXT : FREIGHT_EXT));
     if (!near.length) return;
     const rail = near[(Math.random() * near.length) | 0];
     this.arcInit(rail);
-    if (rail.len < 500) return;
-    const nCars = 14 + ((Math.random() * 14) | 0);
-    if (rail.len < nCars * CAR_LEN + 60) return;
+    if (rail.len < (rail.commuter ? COMMUTER_LEN : FREIGHT_LEN)) return;
+    const nCars = rail.commuter ? 3 + ((Math.random() * 3) | 0) : 14 + ((Math.random() * 14) | 0);
+    if (rail.len < nCars * CAR_LEN + (rail.commuter ? 20 : 60)) return;
     const dir = Math.random() < 0.5 ? 1 : -1;
     const s0 = Math.random() * rail.len;
     // don't spawn right on top of the player
@@ -126,12 +157,46 @@ export class TrainSystem {
     const types = ['boxcar', 'hopper', 'tanker'];
     this.trains.push({
       rail, s: s0, dir,
-      locoColor: LOCO_COLORS[(Math.random() * LOCO_COLORS.length) | 0],
-      cars: Array.from({ length: nCars }, () => ({
-        type: types[(Math.random() * types.length) | 0],
-        color: CAR_COLORS[(Math.random() * CAR_COLORS.length) | 0],
-      })),
+      locoColor: rail.livery ?? LOCO_COLORS[(Math.random() * LOCO_COLORS.length) | 0],
+      cars: Array.from({ length: nCars }, () => (rail.commuter
+        ? { type: 'coach', color: rail.livery }
+        : {
+          type: types[(Math.random() * types.length) | 0],
+          color: CAR_COLORS[(Math.random() * CAR_COLORS.length) | 0],
+        })),
     });
+  }
+
+  // Deterministic spawn for the harness and tour spots: nearest eligible rail,
+  // consist placed at the arc point nearest (x,z), no Math.random on any path.
+  // Evicts the oldest train when the roster is full. Returns the train.
+  force(x, z) {
+    let best = null, bestD = Infinity;
+    for (const r of this.rails) {
+      if (Math.max(r.maxX - r.minX, r.maxZ - r.minZ) <= (r.commuter ? COMMUTER_EXT : FREIGHT_EXT)) continue;
+      this.arcInit(r);
+      if (r.len < (r.commuter ? COMMUTER_LEN : FREIGHT_LEN)) continue;
+      for (let i = 0; i < r.pts.length; i++) {
+        const d = Math.hypot(r.pts[i][0] - x, r.pts[i][1] - z);
+        if (d < bestD) { bestD = d; best = { rail: r, s: r.cum[i] }; }
+      }
+    }
+    if (!best) return null;
+    const { rail } = best;
+    const nCars = rail.commuter ? 4 : 18;
+    const total = (nCars + 1) * CAR_LEN;
+    if (rail.len < total + 4) return null;
+    if (this.trains.length >= MAX_TRAINS) this.trains.shift();
+    const types = ['boxcar', 'hopper', 'tanker'];
+    const tr = {
+      rail, dir: 1, s: Math.min(Math.max(best.s, total + 2), rail.len - 2),
+      locoColor: rail.livery ?? LOCO_COLORS[0],
+      cars: Array.from({ length: nCars }, (_, i) => (rail.commuter
+        ? { type: 'coach', color: rail.livery }
+        : { type: types[i % types.length], color: CAR_COLORS[i % CAR_COLORS.length] })),
+    };
+    this.trains.push(tr);
+    return tr;
   }
 
   update(dt, px, pz) {
@@ -142,7 +207,7 @@ export class TrainSystem {
       this.spawn(px, pz);
     }
 
-    const counts = { loco: 0, boxcar: 0, hopper: 0, tanker: 0 };
+    const counts = { loco: 0, boxcar: 0, hopper: 0, tanker: 0, coach: 0 };
     for (const tr of this.trains) {
       const total = (tr.cars.length + 1) * CAR_LEN;
       // end of line: hold at the buffer if the player is watching, retire otherwise

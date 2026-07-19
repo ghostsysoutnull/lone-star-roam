@@ -25,7 +25,7 @@ const AIRPORT_TAG = {
 };
 const AIRPORT_STATE = { SHV: 'LA', TXK: 'AR', CVN: 'NM', HOB: 'NM', CVS: 'NM', BAD: 'LA' };
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf, trains }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -66,6 +66,11 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       hud.toast('💾 Slots staged — slot 2 occupied, slot 3 empty');
     },
     night() { sky.t = 0.98; },
+    // Rails W1: deterministic train at the player — tours + the rails/lights suites
+    trainHere() {
+      const tr = trains.force(player.pos.x, player.pos.z);
+      hud.toast(tr ? `🚂 ${tr.rail.operator ?? 'freight'} inbound` : '🚂 no eligible rail near here');
+    },
     midnight() { sky.t = 0.998; }, // the bell tolls on the wrap — park near a chapel first
     hauntCemetery() {
       let best = null, bd = Infinity;

@@ -8,27 +8,36 @@ targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
 ## Session briefing
-- **This session**: Railroads Realism (`RAILS_SPEC.md`), wave 1 of 3 —
-  operator liveries + commuter passenger sets + rails on both maps +
-  `trains.force` hook. The spec session shipped 2026-07-18.
-- **Recommended setup**: model **Fable 5**, effort **high** — the
-  deliverable is a look (livery palette, regraded from the umbrella's
-  Sonnet estimate per the Energy-W3 lesson). Flag it if the running model
-  differs.
-- **Budget**: code + checks (`tools/checks/rails.mjs`, new) + **one**
-  staged livery-lineup shot (Copilot + Bruno gate before commit),
-  grep-first. Perf delta: +1 InstancedMesh (coach); no cap retune.
-- **Then**: rewrite this block for W2 (the border show — spur bake +
-  seeded crossings + named trains, Fable 5 high).
+- **This session**: Railroads Realism (`RAILS_SPEC.md`), wave 2 of 3 —
+  the border show: south-of-river spur bake (Overpass GET), seeded
+  `railxing:` crossing schedules at Laredo + Eagle Pass, named trains
+  (Tex-Mex Interchange / Eagle Pass Manifest / the Z double-stack), rail
+  bridges. W1 (liveries + commuter sets + map rails + force hook)
+  shipped 2026-07-18.
+- **Recommended setup**: model **Fable 5**, effort **high** — new
+  visible surface + content wave. Flag it if the running model differs.
+- **Budget**: code + checks (extend `tools/checks/rails.mjs`) + the spur
+  bake + **one** staged crossing shot (Copilot + Bruno gate), grep-first.
+  Perf delta: +1 InstancedMesh (well car) + two small merged bridges.
+- **Then**: rewrite this block for W3 (band railroads, Sonnet 5 high —
+  bake + ribbons + spawn extension; design settled in the spec).
 
 Gotchas carried over:
-- Design is settled in `RAILS_SPEC.md` W1 — livery table hexes, commuter
-  set, `mapStats.rails` assertion, `force(x,z)` contract. Execute, don't
-  re-decide; the shot may retune hexes.
-- The 🚂 rail placard already ships (`nearestRail`, hud.js) — W1 adds no
-  HUD placard work, only the map layer.
-- `lights.mjs:144` must switch from `until(trains>0, 45000)` to the new
-  force hook — that's a W1 deliverable, not a rider.
+- **W2's bake session must also fix commuter fragmentation** (Bruno,
+  2026-07-18): the commuter corridors are shredded (TRE 17 pieces,
+  longest 164 u) because `build-rails.mjs` chains only exact-key endpoint
+  matches within (operator,name) identity groups. Join by endpoint
+  proximity while the bake is open for the spurs; gate on reproducing the
+  shipped `rails.json` unfixed first (prefer-true-source rule). W1 ships
+  commuter sets on the fragments meanwhile.
+- Spur lines must be excluded from random spawn (scheduled trains only)
+  — `RAILS_SPEC.md` W2 design-settled section has the contract + seed
+  strings (`railxing:<site>:<day>`, forever once shipped).
+- DART is dropped deliberately (light rail — real-or-absent), asserted
+  by `rails.mjs`; don't "fix" it back in W2.
+- Tour/shot staging: game heading convention — 90° faces west, 270°
+  east; forced trains keep rolling at 16 u/s on the real loop, so staged
+  shots must pin `tr.s` via interval before shooting.
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to

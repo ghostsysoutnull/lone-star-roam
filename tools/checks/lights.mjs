@@ -140,8 +140,9 @@ export default async function lights(t) {
   });
 
   await t.check('freight locos run a headlight after dark', async () => {
-    // mainlines cross Austin; spawner ticks every ~4s of wall time
-    await t.until('g.trains.trains.length > 0', 45000, 500);
+    // Rails W1: deterministic force — no longer waits on the ~4s wall-time spawner
+    await t.ev('g.trains.force(g.player.pos.x, g.player.pos.z)');
+    await t.until('g.trains.trains.length > 0', 8000, 250);
     await t.wait(0.5);
     const s = await t.ev(`({ n: g.trains.trains.length, beams: g.trains.beams.filter((b) => b.visible).length })`);
     t.ok(s.beams >= 1, `no loco beam among ${s.n} trains`);
