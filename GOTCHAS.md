@@ -19,6 +19,20 @@ graduate here (and out of `NEXT_SESSION.md`).
   greedy over file order). Any rebake shifts band geometry — run the shoulder
   suite (the crossing monuments read band endpoints), `band.mjs`'s guards,
   and `traffic.mjs`'s band-road check.
+- **`GEO.rails`/`GEO.bandRails` follow the same never-merge separation as
+  highways/cities** even though nothing today indexes `rails.json` by array
+  position — keeps the rebake/law surface consistent (`tools/build-rails.mjs`
+  vs `tools/build-band-rails.mjs`, own file, own bboxes). `band-rails.json` is
+  rebakeable from `tx-inputs/band-rails-{la,ar,ok,nm}.json` (script header has
+  the exact Overpass GET queries/bboxes/arg order). **Group chains by
+  operator only, never operator+name**: the OSM band fetch tags the same
+  physical line with an inconsistent operator prefix ("UP Little Rock
+  Subdivision" vs "Little Rock Subdivision") — name-grouping shredded every
+  band mainline at that seam and left Arkansas with nothing long enough to
+  force a train. `chain()`'s turn-angle guard is what actually prevents
+  welding unrelated branches, so dropping name from the identity is safe;
+  each merged chain reports whichever constituent way's name covers the most
+  points (`topName()`), not an arbitrary first pick.
 - **Simplification tolerances are in DEGREES** — simplify before `proj`, never
   after (`build-data.mjs` is the reference). Reversed, 0.0025 reads as 25 cm
   instead of ~260 m and nothing gets dropped; `band.mjs` guards the ratio now.
@@ -217,6 +231,24 @@ graduate here (and out of `NEXT_SESSION.md`).
   Retrofit of pre-W6b props is the queued BACKLOG review, one
   legibility-pass per subject — not license to rework shipped meshes
   mid-track.
+
+- **`trains.js` rail laws** (Railroads Realism, all 3 waves): a rail with
+  `spur` set is scheduled-named-train turf only — `spawn()`/`force()` must
+  keep excluding it from random/forced spawn, or a 14-car freight shows up on
+  a 200-unit border approach. Band rails (`band: true`) are NOT spurs — they
+  join random spawn, forcing, and junction-hop (`hopAt`) like any other
+  mainline, liveries free from their OSM `operator` tag; the dormant
+  random-livery `LOCO_COLORS` fallback (every Texas rail passing the freight
+  filter already carries a real UP/BNSF/CPKC tag) wakes for real once band
+  operators outside the `LIVERY` table show up — that's by design, not a bug
+  to fix by growing the table. `LIVERY` lookups must stay normalized for both
+  UP spellings (`Union Pacific Railroad`/`Union Pacific`). The Z's "longest
+  BNSF mainline" search must skip `r.band` — a long band BNSF line can
+  otherwise win "longest" and silently move the Z off its tour spot; the
+  same guard pattern applies to any future named-train route picked by a
+  live search over `this.rails` rather than a fixed key. `railxing:<site>:
+  <day>` (laredo/eaglepass/ztrain) are seed streams — never rename, per the
+  blanket seed-string law above.
 
 ## Verification
 

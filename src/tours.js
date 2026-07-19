@@ -15,6 +15,12 @@ export const TOURS = [
   {
     track: 'Railroads (2026-07)',
     waves: [
+      { wave: 'W3 — band railroads', spots: [
+        S('🚂 UP armour yellow — Lordsburg Sub, New Mexico', [-6811, -916], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'the shoulder runs real track too — a Union Pacific freight forced onto the Lordsburg Sub west of El Paso, same armour yellow as the Brownsville Sub back in Texas' }),
+        S('🚂 CPKC red — Shreveport Sub, Arkansas', [4883, -3195], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'the Louisiana/Arkansas corner — CPKC red, the livery comes straight off the real OSM operator tag, same as in Texas' }),
+        S('🚂 UP armour yellow — Shreveport Sub, Louisiana', [5533, -1997], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'east Texas\'s neighbor strip — the placard reads across the line too, no gap at the border' }),
+        S('🚂 BNSF orange — Red Rock Sub, Oklahoma', [2262, -3382], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'Panhandle BNSF country keeps going north of the line — same orange' }),
+      ] },
       { wave: 'W2 — the border show', spots: [
         S('🌉 Laredo gateway — Tex-Mex Interchange', [-5.5, 3897], { heading: Math.PI / 2, mode: 'DRIVE', time: 0.35, act: 'railCrossing:laredo', note: 'the international rail bridge over the Rio Grande — the Tex-Mex Interchange (CPKC, 2 locos) is forced onto the approach and crosses into Texas in a few seconds; it also runs on its own seeded schedule, 3 crossings a game day' }),
         S('🌉 Eagle Pass gateway — the Manifest', [-962, 2554], { heading: Math.PI, mode: 'DRIVE', time: 0.35, act: 'railCrossing:eaglepass', note: 'the UP bridge from Piedras Negras — the Eagle Pass Manifest forced onto the approach, crossing north; same seeded 3-a-day schedule as Laredo' }),

@@ -77,8 +77,13 @@ export default async function rails(t) {
   });
 
   await t.check('both maps carry the rail layer (numeric, not pixels)', async () => {
-    // W2's defrag bake merged 560 fragments into ~187 real polylines
-    const m = await t.ev('({ drawn: g.hud.mapStats.rails, total: g.GEO.rails.length })');
+    // W2's defrag bake merged 560 fragments into ~187 real polylines; W3 adds
+    // the band rails, wide-layer only — mapStats.rails reflects the last
+    // renderMapLayer call (the wide one), so it counts both
+    const m = await t.ev(`({
+      drawn: g.hud.mapStats.rails,
+      total: g.GEO.rails.length + g.GEO.bandRails.length,
+    })`);
     t.ok(m.drawn === m.total && m.total > 150, `map rails ${m.drawn} != data ${m.total}`);
   });
 
@@ -246,6 +251,77 @@ export default async function rails(t) {
     t.ok(d.loco === bnsf, `Z loco 0x${d.loco.toString(16)} not BNSF orange`);
     t.ok(d.types.join() === 'loco,well', `consist types ${d.types} — want a second loco + well cars only`);
     t.ok(d.near < 80, `forced Z spawned ${d.near.toFixed(0)} u away — should start where the player is`);
+  });
+
+  await t.check('band rails join the spawn candidate list — one force-spawn per strip with track', async () => {
+    const bySite = await t.ev(`(() => {
+      const inPoly = (x, z, poly) => {
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          const [xi, zi] = poly[i], [xj, zj] = poly[j];
+          if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) inside = !inside;
+        }
+        return inside;
+      };
+      const stateAt = (x, z) => {
+        for (const c of g.GEO.neighborCounties) if (inPoly(x, z, c.ring)) return c.state;
+        return null;
+      };
+      const out = {};
+      for (const r of g.trains.rails) {
+        if (!r.band) continue;
+        g.trains.arcInit(r);
+        const ext = Math.max(r.maxX - r.minX, r.maxZ - r.minZ);
+        if (ext <= 350 || r.len < 500) continue;
+        const mid = r.pts[(r.pts.length / 2) | 0];
+        const st = stateAt(mid[0], mid[1]);
+        if (st && !out[st]) out[st] = { x: mid[0], z: mid[1] };
+      }
+      return out;
+    })()`);
+    for (const state of ['LA', 'AR', 'OK', 'NM']) {
+      const spot = bySite[state];
+      t.ok(spot, `no eligible band rail found for ${state}`);
+      if (!spot) continue;
+      await t.tp(spot.x + 2, spot.z + 2, 'DRIVE');
+      const got = await t.ev(FORCE);
+      t.ok(got, `${state}: force-spawn on band rail failed`);
+      const band = await t.ev('g.trains.trains[0].rail.band');
+      t.ok(band === true, `${state}: forced train landed off the band rail (band=${band})`);
+    }
+  });
+
+  await t.check('nearestRail resolves band track — the placard works across the state line', async () => {
+    const sample = await t.ev(`(() => {
+      for (const r of g.GEO.bandRails) {
+        if (!(r.operator || r.name)) continue;
+        const pt = r.pts[Math.floor(r.pts.length / 2)];
+        return { pt, label: [r.operator, r.name].filter((v, i, a) => v && a.findIndex((x) => x?.toLowerCase() === v.toLowerCase()) === i).join(' · ') };
+      }
+      return null;
+    })()`);
+    t.ok(sample, 'no labeled band rail found');
+    await t.tp(sample.pt[0] + 2, sample.pt[1] + 2, 'WALK');
+    await t.until('!!g.hud.railInfo', 8000);
+    const name = await t.ev('g.hud.railInfo.name');
+    t.ok(name === sample.label, `band rail placard "${name}" != OSM label "${sample.label}"`);
+  });
+
+  await t.check('the Z stays a Texas mainline — band track never wins "longest BNSF"', async () => {
+    const band = await t.ev('g.trains.namedRails.ztrain?.band');
+    t.ok(band === false, `Z rail band=${band} — band track stole the named route`);
+  });
+
+  await t.check('the W3 band-railroad tour spots each force a real band train', async () => {
+    const spots = await t.ev(`g.debug.tours
+      .find((tr) => tr.track === 'Railroads (2026-07)').waves
+      .find((w) => w.wave === 'W3 — band railroads').spots`);
+    t.ok(spots.length === 4, `expected 4 W3 tour spots, found ${spots.length}`);
+    for (const spot of spots) {
+      await t.ev(`(g.trains.trains.length = 0, g.debug.visit(${JSON.stringify(spot)}))`);
+      const band = await t.ev('g.trains.trains[0]?.rail.band');
+      t.ok(band === true, `${spot.label}: trainHere did not land on a band rail (band=${band})`);
+    }
   });
 
   await t.check('a forced train moves down the line under the real loop', async () => {

@@ -118,8 +118,11 @@ export class TrainSystem {
       scene.add(b);
       return b;
     });
-    // rails with bbox + lazy cumulative arc lengths
-    this.rails = GEO.rails.map((r) => {
+    // rails with bbox + lazy cumulative arc lengths. Band rails (Rails W3)
+    // join the same list — liveries come free from their OSM operator tag,
+    // and spawn()/force()/hopAt() already key off r.spur only, so band track
+    // joins random spawn, forcing, and junction-hop with no further change.
+    this.rails = [...GEO.rails, ...GEO.bandRails].map((r) => {
       let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
       for (const [x, z] of r.pts) {
         if (x < minX) minX = x; if (x > maxX) maxX = x;
@@ -132,6 +135,7 @@ export class TrainSystem {
         commuter: COMMUTER.has(r.operator),
         spur: r.spur ?? null, // border spurs: scheduled named trains only, never random spawn
         bridge: r.bridge ?? null,
+        band: r.band ?? false,
       };
     });
     this.LIVERY = LIVERY; // checks assert chosen colors against the same table
@@ -141,7 +145,10 @@ export class TrainSystem {
     for (const r of this.rails) if (r.spur) this.namedRails[r.spur] = r;
     let z = null, zd = 0;
     for (const r of this.rails) {
-      if (r.spur || r.operator !== 'BNSF Railway') continue;
+      // band: false — the Z is a Texas named train ("no band named trains",
+      // Rails W3); without this a long band BNSF line could win "longest"
+      // and silently move the Z off its W2 tour spot.
+      if (r.spur || r.band || r.operator !== 'BNSF Railway') continue;
       const d = Math.hypot(r.maxX - r.minX, r.maxZ - r.minZ);
       if (d > zd) { zd = d; z = r; }
     }

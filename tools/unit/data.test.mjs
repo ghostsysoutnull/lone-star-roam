@@ -61,6 +61,23 @@ test('rail data retains valid geometry and OSM identity when available', async (
   assert.equal(rails.some((rail) => rail.operator || rail.name), true, 'at least one rail identity');
 });
 
+test('band rail data retains valid geometry and OSM identity', async () => {
+  const bandRails = await json('band-rails.json');
+  // 2026-07-19 bake: 38 polylines across the 4 neighbor-state strips
+  assert.equal(bandRails.length > 30, true, 'band rail count');
+  for (const [index, rail] of bandRails.entries()) {
+    assert.equal(rail.band, true, `band-rails[${index}].band`);
+    assert.equal(rail.pts.length >= 2, true, `band-rails[${index}].pts needs two coordinates`);
+    for (const [point, [x, z]] of rail.pts.entries()) {
+      finite(x, `band-rails[${index}].pts[${point}][0]`);
+      finite(z, `band-rails[${index}].pts[${point}][1]`);
+    }
+    if (rail.operator != null) assert.equal(typeof rail.operator, 'string', `band-rails[${index}].operator`);
+    if (rail.name != null) assert.equal(typeof rail.name, 'string', `band-rails[${index}].name`);
+  }
+  assert.equal(bandRails.some((rail) => rail.operator || rail.name), true, 'at least one band rail identity');
+});
+
 test('county agriculture records resolve one-to-one', async () => {
   const counties = await json('counties.json');
   const agriculture = await json('agriculture.json');

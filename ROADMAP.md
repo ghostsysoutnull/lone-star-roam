@@ -5,8 +5,8 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 
 No active priority track (aviation shipped in full 2026-07-12; Brands,
 Jetpack, Agriculture, the Shoulder & the Shelf, Band Parity, New Player
-Experience, Energy, and Performance followed and are folded in below). Queued
-work lives in `BACKLOG.md`.
+Experience, Energy, Performance, and Railroads Realism followed and are
+folded in below). Queued work lives in `BACKLOG.md`.
 
 - [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
   tools/test.mjs` runs four sub-second Node-only groups (`aviation`, `data`,
@@ -678,6 +678,32 @@ work lives in `BACKLOG.md`.
   post-teleport hot context. **W4 — close-out**: real-hardware re-record
   confirmed the drop (render avg −20% to −54% across the three spots, I-10
   floor hit hardest at −54%; Sweetwater now holds a steady 60 fps, was 57.5).
+- [x] ~~Railroads Realism~~ — done 2026-07-19 (3 waves, `RAILS_SPEC.md` kept
+  as history; first track of the 2026-H2 program): the real Texas rail
+  network the game already shipped, made legible and alive. **W1 — operator
+  surfacing**: freight locos tint to their baked OSM `operator` field (UP
+  armour yellow, BNSF orange, CPKC red — instance tint on the white bodywork
+  only, frame stays baked dark); real DFW commuter sets (TRE, TEXRail — DART
+  stays real-or-absent, near-vanishing in the `usage=main` bake) spawn short
+  loco+coach sets in their own livery instead of freight; both maps carry
+  the rail layer; `trains.force(x,z)` deterministic spawn hook (retires
+  `lights.mjs`'s `until(trains>0, 45000)` pole). **W2 — the border show**:
+  small Overpass GET spurs at Laredo (CPKC/Tex-Mex) and Eagle Pass (UP) skip
+  the Texas border clip and carry a baked river-crossing bridge point; one
+  merged steel truss per gateway; three named trains on seeded daily
+  schedules (`railxing:<site>:<day>`, deterministic per game day) — the
+  Tex-Mex Interchange, the Eagle Pass Manifest, and the Z (a BNSF
+  double-stack intermodal on the longest BNSF main, unlike any other train's
+  silhouette); named trains hop the junction onto the connecting mainline
+  instead of dead-stopping at the spur's end; one-shot toast on approach,
+  re-arms on exit. **W3 — band railroads**: real `railway=rail`/`usage=main`
+  geometry baked for the four neighbor-state strips (`tools/build-band-rails.mjs`,
+  band-roads bbox precedent; operator-only chaining, since the fetch tags the
+  same physical line inconsistently across the operator-name prefix) →
+  `GEO.bandRails` (own array/file, indexed into the same rail spatial grid as
+  `GEO.rails` — the placard crosses the state line for free), same ribbon
+  styling as Texas track, band rails join the train spawn candidate list
+  (liveries free from OSM tags), one `trainHere` tour spot per strip.
 
 ## Known limitations (v1)
 

@@ -1,7 +1,7 @@
 # Backlog — queued work
 
-Active track: **Railroads Realism** (`RAILS_SPEC.md`, 3 waves, spec
-2026-07-18) — first track of the 2026-H2 program (`VISION_2026H2.md`).
+No active track — Railroads Realism (`RAILS_SPEC.md`, 3 waves, first track
+of the 2026-H2 program) shipped 2026-07-19 and is folded into `ROADMAP.md`.
 Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
@@ -16,10 +16,6 @@ Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
   measured full run ~24 s (aviation pole 17.4 s, next pole lights 12.0 s), so
   sharding recovers only ~8–10 s/run vs a ~30-min session (~300-run payback).
   Revisit only if aviation grows substantially or concurrency flakes appear.
-- **lights `until(trains>0, 45000)`**: drive/force a train to a known spot
-  instead of waiting on the real spawn, so lights can't become the pole.
-  → **Scheduled: Rails W1** (`trains.force(x,z)` hook, `RAILS_SPEC.md`).
-
 ## Playtest findings 2026-07-15 (Bruno's tx-urgent notes; ocean-zone fix
 already shipped as `54b3511` — these are the remaining items)
 
@@ -30,11 +26,6 @@ already shipped as `54b3511` — these are the remaining items)
   Fix direction: clip or fade the plane outside the terrain grid (or extend
   a dry skirt) — diagnosis in the 2026-07-15 session, geometry all in
   `buildWater`/`buildTerrain`.
-- **Shields for railways**: give rail lines a presence in the HUD the way
-  roads get shields (interpretation to confirm with Bruno — crossing signs
-  at grade crossings vs a rail glyph/name line in the HUD when near track).
-  → **Resolved 2026-07-18**: the HUD half shipped 2026-07-15 (`03fc0d7`,
-  🚂 placard); rails-on-maps **scheduled: Rails W1**; crossbucks declined.
 - **Water sits a touch below terrain + wants effects and sound**: river
   ribbons ride `hAt + 0.07` and lakes sit at lowest-shoreline +0.15, which
   reads sunken at some banks; wants a look at the offsets, plus water
@@ -83,9 +74,6 @@ already shipped as `54b3511` — these are the remaining items)
   flags it wholesale; ranches and chapel–cemetery pairs confirmed good.
 - **Roads, railroads, rivers visual pass**: "make them better" — ribbon
   width/color/texture upgrade candidates; no direction settled yet.
-- **Band railroads** (deferred from Band Parity, 2026-07-16): OSM rail fetch
-  for the 4 neighbor strips + trains.js extension — own bake, build-rails
-  idiom. → **Scheduled: Rails W3** (`RAILS_SPEC.md`, Sonnet 5).
 - **Band airports beyond the 25-mile line** (deferred from Band Parity W6,
   2026-07-17): Roswell/Lawton/Lake Charles (and Carlsbad/Alamogordo) are
   currently glow + radio-wink only — GOTCHAS' exclusion law, `band.mjs`

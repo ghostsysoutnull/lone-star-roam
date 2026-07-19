@@ -11,6 +11,7 @@ export function buildWorld(scene) {
   buildWater(scene);
   buildHighways(scene);
   buildBandHighways(scene);
+  buildBandRails(scene);
   if (!ELEV.data) buildMountains(scene); // decorative cones only when no real terrain
   const sys = new ScenerySystem(scene);
   if (ELEV.data) sys.massif = buildGuadalupes(scene); // hero ridge over the smoothed DEM
@@ -405,6 +406,17 @@ function buildBandHighways(scene) {
   buildRibbons(scene, ofType('trunk'), 2.0, 0x4a4843, 0.1);
   buildRibbons(scene, ofType('primary'), 1.5, 0x5c584e, 0.09);
   buildRibbons(scene, ofType('motorway'), 0.25, 0xd8c860, 0.16);
+}
+
+// Band rails — the shoulder's real railway geometry, same gravel+steel ribbon
+// idiom and colors as Texas rails (Rails W3; band roads carry no in-world
+// tint either — fading is a map-only treatment). Own array, never GEO.rails
+// (see GEO.bandRails comment in geo.js). No bridge props: bridge{} only
+// exists on the W2 border spurs, which live in GEO.rails.
+function buildBandRails(scene) {
+  const railPts = GEO.bandRails.map((r) => r.pts);
+  buildRibbons(scene, railPts, 1.5, 0x4a4440, 0.07);
+  buildRibbons(scene, railPts, 0.55, 0x8a8a90, 0.11);
 }
 
 // Rivers as blue ribbons, lakes as polygons — real geometry

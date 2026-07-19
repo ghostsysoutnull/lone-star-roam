@@ -243,6 +243,18 @@ export class HUD {
       r.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
       ctx.stroke();
     }
+    // band rails — wide layer only (Law: minimap layer stays untouched), faded like band arterials
+    if (isWide) {
+      ctx.setLineDash([3, 3]);
+      ctx.globalAlpha = 0.6;
+      for (const r of GEO.bandRails ?? []) {
+        nRails++;
+        ctx.beginPath();
+        r.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
     ctx.setLineDash([]);
     this.mapStats = { rails: nRails }; // numeric layer assertion for the rails suite
     const roadStyle = {

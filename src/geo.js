@@ -17,6 +17,12 @@ export const GEO = {
   rivers: [],    // [{name, pts:[[x,z],...]}]
   lakes: [],     // [{name, pts:[[x,z],...]}] closed polygons
   rails: [],    // [{pts:[[x,z],...]}] real railway geometry
+  bandRails: [], // [{pts:[[x,z],...], operator?, name?, band:true}] neighbor-state railway
+                  // geometry — NEVER merge into `rails`: keeps the same array/file separation
+                  // as bandHighways/bandCities even though (unlike those) nothing today indexes
+                  // rails.json by array position. Indexed into the SAME rail spatial grid as
+                  // GEO.rails (see buildRailIndex) — nearestRail is display-only, not driving
+                  // physics, so the placard just works across the state line for free.
   bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0 },
   ag: {},        // county name -> {cattle, horses, goats, sheep, onFeed, irrAcres, crops, areaKm2, dominantCrop}
   bandAg: {},    // "STATE|County Name" -> same record shape as `ag`, band counties (LA/AR/OK/NM)
@@ -52,6 +58,7 @@ export async function loadGeo(onStatus) {
   GEO.rivers = await get('rivers.json').catch(() => []);
   GEO.lakes = await get('lakes.json').catch(() => []);
   GEO.rails = await get('rails.json').catch(() => []);
+  GEO.bandRails = await get('band-rails.json').catch(() => []);
   onStatus?.('Loading the night sky…');
   GEO.sky = await get('sky.json').catch(() => null); // real star catalog + constellations
   onStatus?.('Raising the terrain…');
@@ -211,9 +218,13 @@ export function nearestAnyRoad(x, z, radius = 300, typeFilter = null) {
 }
 
 // Separate rail index: tracks are display-only, never eligible for road physics.
+// Band rails share this same grid (not a parallel nearestBandRail/nearestAnyRail
+// pair like the road network) — the reason band roads need their own index is
+// to protect nearestRoad's driving-physics lookups, which doesn't apply to a
+// display-only query, so the placard reads across the state line for free.
 const railGrid = new Map();
 function buildRailIndex() {
-  for (const rail of GEO.rails) {
+  for (const rail of [...GEO.rails, ...GEO.bandRails]) {
     for (let i = 1; i < rail.pts.length; i++) {
       const seg = { a: rail.pts[i - 1], b: rail.pts[i], rail };
       const k = cellKey((seg.a[0] + seg.b[0]) / 2, (seg.a[1] + seg.b[1]) / 2);
