@@ -136,7 +136,8 @@ async function boot() {
   const military = new MilitaryAirSystem(scene);
   radio.helis = heli; radio.militaryAir = military; // A3 scanner sources (property pattern, like onRadio)
   trains.onHorn = () => audio.trainHorn();
-  trains.onNamed = (name) => hud.toast(`🚂 ${name} rolling through`);
+  trains.onIdentity = (text) => hud.toast(text);
+  trains.onChatter = (text, voice) => { audio.radio(text, { voice }); hud.subtitle(text, `📻 rail radio`); };
   traffic.onHonk = (type) => audio.honk(type);
   traffic.groundYAt = (x, z) => groundYAt(x, z) ?? brandGroundYAt(x, z);
   animals.onSound = (kind) => audio[kind]?.();
@@ -384,7 +385,7 @@ async function boot() {
     brands.update(player.pos.x, player.pos.z, dt); perf.lap('brands');
     traffic.update(dt, player.pos.x, player.pos.z, player.pos.y);
     traffic.setNight(ATMOS.night); perf.lap('traffic');
-    trains.update(dt, player.pos.x, player.pos.z, sky.days); perf.lap('trains');
+    trains.update(dt, player.pos.x, player.pos.z, sky.days, player.perks.radio); perf.lap('trains');
     maritime.update(dt, clock.elapsedTime); perf.lap('maritime');
     energy.update(dt, player.pos.x, player.pos.z); perf.lap('energy');
     heli.update(dt, player.pos.x, player.pos.z, sky.days); perf.lap('heli');

@@ -4,7 +4,7 @@
 // Interchange (Laredo) and Eagle Pass Manifest cross the Rio Grande on their
 // baked spur routes, and the Z double-stack runs the longest BNSF line.
 import * as THREE from 'three';
-import { GEO, hAt, seededRand } from './geo.js';
+import { GEO, hAt, seededRand, nearestCity } from './geo.js';
 import { merge, tinted } from './traffic.js';
 import { ATMOS, DAY_SECONDS } from './sky.js';
 
@@ -89,6 +89,55 @@ export const crossingTimes = (site, day) => {
   return Array.from({ length: 3 }, (_, i) => (i + rnd()) / 3);
 };
 
+// Rails Ops W1: per-train identity. Weighted freight cargo table (letter used
+// in the sym, order/weights/letters per spec) — commuter sets skip this table
+// entirely (fixed 'commuter coaches', letter T for the two T-named operators).
+const CARGO = [
+  { name: 'manifest', letter: 'M', w: 3 },
+  { name: 'grain', letter: 'G', w: 2 },
+  { name: 'intermodal', letter: 'S', w: 2 },
+  { name: 'crude', letter: 'O', w: 2 },
+  { name: 'autoracks', letter: 'A', w: 1 },
+  { name: 'coal', letter: 'C', w: 1 },
+  { name: 'aggregate', letter: 'B', w: 1 },
+];
+const CARGO_TOTAL = CARGO.reduce((s, c) => s + c.w, 0);
+// Named trains have a fixed real wagon kind (NAMED[key].wagons) — map straight
+// to a cargo read instead of rolling the weighted table.
+const WAGON_CARGO = { mixed: { name: 'manifest', letter: 'M' }, well: { name: 'intermodal', letter: 'S' } };
+function pickCargo(rnd) {
+  let r = rnd() * CARGO_TOTAL;
+  for (const c of CARGO) { if (r < c.w) return c; r -= c.w; }
+  return CARGO[CARGO.length - 1];
+}
+
+// Radio chatter: proximity ambient near any train, weather-radio perk only
+// extends range. Per-train cooldown reseeds off the train's own sym so two
+// trains never share a stream; global floor keeps lines from stacking.
+const CHAT_R = 40, CHAT_GAP_MIN = 25, CHAT_GAP_VAR = 35, CHAT_FLOOR = 12;
+const CHAT_TEMPLATES = [
+  { w: 3, text: (id, rail) => `${rail.operator ?? 'the railroad'} detector, milepost ${id.mp}, ${id.sub}. Speed five five. No defects. Total axles ${4 * id.cars + 12}. Detector out.` },
+  { w: 2, text: (id, rail) => `${rail.operator ?? 'the railroad'} dispatcher to ${id.sym} — proceed on main, ${id.sub}, no opposing traffic.` },
+  { w: 2, text: (id) => `${id.sym} copies. Proceeding on main.` },
+  { w: 1, text: (id) => `${id.sym}, highball ${id.dest}.` },
+];
+const CHAT_TOTAL = CHAT_TEMPLATES.reduce((s, t) => s + t.w, 0);
+function pickChatLine(rnd) {
+  let r = rnd() * CHAT_TOTAL;
+  for (const t of CHAT_TEMPLATES) { if (r < t.w) return t; r -= t.w; }
+  return CHAT_TEMPLATES[CHAT_TEMPLATES.length - 1];
+}
+const nextChatCooldown = (sym, n) => CHAT_GAP_MIN + seededRand(`trainid:chat:${sym}:${n}`)() * CHAT_GAP_VAR;
+
+// The 🚂 placard is unchanged — named trains keep their bespoke line, with
+// consist + trip appended; every other train gets the full sym-based line.
+function identityText(tr) {
+  const id = tr.id;
+  const consist = id.commuter ? `${id.cars} cars, commuter coaches` : `${id.cars} cars, ${id.cargo}`;
+  const trip = `${id.orig} → ${id.dest} · ${id.sub}`;
+  return tr.named ? `🚂 ${tr.named} rolling through — ${consist} · ${trip}` : `🚂 ${id.sym} — ${consist} · ${trip}`;
+}
+
 export class TrainSystem {
   constructor(scene) {
     const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
@@ -122,14 +171,16 @@ export class TrainSystem {
     // join the same list — liveries come free from their OSM operator tag,
     // and spawn()/force()/hopAt() already key off r.spur only, so band track
     // joins random spawn, forcing, and junction-hop with no further change.
-    this.rails = [...GEO.rails, ...GEO.bandRails].map((r) => {
+    this.rails = [...GEO.rails, ...GEO.bandRails].map((r, i) => {
       let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
       for (const [x, z] of r.pts) {
         if (x < minX) minX = x; if (x > maxX) maxX = x;
         if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
       }
       return {
+        idx: i, // stable per-boot index — the railIdx half of the trainid: seed key
         pts: r.pts, minX, maxX, minZ, maxZ, cum: null, len: 0,
+        name: r.name ?? null,
         operator: r.operator ?? null,
         livery: LIVERY[r.operator] ?? null,
         commuter: COMMUTER.has(r.operator),
@@ -161,8 +212,35 @@ export class TrainSystem {
     this.col = new THREE.Color();
     this.spawnT = 0;
     this.onHorn = null;
-    this.onNamed = null;
+    this.onIdentity = null; // (text) => toast — generalized from the old onNamed
+    this.onChatter = null;  // (text, voice) => audio.radio + hud.subtitle
     this.hornT = 0;
+    this.trainSeq = 0;  // lifetime spawn counter — the seq half of trainid:<railIdx>:<seq>
+    this.chatFloor = 0; // global floor between any two chatter lines
+  }
+
+  // Rails Ops W1: built once per train at spawn/force/startNamed, stable for
+  // its life (deterministic under force() from a fresh boot — trainSeq resets
+  // to 0 at construction). day drives only the sym's day-of-31 suffix; a
+  // missing day (older call sites, tests) falls back to 0, still deterministic.
+  // namedWagons (NAMED[key].wagons) fixes cargo for named trains instead of
+  // the weighted roll — 'well' (the Z's double-stacks) reads as intermodal,
+  // 'mixed' (the border crossings) reads as manifest.
+  buildId(rail, dir, day, cars, namedWagons) {
+    const rnd = seededRand(`trainid:${rail.idx}:${this.trainSeq++}`);
+    const commuter = rail.commuter;
+    const cargo = namedWagons ? WAGON_CARGO[namedWagons]
+      : commuter ? { name: 'commuter coaches', letter: 'T' } : pickCargo(rnd);
+    const nCars = (commuter || namedWagons) ? cars.length : 15 + Math.floor(rnd() * 26); // 15–40
+    const mp = 10 + Math.floor(rnd() * 441); // 10–450
+    const voice = { p: 0.85 + rnd() * 0.3, r: 0.85 + rnd() * 0.3 };
+    const [ox, oz] = rail.pts[dir > 0 ? 0 : rail.pts.length - 1];
+    const [dx2, dz2] = rail.pts[dir > 0 ? rail.pts.length - 1 : 0];
+    const orig = nearestCity(ox, oz).city.name, dest = nearestCity(dx2, dz2).city.name;
+    const d3 = (s) => s.slice(0, 3).toUpperCase();
+    const sym = `${cargo.letter}-${d3(orig)}${d3(dest)}-${Math.floor(day ?? 0) % 31}`;
+    const sub = rail.name ?? rail.operator ?? 'the line';
+    return { sym, cargo: cargo.name, cars: nCars, orig, dest, sub, mp, voice, commuter, chatN: 1, chatT: nextChatCooldown(sym, 0) };
   }
 
   arcInit(rail) {
@@ -187,7 +265,7 @@ export class TrainSystem {
     return [x, z, (b[0] - a[0]) / seg, (b[1] - a[1]) / seg];
   }
 
-  spawn(px, pz) {
+  spawn(px, pz, day) {
     const near = this.rails.filter((r) => !r.spur &&
       px > r.minX - SPAWN_R && px < r.maxX + SPAWN_R && pz > r.minZ - SPAWN_R && pz < r.maxZ + SPAWN_R &&
       // freight mainlines only — no 14-car trains on 200-unit yard spurs;
@@ -205,22 +283,19 @@ export class TrainSystem {
     const [sx, , , ] = this.at(rail, s0), [, sz2] = this.at(rail, s0);
     if (Math.hypot(sx - px, sz2 - pz) < 80) return;
     const types = ['boxcar', 'hopper', 'tanker'];
-    this.trains.push({
-      rail, s: s0, dir,
-      locoColor: rail.livery ?? LOCO_COLORS[(Math.random() * LOCO_COLORS.length) | 0],
-      cars: Array.from({ length: nCars }, () => (rail.commuter
-        ? { type: 'coach', color: rail.livery }
-        : {
-          type: types[(Math.random() * types.length) | 0],
-          color: CAR_COLORS[(Math.random() * CAR_COLORS.length) | 0],
-        })),
-    });
+    const cars = Array.from({ length: nCars }, () => (rail.commuter
+      ? { type: 'coach', color: rail.livery }
+      : {
+        type: types[(Math.random() * types.length) | 0],
+        color: CAR_COLORS[(Math.random() * CAR_COLORS.length) | 0],
+      }));
+    this.trains.push({ rail, s: s0, dir, locoColor: rail.livery ?? LOCO_COLORS[(Math.random() * LOCO_COLORS.length) | 0], cars, id: this.buildId(rail, dir, day, cars) });
   }
 
   // Deterministic spawn for the harness and tour spots: nearest eligible rail,
   // consist placed at the arc point nearest (x,z), no Math.random on any path.
   // Evicts the oldest train when the roster is full. Returns the train.
-  force(x, z) {
+  force(x, z, day) {
     let best = null, bestD = Infinity;
     for (const r of this.rails) {
       if (r.spur) continue; // border spurs are the named trains' turf
@@ -239,12 +314,13 @@ export class TrainSystem {
     if (rail.len < total + 4) return null;
     if (this.trains.length >= MAX_TRAINS) this.trains.shift();
     const types = ['boxcar', 'hopper', 'tanker'];
+    const cars = Array.from({ length: nCars }, (_, i) => (rail.commuter
+      ? { type: 'coach', color: rail.livery }
+      : { type: types[i % types.length], color: CAR_COLORS[i % CAR_COLORS.length] }));
     const tr = {
       rail, dir: 1, s: Math.min(Math.max(best.s, total + 2), rail.len - 2),
       locoColor: rail.livery ?? LOCO_COLORS[0],
-      cars: Array.from({ length: nCars }, (_, i) => (rail.commuter
-        ? { type: 'coach', color: rail.livery }
-        : { type: types[i % types.length], color: CAR_COLORS[i % CAR_COLORS.length] })),
+      cars, id: this.buildId(rail, 1, day, cars),
     };
     this.trains.push(tr);
     return tr;
@@ -255,7 +331,7 @@ export class TrainSystem {
   // starts the run at the arc point nearest that spot (the Z's mainline is
   // long — the forced Z appears where the player is). One instance per name;
   // no Math.random on any path. Returns the train.
-  startNamed(key, sOffset = 0, nx, nz) {
+  startNamed(key, sOffset = 0, nx, nz, day) {
     const def = NAMED[key], rail = this.namedRails[key];
     if (!def || !rail) return null;
     this.arcInit(rail);
@@ -279,7 +355,7 @@ export class TrainSystem {
       rail, dir: 1, named: def.name,
       s: Math.min(Math.max(s, total + 2), rail.len - 2),
       locoColor: LIVERY[def.operator],
-      cars,
+      cars, id: this.buildId(rail, 1, day, cars, def.wagons),
     };
     this.trains.push(tr);
     return tr;
@@ -339,23 +415,27 @@ export class TrainSystem {
         const id = `${key}:${d}:${slot}`;
         if (this.crossingsRun.has(id)) continue;
         this.crossingsRun.add(id);
-        this.startNamed(key, (f - times[slot]) * DAY_SECONDS * SPEED);
+        this.startNamed(key, (f - times[slot]) * DAY_SECONDS * SPEED, undefined, undefined, day);
       }
     }
   }
 
-  update(dt, px, pz, day) {
+  update(dt, px, pz, day, radioPerk) {
     this.spawnT -= dt;
     this.hornT -= dt;
+    this.chatFloor -= dt;
     if (this.trains.filter((t) => !t.named).length < MAX_TRAINS && this.spawnT <= 0) {
       this.spawnT = 4;
-      this.spawn(px, pz);
+      this.spawn(px, pz, day);
     }
     if (day !== undefined) this.updateCrossings(px, pz, day);
 
+    const chatR = CHAT_R * (radioPerk ? 2 : 1);
     const counts = { loco: 0, boxcar: 0, hopper: 0, tanker: 0, coach: 0, well: 0 };
     let beamI = 0; // beams belong to lead locos only — trailing units hold no light
     for (const tr of this.trains) {
+      tr.id.chatT -= dt;
+      let chatFired = false;
       const total = (tr.cars.length + 1) * CAR_LEN;
       // end of line: hold at the buffer if the player is watching, retire otherwise
       let atEnd = (tr.dir > 0 && tr.s >= tr.rail.len) || (tr.dir < 0 && tr.s <= total);
@@ -378,10 +458,19 @@ export class TrainSystem {
         if (d < DESPAWN_R) tr.dead = false;
         // horn when the locomotive passes near
         if (c === 0 && d < 55 && this.hornT <= 0) { this.hornT = 25; this.onHorn?.(); }
-        // named train announces itself once per approach, re-arms on exit
-        if (c === 0 && tr.named) {
-          if (d < TOAST_R && !tr.toasted) { tr.toasted = true; this.onNamed?.(tr.named); }
+        // every train announces its identity once per approach, re-arms on exit
+        if (c === 0) {
+          if (d < TOAST_R && !tr.toasted) { tr.toasted = true; this.onIdentity?.(identityText(tr)); }
           else if (d > TOAST_REARM_R) tr.toasted = false;
+        }
+        // radio chatter: any part of the train within range, seeded cooldowns
+        if (!chatFired && d < chatR && this.chatFloor <= 0 && tr.id.chatT <= 0) {
+          chatFired = true;
+          const rnd = seededRand(`trainid:chatline:${tr.id.sym}:${tr.id.chatN}`);
+          const tmpl = pickChatLine(rnd);
+          this.onChatter?.(tmpl.text(tr.id, tr.rail), tr.id.voice);
+          tr.id.chatT = nextChatCooldown(tr.id.sym, tr.id.chatN++);
+          this.chatFloor = CHAT_FLOOR;
         }
         const type = c === 0 ? 'loco' : tr.cars[c - 1].type;
         const mesh = this.meshes[type];

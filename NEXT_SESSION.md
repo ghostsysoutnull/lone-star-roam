@@ -8,25 +8,34 @@ targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
 Active track: **Rails Operations** (`RAILS_OPS_SPEC.md`, 3 waves) — spec
-written 2026-07-19, slotted before sea-industry. Water Vehicles shipped in
-full 2026-07-19 (folded into `ROADMAP.md`).
+written 2026-07-19, slotted before sea-industry. Wave 1 (identity + chatter)
+shipped 2026-07-19. Water Vehicles shipped in full 2026-07-19 (folded into
+`ROADMAP.md`).
 
 ## Session briefing
-- **This session**: Rails Operations, wave 1 of 3 — per-train identity
-  (symbol/consist/trip toast) + radio chatter. Spec (`RAILS_OPS_SPEC.md`)
-  shipped 2026-07-19; all design settled there — templates, seed stream,
-  contracts. No prior wave.
-- **Recommended setup**: model **Sonnet 5**, effort **high** — pure
-  execution of settled design (authored templates on existing toast +
-  audio.radio surfaces). Flag it if the running model differs.
-- **Budget**: code + checks + tours, no shots (text on an existing toast
-  surface), grep-first. Perf: none.
-- **Then**: rewrite this briefing for W2 (journeys, Fable 5 high).
+- **This session**: Rails Operations, wave 2 of 3 — journeys. Generalize
+  the named-train junction hop (`hopAt`) to every train instead of braking
+  dead at a polyline end; spawn exclusivity so opposing trains stop
+  spawning onto a collision course; `dest`/trip line updates live on each
+  hop. Wave 1 (identity + chatter) shipped 2026-07-19, commit pending push
+  this session.
+- **Recommended setup**: model **Fable 5**, effort **high** — new-system
+  architecture (generalizing a single-train mechanism to the whole roster,
+  spawn-exclusivity logic) carries real design risk despite being mostly
+  plumbing. Flag it if the running model differs.
+- **Budget**: code + checks + tours, logic-only, no shots, grep-first.
+  Perf: none.
+- **Then**: rewrite this briefing for W3 (meets — real siding holds,
+  Fable 5 high, includes a bake step + one Copilot-judged shot).
 
-Gotchas carried over: `trainid:` is a new seed stream — never rename.
-Identity must be deterministic under `force()`. Chatter is proximity
-ambient; the radio perk only extends range. No new announcer machinery —
-generalize the `onNamed` toast.
+Gotchas carried over: `hopAt`'s turn-angle/`minRun` guards stand — reuse,
+don't rewrite. Spur rails stay named-train turf; band rails join like
+mainlines (existing law). `id.dest`/`id.sym` must update in place on hop
+(same `tr.id` object — don't rebuild identity mid-life, only `trainid:`
+spawn-time fields are meant to be stable-for-life; dest is the one field
+W2 explicitly makes live). Chatter/identity toast logic (W1) reads
+`tr.rail`/`tr.dir` on every frame already, so a hop that swaps `tr.rail`
+mid-life needs no changes there. `trainid:` seed stream — never rename.
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to

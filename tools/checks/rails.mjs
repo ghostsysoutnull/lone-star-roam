@@ -135,23 +135,27 @@ export default async function rails(t) {
     await t.tp(b.x + 4, b.z + 2, 'DRIVE');
     const t0 = await t.ev(`(() => {
       g.trains.trains.length = 0;
-      g.trains.onNamed = (n) => { window.__named = n; };
+      window.__toasts = [];
+      g.trains.onIdentity = (t) => { window.__toasts.push(t); };
       const tr = g.trains.startNamed('laredo');
       const [x, z] = g.trains.at(tr.rail, tr.s);
       return { s: tr.s, inTx: g.inTexas(x, z), name: tr.named, locos: tr.cars.filter((c) => c.type === 'loco').length + 1 };
     })()`);
     t.ok(t0.inTx === false, 'forced Interchange should start south of the river');
     t.ok(t0.name === 'the Tex-Mex Interchange' && t0.locos === 2, `consist wrong: ${JSON.stringify(t0)}`);
-    // no day arg — schedule idle, only the forced train moves
+    // no day arg — schedule idle, only the forced train moves (an unrelated
+    // random freight may still spawn+toast near the player in this window
+    // now that every train identifies itself — window.__toasts collects all
+    // of them, we only assert the Interchange's own line is among them)
     await t.step(14, 'g.trains.update(dt, g.player.pos.x, g.player.pos.z)');
     const t1 = await t.ev(`(() => {
       const tr = g.trains.trains.find((x) => x.named);
       const [x, z] = g.trains.at(tr.rail, tr.s);
-      return { s: tr.s, inTx: g.inTexas(x, z), toast: window.__named ?? null };
+      return { s: tr.s, inTx: g.inTexas(x, z), toasts: window.__toasts };
     })()`);
     t.ok(t1.s - t0.s > 14 * 16 * 0.8, `advanced ${(t1.s - t0.s).toFixed(1)} u in 14 s — expected ~224`);
     t.ok(t1.inTx === true, 'Interchange never made it into Texas');
-    t.ok(t1.toast === 'the Tex-Mex Interchange', `named toast: ${t1.toast}`);
+    t.ok(t1.toasts.some((tx) => tx.includes('the Tex-Mex Interchange')), `named toast never fired: ${JSON.stringify(t1.toasts)}`);
   });
 
   await t.check('a scheduled window spawns exactly one crossing, mid-run when late', async () => {
@@ -332,5 +336,114 @@ export default async function rails(t) {
     await t.until(`g.trains.trains[0] && g.trains.trains[0].s - ${s0} > 8`, 10000, 250);
     const ds = await t.ev(`g.trains.trains[0].s - ${s0}`);
     t.ok(ds > 8, `train advanced ${ds} units`);
+  });
+
+  // --- Rails Ops W1: identity + chatter ------------------------------------
+
+  await t.check('freight identity: seeded fields present, no undefined/NaN in the rendered toast', async () => {
+    const spot = await t.ev(pick('BNSF Railway'));
+    await t.tp(spot.x + 2.5, spot.z - 1.5, 'DRIVE');
+    const d = await t.ev(`(() => {
+      g.trains.trains.length = 0;
+      window.__toast = null;
+      g.trains.onIdentity = (t) => { window.__toast = t; };
+      const tr = g.trains.force(g.player.pos.x, g.player.pos.z, 19);
+      return tr && tr.id;
+    })()`);
+    t.ok(d, 'no freight train forced');
+    t.ok(d.sym && d.cargo && Number.isFinite(d.cars) && d.orig && d.dest && d.sub && Number.isFinite(d.mp)
+      && d.voice && Number.isFinite(d.voice.p) && Number.isFinite(d.voice.r), `identity fields missing: ${JSON.stringify(d)}`);
+    t.ok(d.cars >= 15 && d.cars <= 40, `freight identity cars ${d.cars} outside 15–40`);
+    t.ok(d.sym.includes('-19'), `sym day suffix wrong: ${d.sym}`);
+    await t.step(1, 'g.trains.update(dt, g.player.pos.x, g.player.pos.z)');
+    const toast = await t.ev('window.__toast');
+    t.ok(toast && !/undefined|NaN|null/.test(toast), `identity toast malformed: ${toast}`);
+    t.ok([d.sym, d.cargo, d.orig, d.dest, d.sub].every((f) => toast.includes(f)), `toast missing a field: ${toast}`);
+  });
+
+  await t.check('identity is deterministic across two force spawns from a reset trainSeq (simulated fresh boot)', async () => {
+    const spot = await t.ev(pick('Union Pacific Railroad'));
+    await t.tp(spot.x + 2.5, spot.z - 1.5, 'DRIVE');
+    const d = await t.ev(`(() => {
+      g.trains.trainSeq = 0; g.trains.trains.length = 0;
+      const a = g.trains.force(g.player.pos.x, g.player.pos.z, 19).id;
+      g.trains.trainSeq = 0; g.trains.trains.length = 0;
+      const b = g.trains.force(g.player.pos.x, g.player.pos.z, 19).id;
+      return { a, b };
+    })()`);
+    t.ok(JSON.stringify(d.a) === JSON.stringify(d.b), `identity differs across a reset trainSeq: ${JSON.stringify(d.a)} vs ${JSON.stringify(d.b)}`);
+  });
+
+  await t.check('commuter identity reads "commuter coaches" at the real 3–5 consist length', async () => {
+    const spot = await t.ev(`(() => {
+      let best = null, be = 0;
+      for (const r of g.trains.rails) {
+        if (r.operator !== 'Trinity Railway Express') continue;
+        const e = Math.max(r.maxX - r.minX, r.maxZ - r.minZ);
+        if (e > be) { be = e; best = r; }
+      }
+      const p = best.pts[(best.pts.length / 2) | 0];
+      return { x: p[0], z: p[1] };
+    })()`);
+    await t.tp(spot.x + 1.5, spot.z + 2, 'DRIVE');
+    const id = await t.ev(`(() => {
+      g.trains.trains.length = 0;
+      const tr = g.trains.force(g.player.pos.x, g.player.pos.z, 8);
+      return tr.id;
+    })()`);
+    t.ok(id.commuter && id.cargo === 'commuter coaches', `commuter cargo wrong: ${JSON.stringify(id)}`);
+    t.ok(id.cars >= 3 && id.cars <= 5, `commuter identity cars ${id.cars} outside the real 3–5 length`);
+    t.ok(id.sym.startsWith('T-'), `commuter sym letter wrong: ${id.sym}`);
+  });
+
+  await t.check('radio chatter fires within a sim window at CHAT_R, seeded per-train voice, no malformed slot', async () => {
+    const spot = await t.ev(pick('BNSF Railway'));
+    await t.tp(spot.x + 2.5, spot.z - 1.5, 'DRIVE');
+    const d = await t.ev(`(() => {
+      g.trains.trains.length = 0;
+      window.__chat = null; window.__voice = null;
+      g.trains.onChatter = (text, voice) => { window.__chat = text; window.__voice = voice; };
+      const tr = g.trains.force(g.player.pos.x, g.player.pos.z, 12);
+      if (tr) { tr.id.chatT = 0; g.trains.chatFloor = 0; }
+      return tr && tr.id;
+    })()`);
+    t.ok(d, 'no train forced for the chatter check');
+    await t.step(1, 'g.trains.update(dt, g.player.pos.x, g.player.pos.z)');
+    const chat = await t.ev('window.__chat'), voice = await t.ev('window.__voice');
+    t.ok(chat && !/undefined|NaN|null/.test(chat), `chatter line malformed: ${chat}`);
+    t.ok(voice && Number.isFinite(voice.p) && Number.isFinite(voice.r), `chatter voice missing: ${JSON.stringify(voice)}`);
+  });
+
+  await t.check('the weather-radio perk doubles chatter range, never gates it', async () => {
+    // A hand-built dead-straight synthetic rail, not real OSM track: a real
+    // consist can span kilometers and curve enough that a perpendicular offset
+    // from the loco isn't actually the closest car. On a straight line every
+    // trailing car shares the loco's z, so a perpendicular player offset is
+    // exactly 65u from the *nearest* point of the whole consist — isolates the
+    // CHAT_R/radioPerk arithmetic from real-geometry noise.
+    const ok = await t.ev(`(() => {
+      const rail = {
+        idx: -1, pts: [[0, 0], [1000, 0]], minX: 0, maxX: 1000, minZ: -5, maxZ: 5,
+        cum: null, len: 0, name: 'Test Sub', operator: 'Test Railway',
+        livery: null, commuter: false, spur: null, bridge: null, band: false,
+      };
+      g.trains.arcInit(rail);
+      g.trains.trains.length = 0;
+      const cars = Array.from({ length: 18 }, () => ({ type: 'boxcar', color: 0 }));
+      const id = g.trains.buildId(rail, 1, 3, cars);
+      id.chatT = 0;
+      g.trains.trains.push({ rail, dir: 1, s: 500, locoColor: 0xffffff, cars, id });
+      g.trains.chatFloor = 0;
+      g.player.pos.set(500, 0, 65); // 65u out — beyond stock CHAT_R (40), inside the perked 80
+      return true;
+    })()`);
+    t.ok(ok, 'synthetic-rail setup failed');
+    await t.ev(`(window.__chat = null, g.trains.onChatter = (t) => { window.__chat = t; }, 0)`);
+    await t.step(1, 'g.trains.update(dt, g.player.pos.x, g.player.pos.z, undefined, false)');
+    const withoutPerk = await t.ev('window.__chat');
+    t.ok(!withoutPerk, `chatter fired without the radio perk at 65u — CHAT_R leaked: ${withoutPerk}`);
+    await t.step(1, 'g.trains.update(dt, g.player.pos.x, g.player.pos.z, undefined, true)');
+    const withPerk = await t.ev('window.__chat');
+    t.ok(withPerk && !/undefined|NaN|null/.test(withPerk), `chatter did not fire with the radio perk at 65u: ${withPerk}`);
   });
 }

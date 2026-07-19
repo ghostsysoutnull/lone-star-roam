@@ -13,6 +13,15 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'Rails Operations (2026-07)',
+    waves: [
+      { wave: 'W1 — identity + chatter', spots: [
+        S('🚂 Identity toast — UP Brownsville Sub', [1797.6, 3498.7], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'a freight forced next to you — the placard toast now reads the full identity: symbol, consist ("N cars, cargo"), and trip (origin → destination · sub)' }),
+        S('📻 Radio chatter — CPKC Laredo Sub', [843.2, 4097.7], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'the same forcing action zeroes the chatter cooldown too — a detector, dispatcher, crew, or highball call keys up within a couple of seconds' }),
+      ] },
+    ],
+  },
+  {
     track: 'Water Vehicles (2026-07)',
     waves: [
       { wave: 'W3 — the sea opens up', spots: [

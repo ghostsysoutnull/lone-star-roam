@@ -66,22 +66,26 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       hud.toast('💾 Slots staged — slot 2 occupied, slot 3 empty');
     },
     night() { sky.t = 0.98; },
-    // Rails W1: deterministic train at the player — tours + the rails/lights suites
+    // Rails W1: deterministic train at the player — tours + the rails/lights suites.
+    // Rails Ops W1: also zeroes the chatter cooldowns so a radio line fires on
+    // the very next in-range frame — the tour's guaranteed-subject pattern,
+    // no real-time wait needed to demonstrate chatter.
     trainHere() {
-      const tr = trains.force(player.pos.x, player.pos.z);
+      const tr = trains.force(player.pos.x, player.pos.z, sky.days);
+      if (tr) { tr.id.chatT = 0; trains.chatFloor = 0; }
       hud.toast(tr ? `🚂 ${tr.rail.operator ?? 'freight'} inbound` : '🚂 no eligible rail near here');
     },
     // Rails W2: named trains forced onto their routes, schedule bypassed
     'railCrossing:laredo'() {
-      const tr = trains.startNamed('laredo');
+      const tr = trains.startNamed('laredo', 0, undefined, undefined, sky.days);
       hud.toast(tr ? '🚂 the Tex-Mex Interchange is on the bridge approach' : '🚂 no Laredo spur baked');
     },
     'railCrossing:eaglepass'() {
-      const tr = trains.startNamed('eaglepass');
+      const tr = trains.startNamed('eaglepass', 0, undefined, undefined, sky.days);
       hud.toast(tr ? '🚂 the Eagle Pass Manifest is on the bridge approach' : '🚂 no Eagle Pass spur baked');
     },
     ztrain() {
-      const tr = trains.startNamed('ztrain', 0, player.pos.x, player.pos.z);
+      const tr = trains.startNamed('ztrain', 0, player.pos.x, player.pos.z, sky.days);
       hud.toast(tr ? '🚂 the Z is rolling — double-stacks on the BNSF main' : '🚂 no BNSF mainline found');
     },
     midnight() { sky.t = 0.998; }, // the bell tolls on the wrap — park near a chapel first
