@@ -1,7 +1,7 @@
 // Player controller: DRIVE (pickup truck), FLY (truck sprouts wings + prop), WALK (cowboy).
 // Arcade physics, third-person chase camera, per-mode animation and night lights.
 import * as THREE from 'three';
-import { nearestRoad, nearestCity, inWorld, borderZoneAt, hAt, beachAt } from './geo.js';
+import { nearestRoad, nearestCity, inWorld, borderZoneAt, hAt, beachAt, boatableAt } from './geo.js';
 import { ATMOS } from './sky.js';
 import { groundYAt as airportGroundYAt } from './airports.js';
 import { groundYAt as brandGroundYAt } from './brands.js';
@@ -11,7 +11,9 @@ import { groundYAt as brandGroundYAt } from './brands.js';
 // a player walks/drives through those bases instead of over them.
 const groundYAt = (x, z) => airportGroundYAt(x, z) ?? brandGroundYAt(x, z);
 
-export const MODES = ['DRIVE', 'FLY', 'WALK'];
+// BOAT sits right after DRIVE so V at the waterline stop goes truck → boat in
+// one press (inland it's skipped, so the classic DRIVE→FLY→WALK feel holds).
+export const MODES = ['DRIVE', 'BOAT', 'FLY', 'WALK'];
 
 // jetpack (WALK sub-state) physics constants — not tiered, tuned once here.
 // No stable hover point by design (thrust XOR gravity each frame, see
@@ -32,6 +34,16 @@ const FLASHLIGHT_DURATION = 10;
 // tied to the animation's `walkPhase` (which free-runs even at rest for the
 // idle sway/lantern flicker) — coupling it to walkPhase let real-frame
 // jitter during a pre-hold settle wait shift the footstep-crossing count.
+// BOAT (Water Vehicles W1): momentum-heavy — slow spool-up, a glide that
+// carries (a boat has no brakes, reverse is weak), turn authority that grows
+// with way on. Cap sits just under the street tier (26): open-water legs are
+// maritime distances, but roads keep the crown on pavement (Bruno, W1 tune).
+const BOAT_SPEED = 24;
+const BOAT_ACCEL = 10;
+const BOAT_REV = -3.5;
+const BOAT_COAST = 0.85; // per-second speed retention while coasting (DRIVE keeps 0.35)
+const BOAT_TURN = 1.5;   // rad/s at full authority (DRIVE turns at 1.9)
+
 const WALK_SPEED = 6;
 const SPRINT_SPEED = 12;
 const SPRINT_BUILDUP = 0.9; // seconds of sustained straight walking before a run kicks in
@@ -71,7 +83,11 @@ export class Player {
     this.truck.add(this.wings);
     this.cowboy = mkCowboy();
     this.cowboy.visible = false;
-    scene.add(this.truck, this.cowboy);
+    this.skiff = mkSkiff();
+    this.skiff.visible = false;
+    this.atWaterline = false; // grounded mode facing navigable water (hint signal)
+    this._water = null;       // BOAT: last boatableAt record (rides its y)
+    scene.add(this.truck, this.cowboy, this.skiff);
 
     // fake blob shadow — grounds the avatar in every mode
     this.shadow = new THREE.Mesh(
@@ -138,17 +154,71 @@ export class Player {
     this.camPos.copy(this.pos).add(new THREE.Vector3(0, 8, 12));
   }
 
+  // Position-gated V cycle (Water Vehicles W1): BOAT only at navigable water;
+  // land modes only where there's ground to stand on — over open water the
+  // cycle offers FLY alone until the boat noses up to a shore.
+  modeLegal(m) {
+    if (m === 'BOAT') return !!this.waterNear();
+    if (m === 'DRIVE' || m === 'WALK') return !boatableAt(this.pos.x, this.pos.z) || this.shoreNear();
+    return true; // FLY is always an out
+  }
+
+  // Water under the hull or just off the bow — the waterline stop parks the
+  // truck a nose-length short of the water, so BOAT entry must accept "water
+  // right there", not only "water underfoot"; entering hops the hull onto it.
+  waterNear() {
+    const w0 = boatableAt(this.pos.x, this.pos.z);
+    if (w0) return { x: this.pos.x, z: this.pos.z, w: w0 };
+    for (const r of [4, 7]) {
+      for (let k = 0; k < 8; k++) { // k=0 is the bow — checked first each ring
+        const a = this.heading + k * Math.PI / 4;
+        const x = this.pos.x - Math.sin(a) * r, z = this.pos.z - Math.cos(a) * r;
+        const w = boatableAt(x, z);
+        if (w) return { x, z, w };
+      }
+    }
+    return null;
+  }
+
+  // beaching probe: nearest in-world land point within a couple of boat
+  // lengths (or null) — legality test and the step-ashore target in one
+  shoreNear() {
+    for (const r of [5, 9]) {
+      for (let a = 0; a < 8; a++) {
+        const x = this.pos.x - Math.sin(a * Math.PI / 4) * r;
+        const z = this.pos.z - Math.cos(a * Math.PI / 4) * r;
+        if (inWorld(x, z) && !boatableAt(x, z)) return { x, z };
+      }
+    }
+    return null;
+  }
+
   cycleMode() {
-    const i = (MODES.indexOf(this.mode) + 1) % MODES.length;
-    this.setMode(MODES[i]);
+    let i = MODES.indexOf(this.mode);
+    for (let n = 0; n < MODES.length - 1; n++) {
+      i = (i + 1) % MODES.length;
+      if (this.modeLegal(MODES[i])) return this.setMode(MODES[i]);
+    }
   }
 
   setMode(m) {
     this.mode = m;
+    // stepping ashore: entering a land mode while over water (beached boat,
+    // any cycle path) puts the truck/cowboy on the land the probe found, not
+    // on the invisible seafloor. Ferry decks keep their own position control.
+    if ((m === 'DRIVE' || m === 'WALK') && !this.aboardFerry && boatableAt(this.pos.x, this.pos.z)) {
+      const s = this.shoreNear();
+      if (s) { this.pos.x = s.x; this.pos.z = s.z; }
+    }
     this.wings.visible = m === 'FLY';
     this.cowboy.visible = m === 'WALK';
-    this.truck.visible = m !== 'WALK';
-    if (m !== 'FLY') { this.pos.y = 0; this.vy = 0; }
+    this.skiff.visible = m === 'BOAT';
+    this.truck.visible = m === 'DRIVE' || m === 'FLY';
+    if (m === 'BOAT') {
+      const wn = this.waterNear(); // hop onto the water if it's just off the bow
+      if (wn) { this.pos.x = wn.x; this.pos.z = wn.z; this._water = wn.w; this.pos.y = wn.w.y; }
+      this.vy = 0;
+    } else if (m !== 'FLY') { this.pos.y = 0; this.vy = 0; }
     if (m === 'WALK') this.speed = Math.min(this.speed, 2);
     this.hovering = false; // only WALK can be airborne this way — get out of the truck first
     this.sprinting = false;
@@ -163,7 +233,27 @@ export class Player {
 
   resetToRoad() {
     const r = nearestRoad(this.pos.x, this.pos.z, 500);
-    if (r) { this.pos.set(r.x, this.mode === 'FLY' ? this.pos.y : 0, r.z); this.speed = 0; }
+    if (r) {
+      this.pos.set(r.x, this.mode === 'FLY' ? this.pos.y : 0, r.z);
+      this.speed = 0;
+      if (this.mode === 'BOAT') this.setMode('DRIVE'); // rescued onto a road — back in the truck
+    }
+  }
+
+  // Grounded-mode step with the waterline stop: DRIVE/WALK halt where
+  // navigable water starts (the boat's domain — no seafloor driving), probing
+  // a nose-length past the step so the stop lands at the water's edge and the
+  // "switch to boat" hint holds while parked facing it. A vehicle already
+  // over water (ferry drop-off, teleport) is never trapped: only travel
+  // toward water blocks, so reversing off the edge always works.
+  moveGround(dt) {
+    const fx = -Math.sin(this.heading), fz = -Math.cos(this.heading);
+    const dir = this.speed < 0 ? -1 : 1;
+    const nx = this.pos.x + fx * this.speed * dt, nz = this.pos.z + fz * this.speed * dt;
+    const edge = !boatableAt(this.pos.x, this.pos.z) && !!boatableAt(nx + fx * 2.2 * dir, nz + fz * 2.2 * dir);
+    if (edge) this.speed = 0;
+    else { this.pos.x = nx; this.pos.z = nz; }
+    this.atWaterline = edge && dir > 0;
   }
 
   spawnPuff(localX, localY, localZ, color, size, life, riseY) {
@@ -206,9 +296,21 @@ export class Player {
       else this.speed *= Math.pow(0.35, dt); // coast friction
       this.speed = THREE.MathUtils.clamp(this.speed, -8, maxSpd);
       this.heading += steer * dt * 1.9 * Math.min(1, Math.abs(this.speed) / 9) * Math.sign(this.speed || 1);
-      this.pos.x -= Math.sin(this.heading) * this.speed * dt;
-      this.pos.z -= Math.cos(this.heading) * this.speed * dt;
+      this.moveGround(dt);
       this.tilt = steer * Math.min(1, Math.abs(this.speed) / 25) * 0.09;
+    } else if (this.mode === 'BOAT') {
+      // momentum-heavy: slow spool-up, a glide that carries, rudder needs way on
+      if (fwd) this.speed += BOAT_ACCEL * dt;
+      else if (back) this.speed -= (this.speed > 0 ? 10 : 5) * dt;
+      else this.speed *= Math.pow(BOAT_COAST, dt);
+      this.speed = THREE.MathUtils.clamp(this.speed, BOAT_REV, BOAT_SPEED);
+      this.heading += steer * dt * BOAT_TURN * Math.min(1, Math.abs(this.speed) / 8) * Math.sign(this.speed || 1);
+      const nx = this.pos.x - Math.sin(this.heading) * this.speed * dt;
+      const nz = this.pos.z - Math.cos(this.heading) * this.speed * dt;
+      const nw = boatableAt(nx, nz);
+      if (nw) { this.pos.x = nx; this.pos.z = nz; this._water = nw; }
+      else this.speed = 0; // beached: the hull grounds where the water ends
+      this.tilt = -steer * Math.min(1, Math.abs(this.speed) / BOAT_SPEED) * 0.13; // heel into the turn
     } else if (this.mode === 'FLY') {
       if (fwd) this.speed += 40 * dt;
       else if (back) this.speed -= 50 * dt;
@@ -246,8 +348,7 @@ export class Player {
       else this.speed *= Math.pow(0.02, dt);
       this.speed = THREE.MathUtils.clamp(this.speed, -2.5, maxSpd);
       this.heading += steer * dt * 2.6;
-      this.pos.x -= Math.sin(this.heading) * this.speed * dt;
-      this.pos.z -= Math.cos(this.heading) * this.speed * dt;
+      this.moveGround(dt);
       this.tilt = 0;
 
       if (this.hovering) {
@@ -288,16 +389,18 @@ export class Player {
     // ground modes ride the terrain (or an airport pad's flat plateau) — aboard
     // a ferry the deck height is FerrySystem's call, not the terrain's
     const ground = groundYAt(this.pos.x, this.pos.z) ?? hAt(this.pos.x, this.pos.z);
-    if (this.mode !== 'FLY' && !this.hovering && !this.aboardFerry) this.pos.y = ground;
+    if (this.mode === 'BOAT') this.pos.y = this._water?.y ?? ground; // ride the water level, never hAt
+    else if (this.mode !== 'FLY' && !this.hovering && !this.aboardFerry) this.pos.y = ground;
     this.groundY = ground;
+    if (this.mode === 'FLY' || this.mode === 'BOAT' || this.aboardFerry) this.atWaterline = false;
 
     // Place avatar
-    const avatar = this.mode === 'WALK' ? this.cowboy : this.truck;
+    const avatar = this.mode === 'WALK' ? this.cowboy : this.mode === 'BOAT' ? this.skiff : this.truck;
     avatar.position.copy(this.pos);
     avatar.rotation.set(0, this.heading, 0);
     avatar.rotateZ(this.tilt || 0);
     if (this.mode === 'FLY') avatar.rotateX(THREE.MathUtils.clamp(-this.vy * 0.012, -0.35, 0.35));
-    else if (!this.aboardFerry) {
+    else if (!this.aboardFerry && this.mode !== 'BOAT') { // water is flat (W2 adds chop)
       // pitch with the slope (sample fore/aft along heading) — flat on the ferry deck
       const fx = -Math.sin(this.heading), fz = -Math.cos(this.heading);
       const gAt = (x, z) => groundYAt(x, z) ?? hAt(x, z);
@@ -307,8 +410,9 @@ export class Player {
 
     this.animate(dt, avatar, fwd, steer);
 
-    // blob shadow projects onto the terrain
-    this.shadow.position.set(this.pos.x, ground + 0.08, this.pos.z);
+    // blob shadow projects onto the terrain — or onto the water under the boat
+    // (ground is hAt, which over the gulf sits above the -2.5 water plane)
+    this.shadow.position.set(this.pos.x, this.mode === 'BOAT' ? this.pos.y + 0.04 : ground + 0.08, this.pos.z);
     const alt = this.mode === 'FLY' ? Math.max(0, this.pos.y - ground) : 0;
     const shScale = (this.mode === 'WALK' ? 0.5 : this.mode === 'FLY' ? 1.4 : 1) * (1 + alt * 0.004);
     this.shadow.scale.setScalar(shScale);
@@ -318,8 +422,8 @@ export class Player {
     // AGL (the existing camPos.lerp below smooths the rise, no extra easing needed)
     const agl = this.hovering ? Math.max(0, this.pos.y - this.groundY) : 0;
     const sprintKick = this.mode === 'WALK' && this.sprinting ? 1.4 : 0;
-    const back2 = this.mode === 'FLY' ? 16 : this.mode === 'WALK' ? 7 + agl * 0.12 + sprintKick : 11;
-    const up = this.mode === 'FLY' ? 7 : this.mode === 'WALK' ? 3.2 + agl * 0.15 + sprintKick * 0.3 : 5;
+    const back2 = this.mode === 'FLY' ? 16 : this.mode === 'WALK' ? 7 + agl * 0.12 + sprintKick : this.mode === 'BOAT' ? 12 : 11;
+    const up = this.mode === 'FLY' ? 7 : this.mode === 'WALK' ? 3.2 + agl * 0.15 + sprintKick * 0.3 : this.mode === 'BOAT' ? 5.5 : 5;
     const target = new THREE.Vector3(
       this.pos.x + Math.sin(this.heading) * back2,
       this.pos.y + up,
@@ -435,6 +539,13 @@ export class Player {
       if (this.speed > 70 && this.pos.y > 25 && this.puffTimer <= 0) {
         this.puffTimer = 0.06;
         this.spawnPuff(0, 0.9, 2.4, 0xffffff, 2.2, 1.4, 0.1);
+      }
+    } else if (this.mode === 'BOAT') {
+      // outboard wash while under throttle — reuses the shared puff pool
+      this.puffTimer -= dt;
+      if (throttling && this.speed > 2 && this.puffTimer <= 0) {
+        this.puffTimer = 0.1;
+        this.spawnPuff(0, 0.15, 2.4, 0xe8f2f6, 1.5, 0.7, 0.15);
       }
     } else { // WALK
       const c = this.cowboy.userData;
@@ -601,6 +712,40 @@ function mkTruck() {
   g.add(cargo);
 
   g.userData = { headlights: lights, wheels, brakes, cargo, beams, bodyMat: body };
+  return g;
+}
+
+// BOAT avatar: an aluminum skiff — hull, diamond prow, gunwale stripe,
+// console, bench, outboard. Group origin sits at the waterline (pos.y = water
+// level): the hull drafts slightly under, gunwales ride proud. Same boxy
+// vertex-cheap style as the truck; trim reuses the truck blue.
+function mkSkiff() {
+  const g = new THREE.Group();
+  const hullMat = new THREE.MeshLambertMaterial({ color: 0xdde4e8, flatShading: true });
+  const trimMat = new THREE.MeshLambertMaterial({ color: 0x2563b0, flatShading: true });
+  const dark = new THREE.MeshLambertMaterial({ color: 0x22262e });
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.7, 4.2), hullMat);
+  hull.position.y = 0.2; // draft 0.15 under the waterline, freeboard 0.55
+  const bow = new THREE.Mesh(new THREE.BoxGeometry(1.21, 0.6, 1.21), hullMat);
+  bow.position.set(0, 0.25, -2.1);
+  bow.rotation.y = Math.PI / 4; // diamond footprint reads as a prow at parked-truck distance
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(1.74, 0.16, 3.6), trimMat);
+  stripe.position.set(0, 0.5, 0.2); // gunwale stripe
+  const console = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.5), trimMat);
+  console.position.set(0, 0.85, 0.2);
+  const screen = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.3, 0.06), new THREE.MeshLambertMaterial({ color: 0x9fc4e8 }));
+  screen.position.set(0, 1.18, -0.05);
+  screen.rotation.x = -0.3;
+  const bench = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.28, 0.5), dark);
+  bench.position.set(0, 0.62, 1.3);
+  const motor = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.55, 0.5), dark);
+  motor.position.set(0, 0.72, 2.25);
+  const skeg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, 0.25), dark);
+  skeg.position.set(0, 0.08, 2.35);
+  const star = mkStarMesh(0.3, 0xffd35c);
+  star.rotation.x = -Math.PI / 2;
+  star.position.set(0, 0.59, -1.2); // on the foredeck
+  g.add(hull, bow, stripe, console, screen, bench, motor, skeg, star);
   return g;
 }
 

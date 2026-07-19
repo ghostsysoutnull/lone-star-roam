@@ -66,6 +66,10 @@ export async function loadGeo(onStatus) {
     const ab = await (await fetch('data/elevation.bin')).arrayBuffer();
     ELEV.data = new Uint16Array(ab);
   } catch { ELEV.data = null; }
+  // per-lake water level: lowest shoreline + LAKE_OFFSET — the single source
+  // read by both the lake mesh (world.js buildWater) and boatableAt
+  for (const lake of GEO.lakes)
+    lake.level = Math.min(...lake.pts.map(([x, z]) => hAt(x, z))) + LAKE_OFFSET;
   onStatus?.('Drawing county lines…');
   GEO.counties = await get('counties.json').catch(() => []);
   GEO.ag = await get('agriculture.json').catch(() => ({}));
@@ -95,6 +99,13 @@ export async function loadGeo(onStatus) {
   buildRiverIndex();
   return GEO;
 }
+
+// The one gulf water plane's height (GOTCHAS: never a second surface) —
+// world.js builds the mesh here, maritime hulls float relative to it, and
+// BOAT (vehicle.js) rides it. Lakes instead sit at lowest-shoreline +
+// LAKE_OFFSET, baked per lake in loadGeo (W2 retunes the look there).
+export const SEA_Y = -2.5;
+export const LAKE_OFFSET = 0.15;
 
 // --- Real elevation (baked from AWS Terrarium DEM; constants mirror tools/build-elevation.mjs) ---
 export const ELEV = { data: null, w: 448, h: 414, minX: -7330, maxX: 6230, minZ: -6630, maxZ: 5800 };
@@ -529,6 +540,27 @@ export function inStateWater(x, z) {
 // What kind of out-of-Texas point this is — 'land'/'coast'/'mexico'.
 export function borderZoneAt(x, z) {
   return classify(x, z);
+}
+
+// Navigable water for BOAT (Water Vehicles W1) — {kind:'gulf'|'lake', y} or
+// null. Gulf legality is the zone classifier, NOT depth: hAt clamps at the
+// DEM edge and never returns negative (the -4 offshore dip is mesh-only), so
+// "over gulf water" = outside Texas ∧ classify 'coast' ∧ inside the shelf.
+// The Laguna Madre sits outside both the mainland and island rings, so it
+// qualifies for free; wet sand (beachAt) is shore, not water. Lakes:
+// bbox-gated polygon test at the baked per-lake level (loadGeo).
+export function boatableAt(x, z) {
+  for (const lake of GEO.lakes) {
+    const bb = lake.bbox ??= lake.pts.reduce(
+      (a, [px, pz]) => ({ minX: Math.min(a.minX, px), maxX: Math.max(a.maxX, px), minZ: Math.min(a.minZ, pz), maxZ: Math.max(a.maxZ, pz) }),
+      { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    if (x < bb.minX || x > bb.maxX || z < bb.minZ || z > bb.maxZ) continue;
+    if (inPoly(x, z, lake.pts)) return { kind: 'lake', y: lake.level };
+  }
+  if (inTexas(x, z) || beachAt(x, z)) return null; // land or wet-sand shore (islands are inTexas)
+  if (classify(x, z) !== 'coast') return null;
+  if (nearestDist(x, z, GEO.border) > SHELF_U) return null; // past the shelf wall
+  return { kind: 'gulf', y: SEA_Y };
 }
 
 // The Band Parity "in-band land test": Texas OR standing inside one of the

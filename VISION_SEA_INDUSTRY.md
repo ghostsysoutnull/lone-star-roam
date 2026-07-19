@@ -42,6 +42,16 @@ because of the other.
 - Gulf fishing fleet: shrimpers working real grounds, back to port.
 - Radio chatter where it makes sense — VHF channel-16 flavor; the aviation
   chatter and ERCOT radio are the shipped register precedents.
+- **Boat upgrades in the shop** (committed: Water Vehicles spec decision
+  2026-07-19 deferred them here; W1 tune note 2026-07-19 — this is the
+  earn-hauling/spend-on-boat loop, the truck's missions→shop precedent).
+  Both registers, per the two-axis principle: *traditional* — outboard
+  tiers (cap/accel), hull paint (`bodyMat` idiom); *creative* — candidates
+  for the spec session: depth/fish finder (sonar pings surface marine
+  critter-log spots from the boat), VHF radio (hear this track's ship
+  chatter aboard), running lights for night boating (headlight idiom),
+  trim tabs (handling character, planing feel), shrimp/trolling rig
+  (small catch income off the fishing grounds).
 
 ## Existing assets
 
@@ -75,6 +85,9 @@ because of the other.
   `save.passport` (new keys only, by law).
 - Fishing depth: ambient fleet only (lean) vs player fishing gameplay
   (likely its own later track if ever).
+- Boat-upgrade slate: which traditional + creative upgrades ship, their
+  prices against water-haul pay, and which wave carries them (natural fit:
+  the same wave as the haul economy, so the loop closes in one session).
 - Whether ship names announce per vessel (AIS carries names) or per
   route/port only.
 

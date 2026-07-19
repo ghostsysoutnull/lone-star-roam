@@ -834,7 +834,7 @@ export class HUD {
     this.els.road.textContent = [road && !this.shieldInfo && !rail && `🛣 ${road.ref}`, water && `🌊 ${water}`].filter(Boolean).join('   ');
     this.els.speed.innerHTML = player.mode === 'WALK' ? '🚶'
       : `${player.speedMph} <small>mph</small><div id="hud-odo">${Math.round(this.lastDist ?? 0).toLocaleString()} km</div>`;
-    const icons = { DRIVE: '🚙', FLY: '✈️', WALK: '🚶' };
+    const icons = { DRIVE: '🚙', FLY: '✈️', WALK: '🚶', BOAT: '🚤' };
     this.els.mode.textContent = `${weatherIcon} ${clock}${forecast ? ` · ${forecast}` : ''} · ${icons[player.mode]} ${player.mode}${player.mode === 'FLY' ? ` — alt ${Math.round(player.pos.y * 100 / 1000 * 10) / 10} km · F 🧨×${player.flares?.charges ?? 0}` : ''} — V to change`;
     // stamina bar: WALK only, fades in while sprinting or below a full tank
     const showStamina = player.mode === 'WALK' && (player.sprinting || player.stamina < 1);

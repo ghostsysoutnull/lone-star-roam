@@ -1,6 +1,6 @@
 // Static world: Texas-shaped ground, gulf, highway ribbons, regional scenery chunks.
 import * as THREE from 'three';
-import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, bandAgAt, TIDELANDS_U, coastDist, neighborStateAt, inTexasOrBand, nearestAnyRoad, nearestRiver, energyAt } from './geo.js';
+import { GEO, seededRand, inTexas, onIsland, nearestRoad, nearestCity, hAt, outsideAt, ELEV, agAt, bandAgAt, TIDELANDS_U, coastDist, neighborStateAt, inTexasOrBand, nearestAnyRoad, nearestRiver, energyAt, SEA_Y } from './geo.js';
 import { ATMOS } from './sky.js';
 import { cityRadius, cityClear } from './cities.js';
 import { airportClear } from './airports.js';
@@ -35,24 +35,29 @@ function buildGround(scene) {
   const gulfGeom = new THREE.PlaneGeometry(14000, 9000, 140, 90);
   const gulf = new THREE.Mesh(
     gulfGeom,
-    new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true })
+    new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true, transparent: true })
   );
   gulf.rotation.x = -Math.PI / 2;
   gulf.rotation.z = -0.62; // align with coastline (runs SW–NE)
   // centered offshore of the real coast; between outside plane and ground
-  gulf.position.set(6500, -2.5, 5800);
+  gulf.position.set(6500, SEA_Y, 5800);
   gulf.name = 'gulf';
   gulf.updateMatrixWorld();
-  // one boot-time pass over ~13k verts against geo.js's shared coast field
+  // one boot-time pass over ~13k verts against geo.js's shared coast field.
+  // RGBA: alpha fades the plane out where it pokes past the DEM rectangle —
+  // beyond it there is no -4 seafloor dip, so open water would float over the
+  // outside plane with nothing under it ("ocean after dry land" bug).
   const stateWater = new THREE.Color(0x2e6f9e), blueWater = new THREE.Color(0x1c4a74);
-  const gp = gulfGeom.attributes.position, gc = new Float32Array(gp.count * 3);
+  const gp = gulfGeom.attributes.position, gc = new Float32Array(gp.count * 4);
   const gv = new THREE.Vector3(), col = new THREE.Color();
   for (let i = 0; i < gp.count; i++) {
     gv.fromBufferAttribute(gp, i).applyMatrix4(gulf.matrixWorld);
     col.copy(stateWater).lerp(blueWater, Math.max(0, Math.min(1, (coastDist(gv.x, gv.z) - TIDELANDS_U) / 30)));
-    gc[i * 3] = col.r; gc[i * 3 + 1] = col.g; gc[i * 3 + 2] = col.b;
+    const over = Math.max(gv.x - ELEV.maxX, ELEV.minX - gv.x, gv.z - ELEV.maxZ, ELEV.minZ - gv.z);
+    gc[i * 4] = col.r; gc[i * 4 + 1] = col.g; gc[i * 4 + 2] = col.b;
+    gc[i * 4 + 3] = Math.max(0, Math.min(1, 1 - over / 280)); // ~3 verts of feather past the grid edge
   }
-  gulfGeom.setAttribute('color', new THREE.BufferAttribute(gc, 3));
+  gulfGeom.setAttribute('color', new THREE.BufferAttribute(gc, 4));
   scene.add(gulf);
 
   buildTerrain(scene);
@@ -431,8 +436,9 @@ function buildWater(scene) {
     const g = new THREE.ShapeGeometry(shape);
     g.rotateX(-Math.PI / 2);
     const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: WATER }));
-    // flat water at the lowest shoreline point (lakes sit in valleys)
-    mesh.position.y = Math.min(...lake.pts.map(([x, z]) => hAt(x, z))) + 0.15;
+    // flat water at the baked per-lake level (geo.js loadGeo: lowest shoreline
+    // + LAKE_OFFSET) — one source shared with boatableAt
+    mesh.position.y = lake.level;
     scene.add(mesh);
   }
 }

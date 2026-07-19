@@ -28,7 +28,7 @@ export default async function debug(t) {
   await t.check('every tour spot is valid: in-world coords, unique labels, known modes/acts', async () => {
     const r = await t.ev(`(() => {
       const seen = new Set(), errs = [];
-      const modes = ['DRIVE', 'FLY', 'WALK'];
+      const modes = ['DRIVE', 'FLY', 'WALK', 'BOAT'];
       const weathers = ['clear', 'clouds', 'rain', 'storm', 'dust'];
       for (const tr of g.debug.tours) for (const w of tr.waves) for (const s of w.spots) {
         const k = tr.track + ' / ' + w.wave + ' / ' + s.label;

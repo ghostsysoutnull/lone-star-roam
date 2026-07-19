@@ -43,6 +43,8 @@ export const HINTS = [
     msg: "💡 You've crossed the state line — your progress out here lives in the Passport" },
   { key: 'hintAirport', when: (s) => s.apron,
     msg: '💡 An airfield — press V to take to the sky; a runway makes the smoothest start' },
+  { key: 'hintBoat', when: (s) => s.water,
+    msg: "💡 That's open water ahead — press V and the truck becomes a boat" },
 ];
 
 export class Tutorial {

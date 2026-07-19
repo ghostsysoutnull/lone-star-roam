@@ -292,7 +292,9 @@ export class Gameplay {
     player.pos.z = at.z;
     player.heading = at.heading;
     player.setMode(at.mode);
-    if (at.mode === 'FLY') player.pos.y = at.y;
+    // FLY altitude and BOAT water level both live in y; setMode already snaps
+    // BOAT to the water at the restored x/z, at.y covers the boatableAt-miss edge
+    if (at.mode === 'FLY' || at.mode === 'BOAT') player.pos.y = at.y;
     sky.t = at.skyT;
   }
 

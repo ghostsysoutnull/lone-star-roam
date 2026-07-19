@@ -13,6 +13,17 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'Water Vehicles (2026-07)',
+    waves: [
+      { wave: 'W1 — BOAT mode', spots: [
+        S('🚤 Gulf skiff — off Galveston', [4700, 2150], { heading: Math.PI, mode: 'BOAT', time: 0.35, note: 'the fourth mode — open Gulf southeast of Galveston; W to throttle, boats coast long and only steer with way on' }),
+        S('🚤 Falcon Lake', [224, 4649], { mode: 'BOAT', time: 0.35, note: 'lake boating — the border reservoir; the boat rides the baked lake level, and beaches at the banks' }),
+        S('🚤 Laguna Madre', [2100, 4500], { mode: 'BOAT', time: 0.35, note: 'the lagoon behind Padre — navigable water between the mainland and the island' }),
+        S('🛻 waterline stop — Galveston shore', [4470, 1891], { heading: -Math.PI / 2, mode: 'DRIVE', time: 0.35, note: 'drive east toward the Gulf: the truck soft-stops at the waterline and hints the boat (V)' }),
+      ] },
+    ],
+  },
+  {
     track: 'Railroads (2026-07)',
     waves: [
       { wave: 'W3 — band railroads', spots: [

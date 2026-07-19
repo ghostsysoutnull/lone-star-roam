@@ -1,11 +1,11 @@
 // The working Gulf: container ports at real locations, cargo ships and tankers
 // on coastal lanes, shrimp boats off Padre, oil platforms offshore.
 import * as THREE from 'three';
-import { GEO, hAt, coastDist, seededRand, inWorld } from './geo.js';
+import { GEO, hAt, coastDist, seededRand, inWorld, SEA_Y } from './geo.js';
 import { ATMOS } from './sky.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
-const SEA = -2.1; // gulf water plane is at -2.5; hulls sit slightly proud
+const SEA = SEA_Y + 0.4; // hulls sit slightly proud of the gulf water plane
 
 // radial vertex-color falloff for glow discs (center white -> black rim);
 // black + AdditiveBlending contributes nothing, so the edge dissolves

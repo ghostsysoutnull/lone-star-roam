@@ -212,6 +212,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     if (s.weather) setWeather(s.weather);
     tp(s.x, s.z, s.heading);
     if (s.mode === 'FLY') player.pos.y = Math.max(hAt(s.x, s.z) + 6, 6);
+    if (s.mode === 'BOAT') player.setMode('BOAT'); // re-snap y at the destination water (mode was set pre-teleport)
     if (s.act) actions[s.act]();
     hud.toast(`${s.label}${s.note ? ' — ' + s.note : ''}`);
   };

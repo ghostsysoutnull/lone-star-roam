@@ -8,23 +8,39 @@ targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
 ## Session briefing
-- **This session**: Water Vehicles (`WATER_VEHICLES_SPEC.md`), wave 1 of 3 —
-  BOAT mode: physics branch, skiff avatar, position-gated transitions,
-  `boatableAt` water legality, gulf-plane-beyond-DEM fix. Spec session
+- **This session**: Water Vehicles (`WATER_VEHICLES_SPEC.md`), wave 2 of 3 —
+  water feel: ATMOS-driven chop (pitch/roll + y bob, planing flattens it),
+  wake fade-pool behind the stern, sparkle patch, water-lap/engine audio,
+  and the river/lake offset look-pass (backlog fold-in). Wave 1 (BOAT mode)
   shipped 2026-07-19.
-- **Recommended setup**: model **Fable 5**, effort **high** — new-system
-  architecture + feel-critical (the boat's handling is the wave). Flag it
-  if the running model differs.
-- **Budget**: code + `boat.mjs` checks + one staged skiff shot
-  (Copilot-judged), grep-first. Perf delta ~+5 draw calls.
-- **Then**: rewrite this briefing for W2 (water feel: chop/wake/ambience +
-  the river/lake offset look-pass).
+- **Recommended setup**: model **Fable 5**, effort **high** — feel-tuning
+  wave with a new visible water surface treatment. Flag it if the running
+  model differs.
+- **Budget**: code + boat.mjs chop/wake checks + one staged water-surface
+  shot (Copilot-judged), grep-first. Perf delta +≤20 draw calls (wake +
+  sparkle pools); caps hold at the perf baseline spots.
+- **Then**: rewrite this briefing for W3 (fairways/marinas/ICW buoys, dog
+  bow perch, world-edge map lines, boat identity + track close).
 
-Gotchas carried over: gulf legality is the zone classifier, not `hAt`
-depth (it clamps and never returns negative — the −4 offshore dip is
-mesh-only); lake levels move from `buildWater` into geo.js so
-`boatableAt` and the mesh share one source; one-gulf-plane law applies to
-every boat effect.
+Gotchas carried over:
+- One-gulf-plane law: every effect (wake, sparkle, chop) floats ABOVE the
+  plane with a y-stagger — never a second water surface. The plane is now
+  RGBA (itemSize-4 color attr, `transparent: true`) fading past the DEM
+  edge; effects must not disturb the fade, and the boat.mjs plane-edge
+  probe asserts it.
+- Chop reads live `ATMOS` every frame, never cached; amplitude =
+  f(wind, weather), storm multiplies, attitude flattens as speed rises.
+  BOAT skips the slope-pitch block in vehicle.js (`mode !== 'BOAT'`
+  guard) — chop attitude goes exactly there. `pos.y` in BOAT comes from
+  `player._water.y` each frame; bob should offset the avatar, not fight
+  the legality/y source.
+- River offset 0.07 lives in world.js `buildWater`'s buildRibbons calls;
+  the lake offset is geo.js `LAKE_OFFSET` (0.15, baked into
+  `lake.level`). Retuning must update boat.mjs's Falcon
+  lowest-shoreline+0.15 assertion in the same pass.
+- Real-loop suites (aviation — in GOTCHAS — plus shop's dog-yip and
+  springer's hint-priority) flake under parallel `-j`, pass solo `-j 1`:
+  same class, don't chase them as boat regressions.
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to

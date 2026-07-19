@@ -1,6 +1,6 @@
 // Lone Star Roam — bootstrap & game loop
 import * as THREE from 'three';
-import { loadGeo, GEO, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRiver, nearestRail, nearestCity, waterAt, countyAt, neighborCountyAt, hAt, inTexas, onIsland, beachAt, inWorld, borderZoneAt, outsideAt, seededRand, agAt, bandAgAt, energyAt, inStateWater, coastDist, TIDELANDS_U, neighborStateAt, inTexasOrBand } from './geo.js';
+import { loadGeo, GEO, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRiver, nearestRail, nearestCity, waterAt, countyAt, neighborCountyAt, hAt, inTexas, onIsland, beachAt, inWorld, borderZoneAt, outsideAt, seededRand, agAt, bandAgAt, energyAt, inStateWater, coastDist, TIDELANDS_U, neighborStateAt, inTexasOrBand, boatableAt, ELEV, SEA_Y } from './geo.js';
 
 const NEIGHBOR_STATE_NAME = { LA: 'Louisiana', AR: 'Arkansas', OK: 'Oklahoma', NM: 'New Mexico' };
 import { buildWorld, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, wellSiteAt, windTurbinesAt, solarSitesAt, CAUSEWAY, padreSites, bandTint } from './world.js';
@@ -316,8 +316,8 @@ async function boot() {
   // W3 hint signals: npc/dusk are cheap and set per frame; cityEdge/band/apron
   // ride the 12 Hz hud block (their inputs live there). Stale-by-80ms is fine —
   // every trigger is a lingering state, not an edge.
-  const hintSig = { npc: false, cityEdge: false, dusk: false, apron: false, band: false };
-  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, energy, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, perf, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRiver, inTexas, inTexasOrBand, onIsland, beachAt, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, energyAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, wellSiteAt, windTurbinesAt, solarSitesAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, controlsBar, settings, slots, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
+  const hintSig = { npc: false, cityEdge: false, dusk: false, apron: false, band: false, water: false };
+  window.__game = { player, gameplay, GEO, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, energy, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, perf, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRiver, inTexas, inTexasOrBand, onIsland, beachAt, boatableAt, ELEV, SEA_Y, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, energyAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, wellSiteAt, windTurbinesAt, solarSitesAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, controlsBar, settings, slots, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
 
   let hudTick = 0;
   let lastForecast = null; // weather-radio announcement edge detector
@@ -409,6 +409,7 @@ async function boot() {
     const npcName = npcs.update(dt, player.pos); perf.lap('npcs');
     hintSig.npc = !!npcName;
     hintSig.dusk = ATMOS.night >= 0.5;
+    hintSig.water = player.atWaterline; // lingering while parked facing water, not an edge
     tutorial.update(dt, hintSig);
     controlsBar.update(dt);
     const skyHint = npcName ? null : springer.nearHint(player.pos);

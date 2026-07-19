@@ -149,4 +149,22 @@ export default async function ferries(t) {
     t.near(end.x, end.shoreX, 0.5, 'player x not at the Port Aransas arrival ramp');
     t.near(end.z, end.shoreZ, 0.5, 'player z not at the Port Aransas arrival ramp');
   });
+
+  await t.check('arrival drive-off: the BOAT waterline stop never locks the ramp', async () => {
+    // Water Vehicles W1 non-interference: aim inland (away from the channel)
+    // and confirm the truck rolls off the just-arrived ramp
+    const p0 = await t.ev(`(() => {
+      const r = g.ferries.routes.find((r) => r.key === 'portaransas');
+      const here = r.side === 'a' ? r.a : r.b, other = r.side === 'a' ? r.b : r.a;
+      g.player.heading = Math.atan2(-(here[0] - other[0]), -(here[1] - other[1]));
+      return { x: g.player.pos.x, z: g.player.pos.z };
+    })()`);
+    await t.hold('KeyW');
+    await t.simStep(2);
+    await t.release();
+    const res = await t.ev(`({ x: g.player.pos.x, z: g.player.pos.z, aboard: g.player.aboardFerry })`);
+    const moved = Math.hypot(res.x - p0.x, res.z - p0.z);
+    t.ok(moved > 3, `truck stuck on the arrival ramp (moved ${moved.toFixed(1)}u) — waterline stop misfiring at the dock`);
+    t.ok(!res.aboard, 'driving off the ramp re-boarded the ferry');
+  });
 }
