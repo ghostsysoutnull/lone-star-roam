@@ -5,11 +5,14 @@
 
 export default async function band(t) {
   // Captured on clean main, 2026-07-14, BEFORE Padre joined inTexas/inWorld —
-  // pins that in-Texas scenery draws stay byte-identical once the island is in.
+  // pins that in-Texas scenery draws stay byte-identical once the island is
+  // in. Re-pinned 2026-07-18: Performance W3 tagged EVERY scenery prop with
+  // userData.kind (drawAudit attribution), so the count now covers flora too
+  // — placement/streams unchanged, the freeze just got stronger.
   const FROZEN = [
-    { x: -2147.5, z: -3607.7, n: 6, kinds: { farmstead: 1, windmill: 1, chicken: 4 } },   // Hale chunk
-    { x: 830.2, z: 847.1, n: 15, kinds: { ranchhq: 1, hqhouse: 1, watertower: 1, windmill: 1, stocktank: 1, barn: 2, pen: 3, flagpole: 1, chicken: 3, solarfield: 1 } }, // LBJ ranch arch — the chunk's real baked solar site (1.58u from a road) vanished under W3's whole-site clamp; W4.5 per-BLOCK clearance legitimately draws its road-clear blocks
-    { x: -5800, z: -1200, n: 0, kinds: {} },                                              // bare west-Texas chunk
+    { x: -2147.5, z: -3607.7, n: 36, kinds: { mkCactus: 2, mkYucca: 4, mkRock: 4, cropfield: 4, croprows: 4, pivot: 12, farmstead: 1, windmill: 1, chicken: 4 } },   // Hale chunk
+    { x: 830.2, z: 847.1, n: 26, kinds: { mkLiveOak: 7, mkRock: 3, mkHayBale: 1, ranchhq: 1, hqhouse: 1, watertower: 1, windmill: 1, stocktank: 1, barn: 2, pen: 3, flagpole: 1, chicken: 3, solarfield: 1 } }, // LBJ ranch arch — the chunk's real baked solar site (1.58u from a road) vanished under W3's whole-site clamp; W4.5 per-BLOCK clearance legitimately draws its road-clear blocks
+    { x: -5800, z: -1200, n: 14, kinds: { mkCactus: 4, mkYucca: 4, mkRock: 4, mkMesquite: 2 } },                                              // bare west-Texas chunk
   ];
   for (const spot of FROZEN) {
     await t.check(`frozen baseline: chunk at (${spot.x},${spot.z}) unchanged by Padre join`, async () => {

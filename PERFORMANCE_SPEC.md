@@ -155,3 +155,61 @@ round 2.
    and headless-honest** — draw calls and triangles via `renderProbe()`
    (baseline ≈ 1.4–2.0 k / 1.7 M), plus lap-table completeness. Set caps
    with headroom (~2.5 k / 2.5 M) and revisit after any W3 work.
+
+### W3 — the draw audit (2026-07-18)
+
+Method: `perf.drawAudit()` — differential probing. Hide one source's roots,
+render one true frame, the delta against the all-visible probe is that
+source's exact contribution (frustum culling included; the whole audit is
+synchronous, so the scene is frozen across probes). Scenery splits further
+per prop kind via `userData.kind` tags. Debug Perf tab → 🔎 Audit runs it
+live; the perf suite asserts the buckets sum exactly to the probe total.
+
+Audit at the three baseline spots + the solar field nearest the I-10 spot
+(headless, settled 4 s, pre-fix):
+
+| Spot | total | shoulder | gameplay decor* | scenery | animals | traffic | cities | static world |
+| ---- | ----- | -------- | --------------- | ------- | ------- | ------- | ------ | ------------ |
+| Houston night storm | 2041 | 611 | ~510 | 653 | 62 | 8 | 2 | ~190 |
+| I-10 west floor | 1579 | 566 | ~350 | 409 | 85 | 4 | 0 | ~160 |
+| Sweetwater dusk (FLY) | 1510 | ~590 | ~250 | 500 | 177 | 8 | 4 | ~150 |
+| Solar field (I-10) | 1493 | ~570 | ~300 | 377 | 61 | 4 | 0 | ~180 |
+
+*gameplay decor = landmark props (39 sites, 603 meshes), gold + silver city
+stars (~600 meshes). Roses are instanced (2 calls) and innocent.
+
+6. **Finding 2's suspect was wrong.** Per-chunk scenery props are a real but
+   roughly uniform cost (377–653 calls) and NOT the desert-vs-downtown
+   differentiator. The dominant, location-independent base was
+   **world-spanning boot-built decoration that fog hides but never culls**:
+   the camera far plane is 30000 with the fog wall at ≤1400, so every border
+   vignette (`shoulder`, 566–611 calls at *every* spot), landmark prop and
+   city star inside the camera's frustum wedge submitted draws while fully
+   fog-invisible. The W1 "inversion" was just which slice of that unculled
+   field the recorded run's camera swept (plus the solar field Bruno drove
+   through, worth only ~80 calls). Cities (2–4 calls), traffic (4–8) and the
+   energy bakes (transmission = 1 call / 412 k tris) are all healthy.
+
+7. **Fix shipped same-session: the fog-wall gate** (`FogGate` in sky.js,
+   wired into shoulder.js and gameplay.js). Hides a root's direct children
+   once their whole world footprint sits beyond `GATE_R` (1500 = max
+   fog.far 1400 + margin; fogMul never exceeds 1.0 so the wall never grows
+   past 1400). Children with any `fog: false` material are auto-exempt (the
+   horizon glows are *designed* to beat fog). Pure visibility — all
+   interaction stays distance-based. Measured after (same staging):
+   Houston **2041 → 934**, I-10 floor **1579 → 675**, Sweetwater
+   **1510 → 866**, solar field **1493 → 633** — the draw base roughly
+   halved everywhere; triangles unchanged (the fog-hidden decor was small,
+   the 1.45 M static tris are the merged world at 1-call-per-mesh).
+
+8. **Teleport probes run hot.** A probe ~0.6 s after teleport reads ~+300
+   calls over the settled value (the prior spot's scenery chunks still live
+   in the camera wedge — the Finding 3 transient, seen in counts). The W2
+   guardrail probes at that cadence, so its cap is set against the harness
+   context (~1300 observed): draws 2500 → **1600**; triangles cap unchanged.
+   Any future cap tuning must say which context (settled vs post-teleport)
+   it measured.
+
+Open for W4 (close-out): re-record the real-hardware baseline (the spec's
+protocol) to confirm the render-ms drop on Bruno's machine, then fold the
+track into ROADMAP.md.

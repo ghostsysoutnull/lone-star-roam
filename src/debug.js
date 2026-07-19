@@ -246,7 +246,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     el.innerHTML = '<h2>🔧 Debug</h2><div id="debug-state"></div>' +
       '<div id="debug-tabs"><button class="active" data-tab="actions">⚡ Actions</button><button data-tab="tours">🗺️ Tours</button><button data-tab="perf">📈 Perf</button></div>' +
       `<div data-pane="actions">${actionsHtml}${airportsHtml}</div><div data-pane="tours" style="display:none">${toursHtml}</div>` +
-      '<div data-pane="perf" style="display:none"><div id="debug-perf"></div><button id="debug-perf-reset">↺ Reset max</button> <button id="debug-perf-record">📋 Record (0)</button></div>';
+      '<div data-pane="perf" style="display:none"><div id="debug-perf"></div><button id="debug-perf-reset">↺ Reset max</button> <button id="debug-perf-record">📋 Record (0)</button> <button id="debug-perf-audit">🔎 Audit</button><pre id="debug-perf-audit-out" style="margin:4px 0 0;white-space:pre-wrap"></pre></div>';
     el.style.display = 'none';
     document.body.appendChild(el);
     const stateEl = el.querySelector('#debug-state');
@@ -300,6 +300,14 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       recBtn.textContent = `📋 Record (${n})`;
       navigator.clipboard?.writeText(perf.formatRecords());
       hud.toast(`📋 Perf record ${n} saved — all ${n} on the clipboard`);
+    });
+    // W3 draw audit: per-source draw-call breakdown at the current view —
+    // result stays in the pane (the 2 Hz refresh only rewrites #debug-perf)
+    el.querySelector('#debug-perf-audit').addEventListener('click', () => {
+      const a = perf.drawAudit();
+      const text = a ? perf.formatAudit(a) : 'audit unavailable (no auditPlan)';
+      el.querySelector('#debug-perf-audit-out').textContent = text;
+      navigator.clipboard?.writeText(text);
     });
     setInterval(refreshPerf, 500);
     setInterval(refreshState, 500);

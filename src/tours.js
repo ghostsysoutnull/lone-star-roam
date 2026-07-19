@@ -20,6 +20,10 @@ export const TOURS = [
         S('📈 Floor — empty I-10 west, clear day', [-2767, 334], { heading: Math.PI / 2, mode: 'DRIVE', time: 0.35, weather: 'clear', note: 'the cheapest honest frame: open desert, no city, no weather — the baseline floor for the spec table' }),
         S('📈 Dense ambient — Sweetwater wind corridor, dusk', [-650, -1430], { mode: 'FLY', time: 0.79, note: 'the instancing-heavy middle case: the densest turbine cluster spinning — compare draws/tris against the floor spot' }),
       ] },
+      { wave: 'W3 — draw audit + fog-wall gate', spots: [
+        S('🔎 Draw audit — the desert floor, dissected', [-2767, 334], { mode: 'DRIVE', time: 0.35, weather: 'clear', note: 'Perf tab → 🔎 Audit: per-source draw-call breakdown. With the fog-wall gate, far border vignettes / landmarks / city stars submit ~0 calls here — shoulder was 566 before' }),
+        S('🔎 Gate boundary — Texarkana State Line', LL(33.425, -94.043), { mode: 'DRIVE', time: 0.35, weather: 'clear', note: 'a border vignette inside the fog wall: fully visible up close (audit shows shoulder > 0 here) — drive 15+ units west and the far vignettes behind you stop drawing' }),
+      ] },
     ],
   },
   {

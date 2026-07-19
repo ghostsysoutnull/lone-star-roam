@@ -11,6 +11,65 @@ const FF_SPEED = 80;            // hold T
 // mutable atmosphere state read by world.js (windmills), traffic, cities, gameplay
 export const ATMOS = { wind: 1, night: 0, weather: 'clear', rain: 0, ufo: 0 };
 
+// Fog-wall culling (Performance W3). The camera far plane (30000) keeps the
+// whole world in-frustum, so world-spanning boot-built decoration (border
+// vignettes, landmark props, city stars) submits draw calls even after the
+// fog wall (scene.fog.far — never above 1400, see update()) has fully hidden
+// it: the W3 audit measured ~900 such calls per frame, everywhere. A FogGate
+// hides a root's direct children once their whole footprint sits beyond
+// GATE_R of the player. Children carrying any fog:false material are never
+// gated — those are designed to beat fog (horizon glows, celestial). Pure
+// visibility: interaction logic must stay distance-based and never read
+// .visible. Footprints are horizontal enclosing circles over world bounding
+// spheres, computed once at construction (the decoration is static) — a
+// rebuilt root needs a new FogGate. Children later detached from their root
+// (collected city stars) are skipped, not fought over.
+export const GATE_R = 1500; // max fog.far (1400, clear day) + pop-in margin
+export class FogGate {
+  constructor(roots) {
+    this.entries = [];
+    const v = new THREE.Vector3(), s = new THREE.Vector3();
+    for (const root of roots) {
+      root.updateWorldMatrix(true, true); // boot-time matrices are stale
+      for (const child of root.children) {
+        let gate = true, any = false;
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        child.traverse((o) => {
+          const mats = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : [];
+          if (mats.some((m) => m.fog === false)) gate = false;
+          let r;
+          if (o.geometry) {
+            // instanced bounds must cover the instances, not the prototype
+            if (o.isInstancedMesh && !o.boundingSphere) o.computeBoundingSphere();
+            const bs = o.isInstancedMesh
+              ? o.boundingSphere
+              : (o.geometry.boundingSphere ?? (o.geometry.computeBoundingSphere(), o.geometry.boundingSphere));
+            v.copy(bs.center).applyMatrix4(o.matrixWorld);
+            o.getWorldScale(s);
+            r = bs.radius * Math.max(Math.abs(s.x), Math.abs(s.y), Math.abs(s.z));
+          } else if (o.isSprite) {
+            o.getWorldPosition(v);
+            r = Math.max(o.scale.x, o.scale.y);
+          } else return;
+          any = true;
+          minX = Math.min(minX, v.x - r); maxX = Math.max(maxX, v.x + r);
+          minZ = Math.min(minZ, v.z - r); maxZ = Math.max(maxZ, v.z + r);
+        });
+        if (!gate || !any) continue;
+        const rr = Math.hypot(maxX - minX, maxZ - minZ) / 2 + GATE_R;
+        this.entries.push({ obj: child, cx: (minX + maxX) / 2, cz: (minZ + maxZ) / 2, r2: rr * rr });
+      }
+    }
+  }
+
+  update(px, pz) {
+    for (const e of this.entries) {
+      if (!e.obj.parent) continue;
+      e.obj.visible = (px - e.cx) ** 2 + (pz - e.cz) ** 2 < e.r2;
+    }
+  }
+}
+
 // time-of-day keyframes (t: 0 = midnight, 0.25 = sunrise, 0.5 = noon, 0.75 = sunset)
 const KEYS = [
   { t: 0.0, sky: 0x0a1228, sunC: 0x9aa8cc, sunI: 0.22, ambC: 0x2a3a55, ambI: 0.5 },

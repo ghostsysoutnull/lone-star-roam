@@ -13,12 +13,16 @@ const LAPS = ['ferries', 'dolphins', 'player', 'sky', 'scenery', 'airports',
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos(31 * Math.PI / 180) / 100, -(lat - 31) * 111320 / 100];
 
-// Wave 2 guardrails (PERFORMANCE_SPEC.md Findings #5): the W1 baseline maxed
-// at 2037 draws / 1.75 M triangles (empty I-10, the "floor" that's actually
-// the ceiling — cost is location-independent). Caps = baseline + the spec's
-// stated headroom margin. Count-based only: per-system/total ms thresholds
-// are pointless per the same finding (all tiny, machine-bound).
-const CAPS = { draws: 2500, triangles: 2.5e6 };
+// Wave 2 guardrails, retuned after the W3 fog-wall gate (PERFORMANCE_SPEC.md
+// Findings #6–8): the gate halved the settled draw base (Houston storm
+// 2041 → 934). This check probes 0.6 s after teleport, which still carries
+// the teleport transient (the prior spot's scenery chunks in the camera
+// wedge, ~+300 calls — Finding #8), so the cap is set against the HARNESS
+// context max (~1300), not the settled one: 1600 ≈ 1.23× headroom, the W2
+// margin ratio. Triangles were never the problem (flat ~1.6–1.7 M, mostly
+// the merged static world) — that cap stays. Count-based only: per-system/
+// total ms thresholds are pointless per Findings #5 (all tiny, machine-bound).
+const CAPS = { draws: 1600, triangles: 2.5e6 };
 
 // the W1 tour spots (src/tours.js "Performance" track) — same staging so the
 // numbers here track the recorded baseline table
@@ -104,6 +108,43 @@ export default async function perf(t) {
       t.ok(r.triangles <= CAPS.triangles, `${s.label}: ${r.triangles} triangles exceeds the ${CAPS.triangles} cap (W1 baseline max was 1.75M) — new content or a regression, see PERFORMANCE_SPEC.md`);
     }
     await t.setWeather('clear'); // hermetic: don't leak storm into a sibling suite
+  });
+
+  await t.check('drawAudit (W3): differential buckets are exact and visibility is restored', async () => {
+    await t.tp(-2767, 334, 'DRIVE'); // desert floor spot — the inversion under audit
+    await t.wait(0.6); // let scenery/cities spawn for this position
+    const a = await t.ev('g.perf.drawAudit()');
+    t.ok(a && a.total.calls > 0, 'audit returned no total — auditPlan or drawFrame unwired');
+    for (const [k, b] of [...Object.entries(a.buckets), ...Object.entries(a.kinds)]) {
+      t.ok(Number.isFinite(b.calls) && b.calls >= 0, `${k}.calls not sane: ${b.calls}`);
+      t.ok(Number.isFinite(b.triangles) && b.triangles >= 0, `${k}.triangles not sane: ${b.triangles}`);
+    }
+    const sum = Object.values(a.buckets).reduce((s, b) => s + b.calls, 0);
+    t.ok(sum === a.total.calls, `bucket calls ${sum} != total ${a.total.calls} — differential probe not additive`);
+    const ksum = Object.values(a.kinds).reduce((s, b) => s + b.calls, 0);
+    t.ok(ksum === a.buckets.scenery.calls, `scenery kind split ${ksum} != scenery bucket ${a.buckets.scenery.calls} — a chunk child escaped its kind`);
+    t.ok(Object.keys(a.kinds).length >= 3, `desert spot yielded only ${Object.keys(a.kinds).length} scenery kinds — tags missing in spawn()?`);
+    // restoredCalls is probed inside the audit's synchronous block (scene
+    // frozen) — an out-of-block re-probe would race live content streaming
+    t.ok(a.restoredCalls === a.total.calls, `audit left visibility dirty: restored frame ${a.restoredCalls} vs total ${a.total.calls}`);
+  });
+
+  await t.check('fog-wall gate (W3): far decoration hidden by the live loop, near decoration visible', async () => {
+    await t.tp(-2767, 334, 'DRIVE'); // desert — the border vignettes and most landmarks/stars sit far beyond the fog wall
+    await t.wait(0.8); // both gates tick on a 0.5 s cadence inside real updates
+    const r = await t.ev(`({
+      shoulderHidden: g.shoulder.group.children.filter((c) => !c.visible).length,
+      lmHidden: g.gameplay.landmarkGroup.children.filter((c) => !c.visible).length,
+      starHidden: g.gameplay.cityStars.children.filter((c) => !c.visible).length,
+    })`);
+    t.ok(r.shoulderHidden > 10, `only ${r.shoulderHidden} shoulder children hidden in the far desert — gate not running or radius wrong`);
+    t.ok(r.lmHidden >= 25, `only ${r.lmHidden}/39 landmark sites hidden in the far desert`);
+    t.ok(r.starHidden > 80, `only ${r.starHidden}/132 city stars hidden in the far desert`);
+    const alamo = await t.ev(`(() => { const lm = g.LANDMARKS.find((l) => l.name.includes('Alamo')); return [lm.at[0], lm.at[1]]; })()`);
+    await t.tp(alamo[0] + 5, alamo[1] + 5, 'WALK');
+    await t.wait(0.8);
+    const vis = await t.ev(`g.gameplay.landmarkGroup.children.find((c) => c.userData.lm.name.includes('Alamo')).visible`);
+    t.ok(vis, 'the Alamo is hidden while standing at it — gate footprint or radius wrong');
   });
 
   await t.check('resetMax clears the peaks without touching counters', async () => {

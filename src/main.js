@@ -325,6 +325,20 @@ async function boot() {
   // water and the shelf are null so ferries and the Gulf never trigger it
   let lastSide = 'tx', lastCrossT = -Infinity, returnCount = 0;
   perf.drawFrame = () => { renderer.render(scene, camera); perf.captureRender(renderer); }; // renderProbe: one true frame even under __skipRender
+  perf.auditPlan = () => { // drawAudit (W3) sources — disjoint groups + the per-kind scenery split
+    const detail = {};
+    for (const g of scenery.live.values())
+      for (const c of g.children) (detail[c.userData.kind ?? 'untagged'] ??= []).push(c);
+    return {
+      groups: {
+        scenery: [...scenery.live.values()],
+        cities: [...cities.live.values()],
+        traffic: [...Object.values(traffic.meshes), ...Object.values(traffic.lampMeshes)],
+        animals: [...animals.live.values()].map((e) => e.group),
+      },
+      detail,
+    };
+  };
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
     // Title/attract: the world lives, the player doesn't. Camera drifts around

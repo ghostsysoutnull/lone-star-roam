@@ -18,6 +18,7 @@ export class PerfMonitor {
     this.frames = 0; // main-branch frames since boot (title/pause untimed)
     this.render = { calls: 0, triangles: 0, geometries: 0, textures: 0, programs: 0 };
     this.drawFrame = null; // set by main.js: renders one real frame + captures info
+    this.auditPlan = null; // set by main.js: () => ({ groups, detail }) for drawAudit()
     this.records = []; // record() stash — baseline captures for formatRecords()
     this._t0 = 0; // current frame's start
     this._tl = 0; // last lap point
@@ -73,6 +74,55 @@ export class PerfMonitor {
   renderProbe() {
     if (this.drawFrame) this.drawFrame();
     return { ...this.render };
+  }
+
+  // W3 draw audit — differential probing: hide one source's roots, render one
+  // true frame, and the delta against the all-visible probe is that source's
+  // real draw contribution (frustum culling and material groups included —
+  // no estimating from mesh counts). auditPlan is wired by main.js:
+  // () => ({ groups, detail }) where groups are disjoint scene subsets
+  // (remainder reported as 'other') and detail entries overlap groups (the
+  // per-kind scenery split) so they stay out of the disjoint sum. The whole
+  // audit runs synchronously — no rAF can interleave, so the scene is frozen
+  // across every probe and the deltas are exact, not statistical.
+  drawAudit() {
+    if (!this.drawFrame || !this.auditPlan) return null;
+    const { groups, detail } = this.auditPlan();
+    const total = this.renderProbe();
+    const probe = (roots) => {
+      const prev = roots.map((r) => r.visible);
+      for (const r of roots) r.visible = false;
+      const p = this.renderProbe();
+      roots.forEach((r, i) => { r.visible = prev[i]; });
+      return { calls: total.calls - p.calls, triangles: total.triangles - p.triangles, roots: roots.length };
+    };
+    const buckets = {}, kinds = {};
+    let calls = 0, tris = 0;
+    for (const [name, roots] of Object.entries(groups)) {
+      const b = (buckets[name] = probe(roots));
+      calls += b.calls;
+      tris += b.triangles;
+    }
+    buckets.other = { calls: total.calls - calls, triangles: total.triangles - tris, roots: 0 };
+    for (const [name, roots] of Object.entries(detail)) kinds[name] = probe(roots);
+    // final all-visible probe: leaves this.render mirroring a true frame AND
+    // proves restoration — still inside the synchronous block, so the scene
+    // can't have changed and restored must equal total exactly (a later
+    // out-of-block re-probe races the live loop's content streaming)
+    const restored = this.renderProbe();
+    return { total: { calls: total.calls, triangles: total.triangles }, buckets, kinds, restoredCalls: restored.calls };
+  }
+
+  formatAudit(a) {
+    const k = (n) => (n >= 1e5 ? `${(n / 1e6).toFixed(2)}M` : `${(n / 1000).toFixed(0)}k`);
+    const row = ([name, b]) => `${name} — ${b.calls} calls · ${k(b.triangles)} tris · ${b.roots} roots`;
+    const sort = (o) => Object.entries(o).sort((x, y) => y[1].calls - x[1].calls);
+    return [
+      `total ${a.total.calls} calls · ${k(a.total.triangles)} tris`,
+      ...sort(a.buckets).map(row),
+      '— scenery by kind —',
+      ...sort(a.kinds).map(row),
+    ].join('\n');
   }
 
   memoryMB() {

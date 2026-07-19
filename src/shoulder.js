@@ -8,7 +8,7 @@
 // GEO.border + GEO.bandHighways — no streaming, no per-frame geometry.
 import * as THREE from 'three';
 import { GEO, hAt, inTexas, neighborCountyAt, seededRand } from './geo.js';
-import { ATMOS } from './sky.js';
+import { ATMOS, FogGate } from './sky.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const UNIT_MI = 0.0621371; // 1 game unit = 100m
@@ -301,6 +301,7 @@ export class ShoulderSystem {
     this.buildGlows(g);
     scene.add(g);
     this.group = g;
+    this.fogGate = new FogGate([g]); // W3: vignettes beyond the fog wall stop drawing (glows are fog:false — auto-exempt)
 
     this.plaques = [
       { icon: '📜', name: 'The Neutral Ground', at: this.ngPlaqueAt, hint: 'read the Neutral Ground marker', sub: 'No man’s land, 1806–1821',
@@ -985,6 +986,7 @@ export class ShoulderSystem {
     this.scanT += dt;
     if (this.scanT < 0.5) return;
     this.scanT = 0;
+    this.fogGate.update(px, pz);
     for (const s of this.stones) {
       if ((px - s.x) ** 2 + (pz - s.z) ** 2 < 9 * 9) this.onStone?.(s.key, s.label);
     }

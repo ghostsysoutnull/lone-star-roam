@@ -8,43 +8,40 @@ targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
 ## Session briefing
-- **This session**: Performance (`PERFORMANCE_SPEC.md`), wave 3 of ~3 — the
-  draw-call audit Finding 2 calls for, not a fix yet. Wave 2 (count-based
-  guardrails: 2500 draws / 2.5M tris caps via `renderProbe()` at the 3
-  baseline tour spots, perf-cost protocol line) shipped 2026-07-18.
-- **The question to answer**: why does the empty desert (I-10 west, 2037
-  draws) submit *more* draw calls than downtown Houston in a storm (1461)?
-  Triangles are flat (~1.6–1.7 M) everywhere, so it's a call-count problem,
-  not a geometry-size problem. Prime suspect (unproven): per-chunk scenery
-  props built as individual meshes rather than merged/instanced — open land
-  runs more chunks at full density; cities suppress scenery spawn. Read
-  `PERFORMANCE_SPEC.md` Findings 1–5 before planning; do not assume the
-  suspect is correct — the audit's job is to confirm or redirect it.
-- **Deliverable is a diagnosis, not a rewrite**: break down `renderProbe()`
-  draw calls by source (scenery chunk contents vs. cities vs. traffic vs.
-  static world meshes) so the audit has numbers, not a guess. If the data
-  points at one clear, low-risk fix, land it same session with a measured
-  before/after; if not, scope a W4 fix wave instead — don't merge/refactor
-  ScenerySystem on suspicion alone.
-- **Recommended setup**: model **Fable 5**, effort **high** — touches
-  ScenerySystem's chunking, one of the "performance patterns to preserve" in
-  CLAUDE.md; architectural risk grades Fable even though the audit itself is
-  mostly instrumentation. Flag it if the running model differs.
-- **Budget**: audit instrumentation + findings written into
-  `PERFORMANCE_SPEC.md`, code only if the data clearly justifies a same-
-  session fix, no shots, grep-first.
-- **Then**: if the audit lands a fix, rewrite this briefing for a W4
-  before/after verification pass; if it finds nothing worth doing, close the
-  track (`ROADMAP.md` fold, satellite-doc sweep, this block deleted).
+- **This session**: Performance (`PERFORMANCE_SPEC.md`), wave 4 of 4 —
+  real-hardware re-record + track close. Wave 3 (draw audit + the fog-wall
+  gate fix: draws roughly halved everywhere, Houston storm 2041 → 934
+  headless) shipped 2026-07-18. Read the spec's W3 section (Findings 6–8)
+  before anything.
+- **Deliverables**: (1) Bruno re-records the baseline table on his machine
+  (the spec's protocol: teleport → settle 3 s → Reset max → 15–20 s moving
+  play → 📋 Record, at the three W1 tour spots) to confirm the render-ms
+  drop on real hardware; findings go into the spec next to the W1 table.
+  (2) Track close: fold Performance into `ROADMAP.md`, sweep satellite docs
+  (BACKLOG header, anything naming the track), graduate surviving gotchas
+  into `GOTCHAS.md`, delete this briefing block.
+- **Recommended setup**: model **Sonnet 5**, effort **high** — pure
+  execution of settled design (record protocol, doc folds); no new surface,
+  no feel calls. Flag it if the running model differs.
+- **Budget**: doc updates + the recorded numbers, no shots, no new code
+  unless the re-record exposes a regression.
+- **Then**: this block is deleted; the track is closed.
 
 Gotchas carried over:
-- The harness fake clock (Playwright) fakes `performance.now` — headless lap
-  ms are all ~0. Any new audit checks must assert counts (draw calls, tris,
-  per-source breakdowns) or come from the recorded real-hardware baseline;
-  never assert nonzero ms headless (see `tools/checks/perf.mjs` header).
-- `renderProbe()` caps (2500 draws / 2.5M tris) are a coarse regression net,
-  not a diagnosis — they won't catch or explain the desert-vs-downtown
-  inversion; that's this wave's job.
+- The harness fake clock zeroes lap ms — count-based asserts only (see
+  `tools/checks/perf.mjs` header).
+- **Teleport probes run hot** (Finding 8): a probe ~0.6 s after teleport
+  reads ~+300 draw calls (the prior spot's chunks still in the camera
+  wedge). The W2 caps (now 1600 draws) are pinned against that harness
+  context — never re-tune them from settled numbers, and say which context
+  any new number came from.
+- **FogGate rules** (sky.js): `fog: false` materials are auto-exempt (they
+  are designed to beat fog); interaction logic must stay distance-based and
+  never read `.visible`; a rebuilt root (gameplay save-slot switch) needs a
+  fresh gate.
+- The band suite's frozen chunk baseline now counts flora too (W3 tagged
+  every scenery prop with `userData.kind` for the audit) — a new prop kind
+  or tag change re-pins those three chunks.
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to

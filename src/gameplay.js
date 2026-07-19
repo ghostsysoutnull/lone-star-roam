@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { GEO, seededRand, nearestCity, hAt } from './geo.js';
 import { mkStarMesh } from './vehicle.js';
 import { cityRadius } from './cities.js';
+import { FogGate } from './sky.js';
 import { merge, tinted } from './traffic.js';
 import { fieldNear, onRunway, TD_AGL, TD_SPD } from './airports.js';
 import { KEYS, slotKey, activeSlot, setActiveSlot } from './slots.js';
@@ -84,6 +85,8 @@ export class Gameplay {
     this.bandCityStars = this.mkBandCityStars();
     this.roseSystem = this.mkRoses();
     this.landmarkGroup = this.mkLandmarks();
+    this.fogGate = new FogGate([this.cityStars, this.bandCityStars, this.landmarkGroup]); // W3 (roses are instanced — 2 calls, exempt)
+    this.gateT = 0;
     this.t = 0;
   }
 
@@ -133,6 +136,7 @@ export class Gameplay {
     this.bandCityStars = this.mkBandCityStars();
     this.roseSystem = this.mkRoses();
     this.landmarkGroup = this.mkLandmarks();
+    this.fogGate = new FogGate([this.cityStars, this.bandCityStars, this.landmarkGroup]); // rebuilt roots need a fresh gate
   }
 
   _disposeVisuals() {
@@ -452,6 +456,13 @@ export class Gameplay {
         if (b.age > 0.7) { this.scene.remove(b.ring); b.ring.geometry.dispose(); b.ring.material.dispose(); }
       }
       this.bursts = this.bursts.filter((b) => b.age <= 0.7);
+    }
+
+    // fog-wall gate (W3): far stars/landmarks stop drawing — 0.5 s cadence
+    this.gateT = (this.gateT ?? 0) + dt;
+    if (this.gateT > 0.5) {
+      this.gateT = 0;
+      this.fogGate.update(pos.x, pos.z);
     }
 
     // landmark beacons pulse

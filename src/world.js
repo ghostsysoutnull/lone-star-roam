@@ -1100,6 +1100,7 @@ class ScenerySystem {
         } else if (road && road.dist < 3) continue;
         if (!airportClear(x, z)) continue; // fields keep their footprints bare
         const obj = maker(rand);
+        obj.userData.kind ??= maker.name; // drawAudit attribution — animated makers already set their own
         const s = 0.75 + rand() * 0.6;
         obj.scale.setScalar(s);
         obj.position.set(x, hAt(x, z), z);
@@ -1125,6 +1126,7 @@ class ScenerySystem {
       cem.rotation.y = site.rot;
       const oak = mkLiveOak(rand); // a shade tree between them
       oak.position.set((site.x + site.cemX) / 2, hAt(site.x, site.z), (site.z + site.cemZ) / 2 + 4);
+      oak.userData.kind = 'mkLiveOak'; // chapel/cemetery self-tag in their makers
       group.add(chapel, cem, oak);
     }
 
@@ -1153,11 +1155,16 @@ class ScenerySystem {
         if (!cityClear(fx, fz, clear)) continue;
         const patch = mkFieldPatch(fx, fz, w, d, rot, style.ground, false, 0.12 + deck++ * 0.015, stripe);
         patch.userData.crop = ag.dominantCrop;
+        patch.userData.kind = 'cropfield';
         group.add(patch);
-        if (style.row) group.add(mkCropRows(crand2, fx, fz, w * 0.9, d * 0.9, rot, style.row));
-        else if (ag.dominantCrop === 'hay')
+        if (style.row) {
+          const rows = mkCropRows(crand2, fx, fz, w * 0.9, d * 0.9, rot, style.row);
+          rows.userData.kind = 'croprows';
+          group.add(rows);
+        } else if (ag.dominantCrop === 'hay')
           for (let k = 0, kn = 2 + ((rowRoll * 3) | 0); k < kn; k++) {
             const bale = mkHayBale(crand2);
+            bale.userData.kind = 'mkHayBale';
             const bx = fx + (crand2() - 0.5) * w * 0.7, bz = fz + (crand2() - 0.5) * d * 0.7;
             bale.position.set(bx, hAt(bx, bz), bz);
             group.add(bale);
@@ -1177,6 +1184,7 @@ class ScenerySystem {
         arm.position.set(fx, hAt(fx, fz) + 0.35, fz);
         arm.rotation.y = armRot;
         const wedge = mkPivotWedge(fx, fz, r, armRot, 0.12 + deck++ * 0.015);
+        disc.userData.kind = arm.userData.kind = wedge.userData.kind = 'pivot';
         group.add(disc, arm, wedge);
       }
 
@@ -1328,6 +1336,7 @@ class ScenerySystem {
       const bodyI = new THREE.InstancedMesh(mkTurbineBodyGeo(), lamb(0xe4e6ea), turbines.length);
       const bladeI = new THREE.InstancedMesh(mkTurbineBladeGeo(), lamb(0xd0d4d8), turbines.length);
       bodyI.userData.kind = 'turbinetower';
+      bladeI.userData.kind = 'turbineblade';
       bladeI.frustumCulled = false; // per-instance matrices change every frame — a stale bbox would cull live blades
       const sites = [];
       turbines.forEach((tb, i) => {
