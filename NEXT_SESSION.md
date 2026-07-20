@@ -8,34 +8,46 @@ targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
 Active track: **Rails Operations** (`RAILS_OPS_SPEC.md`, 3 waves) — spec
-written 2026-07-19, slotted before sea-industry. Wave 1 (identity + chatter)
-shipped 2026-07-19. Water Vehicles shipped in full 2026-07-19 (folded into
-`ROADMAP.md`).
+written 2026-07-19, slotted before sea-industry. Waves 1 (identity +
+chatter) and 2 (journeys) shipped 2026-07-19. Water Vehicles shipped in
+full 2026-07-19 (folded into `ROADMAP.md`).
 
 ## Session briefing
-- **This session**: Rails Operations, wave 2 of 3 — journeys. Generalize
-  the named-train junction hop (`hopAt`) to every train instead of braking
-  dead at a polyline end; spawn exclusivity so opposing trains stop
-  spawning onto a collision course; `dest`/trip line updates live on each
-  hop. Wave 1 (identity + chatter) shipped 2026-07-19, commit pending push
-  this session.
-- **Recommended setup**: model **Fable 5**, effort **high** — new-system
-  architecture (generalizing a single-train mechanism to the whole roster,
-  spawn-exclusivity logic) carries real design risk despite being mostly
-  plumbing. Flag it if the running model differs.
-- **Budget**: code + checks + tours, logic-only, no shots, grep-first.
-  Perf: none.
-- **Then**: rewrite this briefing for W3 (meets — real siding holds,
-  Fable 5 high, includes a bake step + one Copilot-judged shot).
+- **This session**: Rails Operations, wave 3 of 3 — meets (the track
+  marquee). Bake 878 real OSM sidings onto their parent rails
+  (`tools/build-rails.mjs` + `sd: [{s0, s1, side}]` spans; input
+  `~/claude-area/devel/tx-inputs/tx-sidings.json`, fetched 2026-07-19);
+  draw siding ribbons merged into the rail mesh; opposing pairs resolve —
+  one train pulls into a real siding, holds, the opposer passes, meet
+  chatter voices it; `meet` debug action stages one on demand. Waves 1+2
+  shipped 2026-07-19 (W2 commit pending push this session; W1 commit
+  4418062 may still be unpushed too — check `tools/status.sh`).
+- **Recommended setup**: model **Fable 5**, effort **high** — new visible
+  surface (siding geometry) + new-system architecture (occupancy registry,
+  meet resolution) + a bake step. Flag it if the running model differs.
+- **Budget**: bake + code + checks + tours + one Copilot-judged shot (new
+  visible geometry). Perf: +1 merged mesh / +1 draw call — report against
+  `tools/checks/perf.mjs` caps.
+- **Then**: this is the last wave — delete this briefing block, fold the
+  track into `ROADMAP.md`, sweep satellite docs (`BACKLOG.md` header, any
+  doc naming the active track), graduate surviving gotchas into
+  `GOTCHAS.md`, and return this file to kickoff-only.
 
-Gotchas carried over: `hopAt`'s turn-angle/`minRun` guards stand — reuse,
-don't rewrite. Spur rails stay named-train turf; band rails join like
-mainlines (existing law). `id.dest`/`id.sym` must update in place on hop
-(same `tr.id` object — don't rebuild identity mid-life, only `trainid:`
-spawn-time fields are meant to be stable-for-life; dest is the one field
-W2 explicitly makes live). Chatter/identity toast logic (W1) reads
-`tr.rail`/`tr.dir` on every frame already, so a hop that swaps `tr.rail`
-mid-life needs no changes there. `trainid:` seed stream — never rename.
+Gotchas carried over: `hopAt` now returns the best *unoccupied* connection
+first (`clean ?? best`) — the W3 meet layer sits above it and only ever
+applies on rails with baked `sd`; rails without a real siding keep spawn
+exclusivity as their only protection (real-or-absent, settled). `syncTrip`
+mutates `dest`/`sym`/`sub` in place on the same `tr.id` object after every
+hop — spawn-time `trainid:` fields (cargo, cars, mp, voice, orig) stay
+stable for life; never rebuild the id object mid-life and never rename the
+`trainid:` stream. Commuter sets terminate at end-of-line by design
+(`!tr.id.commuter` gates the hop) — don't "fix" a held TRE set at its
+terminus. `spawn()` direction-locks to a rail's occupant and enforces
+arc-length separation; `force()` deliberately bypasses exclusivity
+(deterministic harness/tour tool — leave it). Spur rails stay named-train
+turf; band rails join like mainlines and have no `sd` (siding scout bbox
+was Texas-only). W3 meet checks: stage state directly (the rails suite's
+synthetic-rail idiom) and assert positions over time, not snapshots.
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to

@@ -3,6 +3,9 @@
 // Rails W2: named border crossings — on a seeded daily schedule the Tex-Mex
 // Interchange (Laredo) and Eagle Pass Manifest cross the Rio Grande on their
 // baked spur routes, and the Z double-stack runs the longest BNSF line.
+// Rails Ops W2: journeys — every freight hops junctions onto connecting rails
+// (commuter sets terminate at their termini), spawns never land on a collision
+// course, and the trip line stays true across hops (dest/sym/sub live).
 import * as THREE from 'three';
 import { GEO, hAt, seededRand, nearestCity } from './geo.js';
 import { merge, tinted } from './traffic.js';
@@ -277,8 +280,17 @@ export class TrainSystem {
     if (rail.len < (rail.commuter ? COMMUTER_LEN : FREIGHT_LEN)) return;
     const nCars = rail.commuter ? 3 + ((Math.random() * 3) | 0) : 14 + ((Math.random() * 14) | 0);
     if (rail.len < nCars * CAR_LEN + (rail.commuter ? 20 : 60)) return;
-    const dir = Math.random() < 0.5 ? 1 : -1;
+    // Ops W2 spawn exclusivity: an occupant fixes the direction (equal SPEED
+    // both ways ⇒ same-direction can never meet), mixed-direction leftovers
+    // (forced pairs) reject, and no consist materializes inside or against
+    // another — arc separation of both train lengths + 30 u.
+    const occ = this.trains.filter((t) => t.rail === rail);
+    const dir = occ.length ? occ[0].dir : (Math.random() < 0.5 ? 1 : -1);
+    if (occ.some((t) => t.dir !== dir)) return;
     const s0 = Math.random() * rail.len;
+    for (const t of occ) {
+      if (Math.abs(s0 - t.s) < (nCars + 1 + t.cars.length + 1) * CAR_LEN + 30) return;
+    }
     // don't spawn right on top of the player
     const [sx, , , ] = this.at(rail, s0), [, sz2] = this.at(rail, s0);
     if (Math.hypot(sx - px, sz2 - pz) < 80) return;
@@ -361,16 +373,18 @@ export class TrainSystem {
     return tr;
   }
 
-  // Named trains don't brake at a junction: find the connecting rail at this
-  // one's outbound end and keep rolling into the network — the spur is only
-  // the border approach, and a through train stopping dead in Laredo reads
+  // Trains don't brake at a junction (named-only until Ops W2, now everyone):
+  // find the connecting rail at this one's outbound end and keep rolling into
+  // the network — a through train stopping dead at a polyline end reads
   // broken. Picks the candidate whose tangent best continues the heading
-  // (≥ ~72° cone); returns null at a true dead end (the hold law applies).
+  // (≥ ~72° cone), preferring a connection with no opposing-direction traffic
+  // (falls back to any); returns null at a true dead end (the hold law
+  // applies).
   hopAt(rail, dir, minRun = 0) {
     const [ex, ez] = rail.pts[dir > 0 ? rail.pts.length - 1 : 0];
     const [, , tdx, tdz] = this.at(rail, dir > 0 ? rail.len : 0);
     const fx = tdx * dir, fz = tdz * dir;
-    let best = null, bestDot = 0.3;
+    let best = null, bestDot = 0.3, clean = null, cleanDot = 0.3;
     for (const r of this.rails) {
       if (r === rail || r.spur) continue;
       if (ex < r.minX - 17 || ex > r.maxX + 17 || ez < r.minZ - 17 || ez > r.maxZ + 17) continue;
@@ -391,8 +405,24 @@ export class TrainSystem {
       // target's own end ping-pongs at the junction instead of rolling on
       if ((dir2 > 0 ? r.len - s0 : s0) < minRun) continue;
       if (Math.abs(dot) > bestDot) { bestDot = Math.abs(dot); best = { rail: r, s: s0, dir: dir2 }; }
+      if (Math.abs(dot) > cleanDot && !this.trains.some((t) => t.rail === r && t.dir !== dir2)) {
+        cleanDot = Math.abs(dot); clean = { rail: r, s: s0, dir: dir2 };
+      }
     }
-    return best;
+    return clean ?? best;
+  }
+
+  // Rails Ops W2: a hop keeps the trip line honest — dest, the sym's DEST
+  // letters, and sub mutate in place on the same id object. The spawn-time
+  // trainid: fields (cargo, cars, mp, voice, orig) stay stable for life;
+  // nothing re-rolls the seed stream.
+  syncTrip(tr) {
+    const id = tr.id;
+    const [dx2, dz2] = tr.rail.pts[tr.dir > 0 ? tr.rail.pts.length - 1 : 0];
+    id.dest = nearestCity(dx2, dz2).city.name;
+    const [letter, , daySfx] = id.sym.split('-');
+    id.sym = `${letter}-${id.orig.slice(0, 3).toUpperCase()}${id.dest.slice(0, 3).toUpperCase()}-${daySfx}`;
+    id.sub = tr.rail.name ?? tr.rail.operator ?? 'the line';
   }
 
   // seeded daily crossing schedule — spawn only while the player is inside the
@@ -439,9 +469,11 @@ export class TrainSystem {
       const total = (tr.cars.length + 1) * CAR_LEN;
       // end of line: hold at the buffer if the player is watching, retire otherwise
       let atEnd = (tr.dir > 0 && tr.s >= tr.rail.len) || (tr.dir < 0 && tr.s <= total);
-      if (atEnd && tr.named) {
+      // Ops W2: every train journeys — hop the junction instead of braking.
+      // Commuter sets terminate: end-of-line is their terminus, not a stall.
+      if (atEnd && !tr.id.commuter) {
         const hop = this.hopAt(tr.rail, tr.dir, total + 20);
-        if (hop) { tr.rail = hop.rail; tr.s = hop.s; tr.dir = hop.dir; atEnd = false; }
+        if (hop) { tr.rail = hop.rail; tr.s = hop.s; tr.dir = hop.dir; atEnd = false; this.syncTrip(tr); }
       }
       if (!atEnd) tr.s += SPEED * tr.dir * dt;
       else {

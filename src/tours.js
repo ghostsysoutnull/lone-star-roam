@@ -15,6 +15,9 @@ export const TOURS = [
   {
     track: 'Rails Operations (2026-07)',
     waves: [
+      { wave: 'W2 — journeys', spots: [
+        S('🔀 Junction hop — Del Rio Sub → Sanderson Sub', [-1288.7, 1818.4], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'a freight forced onto the Del Rio Sub\'s last mile west of town — it rolls through the junction onto the Sanderson Sub instead of braking dead, and its placard destination updates with the hop (drive up for a fresh read)' }),
+      ] },
       { wave: 'W1 — identity + chatter', spots: [
         S('🚂 Identity toast — UP Brownsville Sub', [1797.6, 3498.7], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'a freight forced next to you — the placard toast now reads the full identity: symbol, consist ("N cars, cargo"), and trip (origin → destination · sub)' }),
         S('📻 Radio chatter — CPKC Laredo Sub', [843.2, 4097.7], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'the same forcing action zeroes the chatter cooldown too — a detector, dispatcher, crew, or highball call keys up within a couple of seconds' }),

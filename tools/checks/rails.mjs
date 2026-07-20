@@ -446,4 +446,188 @@ export default async function rails(t) {
     const withPerk = await t.ev('window.__chat');
     t.ok(withPerk && !/undefined|NaN|null/.test(withPerk), `chatter did not fire with the radio perk at 65u: ${withPerk}`);
   });
+
+  // --- Rails Ops W2: journeys ----------------------------------------------
+
+  // A rail end where a forced freight is guaranteed to hop: force-eligible,
+  // non-commuter, hopAt resolves at the +1 end, and force() at that end picks
+  // this rail (its own pick loop replicated, list order + strict <, so a
+  // junction vertex of the target rail can't steal the spawn). Found in live
+  // data — a rebake never stales this.
+  const JUNCTION = `(() => {
+    const minRun = 19 * 3.3 + 20;
+    const eligible = (r) => !r.spur &&
+      Math.max(r.maxX - r.minX, r.maxZ - r.minZ) > (r.commuter ? 40 : 350) &&
+      (g.trains.arcInit(r), r.len >= (r.commuter ? 60 : 500));
+    for (const r of g.trains.rails) {
+      if (!eligible(r) || r.commuter) continue;
+      if (!g.trains.hopAt(r, 1, minRun)) continue;
+      const [ex, ez] = r.pts[r.pts.length - 1];
+      let bestR = null, bd = Infinity;
+      for (const q of g.trains.rails) {
+        if (!eligible(q)) continue;
+        for (const p of q.pts) {
+          const d = Math.hypot(p[0] - (ex + 2), p[1] - (ez + 2));
+          if (d < bd) { bd = d; bestR = q; }
+        }
+      }
+      if (bestR !== r) continue;
+      return { x: ex, z: ez, idx: r.idx };
+    }
+    return null;
+  })()`;
+
+  await t.check('every freight journeys: a forced train hops the junction and keeps rolling', async () => {
+    const j = await t.ev(JUNCTION);
+    t.ok(j, 'no hoppable junction found in the baked network — retune this check');
+    await t.tp(j.x + 2, j.z + 2, 'DRIVE');
+    const before = await t.ev(`(() => {
+      g.trains.trains.length = 0;
+      const tr = window.__jt = g.trains.force(g.player.pos.x, g.player.pos.z, 19);
+      return tr && { idx: tr.rail.idx, s: tr.s, len: tr.rail.len,
+        dest: tr.id.dest, sym: tr.id.sym, sub: tr.id.sub, orig: tr.id.orig };
+    })()`);
+    t.ok(before && before.idx === j.idx, `force landed on rail ${before && before.idx}, junction scout said ${j.idx}`);
+    t.ok(before.len - before.s < 4, `forced spawn not at the rail end: s=${before.s} len=${before.len}`);
+    // s ≈ len−2 at 16 u/s — the hop fires within a second; 6 s proves onward motion
+    await t.step(6, 'g.trains.update(dt, g.player.pos.x, g.player.pos.z)');
+    const after = await t.ev(`(() => {
+      const tr = window.__jt;
+      if (!g.trains.trains.includes(tr)) return null;
+      return { idx: tr.rail.idx, s: tr.s };
+    })()`);
+    t.ok(after, 'the forced train retired at the junction instead of hopping');
+    t.ok(after.idx !== before.idx, 'still on the origin rail after 6 s — the generalized hop never fired');
+    await t.step(2, 'g.trains.update(dt, g.player.pos.x, g.player.pos.z)');
+    const a2 = await t.ev(`({ idx: window.__jt.rail.idx, s: window.__jt.s })`);
+    const ds = a2.idx === after.idx ? Math.abs(a2.s - after.s) : 2 * 16; // rail changed again = still rolling
+    t.ok(ds > 2 * 16 * 0.8, `train stalled after the hop: ${ds.toFixed(1)} u in 2 s`);
+  });
+
+  await t.check('the trip line stays true across the hop: dest, sym, sub all track the new rail', async () => {
+    const d = await t.ev(`(() => {
+      const tr = window.__jt;
+      if (!tr || !g.trains.trains.includes(tr)) return null;
+      const [ex, ez] = tr.rail.pts[tr.dir > 0 ? tr.rail.pts.length - 1 : 0];
+      return { id: tr.id, name: tr.rail.name, operator: tr.rail.operator,
+        endCity: g.nearestCity(ex, ez).city.name };
+    })()`);
+    t.ok(d, 'hopped train from the journey check is gone — cannot verify trip sync');
+    const dd3 = (s) => s.slice(0, 3).toUpperCase();
+    t.ok(d.id.dest === d.endCity, `dest "${d.id.dest}" != course end "${d.endCity}"`);
+    t.ok(d.id.sub === (d.name ?? d.operator ?? 'the line'), `sub "${d.id.sub}" != current rail "${d.name}"`);
+    const [letter, od, day] = d.id.sym.split('-');
+    t.ok(od === dd3(d.id.orig) + dd3(d.id.dest), `sym cities "${od}" != ${dd3(d.id.orig)}${dd3(d.id.dest)}`);
+    t.ok(letter.length === 1 && day === '19', `sym letter/day corrupted by the hop: ${d.id.sym}`);
+    // a fresh approach re-toasts the updated identity
+    await t.ev(`(() => {
+      const tr = window.__jt, [x, z] = g.trains.at(tr.rail, tr.s);
+      g.player.pos.set(x, 0, z);
+      tr.toasted = false;
+      window.__toast2 = null;
+      g.trains.onIdentity = (t) => { window.__toast2 = t; };
+    })()`);
+    await t.step(1, 'g.trains.update(dt, g.player.pos.x, g.player.pos.z)');
+    const toast = await t.ev('window.__toast2');
+    t.ok(toast && toast.includes(d.id.dest) && toast.includes(d.id.sub), `post-hop toast stale: ${toast}`);
+  });
+
+  await t.check('spawn exclusivity: a burst never yields opposing or overlapping trains on one rail', async () => {
+    const spot = await t.ev(pick('Union Pacific Railroad'));
+    await t.tp(spot.x + 2, spot.z + 2, 'DRIVE');
+    // one synchronous eval: direct spawn() calls bypass the MAX_TRAINS gate
+    // (harder stress than play), and the real loop never ticks mid-burst
+    const d = await t.ev(`(() => {
+      g.trains.trains.length = 0;
+      for (let i = 0; i < 60; i++) g.trains.spawn(g.player.pos.x, g.player.pos.z, 5);
+      const byRail = new Map();
+      for (const tr of g.trains.trains) {
+        if (!byRail.has(tr.rail)) byRail.set(tr.rail, []);
+        byRail.get(tr.rail).push(tr);
+      }
+      let pairs = 0, opposing = 0, overlap = 0;
+      for (const list of byRail.values()) {
+        for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+          pairs++;
+          const a = list[i], b = list[j];
+          if (a.dir !== b.dir) opposing++;
+          if (Math.abs(a.s - b.s) < (a.cars.length + b.cars.length + 2) * 3.3) overlap++;
+        }
+      }
+      const n = g.trains.trains.length;
+      g.trains.trains.length = 0;
+      return { n, rails: byRail.size, pairs, opposing, overlap };
+    })()`);
+    t.ok(d.n >= 4 && d.pairs >= 1, `burst too thin to exercise exclusivity: ${JSON.stringify(d)}`);
+    t.ok(d.opposing === 0, `${d.opposing} opposing pairs share a rail after the burst`);
+    t.ok(d.overlap === 0, `${d.overlap} pairs spawned overlapping on one rail`);
+  });
+
+  await t.check('a commuter set terminates at end-of-line — no hop onto the freight net', async () => {
+    const spot = await t.ev(`(() => {
+      let best = null, be = 0;
+      for (const r of g.trains.rails) {
+        if (r.operator !== 'Trinity Railway Express') continue;
+        const e = Math.max(r.maxX - r.minX, r.maxZ - r.minZ);
+        if (e > be) { be = e; best = r; }
+      }
+      const p = best.pts[(best.pts.length / 2) | 0];
+      return { x: p[0], z: p[1] };
+    })()`);
+    await t.tp(spot.x + 1.5, spot.z + 2, 'DRIVE');
+    const before = await t.ev(`(() => {
+      g.trains.trains.length = 0;
+      const tr = window.__ct = g.trains.force(g.player.pos.x, g.player.pos.z, 8);
+      if (!tr || !tr.id.commuter) return null;
+      tr.s = tr.rail.len - 2; // put the set on final approach to its terminus
+      const [x, z] = g.trains.at(tr.rail, tr.s);
+      g.player.pos.set(x, 0, z); // watching — the hold law keeps it alive
+      return { idx: tr.rail.idx, len: tr.rail.len };
+    })()`);
+    t.ok(before, 'no commuter set forced for the terminus check');
+    await t.step(4, 'g.trains.update(dt, g.player.pos.x, g.player.pos.z)');
+    const after = await t.ev(`(() => {
+      const tr = window.__ct;
+      if (!g.trains.trains.includes(tr)) return null;
+      return { idx: tr.rail.idx, s: tr.s, op: tr.rail.operator };
+    })()`);
+    t.ok(after, 'watched commuter set retired at its terminus — the hold law broke');
+    t.ok(after.idx === before.idx && after.op === 'Trinity Railway Express',
+      `commuter set hopped off its line: ${JSON.stringify(after)}`);
+    t.ok(after.s === before.len, `set not held at the buffer: s=${after.s} len=${before.len}`);
+  });
+
+  await t.check('a hop prefers the unoccupied connection over a head-on one (synthetic junction)', async () => {
+    // far outside the world (x ≈ 21000) so no real rail enters the candidate
+    // scan; built, tested, and torn down inside one eval so the live rAF loop
+    // never ticks a bare synthetic train
+    const d = await t.ev(`(() => {
+      const mk = (tag, pts) => {
+        let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+        for (const [x, z] of pts) {
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        }
+        return { idx: -1, tag, pts, minX, maxX, minZ, maxZ, cum: null, len: 0,
+          name: tag, operator: 'Test Railway', livery: null, commuter: false,
+          spur: null, bridge: null, band: false };
+      };
+      const A = mk('A', [[20000, 0], [21000, 0]]);          // heading +x into the junction
+      const B = mk('B', [[21000, 0], [22000, 0]]);          // straight on (dot 1.0)
+      const C = mk('C', [[21000, 10], [21800, 410]]);       // diagonal branch (dot ~0.89)
+      const n0 = g.trains.rails.length;
+      g.trains.rails.push(B, C);
+      g.trains.arcInit(A);
+      const saved = g.trains.trains;
+      g.trains.trains = [{ rail: B, dir: -1, s: 500, cars: [] }]; // head-on occupant on B
+      const blocked = g.trains.hopAt(A, 1, 100);
+      g.trains.trains = [];
+      const open = g.trains.hopAt(A, 1, 100);
+      g.trains.trains = saved;
+      g.trains.rails.length = n0;
+      return { blocked: blocked && blocked.rail.tag, open: open && open.rail.tag };
+    })()`);
+    t.ok(d.blocked === 'C', `occupied straight route not avoided — hop chose ${d.blocked}, want the C branch`);
+    t.ok(d.open === 'B', `with clear track the best-tangent route must win — hop chose ${d.open}, want B`);
+  });
 }
