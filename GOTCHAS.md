@@ -162,6 +162,24 @@ graduate here (and out of `NEXT_SESSION.md`).
 
 ## Rendering & systems
 
+- **UI restyles go through mockups first** (glass-Texas title, 2026-07-19):
+  single-page HTML mockups in the gitignored `mockups/` folder at repo root,
+  each copying the real CSS over one staged attract-view screenshot
+  (`backdrop.png`), reviewed by Bruno at `localhost:8317/mockups/` before any
+  game file changes. `mockups/` must stay in `.gitignore` — the repo is public
+  and Pages deploys it.
+- **The title column is an auto-scroll flex column with decor that bleeds**:
+  the flag glows (`.amb`) use negative offsets and absolutely-positioned boxes
+  DO extend a scroll container's scrollable area — they live inside
+  `.amb-wrap` (absolute, `overflow: hidden`) so `#title`'s `overflow-y: auto`
+  never gains phantom scroll. The settings panel pins to the bottom via
+  `margin-top/bottom: auto` on h1/fact (auto margins collapse to 0 when the
+  viewport is tight, restoring a plain scrollable stack). The layout contract
+  (wordmark never clipped, column reachable to the end) is asserted by the
+  onboarding suite — keep that check when touching title CSS.
+- **The title's Inter font comes from Google Fonts** (the game's second CDN
+  dependency after Three.js); every `font-family` that names it must keep the
+  `system-ui` fallback so offline/blocked loads degrade instead of breaking.
 - **Gated UI is always built, only presentation is gated** (debug.js's
   panel, title.js's boot screen) — the object and every method it needs
   exist unconditionally on `__game`; only a DOM element's visibility or a
@@ -300,6 +318,13 @@ graduate here (and out of `NEXT_SESSION.md`).
 
 ## Verification
 
+- **Sample state AFTER a mutating eval, never before it** (onboarding's
+  title-freeze check, 2026-07-19): two consecutive `t.ev` calls are separated
+  by real frames, so `read state → mutate → assert unchanged` can absorb one
+  physics tick (ΔsimT exactly 0.050, the dt clamp) between the read and the
+  mutation and flake. Order the check `mutate → read baseline → wait →
+  assert`; the fingerprint of this class is a delta of exactly one clamped
+  frame.
 - **Tour spots guarantee their subject** (`src/tours.js`): static/ambient
   content — teleport + staged time suffices. Schedule- or probability-gated
   content — chain a forcing debug action (`turtleMorning`, `treasureNight`,

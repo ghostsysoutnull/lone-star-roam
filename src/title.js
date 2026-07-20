@@ -232,23 +232,37 @@ export class TitleScreen {
   // ---- row rendering (presentation only — the methods above are the seam) ----
 
   renderSlots() {
+    const STAR = '<svg viewBox="0 0 100 100"><polygon fill="#fff" points="50,8 60.9,41 95,41 67.5,61.5 78,94 50,74 22,94 32.5,61.5 5,41 39.1,41"/></svg>';
     this.slotsEl.innerHTML = '';
     for (const s of this.slots()) {
       const row = document.createElement('div');
       row.className = 'slot' + (s.active ? ' active' : '');
+      if (s.active) {
+        const tab = document.createElement('div');
+        tab.className = 'star-tab';
+        tab.innerHTML = STAR + 'Current';
+        row.appendChild(tab);
+      }
+      const info = document.createElement('div');
+      info.className = 'slot-info';
+      const title = document.createElement('span');
+      title.className = 'slot-title';
+      const stats = document.createElement('span');
+      stats.className = 'slot-stats';
+      const actions = document.createElement('span');
+      actions.className = 'slot-actions';
       if (s.empty) {
-        const label = document.createElement('span');
-        label.textContent = `Slot ${s.slot} — empty`;
+        title.textContent = `Slot ${s.slot} — empty`;
+        stats.textContent = 'Available slot';
         const btn = document.createElement('button');
         btn.textContent = 'New game';
         btn.addEventListener('click', () => this._newGameRow(s.slot));
-        row.append(label, btn);
+        actions.appendChild(btn);
       } else {
-        const label = document.createElement('span');
-        label.textContent = `${s.name || 'Slot ' + s.slot} — ${s.active ? this.summary() : `${s.cities} cities · ${s.landmarks} landmarks · $${s.bank}`}`;
-        const actions = document.createElement('span');
-        actions.className = 'slot-actions';
+        title.textContent = s.name || 'Slot ' + s.slot;
+        stats.textContent = s.active ? this.summary() : `${s.cities} cities · ${s.landmarks} landmarks · $${s.bank}`;
         const play = document.createElement('button');
+        play.className = 'btn-primary';
         play.textContent = s.active ? 'Continue' : 'Play';
         play.addEventListener('click', () => this._playRow(s.slot));
         const rename = document.createElement('button');
@@ -260,8 +274,9 @@ export class TitleScreen {
         del.className = 'slot-action-sm';
         del.addEventListener('click', () => this._deleteRow(s.slot, s.name || `Slot ${s.slot}`));
         actions.append(play, rename, del);
-        row.append(label, actions);
       }
+      info.append(title, stats);
+      row.append(info, actions);
       this.slotsEl.appendChild(row);
     }
   }

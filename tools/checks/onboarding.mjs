@@ -135,8 +135,10 @@ export default async function onboarding(t) {
   await t.check('attract: world lives behind the title, player frozen', async () => {
     await t.tp(985, 1737, 'DRIVE');
     await t.ev(`g.sky.t = 0.35`);
-    const before = await t.ev(`({ simT: g.player.simT, x: g.player.pos.x, z: g.player.pos.z, skyT: g.sky.t, angle: g.title.angle })`);
+    // show first, sample after: a frame in flight between the two evaluates
+    // could tick the player once (ΔsimT 0.050 — the dt clamp) and flake the freeze assert
     await t.ev(`g.title.show()`);
+    const before = await t.ev(`({ simT: g.player.simT, x: g.player.pos.x, z: g.player.pos.z, skyT: g.sky.t, angle: g.title.angle })`);
     // wait on the drift itself (player.simT is frozen here, so t.simWait would hang);
     // bounded — resolves at 3 s regardless and the asserts below catch a dead drift
     await t.ev(`new Promise((res) => { const a = g.title.angle, t0 = performance.now();
@@ -153,6 +155,29 @@ export default async function onboarding(t) {
     await t.ev(`g.title.hide()`);
     t.ok(!(await t.ev('g.title.active')), 'title still active after hide()');
     t.ok((await t.ev(`getComputedStyle(document.getElementById('minimap')).visibility`)) === 'visible', 'minimap still hidden after hide()');
+  });
+
+  // Glass-Texas restyle contract: at any viewport the wordmark stays fully on
+  // screen (safe-center anchors the top) and the column scrolls to its end —
+  // the 960×540 stage shot caught both the header and the settings panel clipped
+  await t.check('title layout: header visible, column reachable to the end', async () => {
+    await t.ev(`g.title.show()`);
+    const m = await t.ev(`(() => { const el = document.getElementById('title');
+      const h1 = el.querySelector('h1').getBoundingClientRect();
+      el.scrollTop = 1e6; const scrolled = el.scrollTop; el.scrollTop = 0;
+      const last = [...el.children].filter((c) => getComputedStyle(c).position !== 'absolute').at(-1);
+      return { h1Top: h1.top, h1Bottom: h1.bottom, view: el.clientHeight,
+        overflow: el.scrollHeight - el.clientHeight, scrollable: scrolled,
+        canton: !!el.querySelector('h1 .canton svg'),
+        slotRows: el.querySelectorAll('.slot').length,
+        tab: el.querySelectorAll('.slot.active .star-tab').length }; })()`);
+    t.ok(m.canton, 'canton star missing from the wordmark');
+    t.ok(m.h1Top >= 0 && m.h1Bottom <= m.view, `wordmark clipped (top ${m.h1Top.toFixed(0)}, bottom ${m.h1Bottom.toFixed(0)}, view ${m.view})`);
+    t.ok(m.overflow <= 0 || m.scrollable >= m.overflow - 1,
+      `title column has unreachable overflow (${m.overflow}px over, ${m.scrollable}px scrollable)`);
+    t.ok(m.slotRows === 3, `expected 3 slot rows, got ${m.slotRows}`);
+    t.ok(m.tab === 1, `expected 1 Current star-tab, got ${m.tab}`);
+    await t.ev(`g.title.hide()`);
   });
 
   await t.check('firstRun action stages the empty-save path', async () => {
