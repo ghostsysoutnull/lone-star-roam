@@ -113,7 +113,20 @@ at its end (only named trains hop junctions), no per-train HUD identity or
 trip info, no radio chatter, and opposing trains on one line pass through
 each other (no occupancy model). Full courses + identity + chatter + meets
 — ~3 waves, spec session when the track opens; open calls listed in the
-vision doc.
+vision doc. W1 (identity + chatter) and W2 (journeys) shipped 2026-07-19.
+
+- **Operator-aware hop preference** (Bruno approved backlog 2026-07-19,
+  post-W2 — *only if a playtest notices*): at a junction, a train prefers
+  a connecting rail owned by its own operator, falling back to any (the
+  existing clean/any two-tier in `hopAt` gains a same-operator tier).
+  Closes the one perceivable journey-realism gap — a BNSF loco announcing
+  UP subs for the rest of its life — without a route planner. The fallback
+  must stay soft: a hard operator filter would re-create the dead-end
+  stalls W2 removed on sparse operator networks. ~30 min in `trains.js`
+  `hopAt` + one check. Everything beyond this (planned yard-to-yard trips,
+  fixed symbols, timetables) is imperceptible at roadside-encounter scale
+  — settled as not worth a wave (W2 session verdict); timetable layer
+  stays `FUTURE.md` material.
 
 ## Next in line (in order)
 
