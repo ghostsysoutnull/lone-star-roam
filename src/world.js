@@ -344,7 +344,9 @@ function buildRibbons(scene, polylines, width, color, yOff) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
-  scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color })));
+  const mesh = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color }));
+  scene.add(mesh);
+  return mesh;
 }
 
 // Highways — real OSM geometry, one merged mesh per tier
@@ -360,7 +362,56 @@ function buildHighways(scene) {
   const railPts = GEO.rails.map((r) => r.pts);
   buildRibbons(scene, railPts, 1.5, 0x4a4440, 0.07);
   buildRibbons(scene, railPts, 0.55, 0x8a8a90, 0.11);
+  buildSidings(scene);
   buildRailBridges(scene);
+}
+
+// Passing sidings (Rails Ops W3): one merged steel band per baked `sd` span,
+// offset SIDING_OFF to the span's `side` (+1 = buildRibbons' left normal of
+// increasing arc — the same convention trains.js hold offsets use), with short
+// end tapers angling back toward the main. yOff 0.15 keeps the taper mouths
+// layered above the main steel band (0.11) instead of z-fighting it.
+// 3.0: rolling stock is ~1.8 wide — 2.0 cleared physically but the two
+// consists read as one blob during a pass; 3.0 keeps visible daylight.
+export const SIDING_OFF = 3.0, SIDING_TAPER = 4;
+function buildSidings(scene) {
+  const lines = [];
+  for (const r of GEO.rails) {
+    if (!r.sd) continue;
+    const cum = [0];
+    for (let i = 1; i < r.pts.length; i++) {
+      const a = r.pts[i - 1], b = r.pts[i];
+      cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]));
+    }
+    const len = cum[cum.length - 1];
+    // point + left normal at arc s
+    const at = (s) => {
+      let lo = 0, hi = cum.length - 1;
+      while (lo < hi - 1) { const mid = (lo + hi) >> 1; (cum[mid] <= s ? (lo = mid) : (hi = mid)); }
+      const a = r.pts[lo], b = r.pts[lo + 1];
+      const seg = cum[lo + 1] - cum[lo] || 1;
+      const t = (s - cum[lo]) / seg;
+      const dx = (b[0] - a[0]) / seg, dz = (b[1] - a[1]) / seg;
+      return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, -dz, dx]; // x, z, left normal
+    };
+    for (const { s0, s1, side } of r.sd) {
+      const pts = [];
+      const push = (s, off) => {
+        const [x, z, nx, nz] = at(Math.max(0, Math.min(len, s)));
+        pts.push([x + nx * off * side, z + nz * off * side]);
+      };
+      push(s0 - SIDING_TAPER, 0);
+      // interior samples follow the parent's own vertices so curves track
+      push(s0, SIDING_OFF);
+      for (let i = 0; i < cum.length; i++) if (cum[i] > s0 + 1 && cum[i] < s1 - 1) push(cum[i], SIDING_OFF);
+      push(s1, SIDING_OFF);
+      push(s1 + SIDING_TAPER, 0);
+      lines.push(pts);
+    }
+  }
+  if (!lines.length) return;
+  const mesh = buildRibbons(scene, lines, 0.55, 0x8a8a90, 0.15);
+  mesh.name = 'sidings';
 }
 
 // International rail bridges (Rails W2): one merged steel through-truss per

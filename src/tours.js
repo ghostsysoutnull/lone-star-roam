@@ -15,6 +15,10 @@ export const TOURS = [
   {
     track: 'Rails Operations (2026-07)',
     waves: [
+      { wave: 'W3 — meets', spots: [
+        S('🤝 Staged meet — UP Baird Sub', [1459.9, -1973.6], { heading: 2.23, mode: 'DRIVE', time: 0.35, act: 'meet', note: 'two opposing freights staged on the Abilene racetrack — the dispatcher calls it, the nearer one eases onto the real siding ~25 u ahead and stands in the clear, the opposer passes at track speed, highball, 3 s, and it pulls back out' }),
+        S('🛤️ Siding country — UP Toyah Sub', [-2790, -905], { mode: 'FLY', time: 0.35, note: 'the sub with the most baked sidings (31) — back-to-back parallel steel bands with turnout tapers alongside the main across the Pecos flats; 719 real OSM siding spans ship on 98 rails' }),
+      ] },
       { wave: 'W2 — journeys', spots: [
         S('🔀 Junction hop — Del Rio Sub → Sanderson Sub', [-1288.7, 1818.4], { mode: 'DRIVE', time: 0.35, act: 'trainHere', note: 'a freight forced onto the Del Rio Sub\'s last mile west of town — it rolls through the junction onto the Sanderson Sub instead of braking dead, and its placard destination updates with the hop (drive up for a fresh read)' }),
       ] },

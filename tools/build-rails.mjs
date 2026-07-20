@@ -5,10 +5,15 @@
 // `bridge` crossing point. Spur routes are chained identity-free (operator
 // spelling flips at the river: CPKC / Canadian Pacific Kansas City, UP /
 // Ferromex) and only the longest river-spanning chain per gateway ships.
-// Usage: node tools/build-rails.mjs <osm-rails.json> [--spur=<site>:<file>]…
+// Rails Ops W3: real passing sidings — `service=siding` ways ≥400 m within
+// 300 m of a kept mainline attach to their parent rail as `sd: [{s0, s1,
+// side}]` (arc-length span + side sign, +1 = left of increasing arc).
+// Usage: node tools/build-rails.mjs <osm-rails.json> [--spur=<site>:<file>]… [--sidings=<file>]
 // Fetch fresh inputs with Overpass GET (POST is rejected in this environment):
 // curl -sG --data-urlencode 'data=[out:json][timeout:300];way["railway"="rail"]["usage"="main"](25.8,-106.7,36.6,-93.5);out tags geom;'
 //   https://maps.mail.ru/osm/tools/overpass/api/interpreter -o texas-main-rails-osm.json
+// curl -sG --data-urlencode 'data=[out:json][timeout:300];way["railway"="rail"]["service"="siding"](25.8,-106.7,36.6,-93.5);out tags geom;'
+//   https://maps.mail.ru/osm/tools/overpass/api/interpreter -o tx-sidings.json
 // curl -sG --data-urlencode 'data=[out:json][timeout:120];way["railway"="rail"][!"service"](27.35,-99.65,27.62,-99.35);out tags geom;'
 //   https://maps.mail.ru/osm/tools/overpass/api/interpreter -o rails-spur-laredo.json
 // curl -sG --data-urlencode 'data=[out:json][timeout:120];way["railway"="rail"][!"service"](28.55,-100.65,28.83,-100.35);out tags geom;'
@@ -23,6 +28,7 @@ if (!source) throw new Error('Usage: node tools/build-rails.mjs <osm-rails.json>
 const spurArgs = process.argv.slice(3)
   .filter((a) => a.startsWith('--spur='))
   .map((a) => { const [site, file] = a.slice(7).split(':'); return { site, file }; });
+const sidingsFile = process.argv.slice(3).find((a) => a.startsWith('--sidings='))?.slice(10);
 // the Texas-side operator names the route (livery + placard); the Mexican-side
 // spelling never reaches the game
 const SPUR_OPERATOR = { laredo: 'CPKC', eaglepass: 'Union Pacific Railroad' };
@@ -229,6 +235,105 @@ for (const { site, file } of spurArgs) {
   const pts = simplify(proj2.slice(from), 0.5); // input already projected — tol in game units
   rails.push({ pts, operator: SPUR_OPERATOR[site], name: `${site === 'laredo' ? 'Tex-Mex' : 'Eagle Pass'} International Bridge`, spur: site, bridge });
   console.log(`Spur ${site}: ${pts.length} pts, ${bestLen.toFixed(0)} u chained, bridge at ${bridge.x},${bridge.z}`);
+}
+
+// --- passing sidings (Rails Ops W3): attach service=siding ways ≥4 u long
+// within 3 u of a kept non-spur mainline as arc-length spans on the parent.
+// side: +1 = the buildRibbons left normal (-dz, dx) of increasing arc —
+// world.js ribbons and trains.js hold offsets must share this convention.
+if (sidingsFile) {
+  const raw = JSON.parse(readFileSync(sidingsFile, 'utf8'));
+  const mains = rails.filter((r) => !r.spur);
+  // arc-length cumulative + grid index of sampled mainline points
+  const CELL = 10, grid = new Map();
+  const gkey = (x, z) => `${(x / CELL) | 0}:${(z / CELL) | 0}`;
+  for (const r of mains) {
+    r._cum = [0];
+    for (let i = 1; i < r.pts.length; i++) {
+      const [ax, az] = r.pts[i - 1], [bx, bz] = r.pts[i];
+      r._cum.push(r._cum[i - 1] + Math.hypot(bx - ax, bz - az));
+    }
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+      const d = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(d / 2));
+      for (let j = 0; j <= n; j++) {
+        const k = gkey(ax + (bx - ax) * j / n, az + (bz - az) * j / n);
+        if (!grid.has(k)) grid.set(k, []);
+        grid.get(k).push(r);
+      }
+    }
+  }
+  const nearMain = (x, z, maxD) => {
+    const cx = (x / CELL) | 0, cz = (z / CELL) | 0, rr = Math.ceil(maxD / CELL);
+    const seen = new Set();
+    let best = maxD, rail = null;
+    for (let i = -rr; i <= rr; i++) for (let j = -rr; j <= rr; j++) {
+      for (const r of grid.get(`${cx + i}:${cz + j}`) ?? []) {
+        if (seen.has(r)) continue;
+        seen.add(r);
+        const [d] = arcAt(r, x, z);
+        if (d < best) { best = d; rail = r; }
+      }
+    }
+    return rail;
+  };
+  // nearest point on the rail polyline: [distance, arc s, tangent, left-normal dot]
+  function arcAt(r, x, z) {
+    let bd = Infinity, bs = 0, side = 1;
+    for (let i = 0; i < r.pts.length - 1; i++) {
+      const [ax, az] = r.pts[i], [bx, bz] = r.pts[i + 1];
+      const dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
+      const px = ax + dx * t, pz = az + dz * t;
+      const d = Math.hypot(x - px, z - pz);
+      if (d < bd) {
+        bd = d;
+        bs = r._cum[i] + Math.sqrt(L2) * t;
+        // left normal of increasing arc = (-dz, dx)
+        side = ((x - px) * -dz + (z - pz) * dx) >= 0 ? 1 : -1;
+      }
+    }
+    return [bd, bs, side];
+  }
+  let attached = 0, dropped = 0;
+  for (const e of raw.elements) {
+    if (e.type !== 'way' || e.tags?.railway !== 'rail' || e.tags?.service !== 'siding' || !(e.geometry?.length > 1)) continue;
+    const pts = e.geometry.map(({ lon, lat }) => proj([lon, lat]));
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    if (len < 4) continue; // < 400 m — too short to read as a passing siding
+    const [mx, mz] = pts[(pts.length / 2) | 0];
+    const rail = nearMain(mx, mz, 3);
+    if (!rail) { dropped++; continue; }
+    const [, sA] = arcAt(rail, ...pts[0]);
+    const [, sB] = arcAt(rail, ...pts[pts.length - 1]);
+    const [, , side] = arcAt(rail, mx, mz);
+    const s0 = Math.min(sA, sB), s1 = Math.max(sA, sB);
+    if (s1 - s0 < 3) { dropped++; continue; } // degenerate: siding not parallel to this main
+    (rail._sd ??= []).push({ s0, s1, side });
+    attached++;
+  }
+  // merge overlapping same-side spans (double-digitized sidings z-fight otherwise)
+  let spans = 0;
+  for (const r of mains) {
+    if (!r._sd) continue;
+    for (const side of [1, -1]) {
+      const list = r._sd.filter((s) => s.side === side).sort((a, b) => a.s0 - b.s0);
+      if (!list.length) continue;
+      const merged = [list[0]];
+      for (const s of list.slice(1)) {
+        const last = merged[merged.length - 1];
+        if (s.s0 <= last.s1 + 0.5) last.s1 = Math.max(last.s1, s.s1);
+        else merged.push(s);
+      }
+      for (const s of merged) (r.sd ??= []).push({ s0: +s.s0.toFixed(1), s1: +s.s1.toFixed(1), side });
+    }
+    r.sd.sort((a, b) => a.s0 - b.s0);
+    spans += r.sd.length;
+  }
+  for (const r of mains) { delete r._cum; delete r._sd; }
+  const sided = rails.filter((r) => r.sd).length;
+  console.log(`Sidings: ${attached} attached (${dropped} dropped), ${spans} merged spans on ${sided} rails`);
 }
 
 writeFileSync(join(ROOT, 'data', 'rails.json'), JSON.stringify(rails));

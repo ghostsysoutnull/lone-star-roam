@@ -1,8 +1,8 @@
 # Backlog — queued work
 
-Active track: **Rails Operations** (`RAILS_OPS_SPEC.md`, 3 waves, spec
-2026-07-19) — slotted before sea-industry (`VISION_SEA_INDUSTRY.md`), which
-follows it. Water Vehicles shipped 2026-07-19 (folded into `ROADMAP.md`).
+No active track. Rails Operations shipped in full 2026-07-19 (folded into
+`ROADMAP.md`); next up per the 2026-H2 program is sea-industry
+(`VISION_SEA_INDUSTRY.md`), which needs its spec session first.
 Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 

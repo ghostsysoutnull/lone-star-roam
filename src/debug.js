@@ -88,6 +88,12 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       const tr = trains.startNamed('ztrain', 0, player.pos.x, player.pos.z, sky.days);
       hud.toast(tr ? '🚂 the Z is rolling — double-stacks on the BNSF main' : '🚂 no BNSF mainline found');
     },
+    // Rails Ops W3: deterministic meet — two opposing freights staged on the
+    // nearest sided rail so the resolution plays out in front of the player.
+    meet() {
+      const m = trains.forceMeet(player.pos.x, player.pos.z, sky.days);
+      hud.toast(m ? `🤝 meet staged — ${m.holder.id.sym} takes the siding for ${m.opposer.id.sym}` : '🤝 no sided rail in reach');
+    },
     midnight() { sky.t = 0.998; }, // the bell tolls on the wrap — park near a chapel first
     hauntCemetery() {
       let best = null, bd = Infinity;

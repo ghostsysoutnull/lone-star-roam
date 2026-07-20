@@ -270,6 +270,34 @@ graduate here (and out of `NEXT_SESSION.md`).
   <day>` (laredo/eaglepass/ztrain) are seed streams — never rename, per the
   blanket seed-string law above.
 
+- **`trains.js` operations laws** (Rails Operations, all 3 waves): per-train
+  identity is built once at spawn (`trainid:<railIdx>:<seq>` stream — never
+  rename) and the id object lives as long as the train — `syncTrip` mutates
+  `dest`/`sym`/`sub` in place on the same object after every hop; spawn-time
+  fields (cargo, cars, mp, voice, orig) stay stable for life; never rebuild
+  the id mid-life. `hopAt` prefers the best *unoccupied* connection
+  (`clean ?? best`); commuter sets terminate at end-of-line by design
+  (`!tr.id.commuter` gates the hop) — don't "fix" a held TRE set at its
+  terminus. `spawn()` direction-locks to a rail's occupant and enforces
+  arc-length separation; `force()`/`forceMeet()` deliberately bypass
+  exclusivity (deterministic harness/tour tools — leave them). Meets (W3)
+  run only on rails with baked `sd` spans — rails without a real siding
+  keep spawn exclusivity as their only protection (real-or-absent, settled);
+  spur rails never get `sd` (bake excludes them), and band rails have none
+  (siding scout bbox was Texas-only — extend only if a playtest asks). The
+  `sd` side sign (+1 = left normal `(-dz, dx)` of increasing arc) is a
+  three-way convention shared by the bake (`build-rails.mjs`), the ribbon
+  mesh (`world.js buildSidings`), and the hold offset (`trains.js` render
+  loop) — change one, change all three. `SIDING_OFF` lives in world.js and
+  is imported by trains.js (no cycle) — 3.0 because rolling stock is ~1.8 u
+  wide: 2.0 cleared physically but the passing consists read as one blob.
+  The holder offsets its *whole consist* onto the siding alignment —
+  mini-world trains (50–135 u) dwarf real sidings (median ~24 u), so cars
+  overhang the drawn ribbon during a hold; that's the settled look, not a
+  bug. TrainSystem's constructor maps `GEO.rails` into its own objects —
+  a new baked rail field is invisible at runtime until added to that
+  mapping (the W3 `sd` field shipped its first check-fail exactly there).
+
 ## Verification
 
 - **Tour spots guarantee their subject** (`src/tours.js`): static/ambient
@@ -323,6 +351,20 @@ graduate here (and out of `NEXT_SESSION.md`).
   drawing below a floor rather than shrink to nothing — a real point doesn't
   excuse an unchecked footprint. `nearestRiver(x, z, radius)` (geo.js,
   `nearestRoad` idiom) is the sibling query for river clearance.
+- **Shot staging is numbers-first too** (Rails Ops W3, learned at ~9 staging
+  rounds for 1 budgeted shot): if a staged shot misses its subject once,
+  the SECOND move is a numeric probe (stage-shot boot pattern, print the
+  subject's live world coordinates + relevant mesh vertices), not another
+  framing guess judged through Copilot prose — the probe settled in one
+  round what four blind rounds could not. Camera placement is vector math,
+  never cardinal words: north = −z flips intuition, so compute camera =
+  subject + explicit offset vector and check the sign of (subject − camera)
+  against the facing direction before shooting. Stage the *legible* moment,
+  not the peak one — two actors separated in space (holder seated, opposer
+  approaching) photograph; the busiest instant (nose-to-nose, 3 u apart)
+  self-occludes from almost every angle. And never write invented
+  coordinates into tours.js — derive every spot from live/baked data first.
+
 - **Screenshot analysis goes to Copilot CLI, never into Claude's context**
   (validated 2026-07-16 on a real band shot). Stage with
   `node tools/stage-shot.mjs <out.png> <x> <z> [heading°] [mode] [agl] [skyT]`,

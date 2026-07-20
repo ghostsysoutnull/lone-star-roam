@@ -293,10 +293,15 @@ export default async function hud(t) {
     await t.ev('(g.player.stamina = 0.6)');
     await t.wait(0.15);
     t.ok((await t.ev("document.getElementById('hud-stamina').style.opacity")) === '1', 'stamina bar stayed hidden below a full tank');
-    // idle regen (player isn't sprinting) creeps stamina back up a little
-    // during the wait above, so a tolerance band, not an exact %, is correct
-    const w = parseFloat(await t.ev("document.getElementById('hud-stamina-fill').style.width"));
-    t.near(w, 60, 6, 'fill width did not reflect stamina');
+    // idle regen (player isn't sprinting) creeps stamina back up during the
+    // wait — under a loaded -j pool it crept 11% once — so compare the bar
+    // against the LIVE tank in one eval (12 Hz HUD lag stays inside the band),
+    // not against the value set before the wait
+    const d = await t.ev(`(() => ({
+      w: parseFloat(document.getElementById('hud-stamina-fill').style.width),
+      st: g.player.stamina,
+    }))()`);
+    t.near(d.w, d.st * 100, 6, `fill width did not reflect live stamina ${d.st.toFixed(2)}`);
     await t.ev(`g.player.setMode('DRIVE')`);
   });
 

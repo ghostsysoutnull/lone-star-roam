@@ -630,4 +630,117 @@ export default async function rails(t) {
     t.ok(d.blocked === 'C', `occupied straight route not avoided — hop chose ${d.blocked}, want the C branch`);
     t.ok(d.open === 'B', `with clear track the best-tangent route must win — hop chose ${d.open}, want B`);
   });
+
+  // --- Rails Ops W3: meets --------------------------------------------------
+
+  await t.check('the siding mesh ships: one merged ribbon, hundreds of spans', async () => {
+    const d = await t.ev(`(() => {
+      const m = g.scene.getObjectByName('sidings');
+      return m && { verts: m.geometry.attributes.position.count, tris: m.geometry.index.count / 3 };
+    })()`);
+    t.ok(d, 'no mesh named "sidings" in the scene');
+    // 719 spans × ≥4 ribbon cross-sections each — thousands of verts, not a stub
+    t.ok(d.verts > 4000, `sidings mesh only ${d.verts} vertices — spans missing`);
+  });
+
+  await t.check('a staged meet resolves: hold + clear pass + release, chatter voiced', async () => {
+    // the W3 tour spot — a feasible Baird Sub span with the player parked at
+    // the span center, inside stock CHAT_R of the hold point
+    await t.tp(1459.9, -1973.6, 'DRIVE');
+    const staged = await t.ev(`(() => {
+      const m = window.__meet = g.trains.forceMeet(g.player.pos.x, g.player.pos.z, 19);
+      if (!m) return null;
+      window.__mm = { minD: 1e9, chat: [] };
+      g.trains.onChatter = (t) => window.__mm.chat.push(t);
+      return { holdS: m.span.s1, hs: m.holder.s, os: m.opposer.s, side: m.span.side,
+        hSym: m.holder.id.sym, oSym: m.opposer.id.sym, rail: m.holder.rail.name };
+    })()`);
+    t.ok(staged, 'forceMeet found no sided rail at the Baird tour spot');
+    t.ok(staged.os - staged.hs === 230, `staged geometry off: holder ${staged.hs}, opposer ${staged.os}`);
+    // every frame: tick trains, track the min distance between any two cars of
+    // the pair (both consists, holder offset applied — the interpenetration
+    // sentinel the spec demands)
+    const BODY = `
+      g.trains.update(dt, g.player.pos.x, g.player.pos.z, 19);
+      const m = window.__meet;
+      if (g.trains.trains.includes(m.holder) && g.trains.trains.includes(m.opposer)) {
+        const pos = (tr) => { const out = []; for (let c = 0; c <= tr.cars.length; c++) {
+          const s = tr.s - tr.dir * c * 3.3; if (s < 0 || s > tr.rail.len) continue;
+          let [x, z, dx, dz] = g.trains.at(tr.rail, s);
+          if (tr.meet && tr.meet.off) { x += -dz * tr.meet.off * tr.meet.span.side; z += dx * tr.meet.off * tr.meet.span.side; }
+          out.push([x, z]); } return out; };
+        const A = pos(m.holder), B = pos(m.opposer);
+        for (const a of A) for (const b of B) {
+          const d = Math.hypot(a[0] - b[0], a[1] - b[1]);
+          if (d < window.__mm.minD) window.__mm.minD = d;
+        }
+      }`;
+    // holder run: 60 u with the decel tail ≈ 6–7 s — sample the hold window
+    await t.step(9, BODY);
+    const mid = await t.ev(`(() => {
+      const m = window.__meet;
+      return { phase: m.holder.meet && m.holder.meet.phase, off: m.holder.meet && m.holder.meet.off,
+        hs: m.holder.s, os: m.opposer.s };
+    })()`);
+    t.ok(mid.phase === 'hold', `holder not holding after 9 s — phase ${mid.phase}`);
+    t.ok(mid.off === 3, `holder offset ${mid.off} != SIDING_OFF at hold`);
+    await t.step(1, BODY);
+    const mid2 = await t.ev(`({ hs: window.__meet.holder.s, os: window.__meet.opposer.s })`);
+    t.ok(Math.abs(mid2.hs - mid.hs) < 0.01, `holder crept while holding: ${mid.hs} → ${mid2.hs}`);
+    t.ok(mid.os - mid2.os > 12, `opposer not at track speed during the hold: ${(mid.os - mid2.os).toFixed(1)} u/s`);
+    // opposer pass + 25 u clear + 3 s dwell + pull-out — generous window
+    await t.step(14, BODY);
+    const done = await t.ev(`(() => {
+      const m = window.__meet, mm = window.__mm;
+      return { meet: m.holder.meet && m.holder.meet.phase, hs: m.holder.s,
+        minD: mm.minD, chat: mm.chat };
+    })()`);
+    t.ok(done.hs > mid2.hs + 5 || done.meet === 'dwell' || done.meet === 'out',
+      `holder never released: phase ${done.meet}, s ${mid2.hs} → ${done.hs}`);
+    await t.step(3, BODY);
+    const end = await t.ev(`({ s: window.__meet.holder.s, meet: window.__meet.holder.meet })`);
+    t.ok(end.s > done.hs + 10, `holder not back to speed after release: ${done.hs} → ${end.s}`);
+    // interpenetration sentinel: the pass happened (close approach) but the
+    // lateral siding offset kept daylight between the consists
+    t.ok(done.minD < 8, `no close pass recorded (minD ${done.minD.toFixed(1)}) — the meet never met`);
+    t.ok(done.minD > 1.85, `consists interpenetrated: min pairwise distance ${done.minD.toFixed(2)} u`);
+    // the scripted three-line sequence, voiced because the player stands at the span
+    const chat = done.chat.join(' | ');
+    t.ok(done.chat.length >= 3, `expected the 3-line meet sequence, got ${done.chat.length}: ${chat}`);
+    t.ok(chat.includes(`take the siding at`) && chat.includes(staged.hSym) && chat.includes(staged.oSym),
+      `dispatcher call garbled: ${chat}`);
+    t.ok(chat.includes('in the clear') && chat.includes('highball'), `sequence incomplete: ${chat}`);
+    await t.ev(`(g.trains.trains.length = 0, g.trains.onChatter = null, 0)`);
+  });
+
+  await t.check('meets are sd-gated: an opposing pair on a sidingless rail never engages', async () => {
+    const d = await t.ev(`(() => {
+      const mk = (pts) => {
+        let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;
+        for (const [x, z] of pts) {
+          if (x < minX) minX = x; if (x > maxX) maxX = x;
+          if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        }
+        return { idx: -1, pts, minX, maxX, minZ, maxZ, cum: null, len: 0,
+          name: 'Test Sub', operator: 'Test Railway', livery: null,
+          commuter: false, spur: null, bridge: null, band: false };
+      };
+      const rail = mk([[20000, 0], [21000, 0]]); // far outside the world
+      g.trains.arcInit(rail);
+      const id = (sym) => ({ sym, voice: { p: 1, r: 1 } });
+      const saved = g.trains.trains;
+      const up = { rail, dir: 1, s: 50, cars: [], id: id('UP-TEST') };
+      const dn = { rail, dir: -1, s: 350, cars: [], id: id('DN-TEST') };
+      g.trains.trains = [up, dn];
+      g.trains.updateMeets();
+      const bare = !!(up.meet || dn.meet);
+      rail.sd = [{ s0: 60, s1: 100, side: 1 }]; // now a siding sits just ahead of the up train
+      g.trains.updateMeets();
+      const sided = up.meet && up.meet.phase === 'pull' && up.meet.holdS === 100 && !dn.meet;
+      g.trains.trains = saved;
+      return { bare, sided };
+    })()`);
+    t.ok(!d.bare, 'a meet engaged on a rail with no baked sidings — the sd gate leaked');
+    t.ok(d.sided, 'with a qualifying span the up train must hold at s1 (margin rule picks it)');
+  });
 }

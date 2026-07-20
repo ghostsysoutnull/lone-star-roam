@@ -5,8 +5,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 
 No active priority track (aviation shipped in full 2026-07-12; Brands,
 Jetpack, Agriculture, the Shoulder & the Shelf, Band Parity, New Player
-Experience, Energy, Performance, Railroads Realism, and Water Vehicles
-followed and are folded in below). Queued work lives in `BACKLOG.md`.
+Experience, Energy, Performance, Railroads Realism, Water Vehicles, and
+Rails Operations followed and are folded in below). Queued work lives in
+`BACKLOG.md`.
 
 - [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
   tools/test.mjs` runs four sub-second Node-only groups (`aviation`, `data`,
@@ -730,6 +731,31 @@ followed and are folded in below). Queued work lives in `BACKLOG.md`.
   action for the perch tour spot. Playtest fix (W3.1): gulf legality follows
   the *visible* waterline (`terrainMeshY` vs the border polygon) — sunken
   bay-front slivers no longer make invisible walls (Corpus Ship Channel).
+
+- [x] ~~Rails Operations~~ — done 2026-07-19 (3 waves, `RAILS_OPS_SPEC.md`
+  kept as history; slotted before sea-industry): the railroad starts
+  *operating*. **W1 — identity + chatter**: every train carries a seeded
+  per-train identity (`trainid:` stream — symbol like `M-DALHOU-19`, cargo,
+  car count, origin → destination · subdivision) surfaced on the placard
+  toast, and talks: 4 radio chatter templates (defect detector, dispatcher,
+  crew, highball) with per-train seeded voices/cooldowns; the weather-radio
+  perk doubles chatter range. **W2 — journeys**: `hopAt` generalized from
+  named trains to every freight — consists roll through junctions onto
+  connecting rails (45 hoppable junctions in the bake) instead of braking
+  dead; dest/sym/sub mutate in place so the placard stays true across hops;
+  commuter sets terminate at their real termini; spawn exclusivity (an
+  occupant locks direction + arc-length separation) ends head-on spawns.
+  **W3 — meets (the marquee)**: 920 real OSM `service=siding` ways ≥400 m
+  bake onto their parent mainlines as 719 merged arc-length spans on 98
+  rails (`sd: [{s0, s1, side}]`); one merged steel-band mesh draws them at
+  3 u lateral offset with turnout tapers (+1 draw call); an opposing closing
+  pair on a sided rail resolves — the train nearer a qualifying siding eases
+  to a stop on the offset alignment (whole consist — mini-world trains dwarf
+  real sidings), the opposer passes at track speed, 3 s dwell, pull-out —
+  voiced by a scripted 3-line meet sequence (dispatcher "take the siding at
+  ⟨city⟩", crew "in the clear", "highball"); rails without a real siding
+  keep spawn exclusivity as their only protection (real-or-absent); `meet`
+  debug action + Baird Sub tour spot stage one on demand.
 
 ## Known limitations (v1)
 

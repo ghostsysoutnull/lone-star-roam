@@ -3,7 +3,7 @@
 // settle chunks, shoot. The image is for Bruno's eye and for Copilot CLI
 // analysis (see GOTCHAS.md → Verification) — never a pass/fail signal.
 //
-//   node tools/stage-shot.mjs [--eval '<js>'] <out.png> <x> <z> [heading°=270] [mode=FLY] [agl=55] [skyT=0.5]
+//   node tools/stage-shot.mjs [--eval '<js>'] [--subject <x,z>] <out.png> <x> <z> [heading°=270] [mode=FLY] [agl=55] [skyT=0.5]
 //
 //   heading° — compass degrees, 0 = north (−z)
 //   agl     — camera-subject height above ground (FLY only; ground modes ignore)
@@ -12,6 +12,10 @@
 //             panel being judged, e.g. "__game.setPaused(true)"). Boots with
 //             __harness auto-enter like verify — stage the title explicitly
 //             via --eval "__game.title.show()" when the title IS the subject.
+//   --subject — world coords of what the shot is OF: prints distance + how
+//             far off the camera axis it sits, and warns SUBJECT BEHIND
+//             CAMERA / LIKELY OUT OF FRAME (north = −z flips intuition —
+//             Rails Ops W3 aimed three cameras backward before this flag).
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { readdirSync } from 'node:fs';
@@ -24,6 +28,9 @@ const argv = process.argv.slice(2);
 let evalJs = null;
 const evalIdx = argv.indexOf('--eval');
 if (evalIdx !== -1) evalJs = argv.splice(evalIdx, 2)[1];
+let subject = null;
+const subjIdx = argv.indexOf('--subject');
+if (subjIdx !== -1) subject = argv.splice(subjIdx, 2)[1].split(',').map(Number);
 const [out, xa, za, hdga = '270', mode = 'FLY', agla = '55', skyTa = '0.5'] = argv;
 if (!out || xa === undefined || za === undefined) {
   console.error("usage: node tools/stage-shot.mjs [--eval '<js>'] <out.png> <x> <z> [heading°] [mode] [agl] [skyT]");
@@ -85,5 +92,22 @@ await page.clock.runFor(200);
 await page.screenshot({ path: out });
 console.log('shot:', resolve(out));
 console.log(await page.evaluate('(() => { const g = window.__game; const p = g.player.pos; return `pos ${p.x.toFixed(0)},${p.y.toFixed(0)},${p.z.toFixed(0)} mode=${g.player.mode} inTexas=${g.inTexas(p.x,p.z)} sky.t=${g.sky.t}`; })()'));
+if (subject) {
+  // aim check against the LIVE player pose (settle can drift it): angle
+  // between the facing vector (-sin h, -cos h) and the subject direction,
+  // measured from the chase camera (~12 u behind the avatar) — near subjects
+  // read much wider from the avatar than from the actual lens
+  const aim = await page.evaluate(`(() => {
+    const g = window.__game, p = g.player.pos, h = g.player.heading;
+    const fx = -Math.sin(h), fz = -Math.cos(h);
+    const cx = p.x - fx * 12, cz = p.z - fz * 12;
+    const dx = ${subject[0]} - cx, dz = ${subject[1]} - cz;
+    const dist = Math.hypot(dx, dz) || 1;
+    const dot = (dx * fx + dz * fz) / dist;
+    return { dist, deg: Math.acos(Math.max(-1, Math.min(1, dot))) * 180 / Math.PI };
+  })()`);
+  const flag = aim.deg > 90 ? ' — SUBJECT BEHIND CAMERA' : aim.deg > 45 ? ' — LIKELY OUT OF FRAME' : '';
+  console.log(`subject: ${aim.dist.toFixed(0)} u away, ${aim.deg.toFixed(0)}° off the camera axis${flag}`);
+}
 await browser.close();
 srv.close();

@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { GEO, hAt, seededRand, nearestCity } from './geo.js';
 import { merge, tinted } from './traffic.js';
 import { ATMOS, DAY_SECONDS } from './sky.js';
+import { SIDING_OFF } from './world.js';
 
 const MAX_TRAINS = 3;
 const SPAWN_R = 350, DESPAWN_R = 1200; // despawn only beyond fog — never in plain sight
@@ -132,6 +133,16 @@ function pickChatLine(rnd) {
 }
 const nextChatCooldown = (sym, n) => CHAT_GAP_MIN + seededRand(`trainid:chat:${sym}:${n}`)() * CHAT_GAP_VAR;
 
+// Rails Ops W3: meets. Only rails with baked `sd` spans host meets — rails
+// without a real siding keep spawn exclusivity as their only protection
+// (real-or-absent, settled). The holder eases to a stop at the span's far end
+// while sliding SIDING_OFF onto the siding alignment (whole consist — at
+// mini-world scale a real siding is shorter than a train, so the full train
+// shifts to the parallel track and overhangs the drawn ribbon); the opposer
+// passes at track speed, 3 s dwell, pull out. Engagement demands the opposer
+// arrive ≥100 u behind the holder so the offset is full before the pass.
+const MEET_ENGAGE = 320, MEET_STOP = 40, MEET_RAMP = 40, MEET_DWELL = 3, MEET_CLEAR = 25, MEET_MARGIN = 100;
+
 // The 🚂 placard is unchanged — named trains keep their bespoke line, with
 // consist + trip appended; every other train gets the full sym-based line.
 function identityText(tr) {
@@ -190,6 +201,7 @@ export class TrainSystem {
         spur: r.spur ?? null, // border spurs: scheduled named trains only, never random spawn
         bridge: r.bridge ?? null,
         band: r.band ?? false,
+        sd: r.sd ?? null, // baked passing-siding spans (Rails Ops W3) — meets happen only here
       };
     });
     this.LIVERY = LIVERY; // checks assert chosen colors against the same table
@@ -425,6 +437,119 @@ export class TrainSystem {
     id.sub = tr.rail.name ?? tr.rail.operator ?? 'the line';
   }
 
+  // Meet chatter is scripted (not the weighted ambient table) and voiced only
+  // with the player in radio range of the holder's stand — each line pushes
+  // the global floor so ambient detector calls don't stack on the sequence.
+  meetSay(tr, text, voice) {
+    const [x, z] = this.at(tr.rail, tr.meet ? tr.meet.holdS : tr.s);
+    if (Math.hypot(x - this._px, z - this._pz) > this._chatR) return;
+    this.onChatter?.(text, voice);
+    this.chatFloor = CHAT_FLOOR;
+  }
+
+  // Engage scan: an opposing closing pair on a sided rail resolves to a hold.
+  // The hold point is the span end farthest along the holder's direction; the
+  // holder is whichever train reaches a qualifying span first.
+  updateMeets() {
+    for (let i = 0; i < this.trains.length; i++) for (let j = i + 1; j < this.trains.length; j++) {
+      const a = this.trains[i], b = this.trains[j];
+      if (a.rail !== b.rail || !a.rail.sd || a.dir === b.dir || a.meet || b.meet) continue;
+      const up = a.dir > 0 ? a : b, dn = up === a ? b : a; // up rides +s, dn rides −s
+      const gap = dn.s - up.s;
+      if (gap <= 0 || gap > MEET_ENGAGE) continue; // gap ≤ 0 means they already passed
+      let best = null;
+      for (const sp of a.rail.sd) {
+        const c = (sp.s0 + sp.s1) / 2;
+        if (c <= up.s || c >= dn.s) continue; // the siding must lie between them
+        for (const [tr, o, holdS] of [[up, dn, sp.s1], [dn, up, sp.s0]]) {
+          const dh = (holdS - tr.s) * tr.dir;  // holder run to the hold point
+          const doo = (holdS - o.s) * o.dir;   // opposer run to the same point
+          if (dh < 8 || doo - dh < MEET_MARGIN) continue; // decel room + full-offset headroom
+          if (!best || dh < best.dh) best = { tr, o, holdS, sp, dh };
+        }
+      }
+      if (!best) continue;
+      best.tr.meet = { phase: 'pull', holdS: best.holdS, span: best.sp, other: best.o, off: 0 };
+      const [mx, mz] = this.at(a.rail, (best.sp.s0 + best.sp.s1) / 2);
+      const city = nearestCity(mx, mz).city.name;
+      this.meetSay(best.tr, `${best.tr.id.sym}, take the siding at ${city}, meet ${best.o.id.sym}.`, best.tr.id.voice);
+    }
+  }
+
+  // One holder's frame: pull in (ease + slide out to the siding offset), hold
+  // while the opposer passes, dwell 3 s, pull out (slide back, resume). The
+  // opposer never slows — it holds track speed through the meet.
+  stepMeet(tr, dt) {
+    const m = tr.meet;
+    if (m.phase === 'pull') {
+      const dist = (m.holdS - tr.s) * tr.dir;
+      const v = Math.max(3, SPEED * Math.min(1, dist / MEET_STOP)); // crawl floor: a pure exponential ease never arrives
+      tr.s += Math.min(v * dt, Math.max(0, dist)) * tr.dir;
+      const left = (m.holdS - tr.s) * tr.dir;
+      m.off = SIDING_OFF * (1 - Math.min(1, left / MEET_RAMP));
+      if (left <= 0.1) {
+        m.phase = 'hold';
+        m.off = SIDING_OFF;
+        this.meetSay(tr, `${tr.id.sym} copies, in the clear.`, tr.id.voice);
+      }
+      return;
+    }
+    if (m.phase === 'hold') {
+      const o = m.other;
+      const live = this.trains.includes(o) && o.rail === tr.rail;
+      if (live && !m.passed && (o.s - m.holdS) * o.dir > 0) {
+        m.passed = true;
+        this.meetSay(tr, `${o.id.sym}, highball.`, o.id.voice);
+      }
+      const tailS = live ? o.s - o.dir * o.cars.length * CAR_LEN : 0;
+      if (!live || (tailS - m.holdS) * o.dir > MEET_CLEAR) { m.phase = 'dwell'; m.t = MEET_DWELL; }
+      return;
+    }
+    if (m.phase === 'dwell') {
+      m.t -= dt;
+      if (m.t <= 0) m.phase = 'out';
+      return;
+    }
+    // out: back to track speed, offset ramps off over the first stretch
+    tr.s += SPEED * tr.dir * dt;
+    m.off = SIDING_OFF * Math.max(0, 1 - ((tr.s - m.holdS) * tr.dir) / MEET_RAMP);
+    if (m.off <= 0 || tr.s <= 0 || tr.s >= tr.rail.len) tr.meet = null;
+  }
+
+  // Deterministic staged meet for the harness and the tour (turtleMorning
+  // pattern): nearest sided rail, the feasible span nearest (x, z), holder
+  // placed 60 u short of its hold point, opposer 170 u beyond — the very next
+  // update() engages. Clears the roster; no Math.random on any path.
+  forceMeet(x, z, day) {
+    const N = 12, total = (N + 1) * CAR_LEN;
+    let best = null, bestD = Infinity;
+    for (const r of this.rails) {
+      if (!r.sd) continue;
+      this.arcInit(r);
+      for (const sp of r.sd) {
+        if (sp.s1 - 62 < total + 2 || sp.s1 + 172 + total > r.len) continue; // both consists must fit on-rail
+        const [cx, cz] = this.at(r, (sp.s0 + sp.s1) / 2);
+        const d = Math.hypot(cx - x, cz - z);
+        if (d < bestD) { bestD = d; best = { rail: r, sp }; }
+      }
+    }
+    if (!best) return null;
+    const { rail, sp } = best;
+    this.trains = [];
+    const types = ['boxcar', 'hopper', 'tanker'];
+    const mk = (s, dir) => {
+      const cars = Array.from({ length: N }, (_, i) => (rail.commuter
+        ? { type: 'coach', color: rail.livery }
+        : { type: types[i % types.length], color: CAR_COLORS[i % CAR_COLORS.length] }));
+      const tr = { rail, dir, s, locoColor: rail.livery ?? LOCO_COLORS[0], cars, id: this.buildId(rail, dir, day, cars) };
+      this.trains.push(tr);
+      return tr;
+    };
+    const holder = mk(sp.s1 - 60, 1);
+    const opposer = mk(sp.s1 + 170, -1);
+    return { holder, opposer, span: sp };
+  }
+
   // seeded daily crossing schedule — spawn only while the player is inside the
   // ring, mid-window arrivals join mid-run, one run per (site, day, slot).
   // A slot never replaces a still-running train of the same name (a window
@@ -461,6 +586,8 @@ export class TrainSystem {
     if (day !== undefined) this.updateCrossings(px, pz, day);
 
     const chatR = CHAT_R * (radioPerk ? 2 : 1);
+    this._px = px; this._pz = pz; this._chatR = chatR; // meetSay reads these
+    this.updateMeets();
     const counts = { loco: 0, boxcar: 0, hopper: 0, tanker: 0, coach: 0, well: 0 };
     let beamI = 0; // beams belong to lead locos only — trailing units hold no light
     for (const tr of this.trains) {
@@ -471,11 +598,12 @@ export class TrainSystem {
       let atEnd = (tr.dir > 0 && tr.s >= tr.rail.len) || (tr.dir < 0 && tr.s <= total);
       // Ops W2: every train journeys — hop the junction instead of braking.
       // Commuter sets terminate: end-of-line is their terminus, not a stall.
-      if (atEnd && !tr.id.commuter) {
+      if (atEnd && !tr.id.commuter && !tr.meet) {
         const hop = this.hopAt(tr.rail, tr.dir, total + 20);
         if (hop) { tr.rail = hop.rail; tr.s = hop.s; tr.dir = hop.dir; atEnd = false; this.syncTrip(tr); }
       }
-      if (!atEnd) tr.s += SPEED * tr.dir * dt;
+      if (tr.meet) { this.stepMeet(tr, dt); atEnd = false; }
+      else if (!atEnd) tr.s += SPEED * tr.dir * dt;
       else {
         tr.s = tr.dir > 0 ? tr.rail.len : total;
         const [hx, hz] = this.at(tr.rail, tr.s);
@@ -485,7 +613,13 @@ export class TrainSystem {
       for (let c = 0; c <= tr.cars.length; c++) {
         const s = tr.s - tr.dir * c * CAR_LEN;
         if (s < 0 || s > tr.rail.len) continue;
-        const [x, z, dx, dz] = this.at(tr.rail, s);
+        let [x, z, dx, dz] = this.at(tr.rail, s);
+        // holder mid-meet: whole consist rides the siding alignment (left
+        // normal (-dz, dx) × baked side — the world.js ribbon convention)
+        if (tr.meet?.off) {
+          x += -dz * tr.meet.off * tr.meet.span.side;
+          z += dx * tr.meet.off * tr.meet.span.side;
+        }
         const d = Math.hypot(x - px, z - pz);
         if (d < DESPAWN_R) tr.dead = false;
         // horn when the locomotive passes near
