@@ -20,8 +20,15 @@ Key facts:
 - Local dev: `python3 -m http.server 8317`; verify headlessly with
   **`node tools/verify.mjs`** (parallel pool, full run ~70 s on this machine;
   use named suites while iterating, then the full run before pushing; compact;
-  `-v` per-check, `-j N` sets width). Add checks to `tools/checks/*.mjs`,
-  never throwaway scripts.
+  `-v` per-check, `-j N` sets width; pool-failed suites auto-rerun solo —
+  `FLAKE (solo-green)` exits 0, read the labels). Add checks to
+  `tools/checks/*.mjs`, never throwaway scripts.
+- Session tooling (2026-07-20): `tools/law.sh '<pattern>'` = one-call
+  GOTCHAS + MODULES + src-hit lookup; `tools/judge-shot.sh` = locked-down
+  Copilot shot analysis; `/new-bake` skill = new-data-layer recipe. Waves
+  graded **handoff: yes** run via the `wave-coder` subagent (Sonnet) after
+  plan approval; Fable waves may delegate mechanical chunks to it (chunk
+  mode). Protocol details in CLAUDE.md.
 - Verify at *natural* play values (ugly mid-drive headings, parked-truck
   distances, off-axis approaches), not convenient ones.
 - If Bruno reports something broken after an update, suspect browser cache
