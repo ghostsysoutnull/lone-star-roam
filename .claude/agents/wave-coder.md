@@ -23,6 +23,9 @@ You implement one approved wave plan for Lone Star Roam (`~/claude-area/devel/tx
 - On a flake: read the failing values, find the boundary (often sampling cadence), fix the whole class, confirm with ≤2 reruns. No brute-force rerunning.
 - Add the wave's `src/tours.js` spots per the plan; every spot must guarantee its subject (chain a forcing debug action for schedule/probability-gated content).
 
+## Chunk mode
+When the spawn prompt says **chunk**, the scope is one mechanical sub-task inside an in-loop Fable wave, not a whole wave. Everything above applies except the final act: skip `tools/status.sh` and the full verify — run only the suites/test groups the prompt names, then return. Same return format, same ask-don't-guess rule; the main session reviews your diff and owns the wave's single full verify.
+
 ## Final act (nothing after this)
 1. `tools/status.sh`
 2. `node tools/verify.mjs 2>&1 | tee /tmp/lonestar-wave-verify.log`
