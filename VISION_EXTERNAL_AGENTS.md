@@ -219,6 +219,13 @@ text, identical neutral prompt (no mention of solar, placement or
 clearance), empty working directory, no repo access for either. Models
 pinned `gemini-3.1-pro-high` and `gpt-5.6-sol`.
 
+**Tier note — Gemini was not run cheap.** The head-to-head used
+`gemini-3.1-pro-high`, Google's strongest tier on the `agy` roster, against
+`gpt-5.6-sol` at reasoning effort high. `gemini-3.1-pro-low` appears in
+this record only in the lockdown probes (auth, write, shell and read
+permission tests), never in a scored review. Gemini's result is therefore
+not attributable to tier selection.
+
 | | solar clearance omission | turbine cap defect |
 |---|---|---|
 | **codex / GPT**, text-only | missed | **found** (+ a second real defect) |
@@ -282,6 +289,10 @@ Authenticated and working (`--print`, non-interactive). Model pin is
 trustworthy: a bogus slug fails loudly and lists the valid roster, the
 `judge-shot.sh` precedent — so pinning a Gemini model reliably keeps
 Anthropic models out of the loop.
+
+Probes below ran on `gemini-3.1-pro-low` — deliberately the cheap tier,
+since they test the CLI's permission surface, not model quality. No scored
+review used it; the Round A head-to-head used `gemini-3.1-pro-high`.
 
 | capability | codex `-s read-only` | agy `--print --sandbox` |
 |---|---|---|
