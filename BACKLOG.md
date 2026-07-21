@@ -6,6 +6,22 @@ No active track. Rails Operations shipped in full 2026-07-19 (folded into
 Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
+## Map follow-ups (Map W1 — readable big map — shipped 2026-07-20)
+
+- **Map layers wave (W2)**: toggleable big-map overlays — rails, energy
+  sites, airports, counties, ag, collectibles found/unfound. Shape settled
+  in the W1 discussion: one pre-rendered canvas per layer composited in
+  `drawBig`, so toggles cost nothing at runtime and every future track can
+  register a layer. Plus click-to-set-waypoint on the big map (compass +
+  minimap pointer to it; reuse the travel menu's haul-lock rule if it ever
+  fast-travels). Candidates from the same discussion: visited-vs-unvisited
+  city tint, mission origin→target route hint.
+- **Mexico 25-mi band** — Bruno wants a follow-up conversation (2026-07-20,
+  post-Map-W1) before anything is queued: it reopens the settled
+  Shoulder & Shelf call (`geo.js`: "Mexico gets no dilation at all — the
+  wall stays at the Rio Grande") and done right is track-sized (Band-Parity
+  treatment: border cities, crossings, scenery), not a map wave.
+
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
 
 - ~~**Auto-confirm flaked suites in verify.mjs**~~ → **Shipped 2026-07-20**

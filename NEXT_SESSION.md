@@ -7,10 +7,20 @@ you're changing. `MODULES.md` has per-module grep anchors — prefer grep + a
 targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
 queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
 
-No active track: **Rails Operations shipped in full 2026-07-19** (3 waves,
-folded into `ROADMAP.md`; `RAILS_OPS_SPEC.md` stays as history). Next up per
+No active track: **Map W1 + W1.1 + W1.2 shipped 2026-07-20** (readable big
+map: zoom/chevron/legend/scale bar, dash-hole fix, lat/lon readout,
+world-edge seams, click-to-copy — folded into `ROADMAP.md`). First: Bruno
+wants a **conversation about the Mexico 25-mi band** (reopens a settled
+Shoulder & Shelf call; track-sized — see `BACKLOG.md`). After that, next per
 the 2026-H2 program (`VISION_2026H2.md`) is **sea-industry**
-(`VISION_SEA_INDUSTRY.md`) — it needs its spec session first.
+(`VISION_SEA_INDUSTRY.md`) — spec session first. Map W2 (layers + waypoint)
+is queued in `BACKLOG.md`.
+
+Process law since 2026-07-20 (in `CLAUDE.md`, after a token-heavy session):
+mechanical chunks (checks to a settled contract, probes, doc sweeps) go to
+the `wave-coder` agent even in fix rounds — in-loop needs a reason; hard cap
+one shot-staging round per wave; decision points are prose lettered options
+(AskUserQuestion retired).
 
 Key facts:
 - **Repo is public and GitHub Pages is live** — pushes deploy to

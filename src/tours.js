@@ -13,6 +13,14 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'Map (2026-07)',
+    waves: [
+      { wave: 'W1 — readable big map', spots: [
+        S('🗺️ the map learns to read', [4762, 1851], { mode: 'BOAT', time: 0.5, note: 'press M: the world-edge dashes are legible now (and hole-free along the coast diagonal — the Lake Jackson gap), the legend (bottom right) decodes every ink, a mile scale bar sits bottom left, and Z cycles 1×/2×/4× around your heading chevron — you are an arrow, not a dot; 2× and up name the mid-size towns; the bottom-center pill reads real lat/lon — yours, or the map point under your mouse' }),
+      ] },
+    ],
+  },
+  {
     track: 'Rails Operations (2026-07)',
     waves: [
       { wave: 'W3 — meets', spots: [

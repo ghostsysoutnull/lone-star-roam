@@ -1,6 +1,6 @@
 // HUD: minimap + fullscreen map (border/highways pre-rendered once), text readouts, toasts, dialog.
 import { Vector3 } from 'three';
-import { GEO, nearestCity, inTexas, borderZoneAt, SHOULDER_U, SHELF_U, TIDELANDS_U, coastDist, borderDist } from './geo.js';
+import { GEO, nearestCity, inTexas, borderZoneAt, SHOULDER_U, SHELF_U, TIDELANDS_U, coastDist, borderDist, toLatLon } from './geo.js';
 import { AIRPORTS, fieldNear } from './airports.js';
 import { ATMOS } from './sky.js';
 import { KEYS, slotKey } from './slots.js';
@@ -99,9 +99,23 @@ export class HUD {
       minX: GEO.bounds.minX - SHOULDER_U, maxX: GEO.bounds.maxX + SHELF_U, // east = Gulf shelf too —
       minZ: GEO.bounds.minZ - SHOULDER_U, maxZ: GEO.bounds.maxZ + SHELF_U, // the coast runs SW–NE
     });
-    this.mapLayer = wide.canvas; this.mapT = wide.T; this.mapSc = wide.sc;
+    this.mapLayer = wide.canvas; this.mapT = wide.T; this.mapSc = wide.sc; this.mapInv = wide.inv;
     this.zoomLevels = [1.4, 2.4, 4.5];
     this.zoomIdx = 1;
+    // big-map zoom (Map W1): level 0 is the classic full-extent view; deeper
+    // levels window the same pre-rendered layer around the player
+    this.bigZoomLevels = [1, 2, 4];
+    this.bigZoomIdx = 0;
+    // coordinate readout (W1.1): real lat/lon is a player feature — this is a
+    // real-geography game; raw x/z rides along only under ?debug
+    this.coordsEl = document.getElementById('map-coords');
+    this.showXZ = new URLSearchParams(location.search).has('debug');
+    this.cursorPx = null; // big-canvas px under the mouse; null = follow the player
+    this.bigCanvas.addEventListener('mousemove', (e) => { this.cursorPx = [e.offsetX, e.offsetY]; });
+    this.bigCanvas.addEventListener('mouseleave', () => { this.cursorPx = null; });
+    // W1.2: click copies the pointed coordinates (waypoints, if they ever
+    // come, get a different gesture — this one is claimed for bug reports)
+    this.bigCanvas.addEventListener('click', (e) => this.copyCoords(e.offsetX, e.offsetY));
     this.compass = document.getElementById('compass');
     if (localStorage.getItem(slotKey(KEYS.compass)) === 'off') this.compass.style.display = 'none';
     this.shield = document.getElementById('road-shield-wrap'); // outer: position/centered/perspective (static)
@@ -137,6 +151,7 @@ export class HUD {
     const { minX, maxX, minZ, maxZ } = bounds;
     const pad = 20, sc = Math.min((W - 2 * pad) / (maxX - minX), (H - 2 * pad) / (maxZ - minZ));
     const T = (x, z) => [(x - minX) * sc + pad, (z - minZ) * sc + pad];
+    const inv = (px, pz) => [(px - pad) / sc + minX, (pz - pad) / sc + minZ]; // W1.1: layer px → world
     const isWide = bounds !== GEO.bounds;
     if (isWide) {
       ctx.fillStyle = '#171a14'; // faded band backdrop, dimmer than Texas' own fill
@@ -161,6 +176,19 @@ export class HUD {
       ctx.fillStyle = '#20261c'; ctx.fill();
       ctx.strokeStyle = '#c8b878'; ctx.lineWidth = 1; ctx.stroke();
     }
+    // Dash bands are measured ALONG the contour, not by cell checkerboard
+    // (Map W1.1): a line riding a checkerboard diagonal stays on one color —
+    // the bishop rule — and the old `(⌊x/80⌋+⌊z/80⌋)&1` skip left a 215u hole
+    // in the shelf line off Lake Jackson, where the contour parallels the
+    // coast diagonal. Project the cell midpoint onto the contour tangent
+    // (perpendicular of the field gradient from the cell's corner values —
+    // sign-stable, the gradient always points outward) and alternate 80u
+    // bands of that arc-length-ish parameter instead.
+    const dashOn = (v, mx, mz) => {
+      const gx = v[1] + v[2] - v[0] - v[3], gz = v[2] + v[3] - v[0] - v[1];
+      const L = Math.hypot(gx, gz) || 1;
+      return (Math.floor((mz * gx - mx * gz) / (L * 80)) & 1) === 1;
+    };
     // Tidelands line — big map only (the minimap Law). Marching squares on
     // the coastDist field (border-vertex normal offsets fail here: the coast
     // polygon wanders through bays, so offset points come out unordered).
@@ -169,6 +197,7 @@ export class HUD {
     // Drawn-segment midpoints stay on `this.tidelands` for the verify suite.
     if (isWide && GEO.borderZones?.length) {
       this.tidelands = [];
+      this.tidelandsDrawn = []; // dash midpoints only — the gap-regression surface
       ctx.save();
       ctx.strokeStyle = '#5a86a8'; ctx.lineWidth = 1.2; ctx.lineCap = 'round';
       const FINE = 20, COARSE = 160, X0 = 1400, X1 = 5800, Z0 = 900, Z1 = 6000;
@@ -198,7 +227,8 @@ export class HUD {
               // 166.7u INLAND, and arcs into Mexico water past Boca Chica
               if (inTexas(mx, mz) || borderZoneAt(mx, mz) !== 'coast') continue;
               this.tidelands.push([mx, mz]);
-              if (((Math.floor(x / 80) + Math.floor(z / 80)) & 1) === 0) continue; // the dash gaps
+              if (!dashOn(v, mx, mz)) continue; // the dash gaps
+              this.tidelandsDrawn.push([mx, mz]);
               const [p1x, p1z] = T(hits[0][0], hits[0][1]), [p2x, p2z] = T(hits[1][0], hits[1][1]);
               ctx.moveTo(p1x, p1z); ctx.lineTo(p2x, p2z);
             }
@@ -211,14 +241,16 @@ export class HUD {
     // World-edge iso-lines (Water Vehicles W3) — big map only, the Tidelands
     // dash-pass idiom on the borderDist field: the shelf wall the boat stops
     // at (SHELF_U past the coast) and the shoulder edge on US-neighbor land
-    // (SHOULDER_U; Mexico's edge is the river itself, already inked). Styled
-    // fainter than the Tidelands dashes — the legal line outranks the world
-    // line. Display only: the wall lives in geo.js inWorld, never here.
+    // (SHOULDER_U; Mexico's edge is the river itself, already inked). Map W1
+    // brightened the ink — the original #47535e "fainter than Tidelands" call
+    // was unreadable in play; hue keeps it slate vs the Tidelands blue.
+    // Display only: the wall lives in geo.js inWorld, never here.
     // Drawn-segment midpoints stay on `this.worldEdge` for the verify suite.
     if (isWide && GEO.borderZones?.length) {
       this.worldEdge = { sea: [], land: [] };
+      this.worldEdgeDrawn = { sea: [], land: [] }; // dash midpoints only — gap regression
       ctx.save();
-      ctx.strokeStyle = '#47535e'; ctx.lineWidth = 1; ctx.lineCap = 'round';
+      ctx.strokeStyle = '#90a0b0'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
       const FINE = 20, COARSE = 160;
       const X0 = minX, X1 = maxX, Z0 = minZ, Z1 = maxZ;
       const cache = new Map();
@@ -253,7 +285,8 @@ export class HUD {
                 // units inside Texas, and each line owns one border zone
                 if (inTexas(mx, mz) || borderZoneAt(mx, mz) !== zone) continue;
                 this.worldEdge[out].push([mx, mz]);
-                if (((Math.floor(x / 80) + Math.floor(z / 80)) & 1) === 0) continue; // the dash gaps
+                if (!dashOn(v, mx, mz)) continue; // the dash gaps
+                this.worldEdgeDrawn[out].push([mx, mz]);
                 const [p1x, p1z] = T(hits[0][0], hits[0][1]), [p2x, p2z] = T(hits[1][0], hits[1][1]);
                 ctx.moveTo(p1x, p1z); ctx.lineTo(p2x, p2z);
               }
@@ -262,6 +295,63 @@ export class HUD {
         }
         ctx.stroke();
       }
+      ctx.restore();
+    }
+    // World-edge seams (Map W1.2): where the dilation limit steps — the coast
+    // shelf (1127u) meets the neighbor shoulder (402u) off the Sabine mouth,
+    // the shelf meets Mexico's zero past the Rio Grande mouth, the shoulder
+    // meets zero at the NM corner — the world boundary runs along the zone
+    // divide between the two radii, and W3 never inked those stretches (Bruno
+    // hit the Sabine one at 29.06° N). Marching squares on the per-zone limit
+    // step function; dashes band on borderDist, which runs monotonically
+    // along these radial seams (dashOn's tangent projection would freeze —
+    // seams run along the gradient, not across it).
+    if (isWide && GEO.borderZones?.length) {
+      this.worldEdgeSeam = [];
+      this.worldEdgeSeamDrawn = [];
+      ctx.save();
+      ctx.strokeStyle = '#90a0b0'; ctx.lineWidth = 1.5; ctx.lineCap = 'round';
+      const FINE = 20, COARSE = 160;
+      const LIMITS = { coast: SHELF_U, land: SHOULDER_U, mexico: 0 };
+      const zcache = new Map();
+      const lim = (x, z) => {
+        const k = x * 131072 + z;
+        let v = zcache.get(k);
+        if (v === undefined) { v = LIMITS[borderZoneAt(x, z)]; zcache.set(k, v); }
+        return v;
+      };
+      ctx.beginPath();
+      for (let cx = minX; cx < maxX; cx += COARSE) {
+        for (let cz = minZ; cz < maxZ; cz += COARSE) {
+          const cs = [lim(cx, cz), lim(cx + COARSE, cz), lim(cx + COARSE, cz + COARSE), lim(cx, cz + COARSE)];
+          if (cs[0] === cs[1] && cs[1] === cs[2] && cs[2] === cs[3]) continue;
+          if (borderDist(cx + COARSE / 2, cz + COARSE / 2) > SHELF_U + 250) continue;
+          for (let x = cx; x < cx + COARSE; x += FINE) {
+            for (let z = cz; z < cz + COARSE; z += FINE) {
+              const u = [lim(x, z), lim(x + FINE, z), lim(x + FINE, z + FINE), lim(x, z + FINE)];
+              const E = [[x, z, x + FINE, z, u[0], u[1]], [x + FINE, z, x + FINE, z + FINE, u[1], u[2]],
+                [x + FINE, z + FINE, x, z + FINE, u[2], u[3]], [x, z + FINE, x, z, u[3], u[0]]];
+              const hits = [];
+              for (const [ax, az, bx, bz, ua, ub] of E)
+                if (ua !== ub) hits.push([(ax + bx) / 2, (az + bz) / 2]);
+              if (hits.length < 2) continue;
+              const mx = (hits[0][0] + hits[1][0]) / 2, mz = (hits[0][1] + hits[1][1]) / 2;
+              const bd = borderDist(mx, mz);
+              // the divide continues past both radii (inland below the small
+              // limit, offshore beyond the large) — the seam is only between.
+              // Below 50u the divide hugs the border polygon and the world
+              // edge IS the border, already inked gold — no seam there.
+              if (inTexas(mx, mz) || bd < Math.max(50, Math.min(...u) - 10) || bd > Math.max(...u) + 10) continue;
+              this.worldEdgeSeam.push([mx, mz]);
+              if ((Math.floor((bd - 50) / 80) & 1) === 1) continue; // dashes march down the radius, first band drawn
+              this.worldEdgeSeamDrawn.push([mx, mz]);
+              const [p1x, p1z] = T(hits[0][0], hits[0][1]), [p2x, p2z] = T(hits[1][0], hits[1][1]);
+              ctx.moveTo(p1x, p1z); ctx.lineTo(p2x, p2z);
+            }
+          }
+        }
+      }
+      ctx.stroke();
       ctx.restore();
     }
     // county lines beneath everything
@@ -372,7 +462,7 @@ export class HUD {
         ctx.fillText(city.name, px + 6, pz + 4);
       }
     }
-    return { canvas: c, T, sc };
+    return { canvas: c, T, sc, inv };
   }
 
   toggleBigMap() { this.big.style.display = this.big.style.display === 'block' ? 'none' : 'block'; }
@@ -392,6 +482,23 @@ export class HUD {
   }
 
   cycleZoom() { this.zoomIdx = (this.zoomIdx + 1) % this.zoomLevels.length; }
+
+  cycleBigZoom() { this.bigZoomIdx = (this.bigZoomIdx + 1) % this.bigZoomLevels.length; }
+
+  // Map W1.2: copy the clicked map point's coordinates. The copied string
+  // always carries raw x/z (bug-report friendly); only the pill display
+  // gates x/z behind ?debug. Clipboard write is best-effort (headless and
+  // permission-denied contexts fall back to the toast alone).
+  copyCoords(cx, cz) {
+    if (!this.bigWindow) return;
+    const { x: wx, z: wz, w: sw, h: sh } = this.bigWindow;
+    const [x, z] = this.mapInv(wx + cx * (sw / this.bigCanvas.width), wz + cz * (sh / this.bigCanvas.height));
+    const [lat, lon] = toLatLon(x, z);
+    const s = `${lat.toFixed(2)}° N · ${(-lon).toFixed(2)}° W · x ${x.toFixed(0)} z ${z.toFixed(0)}`;
+    this.lastCopied = s;
+    navigator.clipboard?.writeText(s).catch(() => {});
+    this.toast(`📋 copied: ${s}`);
+  }
 
   applyUiScale() { document.documentElement.style.fontSize = 10 * this.ui + 'px'; }
 
@@ -950,23 +1057,91 @@ export class HUD {
     const ctx = this.bigCanvas.getContext('2d');
     const W = this.bigCanvas.width, H = this.bigCanvas.height;
     ctx.clearRect(0, 0, W, H);
-    ctx.drawImage(this.mapLayer, 0, 0, W, H);
-    const sx = W / this.mapLayer.width, sy = H / this.mapLayer.height;
+    // Map W1: source window on the pre-rendered layer — full extent at 1×,
+    // else centered on the player and clamped inside the layer so the canvas
+    // stays full at the edges. `bigWindow` is the numeric assertion surface.
+    const LW = this.mapLayer.width, LH = this.mapLayer.height;
+    const zoom = this.bigZoomLevels[this.bigZoomIdx];
+    const sw = LW / zoom, sh = LH / zoom;
     const [px, pz] = this.mapT(player.pos.x, player.pos.z);
+    const wx = Math.max(0, Math.min(LW - sw, px - sw / 2));
+    const wz = Math.max(0, Math.min(LH - sh, pz - sh / 2));
+    this.bigWindow = { x: wx, z: wz, w: sw, h: sh };
+    ctx.drawImage(this.mapLayer, wx, wz, sw, sh, 0, 0, W, H);
+    // coordinate readout: cursor position while the mouse roams the map, the
+    // player otherwise (12 Hz with the rest of the draw)
+    const [rx, rz] = this.cursorPx
+      ? this.mapInv(wx + this.cursorPx[0] * (sw / W), wz + this.cursorPx[1] * (sh / H))
+      : [player.pos.x, player.pos.z];
+    const [lat, lon] = toLatLon(rx, rz);
+    this.coordsEl.textContent = `${this.cursorPx ? '⌖' : '➤'} ${lat.toFixed(2)}° N · ${(-lon).toFixed(2)}° W`
+      + (this.showXZ ? `  ·  x ${rx.toFixed(0)} z ${rz.toFixed(0)}` : '');
+    // one shared window transform: world coords → big-canvas px
+    const Tw = (x, z) => { const [lx, lz] = this.mapT(x, z); return [(lx - wx) * (W / sw), (lz - wz) * (H / sh)]; };
     if (this.mission?.target) {
-      const [tx, tz] = this.mapT(this.mission.target[0], this.mission.target[1]);
-      this.diamond(ctx, tx * sx, tz * sy, 9);
+      const [tx, tz] = Tw(this.mission.target[0], this.mission.target[1]);
+      // clamped to the edge as a direction pointer when zoom pushes it off-window
+      this.diamond(ctx, Math.max(12, Math.min(W - 12, tx)), Math.max(12, Math.min(H - 12, tz)), 9);
     }
     // A5: airport codes next to the baked ✈ glyphs — drawn here (occasional
     // full-map redraws), not on the always-live minimap layer
     ctx.font = '12px system-ui'; ctx.fillStyle = '#8fc4f0'; ctx.textAlign = 'center';
     for (const l of this.airportLabels()) {
-      const [lx, lz] = this.mapT(l.x, l.z);
-      ctx.fillText(l.id, lx * sx, lz * sy + 15);
+      const [lx, lz] = Tw(l.x, l.z);
+      ctx.fillText(l.id, lx, lz + 15);
     }
+    // zoomed-in city names: the layer bakes only the ≥190k names — 2× adds
+    // the mid-size towns in view, 4× names everything (live draw, map-open
+    // only). Pop-priority collision skip: metro suburbs yield rather than
+    // overlap (the Houston-crowding shot finding); the baked big-city names
+    // seed the rect list so live labels dodge them too.
+    if (zoom >= 2) {
+      ctx.font = '13px system-ui'; ctx.fillStyle = '#e8e0c8'; ctx.textAlign = 'left';
+      const minPop = zoom >= 4 ? 0 : 60000;
+      const rect = (cx, cz, w) => ({ x0: cx + 6, x1: cx + 6 + w, z0: cz - 8, z1: cz + 8 });
+      const hits = (r, list) => list.some((d) => r.x0 < d.x1 && r.x1 > d.x0 && r.z0 < d.z1 && r.z1 > d.z0);
+      const drawn = [];
+      for (const c of GEO.cities) {
+        if (c.pop < 190000) continue; // baked at 17 layer-px, scaled by the window
+        const [cx, cz] = Tw(c.x, c.z);
+        drawn.push(rect(cx, cz, ctx.measureText(c.name).width * (17 / 13) * (W / sw)));
+      }
+      const live = GEO.cities.filter((c) => c.pop < 190000 && c.pop >= minPop).sort((a, b) => b.pop - a.pop);
+      for (const c of live) {
+        const [cx, cz] = Tw(c.x, c.z);
+        if (cx < -40 || cx > W + 10 || cz < 0 || cz > H) continue;
+        const r = rect(cx, cz, ctx.measureText(c.name).width);
+        if (hits(r, drawn)) continue;
+        drawn.push(r);
+        ctx.fillText(c.name, cx + 6, cz + 4);
+      }
+      ctx.textAlign = 'center';
+    }
+    // scale bar (miles) + zoom factor, bottom-left; `scaleBar` for the checks
+    const miles = [100, 50, 25][this.bigZoomIdx];
+    const barPx = miles * 16.093 * this.mapSc * (W / sw);
+    this.scaleBar = { miles, px: barPx };
+    ctx.strokeStyle = '#e8e0c8'; ctx.fillStyle = '#e8e0c8'; ctx.lineWidth = 2; ctx.lineCap = 'butt';
+    ctx.beginPath();
+    ctx.moveTo(16, H - 18); ctx.lineTo(16 + barPx, H - 18);
+    ctx.moveTo(16, H - 23); ctx.lineTo(16, H - 13);
+    ctx.moveTo(16 + barPx, H - 23); ctx.lineTo(16 + barPx, H - 13);
+    ctx.stroke();
+    ctx.font = '12px system-ui'; ctx.textAlign = 'left';
+    ctx.fillText(`${miles} mi`, 16 + barPx + 8, H - 14);
+    ctx.fillText(`${zoom}×`, 16, H - 30);
+    // player marker: the minimap's heading chevron, sized up — not a dot
+    const [ax, az] = Tw(player.pos.x, player.pos.z);
+    ctx.save();
+    ctx.translate(ax, az);
+    ctx.rotate(-player.heading + Math.PI);
     ctx.fillStyle = player.mode === 'BOAT' ? '#5cc8ff' : '#ffd35c';
     ctx.strokeStyle = '#000';
-    ctx.beginPath(); ctx.arc(px * sx, pz * sy, 7, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(0, 14); ctx.lineTo(9, -9); ctx.lineTo(0, -4); ctx.lineTo(-9, -9);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
   }
 
   // A5: plain data the big map's code labels are drawn from — not baked into

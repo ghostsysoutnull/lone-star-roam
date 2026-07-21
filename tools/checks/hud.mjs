@@ -467,4 +467,129 @@ export default async function hud(t) {
     t.ok(seq(r.d) === '["hud-wildlife"]', `survivor didn't hold the panel alone after the crop left: ${seq(r.d)}`);
     t.ok(seq(r.e) === '["hud-crop","hud-wildlife"]', `reverse arrival order not honored: ${seq(r.e)}`);
   });
+
+  await t.check('Map W1: Z cycles big-map zoom while M is open, minimap zoom when it is closed', async () => {
+    const before = await t.ev(`({ mini: g.hud.zoomIdx, big: g.hud.bigZoomIdx, open: g.hud.big.style.display === 'block' })`);
+    t.ok(!before.open, 'big map unexpectedly open at check start');
+    await t.key('KeyM');
+    await t.key('KeyZ');
+    const mid = await t.ev(`({ mini: g.hud.zoomIdx, big: g.hud.bigZoomIdx, open: g.hud.big.style.display === 'block' })`);
+    await t.key('KeyM');
+    await t.key('KeyZ');
+    const end = await t.ev(`({ mini: g.hud.zoomIdx, big: g.hud.bigZoomIdx, open: g.hud.big.style.display === 'block' })`);
+    await t.ev(`(() => { g.hud.bigZoomIdx = 0; g.hud.zoomIdx = ${before.mini}; })()`); // hermetic restore
+    t.ok(mid.open && !end.open, `M toggling broke: mid.open=${mid.open} end.open=${end.open}`);
+    t.ok(mid.big === (before.big + 1) % 3 && mid.mini === before.mini,
+      `Z with map open should cycle big only: before=${JSON.stringify(before)} mid=${JSON.stringify(mid)}`);
+    t.ok(end.mini === (before.mini + 1) % 3 && end.big === mid.big,
+      `Z with map closed should cycle minimap only: mid=${JSON.stringify(mid)} end=${JSON.stringify(end)}`);
+  });
+
+  await t.check('Map W1: zoom window halves at 2×, centers on the player, clamps at the layer edge', async () => {
+    await t.tp(austin.x, austin.z); // deep inside the wide layer — no clamp in play
+    const r = await t.ev(`(() => {
+      const h = g.hud, p = g.player, idx = h.bigZoomIdx;
+      h.bigZoomIdx = 0; h.drawBig(p);
+      const w1 = { ...h.bigWindow };
+      h.bigZoomIdx = 1; h.drawBig(p);
+      const w2 = { ...h.bigWindow };
+      const [px, pz] = h.mapT(p.pos.x, p.pos.z);
+      // shelf-edge teleport inside one synchronous block (the nature-slots
+      // idiom): drawBig is pure math, pos restored before any frame runs
+      const keep = { x: p.pos.x, z: p.pos.z };
+      p.pos.x = g.GEO.bounds.maxX + 1100; p.pos.z = keep.z;
+      h.drawBig(p);
+      const wc = { ...h.bigWindow };
+      const [cx] = h.mapT(p.pos.x, p.pos.z);
+      p.pos.x = keep.x; p.pos.z = keep.z;
+      h.bigZoomIdx = idx; h.drawBig(p);
+      return { w1, w2, wc, px, pz, cx, LW: h.mapLayer.width, LH: h.mapLayer.height };
+    })()`);
+    t.ok(r.w1.w === r.LW && r.w1.x === 0 && r.w1.z === 0, `zoom 1 should show the full layer: ${JSON.stringify(r.w1)}`);
+    t.ok(Math.abs(r.w2.w - r.LW / 2) < 0.5 && Math.abs(r.w2.h - r.LH / 2) < 0.5,
+      `2x window should be half the layer: ${JSON.stringify(r.w2)}`);
+    t.ok(Math.abs(r.w2.x + r.w2.w / 2 - r.px) < 1 && Math.abs(r.w2.z + r.w2.h / 2 - r.pz) < 1,
+      `2x window should center on the player: window=${JSON.stringify(r.w2)} player=[${r.px.toFixed(1)},${r.pz.toFixed(1)}]`);
+    t.ok(r.wc.x + r.wc.w <= r.LW + 0.5 && r.wc.x >= 0,
+      `east-shelf window should clamp inside the layer: ${JSON.stringify(r.wc)} LW=${r.LW}`);
+    t.ok(r.cx > r.wc.x && r.cx < r.wc.x + r.wc.w, `clamped window lost the player: cx=${r.cx.toFixed(1)} ${JSON.stringify(r.wc)}`);
+  });
+
+  await t.check('Map W1: scale bar spans the same screen length at every zoom, miles halve with it', async () => {
+    const r = await t.ev(`(() => {
+      const h = g.hud, idx = h.bigZoomIdx, out = [];
+      for (let i = 0; i < 3; i++) { h.bigZoomIdx = i; h.drawBig(g.player); out.push({ ...h.scaleBar }); }
+      h.bigZoomIdx = idx; h.drawBig(g.player);
+      return { out, W: h.bigCanvas.width, mapSc: h.mapSc };
+    })()`);
+    t.ok(r.out.map((o) => o.miles).join() === '100,50,25', `miles ladder wrong: ${r.out.map((o) => o.miles)}`);
+    // miles halve exactly as the window halves, so the drawn px must be
+    // constant across levels — an invariant independent of the bar formula
+    t.ok(Math.abs(r.out[0].px - r.out[1].px) < 0.5 && Math.abs(r.out[1].px - r.out[2].px) < 0.5,
+      `bar length should be zoom-invariant: ${r.out.map((o) => o.px.toFixed(1))}`);
+    // and the 1x bar must ground-truth to real miles: 100 mi = 1609.3 units through the layer scale
+    const expect = 100 * 16.093 * r.mapSc * (r.W / 1400);
+    t.ok(Math.abs(r.out[0].px - expect) < 1, `100 mi bar off ground truth: ${r.out[0].px.toFixed(1)} vs ${expect.toFixed(1)}`);
+    t.ok(r.out[0].px > 30 && r.out[0].px < r.W * 0.5, `bar out of proportion: ${r.out[0].px.toFixed(1)} of ${r.W}`);
+  });
+
+  await t.check('Map W1.1: coordinate readout — player lat/lon, cursor lat/lon through the zoom window', async () => {
+    await t.tp(austin.x + 3, austin.z - 3); // ugly off-center spot, not the city anchor
+    const r = await t.ev(`(() => {
+      const h = g.hud, el = document.getElementById('map-coords');
+      const keep = h.cursorPx;
+      h.cursorPx = null; h.drawBig(g.player);
+      const playerTxt = el.textContent;
+      const [plat, plon] = g.toLatLon(g.player.pos.x, g.player.pos.z);
+      // park the cursor exactly on San Antonio's canvas px — inside the 2×
+      // window around Austin, where a real mouse could actually sit
+      const idx = h.bigZoomIdx; h.bigZoomIdx = 1; h.drawBig(g.player);
+      const sa = g.GEO.cities.find((c) => c.name === 'San Antonio');
+      const [lx, lz] = h.mapT(sa.x, sa.z);
+      const { x: wx, z: wz, w: sw, h: sh } = h.bigWindow;
+      h.cursorPx = [(lx - wx) * (h.bigCanvas.width / sw), (lz - wz) * (h.bigCanvas.height / sh)];
+      const onCanvas = h.cursorPx[0] >= 0 && h.cursorPx[0] <= h.bigCanvas.width
+        && h.cursorPx[1] >= 0 && h.cursorPx[1] <= h.bigCanvas.height;
+      h.drawBig(g.player);
+      const curTxt = el.textContent;
+      const [elat, elon] = g.toLatLon(sa.x, sa.z);
+      h.cursorPx = keep; h.bigZoomIdx = idx;
+      h.bigCanvas.dispatchEvent(new MouseEvent('mouseleave'));
+      const cleared = h.cursorPx === null;
+      return { playerTxt, curTxt, plat, plon, elat, elon, cleared, onCanvas };
+    })()`);
+    t.ok(r.playerTxt.includes(r.plat.toFixed(2)) && r.playerTxt.includes((-r.plon).toFixed(2)),
+      `player readout not wired: "${r.playerTxt}" vs ${r.plat.toFixed(2)}/${(-r.plon).toFixed(2)}`);
+    // projection ground truth: the bake round-trips real coordinates
+    t.ok(Math.abs(r.plat - 30.2672) < 0.05, `Austin lat off the real 30.2672: ${r.plat.toFixed(4)}`);
+    t.ok(Math.abs(r.elat - 29.4241) < 0.05 && Math.abs(r.elon - -98.4936) < 0.05,
+      `San Antonio round-trip off the real 29.4241/-98.4936: ${r.elat.toFixed(4)}/${r.elon.toFixed(4)}`);
+    t.ok(r.onCanvas, 'San Antonio should sit inside the 2x window around Austin — cursor px off-canvas');
+    t.ok(r.curTxt.includes(r.elat.toFixed(2)) && r.curTxt.includes((-r.elon).toFixed(2)),
+      `cursor readout not wired through the window: "${r.curTxt}"`);
+    t.ok(r.cleared, 'mouseleave should clear the cursor back to player-follow');
+  });
+
+  await t.check('Map W1.2: clicking the map copies the pointed coordinates', async () => {
+    await t.tp(austin.x, austin.z);
+    const r = await t.ev(`(() => {
+      const h = g.hud, idx = h.bigZoomIdx;
+      h.bigZoomIdx = 0; h.drawBig(g.player);
+      const sa = g.GEO.cities.find((c) => c.name === 'San Antonio');
+      const [lx, lz] = h.mapT(sa.x, sa.z);
+      const { x: wx, z: wz, w: sw, h: sh } = h.bigWindow;
+      h.copyCoords((lx - wx) * (h.bigCanvas.width / sw), (lz - wz) * (h.bigCanvas.height / sh));
+      const [lat, lon] = g.toLatLon(sa.x, sa.z);
+      h.bigZoomIdx = idx;
+      return { copied: h.lastCopied, toast: g.hud.els.toast.textContent,
+               lat, lon, sx: sa.x, sz: sa.z };
+    })()`);
+    t.ok(r.copied.includes(r.lat.toFixed(2)) && r.copied.includes((-r.lon).toFixed(2)),
+      `copied string missing lat/lon: "${r.copied}"`);
+    const m = r.copied.match(/x (-?\d+) z (-?\d+)/);
+    t.ok(m && Math.abs(+m[1] - r.sx) <= 1 && Math.abs(+m[2] - r.sz) <= 1,
+      `copied x/z off San Antonio (${r.sx.toFixed(0)}, ${r.sz.toFixed(0)}): "${r.copied}"`);
+    t.ok(r.toast.includes('copied') && r.toast.includes(r.lat.toFixed(2)),
+      `no confirmation toast: "${r.toast}"`);
+  });
 }

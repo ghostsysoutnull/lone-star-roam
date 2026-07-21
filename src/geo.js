@@ -577,6 +577,14 @@ export function borderDist(x, z) {
   return nearestDist(x, z, GEO.border);
 }
 
+// Map W1.1: inverse of the equirectangular projection — game x,z → [lat, lon].
+// The forward lives twice (build-data.mjs `proj`, gameplay.js `LL`); this is
+// the single runtime inverse — keep all three in sync. Backs the big-map
+// coordinate readout.
+export function toLatLon(x, z) {
+  return [31 - (z * 100) / 111320, (x * 100) / (111320 * Math.cos((31 * Math.PI) / 180)) - 99.5];
+}
+
 // Navigable water for BOAT (Water Vehicles W1) — {kind:'gulf'|'lake', y} or
 // null. Gulf legality is the zone classifier, NOT depth: hAt clamps at the
 // DEM edge and never returns negative (the -4 offshore dip is mesh-only), so

@@ -162,6 +162,20 @@ graduate here (and out of `NEXT_SESSION.md`).
 
 ## Rendering & systems
 
+- **Map dash patterns: band along the contour, never by cell checkerboard**
+  (Map W1.1, 2026-07-20): a `(⌊x/80⌋+⌊z/80⌋)&1` skip looks fine on curvy
+  lines but a straight ~45° stretch rides a single chessboard color (the
+  bishop rule) — the shelf world-edge line shipped a 215u hole off Lake
+  Jackson this way. `renderMapLayer`'s `dashOn` projects the cell midpoint
+  onto the contour tangent (perp of the field gradient, sign-stable) and
+  bands that; any new dashed iso-line reuses it, and the shelf suite's
+  hole-regression check (max point-to-drawn-dash distance < 100u) guards
+  the class. Canvas `setLineDash` is fine for ordered polylines (rails) —
+  the rule is only for orderless marching-squares segments. The world-edge
+  SEAMS (zone divides where the dilation limit steps: Sabine coast/land,
+  RG-mouth coast/mexico, El Paso land/mexico) run along the gradient, so
+  they band on `borderDist` instead — and below 50u of the border they
+  draw nothing (the border's own gold stroke IS the world edge there).
 - **UI restyles go through mockups first** (glass-Texas title, 2026-07-19):
   single-page HTML mockups in the gitignored `mockups/` folder at repo root,
   each copying the real CSS over one staged attract-view screenshot

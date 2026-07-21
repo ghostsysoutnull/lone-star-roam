@@ -757,6 +757,37 @@ Rails Operations followed and are folded in below). Queued work lives in
   keep spawn exclusivity as their only protection (real-or-absent); `meet`
   debug action + Baird Sub tour spot stage one on demand.
 
+- [x] ~~Map W1 — readable big map~~ — done 2026-07-20 (single wave, no spec
+  file; from Bruno's map-improvement review): the M map becomes legible and
+  navigable. World-edge iso-lines brightened `#47535e` → `#90a0b0` (the
+  "fainter than Tidelands" call was unreadable in play; minimap law intact —
+  boundary lines stay big-map only); Z cycles big-map zoom 1×/2×/4× while M
+  is open (minimap zoom untouched when closed), windowing the pre-rendered
+  layer around the player with edge clamping; the player marker is the
+  minimap's heading chevron (BOAT blue kept), not a circle; mission diamond
+  edge-clamps as a direction pointer under zoom; a legend panel (bottom
+  right, DOM/rem) decodes every ink and a mile scale bar + zoom label sit
+  bottom left (bar length zoom-invariant by construction); 2× adds ≥60k
+  city names in view, 4× all of them, with pop-priority collision skip
+  (Houston-metro crowding was a shot finding) that also dodges the baked
+  ≥190k names. **W1.1** (same day, Bruno's playtest): the shelf line's
+  Lake Jackson dash hole root-caused (a ~45° contour rides one checkerboard
+  color — bishop rule) and fixed by banding dashes along the contour tangent
+  (all three boundary lines, hole-regression check in the shelf suite), plus
+  a coordinate readout on the big map — real lat/lon of the player, or of
+  the map point under the mouse (`toLatLon` inverse in geo.js; raw x/z
+  appended under `?debug`). **W1.2** (same day, Bruno pinned the next gap
+  by its coordinates): the world-edge *seams* — the three zone divides
+  where the dilation limit steps (Sabine coast/land 402↔1127, RG-mouth
+  coast/mexico 0↔1127, El Paso land/mexico 0↔402) — get inked by marching
+  squares on the per-zone limit step function, dashes banded on borderDist
+  (seams run along the gradient; below 50u the border's gold stroke is the
+  world edge), so the boundary reads as one continuous stepped outline;
+  plus click-to-copy — clicking the big map copies the pointed
+  coordinates (lat/lon + raw x/z) to the clipboard with a confirming
+  toast. Follow-ups (layers wave, waypoint, Mexico band talk) in
+  `BACKLOG.md`.
+
 ## Known limitations (v1)
 
 - **Procedural downtowns outside the nine arterial metros** — Houston/DFW/SA/Austin

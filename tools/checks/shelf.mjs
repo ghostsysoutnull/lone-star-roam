@@ -45,23 +45,24 @@ export default async function shelf(t) {
       for (let i = 0; i < we.land.length; i += 7) landD.push(g.borderDist(we.land[i][0], we.land[i][1]));
       const zones = { sea: we.sea.every(([x, z]) => g.borderZoneAt(x, z) === 'coast'),
                       land: we.land.every(([x, z]) => g.borderZoneAt(x, z) === 'land') };
-      // canvas-pixel probe (the rail-ink idiom): find a midpoint inside a
-      // drawn dash band and look for the #47535e ink in a window around it
+      // canvas-pixel probe (the rail-ink idiom): drawn-dash midpoints come
+      // straight off worldEdgeDrawn (W1.1 — the dash test lives in one place
+      // now); look for the #90a0b0 ink (Map W1 brightened it from #47535e)
       const probe = (pts) => {
         const ctx = g.hud.mapLayer.getContext('2d');
         for (const [x, z] of pts) {
-          if (((Math.floor(x / 80) + Math.floor(z / 80)) & 1) === 0) continue;
           const [px, pz] = g.hud.mapT(x, z);
           const d = ctx.getImageData(Math.round(px) - 3, Math.round(pz) - 3, 7, 7).data;
           for (let i = 0; i < d.length; i += 4)
-            if (Math.abs(d[i] - 71) < 30 && Math.abs(d[i + 1] - 83) < 30 && Math.abs(d[i + 2] - 94) < 30) return true;
+            if (Math.abs(d[i] - 144) < 30 && Math.abs(d[i + 1] - 160) < 30 && Math.abs(d[i + 2] - 176) < 30) return true;
         }
         return false;
       };
+      const drawn = g.hud.worldEdgeDrawn ?? { sea: [], land: [] };
       return { nSea: we.sea.length, nLand: we.land.length,
         seaMin: Math.min(...seaD), seaMax: Math.max(...seaD),
         landMin: Math.min(...landD), landMax: Math.max(...landD),
-        zones, seaInk: probe(we.sea), landInk: probe(we.land) };
+        zones, seaInk: probe(drawn.sea), landInk: probe(drawn.land) };
     })()`);
     t.ok(res.nSea > 40, `sea world-edge line has only ${res.nSea} points`);
     t.ok(res.nLand > 40, `land world-edge line has only ${res.nLand} points`);
@@ -73,6 +74,74 @@ export default async function shelf(t) {
     t.ok(res.zones.land, 'land line has points off US-neighbor ground (Mexico or the twin leaked)');
     t.ok(res.seaInk, 'no world-edge ink found on the wide layer at a sea dash');
     t.ok(res.landInk, 'no world-edge ink found on the wide layer at a land dash');
+  });
+
+  await t.check('Map W1.1: dash bands leave no holes — every boundary point sits near a drawn dash', async () => {
+    // The Lake Jackson gap: the old checkerboard dash test let a diagonal
+    // contour ride a skip-colored lane (bishop rule) — a 215u hole, whose
+    // midpoint sat ~107u from the nearest drawn dash. The along-line bands
+    // measure ≤91u on deterministic data; 100 splits the two with margin.
+    const res = await t.ev(`(() => {
+      const hole = (all, drawn) => {
+        let worst = 0, at = null;
+        for (const [x, z] of all) {
+          let best = Infinity;
+          for (const [dx, dz] of drawn) {
+            const d = (dx - x) ** 2 + (dz - z) ** 2;
+            if (d < best) best = d;
+          }
+          if (best > worst) { worst = best; at = [Math.round(x), Math.round(z)]; }
+        }
+        return { worst: Math.sqrt(worst), at };
+      };
+      return { sea: hole(g.hud.worldEdge.sea, g.hud.worldEdgeDrawn.sea),
+               land: hole(g.hud.worldEdge.land, g.hud.worldEdgeDrawn.land),
+               tide: hole(g.hud.tidelands, g.hud.tidelandsDrawn) };
+    })()`);
+    for (const k of ['sea', 'land', 'tide'])
+      t.ok(res[k].worst < 100, `${k} line has a dash hole: ${res[k].worst.toFixed(0)}u at ${res[k].at}`);
+  });
+
+  await t.check('Map W1.2: world-edge seams are inked where the dilation limit steps', async () => {
+    const res = await t.ev(`(() => {
+      const seam = g.hud.worldEdgeSeam ?? [], drawn = g.hud.worldEdgeSeamDrawn ?? [];
+      // the Sabine coast/land seam sits east of x 4000; the Rio Grande
+      // coast/mexico seam west of it (mouth ≈ x 2240) — split and span-check
+      const span = (pts) => {
+        const bds = pts.map(([x, z]) => g.borderDist(x, z));
+        return bds.length ? { n: bds.length, lo: Math.min(...bds), hi: Math.max(...bds) } : { n: 0, lo: 0, hi: 0 };
+      };
+      const sab = span(seam.filter(([x]) => x > 4000));
+      const rg = span(seam.filter(([x]) => x >= -4000 && x < 4000));
+      const ep = span(seam.filter(([x]) => x < -4000)); // El Paso NM/Mexico corner
+      // every seam point straddles a zone divide within a fine cell
+      const onDivide = seam.every(([x, z]) => new Set([
+        g.borderZoneAt(x + 15, z), g.borderZoneAt(x - 15, z),
+        g.borderZoneAt(x, z + 15), g.borderZoneAt(x, z - 15)]).size > 1);
+      // and the drawn dashes leave no hole along the seams (the sibling
+      // metric of the boundary-line check above)
+      let worst = 0;
+      for (const [x, z] of seam) {
+        let best = Infinity;
+        for (const [dx, dz] of drawn) {
+          const d = (dx - x) ** 2 + (dz - z) ** 2;
+          if (d < best) best = d;
+        }
+        worst = Math.max(worst, Math.sqrt(best));
+      }
+      return { sab, rg, ep, onDivide, worst, total: seam.length };
+    })()`);
+    t.ok(res.sab.n > 15, `Sabine seam too sparse: ${res.sab.n} points`);
+    t.ok(res.sab.lo < 460 && res.sab.hi > 1060,
+      `Sabine seam should span shoulder→shelf radii: ${res.sab.lo.toFixed(0)}..${res.sab.hi.toFixed(0)}`);
+    t.ok(res.rg.n > 15, `Rio Grande seam too sparse: ${res.rg.n} points`);
+    t.ok(res.rg.lo < 150 && res.rg.hi > 1060,
+      `RG seam should span river→shelf radii: ${res.rg.lo.toFixed(0)}..${res.rg.hi.toFixed(0)}`);
+    t.ok(res.ep.n > 5, `El Paso corner seam too sparse: ${res.ep.n} points`);
+    t.ok(res.ep.lo < 150 && res.ep.hi > 350,
+      `El Paso seam should span border→shoulder radii: ${res.ep.lo.toFixed(0)}..${res.ep.hi.toFixed(0)}`);
+    t.ok(res.onDivide, 'a seam point sits away from any zone divide');
+    t.ok(res.worst < 100, `seam dashes have a hole: ${res.worst.toFixed(0)}u`);
   });
 
   await t.check('gulf plane: state water keeps the teal, blue water past the line reads darker', async () => {
