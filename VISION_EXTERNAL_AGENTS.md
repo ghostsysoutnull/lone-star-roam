@@ -93,16 +93,89 @@ is why it ranks second.
   documented for images and native documents).
 - Whether `agy` is authenticated.
 
+## Gate result (2026-07-21) — gold case FAILED, live bug found anyway
+
+Harness: depth-2 clone of a temp branch at the defect commit, built inside a
+throwaway full clone so the real repo never receives a ref. `git cat-file -e
+68aec12` fails inside it; codex independently reported 2 visible commits.
+Model pinned `gpt-5.6-sol` (OpenAI, high effort). Lockdown probe: write
+attempt blocked by the OS (`Read-only file system`), no file created.
+Both previously-unverified hypotheses now settled — the sandbox holds and
+the answer key is unreachable. (`bubblewrap` absent from PATH; codex fell
+back to its bundled copy, sandbox still enforced.)
+
+**Gold case: MISSED.** `codex review --commit 5f560fe` did not find the
+`solarSitesAt` clearance omission it was tested on.
+
+**But it found a real, larger, still-live defect instead.** Two findings,
+both on `windTurbinesAt`, both same-class (placement legality):
+
+1. **Turbine cap applied before circle rejection** — `expect` is capped at
+   `TURBINE_CAP` *before* `draws` is derived, then candidates are drawn
+   across the whole 260-unit chunk and rejected against the farm circle.
+   Compact farms occupy ~2% of a chunk, so nearly every draw is rejected.
+   Verified independently by replaying the real `seededRand` stream against
+   `data/energy.json`: of 145 compact farms (r ≤ 130, count ≥ 5) holding
+   11,021 real turbines, **133 render under 25% of their baked count and 15
+   render zero** — deterministic counts, before the `inTexas`/road/airport
+   gates that only cut further. The reviewer's cited farm (count 17, r 20)
+   renders zero, exactly as it claimed. `windTurbinesAt` at HEAD is
+   byte-identical to the reviewed version, so this ships today.
+2. **No `cityClear` gate** — turbines check road and airport clearance but
+   not city footprints, unlike sibling placement functions. Omission
+   confirmed by inspection; the specific Snyder instance is unverified.
+
+**Scoring, against the pre-registered standard.** The gate was written as
+binary — "does it name that omission, unprompted?" It did not. **By the
+standard set before the run, the gold case is a FAIL.** The unexpected find
+does not retroactively pass it; that would be validating the method on
+exploratory data after the pre-registered test failed.
+
+The asymmetry makes the miss sharper, not incidental: it found the
+*turbine* missing-`cityClear` omission while missing the *solar*
+missing-all-clearance omission — same bug class, same commit, same diff.
+That pattern reads as triage and luck, not reliable detection.
+
+**Two separable conclusions, and only one is supported:**
+- **Validated as an opportunistic finder** (n=1): it surfaced a live defect
+  that survived Fable review, Sonnet review, a full verify suite, and
+  months of play. That is the diversity value this doc predicted.
+- **NOT validated as a gate or safety net**: it missed the seeded bug, so a
+  clean report from it means nothing. Never treat its silence as assurance.
+
+Provisional numbers: noise low (2 findings, both specific, both carrying
+computed evidence — it ran node probes against baked data rather than
+pattern-matching), precision 1 of 2 fully verified real plus 1 confirmed
+omission. Both measured on n=2 from a single commit. **The negative
+control (false-positive baseline on an aesthetic rework) was not run, so
+the false-positive rate — the actual input to "is the triage time worth
+it" — remains unmeasured.**
+
 ## Candidate first waves (when retaken)
 
 1. **Backtest the reviewer before trusting it** — the gate, and it comes
    first. Run `codex review --commit <SHA>` against a past wave's diff
-   whose defects are already known (Energy-W3's solar look that needed the
-   Fable W4.5 rework; the Map W1.1 playtest fix round) and score the hit
-   rate against ground truth. Point it at the **defect-introducing**
-   commit, not the fix commit — `--commit <SHA>` reviews the changes that
-   commit introduced, so the fix SHA shows corrected code and scores
-   nothing. A findings list on fresh code has nothing to
+   whose defects are already known and score the hit rate against ground
+   truth. Point it at the **defect-introducing** commit, not the fix
+   commit — `--commit <SHA>` reviews the changes that commit introduced,
+   so the fix SHA shows corrected code and scores nothing.
+
+   Corpus notes (verified 2026-07-21):
+   - Gold case is `5f560fe` (Energy W3) → fixed by `68aec12`:
+     `solarSitesAt` shipped as the only Energy placement function with no
+     road/river clearance check while every sibling had one. Sibling
+     inconsistency, visible inside the diff, human-reported.
+   - **Map W1.1 is unusable** — W1, W1.1 and W1.2 are folded into a single
+     commit (`60bf81d`), so defect and fix share one diff and there is
+     nothing to score. Do not use it.
+   - Aesthetic reworks (`8021248` lattice→H-frame, `9b32732` W4.5 solar,
+     `dfc54fe`, `01c8547`) are **negative controls**, not targets — a
+     code reviewer cannot be expected to find "reads too busy", so
+     finding volume there measures false-positive burden.
+   - Other `fix:` commits (`8398546` unit mismatch, `b5671ec` placement
+     legality, `54b3511`, `308ce22`) are good defects but have no single
+     clean introducing commit; reaching them needs the tree-audit mode
+     (review the file at the fix's parent) rather than commit review. A findings list on fresh code has nothing to
    score against; a findings list on known-buggy code does. If it misses
    what we already know is there, it does not get a live wave. This
    replaces the earlier blind gate ("trial on the next risky wave").

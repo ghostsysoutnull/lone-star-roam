@@ -9,6 +9,34 @@ Parked dev-process strategy: external-model agents (codex/agy as
 independent reviewers) — assessment + retake plan in
 `VISION_EXTERNAL_AGENTS.md` (2026-07-21).
 
+## Bugs (live in shipped code)
+
+- **Compact wind farms render a fraction of their turbines; 15 render none.**
+  `windTurbinesAt` (world.js ~980) caps `expect` at `TURBINE_CAP` *before*
+  deriving `draws`, then scatters candidates across the whole 260-unit chunk
+  and rejects them against the farm circle. A compact farm covers ~2% of a
+  chunk, so nearly every draw is discarded. Measured by replaying the real
+  `seededRand` stream against `data/energy.json` (deterministic counts,
+  before the `inTexas`/road/airport gates that cut further): of 145 compact
+  farms (r ≤ 130, count ≥ 5) holding 11,021 real turbines, **133 render
+  under 25% of baked count and 15 render zero** — including a real
+  17-turbine farm at r 20. Fix direction: draw from the *uncapped* chunk
+  expectation and stop after `TURBINE_CAP` **accepted** sites, so the cap
+  bounds output rather than input. Note the seed-string law — changing
+  `turbine:` stream inputs moves every turbine in the world; prefer a fix
+  that keeps the stream shape (more draws from the same stream) over one
+  that re-keys it. Needs a `tools/checks/energy.mjs` guard asserting compact
+  farms render proportionally.
+- **Turbines skip the city-clearance gate.** `windTurbinesAt` checks
+  `nearestAnyRoad` and `airportClear` but not `cityClear`, unlike sibling
+  placement functions — turbines can stand inside procedural downtowns.
+  Omission confirmed by inspection; a specific instance (Snyder) was
+  reported but not verified. Fold into the same wave as the cap fix.
+
+  Both found 2026-07-21 by the `codex review` gate run (`5f560fe`, the
+  Energy W3 commit) — see `VISION_EXTERNAL_AGENTS.md` → Gate result. Both
+  survived Fable review, Sonnet review, and the full verify suite.
+
 ## Map follow-ups (Map W1 — readable big map — shipped 2026-07-20)
 
 - **Seam-pass boot cost (wave-coder chunk) — shipped-pending-commit.** Fixed:
