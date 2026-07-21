@@ -22,35 +22,53 @@ found it, whether the claim was independently verified in-session, and the
 Claude session model that ran the effort. External findings are claims
 until a probe confirms them.
 
-- **Compact wind farms render a fraction of their turbines; 15 render none.**
-  `windTurbinesAt` (world.js ~980) caps `expect` at `TURBINE_CAP` *before*
-  deriving `draws`, then scatters candidates across the whole 260-unit chunk
-  and rejects them against the farm circle. A compact farm covers ~2% of a
-  chunk, so nearly every draw is discarded. Measured by replaying the real
-  `seededRand` stream against `data/energy.json` (deterministic counts,
-  before the `inTexas`/road/airport gates that cut further): of 145 compact
-  farms (r ≤ 130, count ≥ 5) holding 11,021 real turbines, **133 render
-  under 25% of baked count and 15 render zero** — including a real
-  17-turbine farm at r 20. **Statewide: 27,644 baked turbines render as
-  5,175 — 19%.** The sampler is also wrong in the *other* direction:
-  `draws = Math.ceil(expect) + 3` means chunks fully inside a farm accept
-  every candidate, so interior chunks over-populate (expect 6.6 → 10
-  turbines); 5 farms render above their baked count while 213 render
-  below. Fix must correct both. (5,175 is an **upper bound**: the probe
-  counts geometry only, before the `inTexas`/road/airport gates, and uses
-  a per-farm rather than the game's per-chunk shared cap. True rendered
-  count is lower.) Fix direction: draw from the *uncapped* chunk
-  expectation and stop after `TURBINE_CAP` **accepted** sites, so the cap
-  bounds output rather than input. Note the seed-string law — changing
-  `turbine:` stream inputs moves every turbine in the world; prefer a fix
-  that keeps the stream shape (more draws from the same stream) over one
-  that re-keys it. Needs a `tools/checks/energy.mjs` guard asserting compact
-  farms render proportionally.
-- **Turbines skip the city-clearance gate.** `windTurbinesAt` checks
-  `nearestAnyRoad` and `airportClear` but not `cityClear`, unlike sibling
-  placement functions — turbines can stand inside procedural downtowns.
-  Omission confirmed by inspection; a specific instance (Snyder) was
-  reported but not verified. Fold into the same wave as the cap fix.
+- **15 real wind farms render zero turbines; 5 render more turbines than
+  exist.** `windTurbinesAt` (world.js ~980) draws candidates across the
+  whole 260-unit chunk and rejects them against the farm circle, but
+  derives the draw count from an *already-capped* expectation:
+  `expect = Math.min(TURBINE_CAP, density * CHUNK²)`, then
+  `draws = Math.ceil(expect) + 3`. Two independent failures follow:
+  - **Compact farms vanish.** A compact farm covers ~2% of a chunk, so
+    nearly every draw lands outside the circle and is discarded. 15 farms
+    render nothing at all — including a real 17-turbine farm at r 20.
+  - **Interior chunks over-populate.** A chunk lying fully inside a farm
+    accepts *every* candidate, so the `+3` becomes pure surplus (expect
+    6.6 → 10 turbines). 5 farms render above their baked count.
+
+  **Not to be confused with intentional thinning.** `TURBINE_CAP = 32` per
+  chunk is a deliberate density limiter and the game was never meant to
+  draw all 27,644 baked turbines — **do not treat 1:1 as the fix target.**
+  The defect is that the sampler is unfaithful *underneath* the cap, in
+  both directions. The distinguishing evidence: a density limiter yields
+  fewer-but-present, never zero, and can never exceed the real count.
+  `ENERGY_SPEC.md`'s expected result is "the 27k-turbine fleet appears
+  **clustered into its real farms**", and both spec and `GOTCHAS.md`
+  describe the seeded-stream design as keeping the JSON small "and the
+  fleet **honest**" — proportional representation under the cap, which is
+  exactly what is broken.
+
+  *Context only, not a target*: statewide the replay renders ~5,175 of
+  27,644 (an upper bound — geometry only, before the `inTexas`/road/airport
+  gates, and using a per-farm rather than the game's shared per-chunk cap).
+  213 farms render under their baked count. The correct fix target is
+  proportionality and non-vanishing, **not** a percentage.
+
+  Fix direction: draw from the *uncapped* chunk expectation and stop after
+  `TURBINE_CAP` **accepted** sites, so the cap bounds output rather than
+  input; drop or rethink the `+3` surplus. Note the seed-string law —
+  changing `turbine:` stream inputs moves every turbine in the world;
+  prefer a fix that keeps the stream shape (more draws from the same
+  stream) over one that re-keys it. Needs a `tools/checks/energy.mjs`
+  guard asserting no baked farm renders zero and none exceeds its count.
+- **Turbines skip the city-clearance gate — contradicts written law.**
+  `windTurbinesAt` checks `nearestAnyRoad` and `airportClear` but not
+  `cityClear`, so turbines can stand inside procedural downtowns.
+  `GOTCHAS.md` (Rendering & systems) states the opposite as settled law:
+  "every other site-placement function (`wellSiteAt`, `windTurbinesAt`)
+  checks road/city/airport clearance before drawing". Code violates a
+  documented rule — not a design choice. Omission confirmed by inspection;
+  a specific instance (Snyder) was reported but not verified. Fold into the
+  same wave as the sampler fix.
 
 - **Solar field decals ignore road/river/city clearance at render time.**
   The ScenerySystem solar branch draws an `r*2 × r*2` field patch plus crop

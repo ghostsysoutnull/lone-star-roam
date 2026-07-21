@@ -243,9 +243,16 @@ not attributable to tier selection.
   means chunks fully inside a farm accept every candidate, so interior
   chunks *over*-populate (expect 6.6 → 10 turbines). Verified: 5 farms
   render over their baked count while 213 render under.
-- **Statewide verification**: 27,644 baked turbines → **5,175 rendered
-  (19%)**. The sampler is wrong in both directions, dominated by
-  under-rendering.
+- **Statewide verification**: 27,644 baked turbines → ~5,175 rendered
+  (19%). **Framing correction (Bruno's challenge, 2026-07-21): this
+  percentage is not the defect and 1:1 was never the design target.**
+  `TURBINE_CAP = 32` per chunk is deliberate density limiting. The real
+  defect is that the sampler is unfaithful *underneath* the cap in both
+  directions — 15 farms render zero (a limiter yields fewer-but-present,
+  never none) and 5 render above their baked count (a limiter can never
+  exceed the real number). Quote the zero/over counts, not the percentage.
+  Recorded because the original write-up led with 19% and would have sent
+  an implementer chasing a target the game never had.
 
 **Conclusion: no evidence for a two-model panel.** The diversity thesis
 predicted different families catch different bugs; on this corpus Gemini
