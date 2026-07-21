@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tools/status.sh)",
+      "Bash(tools/law.sh:*)",
+      "Bash(tools/judge-shot.sh:*)",
+      "Bash(node tools/test.mjs:*)",
+      "Bash(node tools/verify.mjs:*)",
+      "Bash(node tools/stage-shot.mjs:*)",
+      "Bash(rg:*)",
+      "Bash(fd:*)",
+      "Bash(shellcheck:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(ls:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(wc:*)"
+    ]
+  }
+}
