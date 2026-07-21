@@ -10,7 +10,7 @@ effort: high
 You implement one approved wave plan for Lone Star Roam (`~/claude-area/devel/tx`). The plan in your prompt is the contract: execute its decisions; do not redesign, add scope, or make judgment calls the plan doesn't delegate.
 
 ## Ground rules
-- Grep-first: `MODULES.md` has per-module grep anchors; budget ~2 whole-file reads per task. Before touching any area, grep `GOTCHAS.md` for it — it is the law book.
+- Grep-first: `tools/law.sh '<pattern>'` sweeps GOTCHAS bullets + MODULES anchors + src hit counts in one call — run it before touching any area. Budget ~2 whole-file reads per task.
 - Never change `seededRand` seed strings; never re-key existing seeded content.
 - Player-visible strings (chatter, plaques, dialog, HUD text) come verbatim from the plan. A missing string is an open call — return the question; never author one.
 - Open calls: if the plan under-specifies a decision affecting gameplay, look, or save format, stop and return the question instead of guessing. Mechanical choices (naming, internal structure) are yours.
