@@ -11,6 +11,17 @@ independent reviewers) — assessment + retake plan in
 
 ## Bugs (live in shipped code)
 
+**Standing rule for this section (set 2026-07-21).** The external-agents
+effort **files bugs, it does not fix them.** Every defect it surfaces lands
+here with full provenance and waits for a future wave to schedule it.
+Nothing found by an external reviewer is fixed in the same session it is
+found — the finder's job ends at a verified, written-down entry.
+
+**Provenance required per entry**: how it was found, which external model
+found it, whether the claim was independently verified in-session, and the
+Claude session model that ran the effort. External findings are claims
+until a probe confirms them.
+
 - **Compact wind farms render a fraction of their turbines; 15 render none.**
   `windTurbinesAt` (world.js ~980) caps `expect` at `TURBINE_CAP` *before*
   deriving `draws`, then scatters candidates across the whole 260-unit chunk
@@ -20,7 +31,15 @@ independent reviewers) — assessment + retake plan in
   before the `inTexas`/road/airport gates that cut further): of 145 compact
   farms (r ≤ 130, count ≥ 5) holding 11,021 real turbines, **133 render
   under 25% of baked count and 15 render zero** — including a real
-  17-turbine farm at r 20. Fix direction: draw from the *uncapped* chunk
+  17-turbine farm at r 20. **Statewide: 27,644 baked turbines render as
+  5,175 — 19%.** The sampler is also wrong in the *other* direction:
+  `draws = Math.ceil(expect) + 3` means chunks fully inside a farm accept
+  every candidate, so interior chunks over-populate (expect 6.6 → 10
+  turbines); 5 farms render above their baked count while 213 render
+  below. Fix must correct both. (5,175 is an **upper bound**: the probe
+  counts geometry only, before the `inTexas`/road/airport gates, and uses
+  a per-farm rather than the game's per-chunk shared cap. True rendered
+  count is lower.) Fix direction: draw from the *uncapped* chunk
   expectation and stop after `TURBINE_CAP` **accepted** sites, so the cap
   bounds output rather than input. Note the seed-string law — changing
   `turbine:` stream inputs moves every turbine in the world; prefer a fix
@@ -33,9 +52,41 @@ independent reviewers) — assessment + retake plan in
   Omission confirmed by inspection; a specific instance (Snyder) was
   reported but not verified. Fold into the same wave as the cap fix.
 
-  Both found 2026-07-21 by the `codex review` gate run (`5f560fe`, the
-  Energy W3 commit) — see `VISION_EXTERNAL_AGENTS.md` → Gate result. Both
-  survived Fable review, Sonnet review, and the full verify suite.
+- **Solar field decals ignore road/river/city clearance at render time.**
+  The ScenerySystem solar branch draws an `r*2 × r*2` field patch plus crop
+  rows at the baked aggregate radius **unconditionally**, while the turbine
+  branch a few lines away gates on road and airport. Fixed once already for
+  roads/rivers by `68aec12`, then restructured by the W4.5 rework
+  (`9b32732`) into per-block clearance — **status at HEAD unverified**, this
+  entry is a re-check item, not a confirmed live bug. Confirm before
+  scheduling.
+
+  **Provenance (all three entries above).**
+  - *Found*: 2026-07-21, external-agents gate run. Turbine defects from
+    `codex review --commit 5f560fe` (Energy W3) against a leak-proofed
+    depth-2 clone with the fix commit unreachable; the over-population
+    variant from the text-only round-A rerun of the same diff.
+  - *External model*: **`gpt-5.6-sol`** (OpenAI, via `codex` 0.144.5,
+    reasoning effort high). The cap defect was reproduced by the same model
+    with **no tool access at all**, from diff text alone.
+  - *Independently verified in-session*: yes — by replaying the real
+    `seededRand` stream against `data/energy.json`. An earlier area-ratio
+    proxy gave a wrong figure ("21 render zero"); the deterministic replay
+    gives 15. Trust the replay, not the proxy.
+  - *Not found by*: **`gemini-3.1-pro-high`** (Google, via `agy` 1.1.5) on
+    the identical diff — it returned "No defects found" and explicitly
+    certified the broken cap logic as correct.
+  - *Claude session model*: **Opus 4.8 (1M context)** (`claude-opus-4-8[1m]`).
+  - *Also note*: all three defects survived the original Fable review, the
+    Sonnet review, and the full verify suite.
+  - *Attribution erratum*: commits `94c8fc5`, `87554e8` and `77768eb`
+    (2026-07-21) carry `Co-Authored-By: Claude Fable 5`. That trailer is
+    **wrong** — the session ran Opus 4.8. The convention was copied from
+    prior commits without checking the running model. Corrected here rather
+    than by rewriting pushed history.
+
+  Full method, scoring and the model comparison: `VISION_EXTERNAL_AGENTS.md`
+  → Gate result and Round A.
 
 ## Map follow-ups (Map W1 — readable big map — shipped 2026-07-20)
 

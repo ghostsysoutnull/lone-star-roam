@@ -105,7 +105,17 @@ the answer key is unreachable. (`bubblewrap` absent from PATH; codex fell
 back to its bundled copy, sandbox still enforced.)
 
 **Gold case: MISSED.** `codex review --commit 5f560fe` did not find the
-`solarSitesAt` clearance omission it was tested on.
+solar clearance omission it was tested on.
+
+*Location correction (2026-07-21):* the defect is **not** inside
+`solarSitesAt`, despite `68aec12`'s commit message saying so. At that
+commit `solarSitesAt` is a pure filter over baked plant coordinates and
+needs no checks. The missing clearance is one level up, in the
+ScenerySystem render branch, which draws an `r*2 × r*2` field patch plus
+crop rows at the baked radius **unconditionally** — while the turbine
+branch a few lines away gates on road and airport. The miss still counts:
+that is the same sibling-inconsistency pattern codex *did* catch between
+turbines and their siblings.
 
 **But it found a real, larger, still-live defect instead.** Two findings,
 both on `windTurbinesAt`, both same-class (placement legality):
@@ -165,6 +175,180 @@ opportunistic finder and a useless gate, which is exactly how it should be
 integrated.
 
 Caveat that remains: measured on n=2 commits, both from the Energy track.
+
+## Standing rules for this effort (set 2026-07-21)
+
+- **This effort files bugs; it does not fix them.** Every defect an external
+  reviewer surfaces goes to `BACKLOG.md` with full provenance and waits for
+  a future wave. Nothing is fixed in the session that finds it. This keeps
+  the evaluation honest — a finder that also patches its own findings can
+  no longer be scored — and keeps wave scope from being hijacked by
+  whatever the reviewer happened to notice.
+- **Provenance is mandatory per backlog entry**: how it was found, which
+  external model found it, whether it was independently verified
+  in-session, and the Claude session model that ran the effort.
+- **Record the Claude session model, every time.** Session provenance is
+  part of the finding. See the erratum below — this rule exists because it
+  was got wrong on day one.
+- **An all-clear carries no evidential weight.** Only positive, verified
+  findings count. See Round A: Gemini's confident "No defects found" was
+  issued over known-broken code it had described correctly.
+
+### Erratum — session model misattributed (2026-07-21)
+
+Commits `94c8fc5`, `87554e8` and `77768eb` carry
+`Co-Authored-By: Claude Fable 5`. **The session ran Opus 4.8 (1M context)**
+(`claude-opus-4-8[1m]`). The trailer was copied from prior commits without
+checking the running model, and the session greeting additionally asserted
+Fable 5 was running — the inverse of CLAUDE.md's "flag it if a different
+model is running" rule. Pushed history left intact; the correction lives
+here and in `BACKLOG.md`. Check the running model before writing a trailer.
+
+## Planned rounds (agreed 2026-07-21 — run one at a time, in order)
+
+**Status: A done. B and C deferred to a later session at Bruno's
+direction.** Round A's result (below) lowered their value — B can only
+refine an established profile, and C is no longer evaluation but
+bug-hunting with a validated finder. Both remain worth running; neither is
+urgent.
+
+### Round A — RESULT (2026-07-21): no case for a panel; codex is the reviewer
+
+Run under the option-b design: identical 27 KB diff of `5f560fe` as prompt
+text, identical neutral prompt (no mention of solar, placement or
+clearance), empty working directory, no repo access for either. Models
+pinned `gemini-3.1-pro-high` and `gpt-5.6-sol`.
+
+| | solar clearance omission | turbine cap defect |
+|---|---|---|
+| **codex / GPT**, text-only | missed | **found** (+ a second real defect) |
+| **Gemini**, text-only | missed | **missed, and explicitly validated it** |
+
+- **Gemini returned "No defects found"** — then wrote a confident four-point
+  review affirming the code sound, including: *"Rejection checks … are
+  correctly applied before capping per-chunk instances to 32."* That is the
+  defect, described accurately and certified correct.
+- **codex reproduced its finding with no tools at all** (its one shell call
+  was an `ls` of the empty dir). So its gate-run win was *not* tool-
+  dependent — it re-derived the cap defect from the diff text alone. This
+  retires the confound that motivated option b.
+- **codex also found a second real defect**: `draws = Math.ceil(expect) + 3`
+  means chunks fully inside a farm accept every candidate, so interior
+  chunks *over*-populate (expect 6.6 → 10 turbines). Verified: 5 farms
+  render over their baked count while 213 render under.
+- **Statewide verification**: 27,644 baked turbines → **5,175 rendered
+  (19%)**. The sampler is wrong in both directions, dominated by
+  under-rendering.
+
+**Conclusion: no evidence for a two-model panel.** The diversity thesis
+predicted different families catch different bugs; on this corpus Gemini
+caught strictly less than nothing — a false all-clear over known-broken
+code. codex is the reviewer; `agy` is not worth integrating on this
+evidence.
+
+**Hardened operating rule.** Earlier phrasing was "never read its silence
+as a clean bill of health." Gemini's run shows that is too weak: it did not
+stay silent, it actively asserted correctness. **An all-clear from these
+tools carries no evidential weight — treat it as noise, not reassurance.**
+Only positive findings count, and only after verification.
+
+Residual asymmetry, recorded not hidden: codex retained shell access
+(unused beyond `ls`), Gemini's was denied. With no repo present there was
+nothing to probe, so the comparison is fair in substance.
+
+Scope note: **only the defect arm was run.** Gemini never saw the control
+commit (`8021248`). Judged unnecessary — a model that returns zero findings
+on the *defect* commit has already demonstrated it is not noisy, so the
+control could only reconfirm silence. Recorded so the two-arm plan does not
+read as silently half-executed.
+
+### Round A — original plan (superseded by the result above)
+
+Re-run both gate commits (`5f560fe` defect, `8021248` control) through
+Antigravity with a Gemini model pinned, then diff the findings against
+codex's.
+- *Decides*: whether the integration is one reviewer or a two-model panel.
+  The sharp question is whether Gemini finds the `solarSitesAt` clearance
+  omission codex missed. A different-family hit there is direct evidence
+  for the doc's central diversity thesis; a same miss suggests the bug is
+  simply hard to see in that diff, and one reviewer suffices.
+- *Lockdown: PROBED 2026-07-21 (5 tests) — safe enough to run, but the
+  round as designed is CONFOUNDED.* See below.
+- *Cost*: 2 review calls, plus a decision on the confound first.
+
+### `agy` lockdown probe (2026-07-21)
+
+Authenticated and working (`--print`, non-interactive). Model pin is
+trustworthy: a bogus slug fails loudly and lists the valid roster, the
+`judge-shot.sh` precedent — so pinning a Gemini model reliably keeps
+Anthropic models out of the loop.
+
+| capability | codex `-s read-only` | agy `--print --sandbox` |
+|---|---|---|
+| read workspace files | yes | yes |
+| run shell commands | **yes** (git, node, sed) | **no** — auto-denied |
+| write workspace files | no | no |
+| write outside workspace | no | **yes** — see below |
+| enforcement | **OS-level** (read-only FS) | **policy-level** (headless auto-deny) |
+
+- **Writes into the workspace are blocked**, but by headless
+  permission auto-deny, *not* by `--sandbox`. Both `write_file` and
+  `command` are denied because headless mode cannot prompt. Any
+  allow-rule in `settings.json`, or `--dangerously-skip-permissions`,
+  removes the protection entirely. Policy can be misconfigured; a
+  read-only filesystem cannot be talked around. **codex's guarantee is
+  strictly stronger.**
+- **There is a pre-approved write path outside the workspace.** With no
+  active workspace, agy silently redirected a file write to
+  `~/.gemini/antigravity-cli/scratch/` and succeeded. It did not refuse —
+  it relocated. Contained and known, but it is a real write path in
+  `$HOME`. (Probe file deleted.)
+
+**The confound.** Because `command` is auto-denied, agy cannot run `git`,
+`node` or any probe. codex's most credible evidence — running node scripts
+against `data/energy.json` to prove specific farms render zero turbines —
+is unavailable to agy in this configuration. A weaker agy review would
+therefore be attributable to *tool starvation, not model family*, which is
+exactly the variable round A exists to isolate. Running it as-is would
+produce an uninterpretable result.
+
+Ways out, none free:
+1. **Narrow allow-rules** in `~/.gemini/settings.json` for read-only
+   commands. Closest to parity, but `command(...)` allow-rules risk
+   re-opening writes via shell redirection, and it means editing Bruno's
+   global config — his call, not a session decision.
+2. **Feed the diff as prompt text.** No tools needed; both models then
+   reason over identical input. Fair comparison of *diff reasoning*, but
+   handicaps codex relative to its own gate run, so it does not compare
+   like-for-like against the recorded result.
+3. **Run agy degraded and label it.** Answers "can Gemini catch it by
+   reading alone?" — a real question, but not the family comparison.
+
+**Round B — breadth, commits outside the Energy track.** Tests whether the
+high-precision / poor-recall profile generalizes or is an artifact of one
+track's code style.
+- *Decides*: how much to trust the profile when designing the integration.
+- *Known limit*: corpus is thin. Most `fix:` commits (`8398546` unit
+  mismatch, `b5671ec` placement legality, `54b3511`, `308ce22`) have no
+  single clean defect-introducing commit, so each needs archaeology or the
+  tree-audit mode (review the file at the fix's parent) rather than
+  `--commit`.
+- *Cost*: archaeology per case + 1 review call each.
+
+**Round C — live audit of current HEAD.** Point the reviewer at shipped
+code rather than history.
+- *Decides*: nothing about the tool — there is no ground truth here, so it
+  measures no precision or recall. This is bug-hunting, not evaluation,
+  and should be judged on bugs found rather than on what it teaches about
+  the reviewer.
+- *Cost*: every finding needs main-session verification before it counts
+  (the turbine finding took two probes, one of which was wrong on the
+  first attempt). Budget verification time, not just review calls.
+- *Note*: the two known bug classes are already swept by hand — the
+  cap-before-draw pattern is unique to `windTurbinesAt`, and every other
+  seeded placement function checks city clearance (some via `cityClear`,
+  `ranchHQSite` via `nearestCity` + `cityRadius`). So round C should hunt
+  classes we have *not* thought of, not re-run these.
 
 ## Candidate first waves (when retaken)
 
