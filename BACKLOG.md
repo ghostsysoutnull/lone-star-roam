@@ -8,17 +8,11 @@ Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
 
-- **Auto-confirm flaked suites in verify.mjs** (Bruno approved backlog
-  2026-07-19): after the parallel pool drains, rerun each failed suite once
-  at `-j 1` and report `FLAKE (solo-green)` vs real `FAIL` distinctly (exit 0
-  when everything is solo-green, matching the shipped push practice —
-  solo-green flakes must stay loudly printed so an intermittent real bug
-  can't hide behind the label). Removes the manual batched-confirm step in
-  GOTCHAS → "Full-verify run discipline". ~30 min in `tools/verify.mjs`
-  (rerun loop + sink relabel); pays back ~3–6 min per wave — break-even
-  within a 3-wave track. Context: W1 session 2026-07-19 spent ~¼ of its
-  time on avoidable full-run reruns + per-run flake confirms across six
-  different real-loop suites.
+- ~~**Auto-confirm flaked suites in verify.mjs**~~ → **Shipped 2026-07-20**
+  (wave-coder shakedown chunk): solo rerun after the pool drains, `FLAKE
+  (solo-green)` exit 0 vs `FAIL (confirmed on rerun)` nonzero, labels always
+  printed; caught two live flakes (onboarding, springer) on its first full
+  run. GOTCHAS run-discipline rule amended.
 
 - **Split `aviation.mjs` into wave-shards** (~30 s → ~20 s): export
   `shards = [{name, run}]` (wrap each wave's checks in an in-place arrow fn,

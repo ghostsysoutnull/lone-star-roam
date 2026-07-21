@@ -13,6 +13,16 @@
 // detail for any FAIL; -v prints every check (durations shown when ≥1 s).
 // Exit 1 on any failure. Suites assert NUMBERS at natural play values —
 // screenshots are a last resort (t.shot), never the pass/fail signal.
+//
+// Flake auto-confirm: any suite that fails in the parallel pool is rerun once
+// SOLO (its own browser, alone, nothing co-scheduled — the -j 1 equivalent),
+// one suite at a time after the pool drains. A solo-green rerun is relabeled
+// `FLAKE (solo-green): <suite>` and does not affect the exit code (matching
+// the shipped push practice), but the label — and the original failure
+// detail above it — always print, gated-off nothing, so a real intermittent
+// bug can't hide behind it. A rerun that fails again stays a real FAIL and
+// keeps the nonzero exit. This replaces the manual batched -j 1 confirm step
+// (GOTCHAS.md → Verification → full-verify run discipline).
 import { createServer } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync, mkdirSync, readdirSync } from 'node:fs';
@@ -321,6 +331,29 @@ async function worker() {
 
 try {
   await Promise.all(Array.from({ length: C }, () => worker()));
+
+  // --- auto-confirm flakes: solo rerun, one failed suite at a time, nothing
+  // co-scheduled (the -j 1 equivalent) — see the header comment for the
+  // contract. Runs before the server closes — reruns still need it.
+  const soloFailed = suites.filter((s) => (results.get(s)?.failed ?? 0) > 0);
+  for (const name of soloFailed) {
+    const origSink = results.get(name); // the pool attempt's FAIL detail
+    process.stderr.write(`  ↻ rerun solo: ${name}\n`);
+    let browser, ctx;
+    try {
+      browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+      ctx = await browser.newContext({ viewport: { width: 640, height: 360 } });
+      await ctx.addInitScript(() => { localStorage.clear(); window.__harness = 1; });
+      await runSuite(ctx, name); // overwrites results.set(name, …) with the solo attempt
+    } finally {
+      if (ctx) await ctx.close();
+      if (browser) await browser.close();
+    }
+    const soloSink = results.get(name);
+    soloSink.lines = soloSink.failed === 0
+      ? [...origSink.lines, `FLAKE (solo-green): ${name}`]
+      : [...origSink.lines, ...soloSink.lines, `FAIL (confirmed on rerun): ${name}`];
+  }
 } finally {
   srv.close();
 }

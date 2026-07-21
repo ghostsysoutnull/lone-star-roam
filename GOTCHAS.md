@@ -344,9 +344,12 @@ graduate here (and out of `NEXT_SESSION.md`).
   to avoidable reruns): (1) *capture-once* — pipe every full run to a file
   (`node tools/verify.mjs > /tmp/verify-run.log 2>&1`), then `tail`/`rg FAIL`
   the file; NEVER re-run the suite just to re-see failures that scrolled past a
-  `| tail`. (2) *batch the flake tax* — collect flaked suites across the
-  session and confirm them in ONE `-j 1` pass at the end, not one confirm
-  cycle per full run. (3) full runs are for the protocol points (wave end,
+  `| tail`. (2) *the flake tax is automated* (2026-07-20): verify.mjs reruns
+  each pool-failed suite once solo after the pool drains — `FLAKE
+  (solo-green)` exits 0 (label + original failure detail always print), `FAIL
+  (confirmed on rerun)` stays nonzero; no manual `-j 1` confirm pass anymore,
+  but READ the flake labels — a suite flaking every run is a real bug wearing
+  the label. (3) full runs are for the protocol points (wave end,
   pre-push); mid-wave iteration stays on named suites. (4) a mid-wave
   named-suite run must gate a decision — something done differently on FAIL
   before the wave-end full run; assurance-only runs wait for the full run,
