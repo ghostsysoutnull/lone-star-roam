@@ -93,7 +93,7 @@ is why it ranks second.
   documented for images and native documents).
 - Whether `agy` is authenticated.
 
-## Gate result (2026-07-21) — gold case FAILED, live bug found anyway
+## Gate result (2026-07-21) — recall poor, precision high, live bug found
 
 Harness: depth-2 clone of a temp branch at the defect commit, built inside a
 throwaway full clone so the real repo never receives a ref. `git cat-file -e
@@ -143,13 +143,28 @@ That pattern reads as triage and luck, not reliable detection.
 - **NOT validated as a gate or safety net**: it missed the seeded bug, so a
   clean report from it means nothing. Never treat its silence as assurance.
 
-Provisional numbers: noise low (2 findings, both specific, both carrying
-computed evidence — it ran node probes against baked data rather than
-pattern-matching), precision 1 of 2 fully verified real plus 1 confirmed
-omission. Both measured on n=2 from a single commit. **The negative
-control (false-positive baseline on an aesthetic rework) was not run, so
-the false-positive rate — the actual input to "is the triage time worth
-it" — remains unmeasured.**
+**Negative control: PASSED, cleanly.** `codex review --commit 8021248` (the
+H-frame rework — purely cosmetic, 75 lines, one file, nothing real to
+find). It spent 15 tool calls probing tower counts, terrain seating,
+conductor spans and placement angles numerically, then returned **zero
+findings**: "No actionable regression was identified in the changed code."
+It investigated hard and correctly declined to invent anything.
+
+**Measured profile: low noise, incomplete coverage.**
+- **Precision: high.** 2 findings on the defect commit, both legitimate
+  (1 verified real, 1 confirmed omission); 0 findings on a clean commit
+  despite deep investigation. No fabrication observed. Triage cost is
+  therefore cheap — the reason to run it is that its output is short and
+  worth reading.
+- **Recall: poor.** It missed the seeded bug while flagging a same-class
+  omission in the same diff.
+
+The practical consequence of that asymmetry: **believe it when it speaks,
+never read its silence as a clean bill of health.** That makes it a good
+opportunistic finder and a useless gate, which is exactly how it should be
+integrated.
+
+Caveat that remains: measured on n=2 commits, both from the Energy track.
 
 ## Candidate first waves (when retaken)
 
