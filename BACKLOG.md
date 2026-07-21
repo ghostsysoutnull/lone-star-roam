@@ -8,6 +8,27 @@ Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Map follow-ups (Map W1 — readable big map — shipped 2026-07-20)
 
+- **Seam-pass boot cost (wave-coder chunk) — shipped-pending-commit.** Fixed:
+  `classify()` (geo.js) now bbox-gates each neighbor-state ring before its
+  `inPoly` scan (the `beachAt` idiom), and the W1.2 seam pass (hud.js) is
+  gated to 3 padded rectangles around the real seam extents (recorded by a
+  one-off full-scan probe — not derived from borderZones flip vertices; the
+  El Paso seam's divide sits ~3,800u west of its border-vertex anchor at
+  (−3401,−1114)). Measured: wide `renderMapLayer` 11.2s → ~4.4s per boot
+  (`classify()`'s bbox gate is the whole win, 385µs/call → ~150µs; the seam
+  gate cut its call count but landed on already-cheap calls, so it barely
+  moves `wideLayerMs` further — shelf suite confirms the seams are unchanged
+  and still span-check clean, including El Paso). Full verify: 564 passed, 0
+  failed, 1 unrelated flake (aviation A3, solo-confirmed, no shared code
+  path). **Residual, NOT fixed by this chunk**: ~4.4s of the 11.2s remains,
+  dominated by the pre-existing Water Vehicles W3 "World-edge iso-lines"
+  block (hud.js ~249–299, separate from the W1.2 seam block) — instrumented
+  at 258k `borderDist` calls per wide boot vs the seam pass's 8k
+  `borderZoneAt` calls. That block scans the full coast + land border
+  perimeter (not 3 localizable points like the seam), so it needs a
+  different fix (tighter near-band, a border spatial index, or a cached
+  static line) — open follow-up, out of this chunk's authorized scope.
+
 - **Map layers wave (W2)**: toggleable big-map overlays — rails, energy
   sites, airports, counties, ag, collectibles found/unfound. Shape settled
   in the W1 discussion: one pre-rendered canvas per layer composited in

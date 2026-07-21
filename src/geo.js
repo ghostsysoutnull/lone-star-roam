@@ -503,7 +503,13 @@ function nearestDist(x, z, poly) {
 // 'mexico' = everything else (fail-safe: no dilation).
 let rgMouth = null; // the Rio Grande mouth: east-most 'mexico'-labeled border vertex
 function classify(x, z) {
-  if (GEO.neighborStates && Object.values(GEO.neighborStates).some((ring) => inPoly(x, z, ring))) return 'land';
+  if (GEO.neighborStates && Object.values(GEO.neighborStates).some((ring) => {
+    const bb = ring.bbox ??= ring.reduce(
+      (a, [px, pz]) => ({ minX: Math.min(a.minX, px), maxX: Math.max(a.maxX, px), minZ: Math.min(a.minZ, pz), maxZ: Math.max(a.maxZ, pz) }),
+      { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity });
+    if (x < bb.minX || x > bb.maxX || z < bb.minZ || z > bb.maxZ) return false;
+    return inPoly(x, z, ring);
+  })) return 'land';
   let bestD = Infinity, bestI = 0;
   const poly = GEO.border;
   for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {

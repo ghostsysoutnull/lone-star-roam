@@ -306,6 +306,14 @@ export class HUD {
     // step function; dashes band on borderDist, which runs monotonically
     // along these radial seams (dashOn's tangent projection would freeze —
     // seams run along the gradient, not across it).
+    // Boot-cost follow-up (Map W1.2 chunk): the coarse scan used to walk the
+    // WHOLE wide extent (7,392 cells) for only ~105 non-uniform ones — the
+    // seam only exists near the three real border corners where the dilation
+    // radius steps. Gated to padded (+~400u) bounding boxes of the real seam
+    // extents, recorded by a one-off full-scan probe. NOT derived from
+    // borderZones flip vertices — those don't localize where the OFFSET
+    // curves diverge (the El Paso seam's divide sits ~3,800u west of its
+    // border-vertex anchor at (−3401,−1114), not at the map corner).
     if (isWide && GEO.borderZones?.length) {
       this.worldEdgeSeam = [];
       this.worldEdgeSeamDrawn = [];
@@ -320,33 +328,42 @@ export class HUD {
         if (v === undefined) { v = LIMITS[borderZoneAt(x, z)]; zcache.set(k, v); }
         return v;
       };
+      const SEAM_GATES = [
+        { minX: -7620, maxX: -6400, minZ: -1280, maxZ: -470 }, // El Paso NM/Mexico corner
+        { minX: 1900, maxX: 3780, minZ: 5200, maxZ: 6010 },    // Rio Grande mouth
+        { minX: 4940, maxX: 5840, minZ: 1480, maxZ: 3010 },    // Sabine mouth
+      ];
       ctx.beginPath();
-      for (let cx = minX; cx < maxX; cx += COARSE) {
-        for (let cz = minZ; cz < maxZ; cz += COARSE) {
-          const cs = [lim(cx, cz), lim(cx + COARSE, cz), lim(cx + COARSE, cz + COARSE), lim(cx, cz + COARSE)];
-          if (cs[0] === cs[1] && cs[1] === cs[2] && cs[2] === cs[3]) continue;
-          if (borderDist(cx + COARSE / 2, cz + COARSE / 2) > SHELF_U + 250) continue;
-          for (let x = cx; x < cx + COARSE; x += FINE) {
-            for (let z = cz; z < cz + COARSE; z += FINE) {
-              const u = [lim(x, z), lim(x + FINE, z), lim(x + FINE, z + FINE), lim(x, z + FINE)];
-              const E = [[x, z, x + FINE, z, u[0], u[1]], [x + FINE, z, x + FINE, z + FINE, u[1], u[2]],
-                [x + FINE, z + FINE, x, z + FINE, u[2], u[3]], [x, z + FINE, x, z, u[3], u[0]]];
-              const hits = [];
-              for (const [ax, az, bx, bz, ua, ub] of E)
-                if (ua !== ub) hits.push([(ax + bx) / 2, (az + bz) / 2]);
-              if (hits.length < 2) continue;
-              const mx = (hits[0][0] + hits[1][0]) / 2, mz = (hits[0][1] + hits[1][1]) / 2;
-              const bd = borderDist(mx, mz);
-              // the divide continues past both radii (inland below the small
-              // limit, offshore beyond the large) — the seam is only between.
-              // Below 50u the divide hugs the border polygon and the world
-              // edge IS the border, already inked gold — no seam there.
-              if (inTexas(mx, mz) || bd < Math.max(50, Math.min(...u) - 10) || bd > Math.max(...u) + 10) continue;
-              this.worldEdgeSeam.push([mx, mz]);
-              if ((Math.floor((bd - 50) / 80) & 1) === 1) continue; // dashes march down the radius, first band drawn
-              this.worldEdgeSeamDrawn.push([mx, mz]);
-              const [p1x, p1z] = T(hits[0][0], hits[0][1]), [p2x, p2z] = T(hits[1][0], hits[1][1]);
-              ctx.moveTo(p1x, p1z); ctx.lineTo(p2x, p2z);
+      for (const gate of SEAM_GATES) {
+        const gMinX = Math.max(minX, gate.minX), gMaxX = Math.min(maxX, gate.maxX);
+        const gMinZ = Math.max(minZ, gate.minZ), gMaxZ = Math.min(maxZ, gate.maxZ);
+        for (let cx = gMinX; cx < gMaxX; cx += COARSE) {
+          for (let cz = gMinZ; cz < gMaxZ; cz += COARSE) {
+            const cs = [lim(cx, cz), lim(cx + COARSE, cz), lim(cx + COARSE, cz + COARSE), lim(cx, cz + COARSE)];
+            if (cs[0] === cs[1] && cs[1] === cs[2] && cs[2] === cs[3]) continue;
+            if (borderDist(cx + COARSE / 2, cz + COARSE / 2) > SHELF_U + 250) continue;
+            for (let x = cx; x < cx + COARSE; x += FINE) {
+              for (let z = cz; z < cz + COARSE; z += FINE) {
+                const u = [lim(x, z), lim(x + FINE, z), lim(x + FINE, z + FINE), lim(x, z + FINE)];
+                const E = [[x, z, x + FINE, z, u[0], u[1]], [x + FINE, z, x + FINE, z + FINE, u[1], u[2]],
+                  [x + FINE, z + FINE, x, z + FINE, u[2], u[3]], [x, z + FINE, x, z, u[3], u[0]]];
+                const hits = [];
+                for (const [ax, az, bx, bz, ua, ub] of E)
+                  if (ua !== ub) hits.push([(ax + bx) / 2, (az + bz) / 2]);
+                if (hits.length < 2) continue;
+                const mx = (hits[0][0] + hits[1][0]) / 2, mz = (hits[0][1] + hits[1][1]) / 2;
+                const bd = borderDist(mx, mz);
+                // the divide continues past both radii (inland below the small
+                // limit, offshore beyond the large) — the seam is only between.
+                // Below 50u the divide hugs the border polygon and the world
+                // edge IS the border, already inked gold — no seam there.
+                if (inTexas(mx, mz) || bd < Math.max(50, Math.min(...u) - 10) || bd > Math.max(...u) + 10) continue;
+                this.worldEdgeSeam.push([mx, mz]);
+                if ((Math.floor((bd - 50) / 80) & 1) === 1) continue; // dashes march down the radius, first band drawn
+                this.worldEdgeSeamDrawn.push([mx, mz]);
+                const [p1x, p1z] = T(hits[0][0], hits[0][1]), [p2x, p2z] = T(hits[1][0], hits[1][1]);
+                ctx.moveTo(p1x, p1z); ctx.lineTo(p2x, p2z);
+              }
             }
           }
         }
