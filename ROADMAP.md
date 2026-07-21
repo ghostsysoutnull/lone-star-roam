@@ -679,6 +679,14 @@ Rails Operations followed and are folded in below). Queued work lives in
   post-teleport hot context. **W4 — close-out**: real-hardware re-record
   confirmed the drop (render avg −20% to −54% across the three spots, I-10
   floor hit hardest at −54%; Sweetwater now holds a steady 60 fps, was 57.5).
+- [x] ~~West Texas massifs~~ — done 2026-07-18 (single wave, no spec file;
+  closes the "NM band mountain silhouettes read flat" playtest item): 14 hero
+  ridge tents over the real DEM (`GUADALUPE_SPINE` in world.js — El Capitan
+  prow, Guadalupe Peak massif, Brokeoff ridge into NM, reef arm toward
+  Carlsbad) + the Guadalupe Peak summit landmark (39th). The old premise was
+  wrong: `buildMountains` cones were a no-DEM fallback, never live — this is
+  a new always-on overlay. Verified by `massif.mjs` + Copilot-judged staged
+  shot.
 - [x] ~~Railroads Realism~~ — done 2026-07-19 (3 waves, `RAILS_SPEC.md` kept
   as history; first track of the 2026-H2 program): the real Texas rail
   network the game already shipped, made legible and alive. **W1 — operator

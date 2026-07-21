@@ -329,6 +329,13 @@ graduate here (and out of `NEXT_SESSION.md`).
   bug. TrainSystem's constructor maps `GEO.rails` into its own objects —
   a new baked rail field is invisible at runtime until added to that
   mapping (the W3 `sd` field shipped its first check-fail exactly there).
+- **Flee heading is `atan2(-dx,-dz)` with d = animal−player — never add π**
+  (animals.js): the +π variant shipped once and animals *charged* the player
+  while headless eyes read the scatter as fleeing. Assert flee as distance
+  growing over time, not motion existing.
+- **Animal region boxes are duplicated** (plains, Hill Country, coast):
+  world.js and animals.js each hold their own region tables — change one,
+  change both, or flora and fauna disagree about where a region is.
 
 ## Verification
 

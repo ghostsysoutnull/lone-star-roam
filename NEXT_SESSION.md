@@ -1,47 +1,15 @@
 # Lone Star Roam — next session kickoff
 
-Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the Three.js
-free-roam Texas game. Before touching code read `CLAUDE.md` (architecture +
-commands + gotchas) and grep **`GOTCHAS.md`** — the law book — for the area
-you're changing. `MODULES.md` has per-module grep anchors — prefer grep + a
-targeted read over whole-file reads. `ROADMAP.md` is history; `BACKLOG.md` holds
-queued work and pending playtests; `LEDGER.md` is the per-wave scoreboard.
+Background: we're on **Lone Star Roam** (`~/claude-area/devel/tx`), the
+Three.js free-roam Texas game. Process law, commands, and architecture live in
+`CLAUDE.md`; standing rules in **`GOTCHAS.md`** (grep it for the area you're
+changing); per-module grep anchors in `MODULES.md`; history in `ROADMAP.md`;
+queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
 No active track: **Map W1 + W1.1 + W1.2 shipped 2026-07-20** (readable big
-map: zoom/chevron/legend/scale bar, dash-hole fix, lat/lon readout,
-world-edge seams, click-to-copy — folded into `ROADMAP.md`). First: Bruno
-wants a **conversation about the Mexico 25-mi band** (reopens a settled
-Shoulder & Shelf call; track-sized — see `BACKLOG.md`). After that, next per
-the 2026-H2 program (`VISION_2026H2.md`) is **sea-industry**
-(`VISION_SEA_INDUSTRY.md`) — spec session first. Map W2 (layers + waypoint)
-is queued in `BACKLOG.md`.
-
-Process law since 2026-07-20 (in `CLAUDE.md`, after a token-heavy session):
-mechanical chunks (checks to a settled contract, probes, doc sweeps) go to
-the `wave-coder` agent even in fix rounds — in-loop needs a reason; hard cap
-one shot-staging round per wave; decision points are prose lettered options
-(AskUserQuestion retired).
-
-Key facts:
-- **Repo is public and GitHub Pages is live** — pushes deploy to
-  https://ghostsysoutnull.github.io/lone-star-roam/. Full verify before
-  every code push is mandatory (doc-only diffs skip tests); commits and
-  pushes always wait for Bruno's explicit go-ahead.
-- Local dev: `python3 -m http.server 8317`; verify headlessly with
-  **`node tools/verify.mjs`** (parallel pool, full run ~70 s on this machine;
-  use named suites while iterating, then the full run before pushing; compact;
-  `-v` per-check, `-j N` sets width; pool-failed suites auto-rerun solo —
-  `FLAKE (solo-green)` exits 0, read the labels). Add checks to
-  `tools/checks/*.mjs`, never throwaway scripts.
-- Session tooling (2026-07-20): `tools/law.sh '<pattern>'` = one-call
-  GOTCHAS + MODULES + src-hit lookup; `tools/judge-shot.sh` = locked-down
-  Copilot shot analysis; `/new-bake` skill = new-data-layer recipe. Waves
-  graded **handoff: yes** run via the `wave-coder` subagent (Sonnet) after
-  plan approval; Fable waves may delegate mechanical chunks to it (chunk
-  mode). Protocol details in CLAUDE.md.
-- Verify at *natural* play values (ugly mid-drive headings, parked-truck
-  distances, off-axis approaches), not convenient ones.
-- If Bruno reports something broken after an update, suspect browser cache
-  first (hard refresh — python http.server sends no cache headers).
-- **Ask before coding** — present an implementation plan and wait for the
-  go-ahead.
+map — folded into `ROADMAP.md`); a docs/memory housekeeping sweep ran
+2026-07-21. First: Bruno wants a **conversation about the Mexico 25-mi band**
+(reopens a settled Shoulder & Shelf call; track-sized — see `BACKLOG.md`).
+After that, next per the 2026-H2 program (`VISION_2026H2.md`) is
+**sea-industry** (`VISION_SEA_INDUSTRY.md`) — spec session first. Map W2
+(layers + waypoint) is queued in `BACKLOG.md`.
