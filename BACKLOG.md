@@ -137,11 +137,9 @@ until a probe confirms them.
   minimap pointer to it; reuse the travel menu's haul-lock rule if it ever
   fast-travels). Candidates from the same discussion: visited-vs-unvisited
   city tint, mission origin→target route hint.
-- **Mexico 25-mi band** — Bruno wants a follow-up conversation (2026-07-20,
-  post-Map-W1) before anything is queued: it reopens the settled
-  Shoulder & Shelf call (`geo.js`: "Mexico gets no dilation at all — the
-  wall stays at the Rio Grande") and done right is track-sized (Band-Parity
-  treatment: border cities, crossings, scenery), not a map wave.
+- ~~Mexico 25-mi band conversation~~ — discarded 2026-07-22: the topic is
+  already covered by `VISION_MEXICO_SHOULDER.md` (vision + future spec); no
+  separate conversation needed before that track is scheduled.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
 

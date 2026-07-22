@@ -8,8 +8,8 @@ queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
 No active track: **Map W1 + W1.1 + W1.2 shipped 2026-07-20** (readable big
 map — folded into `ROADMAP.md`); a docs/memory housekeeping sweep ran
-2026-07-21. First: Bruno wants a **conversation about the Mexico 25-mi band**
-(reopens a settled Shoulder & Shelf call; track-sized — see `BACKLOG.md`).
-After that, next per the 2026-H2 program (`VISION_2026H2.md`) is
-**sea-industry** (`VISION_SEA_INDUSTRY.md`) — spec session first. Map W2
-(layers + waypoint) is queued in `BACKLOG.md`.
+2026-07-21. Next per the 2026-H2 program (`VISION_2026H2.md`) is
+**sea-industry** (`VISION_SEA_INDUSTRY.md`) — spec session first. The Mexico
+25-mi band conversation was discarded 2026-07-22 (covered by
+`VISION_MEXICO_SHOULDER.md`). Map W2 (layers + waypoint) is queued in
+`BACKLOG.md`.
