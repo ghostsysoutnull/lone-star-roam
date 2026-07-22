@@ -8,12 +8,11 @@ queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
 No active track: **Map W1 + W1.1 + W1.2 shipped 2026-07-20** (readable big
 map — folded into `ROADMAP.md`); a docs/memory housekeeping sweep ran
-2026-07-21. **First: the wide-layer boot-cost fix** (residual ~4.4s
-iso-lines block — `BACKLOG.md` → Map follow-ups; Bruno's call 2026-07-22,
-fix before new development). **Second: the turbine sampler wave** (zero/over
-farm counts + missing city-clearance gate, one wave — `BACKLOG.md` → Bugs;
-queued 2026-07-22, confirmed real by in-code verification). Then next per
-the 2026-H2 program (`VISION_2026H2.md`) is **sea-industry**
-(`VISION_SEA_INDUSTRY.md`) — spec session first. The Mexico 25-mi band conversation was discarded 2026-07-22
+2026-07-21. The wide-layer boot-cost fix shipped 2026-07-22 (border spatial
+index, wave-coder chunk — wide layer 3.3s → ~1.8s). **First: the turbine
+sampler wave** (zero/over farm counts + missing city-clearance gate, one
+wave — `BACKLOG.md` → Bugs; queued 2026-07-22, confirmed real by in-code
+verification). Then next per the 2026-H2 program (`VISION_2026H2.md`) is
+**sea-industry** (`VISION_SEA_INDUSTRY.md`) — spec session first. The Mexico 25-mi band conversation was discarded 2026-07-22
 (covered by `VISION_MEXICO_SHOULDER.md`). Map W2 (layers + waypoint) is
 queued in `BACKLOG.md`.

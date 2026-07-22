@@ -95,10 +95,14 @@ export class HUD {
     // widens to the shoulder/shelf (band cities/stars land in W2).
     const mini = this.renderMapLayer(1400, 1320, GEO.bounds);
     this.miniLayer = mini.canvas; this.miniT = mini.T; this.miniSc = mini.sc;
+    const wideT0 = performance.now();
     const wide = this.renderMapLayer(1400, 1320, {
       minX: GEO.bounds.minX - SHOULDER_U, maxX: GEO.bounds.maxX + SHELF_U, // east = Gulf shelf too —
       minZ: GEO.bounds.minZ - SHOULDER_U, maxZ: GEO.bounds.maxZ + SHELF_U, // the coast runs SW–NE
     });
+    // Boot-cost surface (always built, not URL-gated — the debug-suite idiom):
+    // the wide layer's world-edge iso-lines sample borderDist ~258k times.
+    this.wideLayerMs = performance.now() - wideT0;
     this.mapLayer = wide.canvas; this.mapT = wide.T; this.mapSc = wide.sc; this.mapInv = wide.inv;
     this.zoomLevels = [1.4, 2.4, 4.5];
     this.zoomIdx = 1;

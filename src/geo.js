@@ -97,6 +97,7 @@ export async function loadGeo(onStatus) {
   buildBandRoadIndex();
   buildRailIndex();
   buildRiverIndex();
+  buildBorderIndex();
   return GEO;
 }
 
@@ -492,6 +493,86 @@ function nearestDist(x, z, poly) {
   return Math.sqrt(bestD);
 }
 
+// Border spatial index (boot-cost fix): the big map's world-edge iso-lines
+// sample borderDist ~258k times per wide-layer boot, and a brute-force scan
+// of all 1,517 border segments per call cost ~4.4s. Built once in loadGeo
+// (the border polygon is static). Segments are indexed into EVERY grid cell
+// their bounding box overlaps, not their midpoint cell — a midpoint-only
+// index misses a segment whose closest point to a query is far from its own
+// midpoint (the nearestBandRoad class of bug, BACKLOG #5). Cell size 500u
+// (wider than a typical spatial-index cell here) because the callers that
+// dominate call volume query points offset 400-1127u from the actual
+// border (the shoulder/shelf iso-lines) — a small cell would force many
+// rings of expansion before the first hit on every one of those calls.
+const BORDER_CELL = 500;
+// Numeric cell keys (ci, cj biased into a positive range then packed into one
+// integer) — a template-string key measurably costs more than an int key at
+// the tens-of-millions-of-lookups volume the wide-layer boot drives through
+// this index (every marching-squares corner near the world-edge iso-lines).
+const BORDER_KEY_BIAS = 4096, BORDER_KEY_MUL = 1 << 14; // world is far smaller than +-4096 cells at 500u/cell
+const borderKey = (ci, cj) => (ci + BORDER_KEY_BIAS) * BORDER_KEY_MUL + (cj + BORDER_KEY_BIAS);
+const borderGrid = new Map();
+function buildBorderIndex() {
+  const poly = GEO.border;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[j], b = poly[i];
+    const ci0 = Math.floor(Math.min(a[0], b[0]) / BORDER_CELL), ci1 = Math.floor(Math.max(a[0], b[0]) / BORDER_CELL);
+    const cj0 = Math.floor(Math.min(a[1], b[1]) / BORDER_CELL), cj1 = Math.floor(Math.max(a[1], b[1]) / BORDER_CELL);
+    for (let ci = ci0; ci <= ci1; ci++) {
+      for (let cj = cj0; cj <= cj1; cj++) {
+        const k = borderKey(ci, cj);
+        if (!borderGrid.has(k)) borderGrid.set(k, []);
+        borderGrid.get(k).push({ a, b });
+      }
+    }
+  }
+}
+
+// Indexed equivalent of nearestDist(x, z, GEO.border): expanding square rings
+// of cells around the query point, early-exiting once the next ring can't
+// possibly hold a closer segment than the current best. Most rings near an
+// interior Texas point or deep offshore are empty — cheap to skip, and
+// correctness (identical output to the brute-force scan) comes first.
+function borderNearestDist(x, z) {
+  const cx = Math.floor(x / BORDER_CELL), cz = Math.floor(z / BORDER_CELL);
+  let bestD2 = Infinity;
+  const visit = (ci, cj) => {
+    const segs = borderGrid.get(borderKey(ci, cj));
+    if (!segs) return;
+    for (const s of segs) {
+      // Inlined closestOnSeg + distance-squared: avoids the [px,pz] array
+      // allocation closestOnSeg does per call, at the tens-of-millions-of-
+      // calls volume this index sees during the wide-layer boot.
+      const a = s.a, b = s.b;
+      const dx = b[0] - a[0], dz = b[1] - a[1];
+      const L = dx * dx + dz * dz;
+      const t = L ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)) : 0;
+      const px = a[0] + dx * t - x, pz = a[1] + dz * t - z;
+      const d2 = px * px + pz * pz;
+      if (d2 < bestD2) bestD2 = d2;
+    }
+  };
+  for (let r = 0; ; r++) {
+    // Only the O(r) cells new to this ring (the square's perimeter) — NOT a
+    // full (2r+1)^2 resweep, which would make every ring redo all inner work
+    // (O(r^3) total instead of O(r^2)).
+    if (r === 0) {
+      visit(cx, cz);
+    } else {
+      for (let i = -r; i <= r; i++) { visit(cx + i, cz - r); visit(cx + i, cz + r); }
+      for (let j = -r + 1; j <= r - 1; j++) { visit(cx - r, cz + j); visit(cx + r, cz + j); }
+    }
+    // Minimum possible distance from (x,z) to any point outside the square of
+    // cells covered by rings 0..r — if the current best already beats that,
+    // no further ring can improve it.
+    const minOut = Math.min(
+      x - (cx - r) * BORDER_CELL, (cx + r + 1) * BORDER_CELL - x,
+      z - (cz - r) * BORDER_CELL, (cz + r + 1) * BORDER_CELL - z,
+    );
+    if (bestD2 <= minOut * minOut) return Math.sqrt(bestD2);
+  }
+}
+
 // Classify an out-of-Texas point by what it's actually standing on — NOT by
 // which border stretch is nearest (near El Paso the closest Texas border
 // segment is the Rio Grande even for points deep in New Mexico, e.g. Las
@@ -539,7 +620,7 @@ export function inWorld(x, z) {
   if (inTexas(x, z)) return true;
   const zone = classify(x, z);
   if (zone === 'mexico') return false;
-  return nearestDist(x, z, GEO.border) <= (zone === 'coast' ? SHELF_U : SHOULDER_U);
+  return borderDist(x, z) <= (zone === 'coast' ? SHELF_U : SHOULDER_U);
 }
 
 // The Tidelands line: Texas uniquely kept 3 marine leagues (10.36 mi) of Gulf
@@ -579,8 +660,10 @@ export function borderZoneAt(x, z) {
 
 // Water Vehicles W3: raw distance to the border polygon — sampled by the big
 // map's world-edge iso-lines (display only; the wall itself stays inWorld's).
+// Boot-cost fix: indexed via the border segment grid above — same semantics
+// as nearestDist(x, z, GEO.border) for every input, just fast.
 export function borderDist(x, z) {
-  return nearestDist(x, z, GEO.border);
+  return borderNearestDist(x, z);
 }
 
 // Map W1.1: inverse of the equirectangular projection — game x,z → [lat, lon].
@@ -613,7 +696,7 @@ export function boatableAt(x, z) {
   // fine sand mesh instead of the DEM, so they stay land regardless.
   if (inTexas(x, z) && (onIsland(x, z) || terrainMeshY(x, z) > SEA_Y)) return null;
   if (classify(x, z) !== 'coast') return null;
-  if (nearestDist(x, z, GEO.border) > SHELF_U) return null; // past the shelf wall
+  if (borderDist(x, z) > SHELF_U) return null; // past the shelf wall
   return { kind: 'gulf', y: SEA_Y };
 }
 

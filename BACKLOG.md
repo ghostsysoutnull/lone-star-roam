@@ -134,19 +134,17 @@ until a probe confirms them.
   (`classify()`'s bbox gate is the whole win, 385µs/call → ~150µs).
   The residual ~4.4s is its own queued entry below.
 
-- **Wide-layer boot cost, residual ~4.4s — QUEUED NEXT (2026-07-22), fix
-  before new development.** The remaining wide `renderMapLayer` cost is
-  dominated by the pre-existing Water Vehicles W3 "World-edge iso-lines"
-  block (hud.js ~249–299, separate from the W1.2 seam block) —
-  instrumented at 258k `borderDist` calls per wide boot vs the seam pass's
-  8k. It scans the full coast + land border perimeter (not 3 localizable
-  points like the seam), so it needs a different fix: tighter near-band, a
-  border spatial index, or a cached static line. Every boot pays it —
-  player load time and every headless suite boot in the verify pool — so
-  it taxes all future development until fixed. Shape: chunk-sized,
-  contract-settleable (the seam-pass chunk is the precedent); guard the
-  fix with a before/after `wideLayerMs` number and the shelf suite's
-  iso-line/seam checks.
+- ~~Wide-layer boot cost, residual~~ — shipped 2026-07-22 (wave-coder
+  chunk): border segment grid in geo.js (500u cells, bbox-overlap indexing,
+  expanding-ring query), `borderDist` + the two internal `nearestDist`
+  callers switched; ~10× per call, wide layer 3.3s → ~1.8s solo (pristine
+  measure was 3.3s, not the earlier instrumented 4.4s estimate). Guarded in
+  shelf.mjs: 300-point equivalence vs brute force + contention-proof
+  brute/indexed ratio check (>3×; an absolute wall-clock ceiling flaked
+  under `-j4` and was restructured in-loop). New `hud.wideLayerMs` surface.
+  **Remaining ~1.8s is NOT borderDist**: ~520ms Tidelands `coastDist`
+  field + base layer drawing — separate follow-up if ever worth it, no
+  longer the dominant tax.
 
 - **Map layers wave (W2)**: toggleable big-map overlays — rails, energy
   sites, airports, counties, ag, collectibles found/unfound. Shape settled

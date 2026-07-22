@@ -7,6 +7,90 @@
 // (roseate spoonbill + whooping crane, species 26 → 28).
 
 export default async function shelf(t) {
+  await t.check('boot-cost: border spatial index — equivalence vs brute-force nearestDist', async () => {
+    // ~300 seeded deterministic points spanning the wide extent: interior
+    // Texas, coast, US-neighbor band, Mexico side, offshore — every zone the
+    // indexed borderDist (geo.js) must agree with the brute-force scan on.
+    const res = await t.ev(`(() => {
+      const rand = g.seededRand('bordergrid-check');
+      const B = g.GEO.bounds;
+      const bruteDist = (x, z) => {
+        const poly = g.GEO.border;
+        let best = Infinity;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          const a = poly[j], b = poly[i];
+          const dx = b[0] - a[0], dz = b[1] - a[1];
+          const L = dx * dx + dz * dz;
+          const t = L ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)) : 0;
+          const px = a[0] + dx * t - x, pz = a[1] + dz * t - z;
+          const d = px * px + pz * pz;
+          if (d < best) best = d;
+        }
+        return Math.sqrt(best);
+      };
+      const marginX = 1600, marginZ = 1600; // past SHELF_U (1127) so offshore/band/mexico all sample
+      let worst = 0, n = 0, atX = 0, atZ = 0;
+      for (let i = 0; i < 300; i++) {
+        const x = B.minX - marginX + rand() * (B.maxX - B.minX + 2 * marginX);
+        const z = B.minZ - marginZ + rand() * (B.maxZ - B.minZ + 2 * marginZ);
+        const indexed = g.borderDist(x, z), brute = bruteDist(x, z);
+        const diff = Math.abs(indexed - brute);
+        if (diff > worst) { worst = diff; atX = x; atZ = z; }
+        n++;
+      }
+      return { n, worst, atX, atZ };
+    })()`);
+    t.ok(res.n === 300, `expected 300 sample points, ran ${res.n}`);
+    t.ok(res.worst < 1e-6, `indexed borderDist disagrees with brute force by ${res.worst} at (${res.atX.toFixed(1)}, ${res.atZ.toFixed(1)})`);
+  });
+
+  await t.check('boot-cost: indexed borderDist beats brute-force in-situ', async () => {
+    // Regression guard on the border spatial index, contention-proof: an
+    // absolute wall-clock ceiling flakes under the verify pool (a 2000ms
+    // ceiling measured 5131ms under -j4 CPU contention with the fix in
+    // place), so assert the RATIO of brute-force to indexed per-call cost
+    // measured back-to-back in this same run — contention slows both sides
+    // alike. Real margin is ~10×; the gate is 3×. Sample points sit at
+    // iso-line-typical offsets, the workload that dominates the wide boot.
+    const res = await t.ev(`(() => {
+      const rand = g.seededRand('bordergrid-perf');
+      const B = g.GEO.bounds;
+      const poly = g.GEO.border;
+      const bruteDist = (x, z) => {
+        let best = Infinity;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          const a = poly[j], b = poly[i];
+          const dx = b[0] - a[0], dz = b[1] - a[1];
+          const L = dx * dx + dz * dz;
+          const t = L ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (z - a[1]) * dz) / L)) : 0;
+          const px = a[0] + dx * t - x, pz = a[1] + dz * t - z;
+          const d = px * px + pz * pz;
+          if (d < best) best = d;
+        }
+        return Math.sqrt(best);
+      };
+      const pts = [];
+      for (let i = 0; i < 500; i++) {
+        pts.push([B.minX - 1600 + rand() * (B.maxX - B.minX + 3200),
+                  B.minZ - 1600 + rand() * (B.maxZ - B.minZ + 3200)]);
+      }
+      let sink = 0;
+      const tb0 = performance.now();
+      for (const [x, z] of pts) for (let k = 0; k < 4; k++) sink += bruteDist(x, z);
+      const bruteMs = performance.now() - tb0;
+      const ti0 = performance.now();
+      for (const [x, z] of pts) for (let k = 0; k < 40; k++) sink += g.borderDist(x, z);
+      const idxMs = performance.now() - ti0;
+      const brutePerCall = bruteMs / (pts.length * 4), idxPerCall = idxMs / (pts.length * 40);
+      return { brutePerCall, idxPerCall, ratio: brutePerCall / idxPerCall, sink };
+    })()`);
+    t.ok(res.ratio > 3, `index only ${res.ratio.toFixed(1)}x faster than brute force ` +
+      `(${(res.idxPerCall * 1000).toFixed(2)}µs vs ${(res.brutePerCall * 1000).toFixed(2)}µs per call), expected > 3x`);
+    // Pathology backstop only — loose enough to hold under a contended pool.
+    const ms = await t.ev('g.hud.wideLayerMs');
+    t.ok(typeof ms === 'number' && ms > 0, `hud.wideLayerMs not set: ${ms}`);
+    t.ok(ms < 15000, `wide-layer boot took ${ms.toFixed(0)}ms, expected < 15000ms even contended`);
+  });
   await t.check('inStateWater: island-aware straddle points around the 166.7u line', async () => {
     const res = await t.ev(`({
       buoy: g.inStateWater(4762.2, 1851.5),          // ON the line (166.66u)
