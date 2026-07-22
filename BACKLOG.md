@@ -202,7 +202,12 @@ until a probe confirms them.
   index — trade-offs in `TESTING_ASSESSMENT_COUNTER.md`). Gate: accumulated
   `/tmp/lonestar-verify.json` history confirming the payoff, then a
   spec'd wave; replacement must match the current classifier at every
-  elevation-grid point before the old path is removed.
+  elevation-grid point before the old path is removed. When this opens,
+  consider a scoped **Chrome DevTools MCP** trial for the perf-trace work
+  (CDP tracing first-class vs the hand-rolled profiling scripts); two
+  standing rules pinned now: never a substitute for `verify.mjs`, and no
+  screenshots into Claude's context (Copilot-judged path regardless of
+  capture tool). Not wired into `wave-coder` by default.
 
 - **Flake policy redesign** (queued 2026-07-22 — this entry backs the
   **temporary** solo-green exit-zero label in the verify summary; if this
