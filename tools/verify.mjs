@@ -1,9 +1,14 @@
 // Headless verification harness — runs named check suites across a pool of
 // parallel browser workers (each suite gets a fresh game in its own context).
 //
-//   node tools/verify.mjs [-v] [-j N] [suite…]   # no args = every suite
+//   node tools/verify.mjs [-v] [-q] [-j N] [suite…]   # no args = every suite
 //   node tools/verify.mjs drive missions
 //   node tools/verify.mjs -j8                     # force 8-wide (default: cores/2, RAM-capped)
+//   node tools/verify.mjs -q                      # quiet: FAIL/FLAKE detail + final summary only
+//
+// Every run also writes the full compact report to /tmp/lonestar-verify.log
+// (override: VERIFY_LOG) — so -q callers pay tokens for detail only when a
+// failure makes reading it worthwhile. -q overrides -v; exit code unchanged.
 //
 // One-time setup (deps live OUTSIDE the repo, shared across sessions):
 //   mkdir -p ~/.cache/lonestar-verify && cd ~/.cache/lonestar-verify && npm i playwright-core
@@ -25,7 +30,7 @@
 // (GOTCHAS.md → Verification → full-verify run discipline).
 import { createServer } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
-import { existsSync, mkdirSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,7 +81,9 @@ function serve() {
 // Lines are buffered into the sink and flushed in canonical suite order after
 // the pool drains, so the compact one-line-per-suite output contract holds
 // regardless of the order suites actually finish in.
-const VERBOSE = process.argv.includes('-v');
+const QUIET = process.argv.includes('-q');
+const VERBOSE = process.argv.includes('-v') && !QUIET; // -q wins over -v
+const LOG = process.env.VERIFY_LOG || '/tmp/lonestar-verify.log';
 function mkCheck(sink) {
   return async function check(name, fn) {
     const t0 = Date.now();
@@ -241,7 +248,7 @@ function mkT(page, check) {
 // OWN chromium instance — separate renderer process, so a suite's synchronous
 // in-page loops actually run on their own core; pages sharing one browser can
 // land in one renderer and serialise, defeating that).
-const raw = process.argv.slice(2).filter((a) => a !== '-v');
+const raw = process.argv.slice(2).filter((a) => a !== '-v' && a !== '-q');
 let jFlag = 0;
 const wanted = [];
 for (let i = 0; i < raw.length; i++) {
@@ -310,7 +317,7 @@ async function runSuite(ctx, name) {
     const s0 = Date.now();
     await (await import(join(suiteDir, name + '.mjs'))).default(mkT(page, mkCheck(sink)));
     sink.ms = Date.now() - s0;
-    process.stderr.write(`  ✓ ${name} (${(sink.ms / 1000).toFixed(1)}s)\n`); // live progress → stderr, off the stdout report
+    if (!QUIET) process.stderr.write(`  ✓ ${name} (${(sink.ms / 1000).toFixed(1)}s)\n`); // live progress → stderr, off the stdout report
   } finally {
     if (page) await page.close();
   }
@@ -338,7 +345,7 @@ try {
   const soloFailed = suites.filter((s) => (results.get(s)?.failed ?? 0) > 0);
   for (const name of soloFailed) {
     const origSink = results.get(name); // the pool attempt's FAIL detail
-    process.stderr.write(`  ↻ rerun solo: ${name}\n`);
+    if (!QUIET) process.stderr.write(`  ↻ rerun solo: ${name}\n`);
     let browser, ctx;
     try {
       browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
@@ -358,15 +365,23 @@ try {
   srv.close();
 }
 
-// flush in canonical suite order, same compact contract as the serial runner
+// flush in canonical suite order, same compact contract as the serial runner.
+// The full report is always written to LOG; -q prints only what r.lines holds
+// without -v (FAIL detail + FLAKE labels) plus the final summary.
 let passed = 0, failed = 0;
+const report = [];
 for (const s of suites) {
   const r = results.get(s);
   if (!r) continue;
   passed += r.passed; failed += r.failed;
-  if (VERBOSE) console.log(`— ${s}`);
-  for (const line of r.lines) console.log(line);
-  console.log(`${s}: ${r.passed} passed${r.failed ? `, ${r.failed} FAILED` : ''}, ${(r.ms / 1000).toFixed(1)}s`);
+  if (VERBOSE) report.push(`— ${s}`);
+  report.push(...r.lines);
+  report.push(`${s}: ${r.passed} passed${r.failed ? `, ${r.failed} FAILED` : ''}, ${(r.ms / 1000).toFixed(1)}s`);
+  if (QUIET) for (const line of r.lines) console.log(line);
 }
-console.log(`${passed} passed, ${failed} failed (${suites.join(', ')})  [j=${C}, ${process.uptime().toFixed(0)}s wall]`);
+const summary = `${passed} passed, ${failed} failed (${suites.join(', ')})  [j=${C}, ${process.uptime().toFixed(0)}s wall]`;
+report.push(summary);
+try { writeFileSync(LOG, report.join('\n') + '\n'); } catch { /* log is best-effort — never fail the run over it */ }
+if (QUIET) console.log(summary);
+else for (const line of report) console.log(line);
 process.exit(failed ? 1 : 0);

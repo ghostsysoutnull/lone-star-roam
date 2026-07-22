@@ -30,8 +30,10 @@ When the spawn prompt says **chunk**, the scope is one mechanical sub-task insid
 Run these in the FOREGROUND — never as background tasks; waiting on a
 background run stalls your return (shakedown lesson, 2026-07-20).
 1. `tools/status.sh`
-2. `node tools/verify.mjs 2>&1 | tee /tmp/lonestar-wave-verify.log`
-3. On failure: fix, re-run (tee again, same path) under the flake discipline above. No source edits after the last green run.
+2. `node tools/verify.mjs -q` — the full report auto-writes to
+   `/tmp/lonestar-verify.log`; you read only the FAIL/FLAKE lines + summary.
+3. On failure: read the log for context if needed, fix, re-run `-q` under the
+   flake discipline above. No source edits after the last green run.
 
 ## Return format — raw data only
 - `files:` one line per changed file — path + what changed
