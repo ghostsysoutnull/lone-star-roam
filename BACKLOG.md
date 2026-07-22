@@ -5,9 +5,6 @@ No active track. Rails Operations shipped in full 2026-07-19 (folded into
 (`VISION_SEA_INDUSTRY.md`), which needs its spec session first.
 Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
-Parked dev-process strategy: external-model agents (codex/agy as
-independent reviewers) — assessment + retake plan in
-`VISION_EXTERNAL_AGENTS.md` (2026-07-21).
 
 ## Bugs (live in shipped code)
 
@@ -23,7 +20,11 @@ Claude session model that ran the effort. External findings are claims
 until a probe confirms them.
 
 - **15 real wind farms render zero turbines; 5 render more turbines than
-  exist.** `windTurbinesAt` (world.js ~980) draws candidates across the
+  exist. QUEUED (2026-07-22): one wave with the city-clearance entry below,
+  after the boot-cost fix, before sea-industry. Mechanism re-confirmed in
+  code 2026-07-22 (Fable): the accept loop already stops at `TURBINE_CAP`
+  accepted sites, so the input-side cap is pure defect.**
+  `windTurbinesAt` (world.js ~980) draws candidates across the
   whole 260-unit chunk and rejects them against the farm circle, but
   derives the draw count from an *already-capped* expectation:
   `expect = Math.min(TURBINE_CAP, density * CHUNK²)`, then
@@ -106,28 +107,46 @@ until a probe confirms them.
   Full method, scoring and the model comparison: `VISION_EXTERNAL_AGENTS.md`
   → Gate result and Round A.
 
+## Dev-process — external-agents retake (parked 2026-07-21, queued 2026-07-22)
+
+- **External-model review lane (codex)** — assessment done, no integration
+  built; full strategy, gate/round-A results, probed flags and standing
+  constraints in `VISION_EXTERNAL_AGENTS.md`. Settled so far: codex
+  (`gpt-5.6-sol`) is the one reviewer (`agy`/Gemini rejected on a false
+  all-clear); high precision, poor recall — findings count only after
+  in-session verification, an all-clear carries no evidential weight.
+  Queued work when retaken, in order: rounds B (breadth backtest outside
+  the Energy track) and C (live audit of HEAD, bug-hunting not evaluation),
+  then the `tools/review-diff.sh` lockdown wrapper if the profile holds.
+  Follows the multi-wave protocol; the vision doc's standing rules (files
+  bugs, never fixes; provenance per entry; pin + assert the model family)
+  bind any retake. Retake triggers listed in the vision doc.
+
 ## Map follow-ups (Map W1 — readable big map — shipped 2026-07-20)
 
-- **Seam-pass boot cost (wave-coder chunk) — shipped-pending-commit.** Fixed:
-  `classify()` (geo.js) now bbox-gates each neighbor-state ring before its
+- ~~Seam-pass boot cost (wave-coder chunk)~~ — shipped in `137056b`:
+  `classify()` (geo.js) bbox-gates each neighbor-state ring before its
   `inPoly` scan (the `beachAt` idiom), and the W1.2 seam pass (hud.js) is
   gated to 3 padded rectangles around the real seam extents (recorded by a
   one-off full-scan probe — not derived from borderZones flip vertices; the
   El Paso seam's divide sits ~3,800u west of its border-vertex anchor at
   (−3401,−1114)). Measured: wide `renderMapLayer` 11.2s → ~4.4s per boot
-  (`classify()`'s bbox gate is the whole win, 385µs/call → ~150µs; the seam
-  gate cut its call count but landed on already-cheap calls, so it barely
-  moves `wideLayerMs` further — shelf suite confirms the seams are unchanged
-  and still span-check clean, including El Paso). Full verify: 564 passed, 0
-  failed, 1 unrelated flake (aviation A3, solo-confirmed, no shared code
-  path). **Residual, NOT fixed by this chunk**: ~4.4s of the 11.2s remains,
+  (`classify()`'s bbox gate is the whole win, 385µs/call → ~150µs).
+  The residual ~4.4s is its own queued entry below.
+
+- **Wide-layer boot cost, residual ~4.4s — QUEUED NEXT (2026-07-22), fix
+  before new development.** The remaining wide `renderMapLayer` cost is
   dominated by the pre-existing Water Vehicles W3 "World-edge iso-lines"
-  block (hud.js ~249–299, separate from the W1.2 seam block) — instrumented
-  at 258k `borderDist` calls per wide boot vs the seam pass's 8k
-  `borderZoneAt` calls. That block scans the full coast + land border
-  perimeter (not 3 localizable points like the seam), so it needs a
-  different fix (tighter near-band, a border spatial index, or a cached
-  static line) — open follow-up, out of this chunk's authorized scope.
+  block (hud.js ~249–299, separate from the W1.2 seam block) —
+  instrumented at 258k `borderDist` calls per wide boot vs the seam pass's
+  8k. It scans the full coast + land border perimeter (not 3 localizable
+  points like the seam), so it needs a different fix: tighter near-band, a
+  border spatial index, or a cached static line. Every boot pays it —
+  player load time and every headless suite boot in the verify pool — so
+  it taxes all future development until fixed. Shape: chunk-sized,
+  contract-settleable (the seam-pass chunk is the precedent); guard the
+  fix with a before/after `wideLayerMs` number and the shelf suite's
+  iso-line/seam checks.
 
 - **Map layers wave (W2)**: toggleable big-map overlays — rails, energy
   sites, airports, counties, ag, collectibles found/unfound. Shape settled
