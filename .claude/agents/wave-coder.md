@@ -38,6 +38,11 @@ background run stalls your return (shakedown lesson, 2026-07-20).
 - `checks:` suites/checks added or changed
 - `verify:` summary lines from the log, run/flake count, and the log path
 - `deviations:` departures from the plan, each with its reason (empty if none)
+- `challenges:` friction hit en route — wrong turns, environment traps,
+  contract gaps, flake hunts, anything that cost real time or tokens. One
+  line each, ≤5 lines total, hardest first; `none` if genuinely none.
+  Distinct from `deviations` (what changed vs the plan) — this is what
+  *fought back* even where the plan held (Bruno, 2026-07-22).
 - `open:` unresolved questions (empty if none)
 
 No prose, no diffs, no code echoes.

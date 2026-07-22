@@ -24,6 +24,22 @@ Hard-won harness lessons (already codified in CLAUDE.md): wait in physics time
 compute expected values from live `ATMOS` (weather is random per boot); keep a
 road-free bubble around offroad tests covering the *whole* run distance.
 
+## Addendum 2026-07-22 — cost is turns × context, not printed lines
+
+Session cost scales with **main-session turn count × conversation length**:
+every tool call re-sends the whole conversation as input (cache-discounted,
+not free), so `| tail -8` on a long command trims almost nothing — the 8
+lines are noise next to the context replay carrying them. Observed on the
+border-index wave: a 145-tool-call chunk cost its agent ~180k tokens against
+its *own* small transcript; the same steps in-loop would have replayed the
+full session per call. Levers, in order: (1) fewer main-session turns;
+(2) multi-step runs (full verifies, measurement loops, flake confirms)
+execute inside agents — including post-review confirm runs after in-loop
+edits, sent back to the same agent via SendMessage; (3) batch independent
+commands into one call; (4) tee long output to a log and read the tail —
+real but the smaller half of the win. Enforcement lines live in CLAUDE.md
+(multi-wave protocol step 4, per-wave budget bullet).
+
 ---
 
 ## M1 — Persistent verification harness (`tools/verify.mjs`)  [item 1 — biggest win]
