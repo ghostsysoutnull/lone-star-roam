@@ -349,6 +349,16 @@ graduate here (and out of `NEXT_SESSION.md`).
   "exits 0" as a permanent verdict. Runner-internal changes (sink/report/JSON
   shape) must pass `node tools/verify-selftest.mjs` before shipping.
 
+- **The harness fake clock swallows page-side timer throws** (2026-07-22,
+  self-test wave): under `page.clock.install()` a `setTimeout(() => { throw
+  ... })` in page context never fires `pageerror` — the fake-timer tick loop
+  catches it and logs to the page console, so the runner's fatal-pageerror
+  guard never sees it; `queueMicrotask` throws DO reach the real
+  uncaught-exception path (the `pagethrow.mjs` fixture is the working repro).
+  Same root: `t.wait()` advances the *fake* clock at near-zero real cost, so
+  any assertion on real wall/body time needs Node-side
+  `page.waitForTimeout()`, never `t.wait()`.
+
 - **Never pipe `verify.mjs`/`status.sh` through `tail`/`head`** (2026-07-22):
   `-q` is the trim — one summary line, FAIL detail capped at 5 lines per
   suite, full report always in `/tmp/lonestar-verify.log`. A pipe caps

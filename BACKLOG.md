@@ -192,6 +192,41 @@ until a probe confirms them.
   above it. The headline's ~30 s premise is obsolete; skip verdict stands,
   and any future suite-time work should start at perf/ag, not aviation.
   Full-run wall time now prints in the verify summary line (`Ns wall`).
+
+- **Startup optimization: terrain neighbor-state classification** (evidence
+  recorded 2026-07-22, hardening wave). `bandTint` (`world.js:203`) →
+  `neighborStateAt` (`geo.js:727`) owns ~69 % of `inPoly` boot cost (~2.8 s
+  of a ~6.75 s boot, paid by every player start and all 29 suite boots);
+  full caller table in `TESTING_ASSESSMENT.md` → Addendum. Implementation
+  shape deliberately undecided (runtime scanline vs baked mask vs spatial
+  index — trade-offs in `TESTING_ASSESSMENT_COUNTER.md`). Gate: accumulated
+  `/tmp/lonestar-verify.json` history confirming the payoff, then a
+  spec'd wave; replacement must match the current classifier at every
+  elevation-grid point before the old path is removed.
+
+- **Flake policy redesign** (queued 2026-07-22 — this entry backs the
+  **temporary** solo-green exit-zero label in the verify summary; if this
+  rots, the temporary policy silently becomes permanent). Design from
+  recorded JSON history: which failure signatures auto-confirm, flake
+  budget/expiry, whether one solo-green rerun is sufficient evidence, exit
+  status for unknown intermittents, escalation of repeat flakes into
+  defects. Contract questions listed in `TESTING_ASSESSMENT_COUNTER.md`.
+
+- **Scheduler weights from telemetry** (2026-07-22): `WEIGHTS` in
+  `verify.mjs` omits boat/energy/massif/onboarding/perf/rails (perf is the
+  measured pole) and guesses body time only. Replace with measured
+  end-to-end attempt cost (boot + settle + body + cleanup) from the JSON
+  sidecar; keep per-worker page counts balanced — boot cost is large and
+  near-uniform, so body-only ordering can still strand a worker on an
+  extra boot wave.
+
+- **Runner infra-failure normalization** (2026-07-22): a navigation/import
+  failure outside `t.check()` rejects its worker, kills the pool via
+  `Promise.all`, and exits with **no report, no LOG, no JSON**. Needs a
+  normalized fatal-suite result + cleanup that still writes the reports
+  (suite watchdogs optional, same family). Known and deliberately excluded
+  from the hardening wave's scope.
+
 ## Playtest findings 2026-07-15 (Bruno's tx-urgent notes; ocean-zone fix
 already shipped as `54b3511` — these are the remaining items)
 
