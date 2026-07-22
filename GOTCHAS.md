@@ -339,6 +339,15 @@ graduate here (and out of `NEXT_SESSION.md`).
 
 ## Verification
 
+- **Never pipe `verify.mjs`/`status.sh` through `tail`/`head`** (2026-07-22):
+  `-q` is the trim — one summary line, FAIL detail capped at 5 lines per
+  suite, full report always in `/tmp/lonestar-verify.log`. A pipe caps
+  blindly and cut the root-cause FAIL line during the turbine wave (25-FAIL
+  cascade, tail showed 3). Run bare; read the log only on failure. The
+  harness also aborts a suite at its first *thrown* JS error
+  (Reference/Type/SyntaxError → remaining checks report "not run");
+  assertion failures and helper timeouts never abort.
+
 - **Sample state AFTER a mutating eval, never before it** (onboarding's
   title-freeze check, 2026-07-19): two consecutive `t.ev` calls are separated
   by real frames, so `read state → mutate → assert unchanged` can absorb one

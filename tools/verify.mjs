@@ -16,6 +16,12 @@
 //
 // Output contract: compact by default — one summary line per suite plus full
 // detail for any FAIL; -v prints every check (durations shown when ≥1 s).
+// -q caps console FAIL detail at 5 lines per suite (FLAKE/confirm labels
+// always print past the cap; the LOG file always has everything) — never
+// pipe this tool through tail/head, the cap is the trim and a pipe can cut
+// the root-cause line. A thrown JS bug (Reference/Type/SyntaxError) aborts
+// the rest of its suite — remaining checks report as "not run" instead of
+// cascading a FAIL each; assertion failures and timeouts don't abort.
 // Exit 1 on any failure. Suites assert NUMBERS at natural play values —
 // screenshots are a last resort (t.shot), never the pass/fail signal.
 //
@@ -86,6 +92,7 @@ const VERBOSE = process.argv.includes('-v') && !QUIET; // -q wins over -v
 const LOG = process.env.VERIFY_LOG || '/tmp/lonestar-verify.log';
 function mkCheck(sink) {
   return async function check(name, fn) {
+    if (sink.aborted) { sink.skipped++; return; }
     const t0 = Date.now();
     const dur = () => { const s = (Date.now() - t0) / 1000; return s >= 1 ? ` (${s.toFixed(1)}s)` : ''; };
     try {
@@ -94,7 +101,17 @@ function mkCheck(sink) {
       if (VERBOSE) sink.lines.push(`PASS ${name}${dur()}`);
     } catch (e) {
       sink.failed++;
-      sink.lines.push(`FAIL ${name} — ${String(e.message || e).split('\n')[0]}${dur()}`);
+      const msg = String(e.message || e).split('\n')[0];
+      sink.lines.push(`FAIL ${name} — ${msg}${dur()}`);
+      // A thrown JS bug (Reference/Type/SyntaxError, node- or page-side)
+      // invalidates every later check in the suite — one root cause cascades
+      // into a FAIL per dependent check (25 FAILs from one bad variable,
+      // 2026-07-22). Assertion failures and helper timeouts keep going.
+      if (e instanceof TypeError || e instanceof ReferenceError || e instanceof SyntaxError
+          || /(^|[\s:(])(Reference|Type|Syntax)Error\b/.test(msg)) {
+        sink.aborted = true;
+        sink.lines.push('     suite aborted — remaining checks not run (thrown error, not an assertion)');
+      }
     }
   };
 }
@@ -292,7 +309,7 @@ const results = new Map();
 // clears localStorage before game code runs, preserving the prior fresh-context
 // isolation for game saves and UI preferences.
 async function runSuite(ctx, name) {
-  const sink = { name, passed: 0, failed: 0, lines: [], ms: 0 };
+  const sink = { name, passed: 0, failed: 0, skipped: 0, aborted: false, lines: [], ms: 0 };
   results.set(name, sink);
   let page;
   try {
@@ -368,18 +385,27 @@ try {
 // flush in canonical suite order, same compact contract as the serial runner.
 // The full report is always written to LOG; -q prints only what r.lines holds
 // without -v (FAIL detail + FLAKE labels) plus the final summary.
-let passed = 0, failed = 0;
+let passed = 0, failed = 0, skipped = 0;
+const FAIL_CAP = 5; // -q console cap per suite; the LOG always has every line
 const report = [];
 for (const s of suites) {
   const r = results.get(s);
   if (!r) continue;
-  passed += r.passed; failed += r.failed;
+  passed += r.passed; failed += r.failed; skipped += r.skipped;
   if (VERBOSE) report.push(`— ${s}`);
   report.push(...r.lines);
-  report.push(`${s}: ${r.passed} passed${r.failed ? `, ${r.failed} FAILED` : ''}, ${(r.ms / 1000).toFixed(1)}s`);
-  if (QUIET) for (const line of r.lines) console.log(line);
+  report.push(`${s}: ${r.passed} passed${r.failed ? `, ${r.failed} FAILED` : ''}${r.skipped ? `, ${r.skipped} not run` : ''}, ${(r.ms / 1000).toFixed(1)}s`);
+  if (QUIET) {
+    // FLAKE/confirm labels always print, even past the cap — they are the
+    // signal the flake contract promises never to gate off.
+    const labels = r.lines.filter((l) => /^(FLAKE \(solo-green\)|FAIL \(confirmed on rerun\)):/.test(l));
+    const rest = r.lines.filter((l) => !/^(FLAKE \(solo-green\)|FAIL \(confirmed on rerun\)):/.test(l));
+    for (const line of rest.slice(0, FAIL_CAP)) console.log(line);
+    if (rest.length > FAIL_CAP) console.log(`     … +${rest.length - FAIL_CAP} more lines in this suite (full report: ${LOG})`);
+    for (const line of labels) console.log(line);
+  }
 }
-const summary = `${passed} passed, ${failed} failed (${suites.join(', ')})  [j=${C}, ${process.uptime().toFixed(0)}s wall]`;
+const summary = `${passed} passed, ${failed} failed${skipped ? `, ${skipped} not run` : ''} (${suites.join(', ')})  [j=${C}, ${process.uptime().toFixed(0)}s wall]`;
 report.push(summary);
 try { writeFileSync(LOG, report.join('\n') + '\n'); } catch { /* log is best-effort — never fail the run over it */ }
 if (QUIET) console.log(summary);
