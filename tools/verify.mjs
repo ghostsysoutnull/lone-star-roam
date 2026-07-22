@@ -368,5 +368,5 @@ for (const s of suites) {
   for (const line of r.lines) console.log(line);
   console.log(`${s}: ${r.passed} passed${r.failed ? `, ${r.failed} FAILED` : ''}, ${(r.ms / 1000).toFixed(1)}s`);
 }
-console.log(`${passed} passed, ${failed} failed (${suites.join(', ')})  [j=${C}]`);
+console.log(`${passed} passed, ${failed} failed (${suites.join(', ')})  [j=${C}, ${process.uptime().toFixed(0)}s wall]`);
 process.exit(failed ? 1 : 0);

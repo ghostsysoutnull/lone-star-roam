@@ -172,6 +172,11 @@ until a probe confirms them.
   measured full run ~24 s (aviation pole 17.4 s, next pole lights 12.0 s), so
   sharding recovers only ~8–10 s/run vs a ~30-min session (~300-run payback).
   Revisit only if aviation grows substantially or concurrency flakes appear.
+  **Re-measured 2026-07-22** (post border-index, `-j4` full run): aviation
+  17.2 s and no longer the pole — perf 30.2 s, ag 20.0 s, hud 18.2 s sit
+  above it. The headline's ~30 s premise is obsolete; skip verdict stands,
+  and any future suite-time work should start at perf/ag, not aviation.
+  Full-run wall time now prints in the verify summary line (`Ns wall`).
 ## Playtest findings 2026-07-15 (Bruno's tx-urgent notes; ocean-zone fix
 already shipped as `54b3511` — these are the remaining items)
 
