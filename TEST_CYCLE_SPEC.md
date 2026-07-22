@@ -18,15 +18,20 @@ track does not reduce its coverage or declare a browser-only behavior covered
 by a logic check.
 
 Current development-machine baselines: all four fast groups complete in about
-0.55 s; the full browser suite is about 70 s.
+0.55 s. The full browser suite's timing is no longer quoted as a fixed number
+here — every run writes per-attempt boot/settle/body/cleanup/total timings,
+machine conditions (cpus/freemem/loadavg), and the scheduled queue order to
+`/tmp/lonestar-verify.json` (override: `VERIFY_JSON`); that sidecar is the
+source of record for full-run timing, not a number frozen in this doc.
 
 ## Why this is worth doing
 
-The full browser suite currently takes about 70 seconds on the development
-machine. Many invariants are deterministic table, geometry, and rule checks
-that do not need Chromium, WebGL, or a game boot. Giving those checks a
-separate, near-immediate command makes routine edits cheaper to validate and
-makes failures easier to localize.
+The full browser suite takes on the order of minutes on the development
+machine (see the JSON sidecar for the current measured figure). Many
+invariants are deterministic table, geometry, and rule checks that do not
+need Chromium, WebGL, or a game boot. Giving those checks a separate,
+near-immediate command makes routine edits cheaper to validate and makes
+failures easier to localize.
 
 ## Decisions
 
@@ -166,6 +171,18 @@ Success criteria:
 
 Do not migrate any of these until runtime calls the extracted helper and a
 browser sentinel continues to cover the visible integration.
+
+## Runner self-test
+
+`tools/verify-selftest.mjs` validates `tools/verify.mjs`'s own runner
+internals — the near-guard, fatal-pageerror handling, pool/solo attempt
+preservation, summary format, and JSON sidecar shape — against three minimal
+fixture suites in `tools/checks-fixtures/` (green/assertfail/pagethrow) via
+`VERIFY_CHECKS`. It spawns one child `verify.mjs` run, asserts exit code,
+specific stdout lines, and the JSON sidecar's shape, and reports a compact
+PASS/FAIL per assertion. Run it on demand and always after changing
+`verify.mjs`'s runner internals (sink/report/JSON shape) — game-suite changes
+don't need it.
 
 ## Completion
 

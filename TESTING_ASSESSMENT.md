@@ -445,3 +445,20 @@ Expected payoff: the path from a 2–3 minute gate toward a sub-two-minute gate.
 - Existing current-HEAD full report: 572 passed, zero confirmed failures, two solo-green flakes, 306 seconds at `-j4`.
 
 No additional full run was performed because the current-HEAD report already supplied the required baseline.
+
+## Addendum (2026-07-22, hardening wave): caller-level `inPoly` attribution
+
+Recorded after the hardening-and-telemetry wave shipped, per the counter's requirement that caller-level timings precede any startup-optimization decision. One CDP-profiled game boot (10.679 s profiled, 65,487 samples at 100 µs; total `inPoly` self+child time 4.108 s = 38.5 % of profiled boot):
+
+| caller | file:line | inPoly seconds | example call-path |
+| --- | --- | ---: | --- |
+| `neighborStateAt` | geo.js:727 | 2.836 | boot → buildWorld → buildGround → buildTerrain → bandTint (world.js:203) → neighborStateAt → inPoly |
+| `inTexas` | geo.js:461 | 0.638 | boot → BrandSystem → getLscSites → legalize → spotClear → inTexas → inPoly (+15 more call-sites) |
+| (anonymous) | geo.js:468 | 0.275 | boot → buildWorld → buildIslands → onIsland → inPoly (+1 more) |
+| (anonymous) | geo.js:587 | 0.255 | boot → HUD → renderMapLayer → borderZoneAt → classify → inPoly (+3 more) |
+| (anonymous) | geo.js:462 | 0.100 | boot → HUD → renderMapLayer → inTexas → inPoly (+6 more) |
+| `neighborCountyAt` | geo.js:394 | 0.003 | boot → ShoulderSystem → deriveCrossings → neighborCountyAt → inPoly |
+| `boatableAt` | geo.js:684 | 0.000 | boot → MaritimeSystem → buildMarinas → boatableAt → inPoly |
+| `spawn` | world.js:1224 | 0.000 | (real loop, post-boot) update → spawn → inPoly |
+
+Conclusion: the assessment's terrain-tinting attribution is confirmed — `neighborStateAt` called from `bandTint` inside `buildTerrain` owns ~69 % of the `inPoly` cost; the remaining ~31 % is spread across brand legality, island, and map-layer classification. The startup-optimization decision additionally waits on accumulated `/tmp/lonestar-verify.json` history.

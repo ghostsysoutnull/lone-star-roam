@@ -339,6 +339,16 @@ graduate here (and out of `NEXT_SESSION.md`).
 
 ## Verification
 
+- **Every verify run writes `/tmp/lonestar-verify.json`** (override:
+  `VERIFY_JSON`, 2026-07-22): per-attempt boot/settle/body/cleanup/total/launch
+  timings, per-check `{name, ms, status}`, machine conditions
+  (cpus/freemem/loadavg), scheduled queue order, and the flake list — the
+  timing source of record (`TEST_CYCLE_SPEC.md` no longer quotes a frozen
+  full-run number). Solo-green exit-zero is **temporary policy** pending an
+  evidence-based flake policy built from that recorded history — don't read
+  "exits 0" as a permanent verdict. Runner-internal changes (sink/report/JSON
+  shape) must pass `node tools/verify-selftest.mjs` before shipping.
+
 - **Never pipe `verify.mjs`/`status.sh` through `tail`/`head`** (2026-07-22):
   `-q` is the trim — one summary line, FAIL detail capped at 5 lines per
   suite, full report always in `/tmp/lonestar-verify.log`. A pipe caps

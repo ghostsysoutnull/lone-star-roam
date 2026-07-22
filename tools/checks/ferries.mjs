@@ -52,7 +52,7 @@ export default async function ferries(t) {
     t.ok(mid.speed === 0, `held KeyW moved the throttle mid-crossing: speed ${mid.speed}`);
     // mid-Gulf by now (~20s of 25s, well clear of shore) — no proximity toasts
     // pending, so this is the one sanctioned SHOT: deck composition only
-    await t.shot('ferry-deck-crossing');
+    if (process.env.SHOT) await t.shot('ferry-deck-crossing');
     // finish it — once aboardFerry drops, the SAME tick's player.update() sees
     // control already returned, so held input legitimately resumes that instant
     await t.step(15, STEP, 'g.player.aboardFerry === false');

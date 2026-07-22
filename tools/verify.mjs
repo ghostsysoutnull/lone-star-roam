@@ -34,6 +34,12 @@
 // bug can't hide behind it. A rerun that fails again stays a real FAIL and
 // keeps the nonzero exit. This replaces the manual batched -j 1 confirm step
 // (GOTCHAS.md → Verification → full-verify run discipline).
+//
+// TEMPORARY POLICY (2026-07-22): solo-green still exits 0 — this is a stopgap
+// pending an evidence-based flake policy (enough recorded /tmp/lonestar-verify.json
+// history to tell a real intermittent from a suite that never should have
+// flaked). The summary line and JSON both say so; don't read "exit 0" as a
+// permanent verdict that solo-green suites are fine to ignore.
 import { createServer } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
 import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
@@ -92,15 +98,17 @@ const VERBOSE = process.argv.includes('-v') && !QUIET; // -q wins over -v
 const LOG = process.env.VERIFY_LOG || '/tmp/lonestar-verify.log';
 function mkCheck(sink) {
   return async function check(name, fn) {
-    if (sink.aborted) { sink.skipped++; return; }
+    if (sink.aborted) { sink.skipped++; sink.checks.push({ name, ms: 0, status: 'skip' }); return; }
     const t0 = Date.now();
     const dur = () => { const s = (Date.now() - t0) / 1000; return s >= 1 ? ` (${s.toFixed(1)}s)` : ''; };
     try {
       await fn();
       sink.passed++;
+      sink.checks.push({ name, ms: Date.now() - t0, status: 'pass' });
       if (VERBOSE) sink.lines.push(`PASS ${name}${dur()}`);
     } catch (e) {
       sink.failed++;
+      sink.checks.push({ name, ms: Date.now() - t0, status: 'fail' });
       const msg = String(e.message || e).split('\n')[0];
       sink.lines.push(`FAIL ${name} — ${msg}${dur()}`);
       // A thrown JS bug (Reference/Type/SyntaxError, node- or page-side)
@@ -122,7 +130,10 @@ function mkT(page, check) {
   const t = {
     page, ev, check,
     ok(cond, msg) { if (!cond) throw new Error(msg); },
-    near(a, b, eps, msg) { if (Math.abs(a - b) > eps) throw new Error(`${msg}: ${a.toFixed(2)} vs ${b.toFixed(2)} (±${eps})`); },
+    near(a, b, eps, msg) {
+      if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(eps)) throw new Error(`${msg}: non-finite (${a} vs ${b}, ±${eps})`);
+      if (Math.abs(a - b) > eps) throw new Error(`${msg}: ${a.toFixed(2)} vs ${b.toFixed(2)} (±${eps})`);
+    },
     // teleport + settle (mode first: setMode zeroes y for ground modes)
     async tp(x, z, mode = 'DRIVE', y = 0) {
       await ev(`(g.player.setMode('${mode}'), g.player.pos.set(${x}, ${y}, ${z}), g.player.speed = 0, g.player.vy = 0)`);
@@ -251,7 +262,7 @@ function mkT(page, check) {
       mkdirSync(SHOTS, { recursive: true });
       const p = join(SHOTS, `${name}.png`);
       await page.evaluate('window.__skipRender = 0');
-      await t.wait(0.7);
+      await t.wait(0.06); // one 50ms rAF tick — enough to render exactly one frame
       await page.screenshot({ path: p });
       await page.evaluate('window.__skipRender = 1');
       console.log(`     shot: ${p}`);
@@ -274,7 +285,7 @@ for (let i = 0; i < raw.length; i++) {
   if (a.startsWith('-j')) { jFlag = parseInt(a.slice(2), 10) || 0; continue; }
   wanted.push(a);
 }
-const suiteDir = join(ROOT, 'tools/checks');
+const suiteDir = process.env.VERIFY_CHECKS || join(ROOT, 'tools/checks');
 const all = (await readdir(suiteDir)).filter((f) => f.endsWith('.mjs')).map((f) => f.replace('.mjs', ''));
 const suites = wanted.length ? wanted : all;
 const unknown = suites.filter((s) => !all.includes(s));
@@ -302,15 +313,33 @@ const C = Math.max(1, Math.min(suites.length, jFlag > 0 ? jFlag : DEFAULT_J));
 const srv = await serve();
 const port = srv.address().port;
 const queue = suites.slice().sort((a, b) => (WEIGHTS[b] ?? 5) - (WEIGHTS[a] ?? 5));
+const order = queue.slice(); // scheduled queue order, captured before workers drain it — JSON telemetry only
 const results = new Map();
+
+// Per suite-attempt: distinct pageerror messages are fatal, deduped by the
+// first line of the error string (no allowlist). Counted once the suite body
+// finishes — including when it throws — so a pageerror-failed suite routes
+// through the normal solo-rerun flake path like any other failure.
+function finalizePageErrors(sink) {
+  if (!sink.pageErrors.size) return;
+  for (const [msg, count] of sink.pageErrors) {
+    sink.lines.push(`FAIL pageerror — ${msg}${count > 1 ? ` (×${count})` : ''}`);
+  }
+  sink.failed += sink.pageErrors.size;
+}
 
 // Each suite gets a fresh page and game boot. The worker context stays alive so
 // its HTTP cache can reuse the game's static modules and data; its init script
 // clears localStorage before game code runs, preserving the prior fresh-context
-// isolation for game saves and UI preferences.
-async function runSuite(ctx, name) {
-  const sink = { name, passed: 0, failed: 0, skipped: 0, aborted: false, lines: [], ms: 0 };
-  results.set(name, sink);
+// isolation for game saves and UI preferences. Returns its sink — callers decide
+// where it lives in `results` (pool vs solo-rerun register differently, below).
+async function runSuite(ctx, name, kind = 'pool', launch) {
+  const sink = {
+    name, passed: 0, failed: 0, skipped: 0, aborted: false, lines: [], checks: [], ms: 0,
+    kind, launch, boot: 0, settle: 0, body: 0, cleanup: 0, total: 0,
+    pageErrors: new Map(),
+  };
+  const tTotal0 = Date.now();
   let page;
   try {
     await ctx.clearCookies();
@@ -324,29 +353,53 @@ async function runSuite(ctx, name) {
       window.requestAnimationFrame = (callback) => setTimeout(() => callback(performance.now()), 50);
       window.cancelAnimationFrame = (id) => clearTimeout(id);
     });
-    page.on('pageerror', (e) => sink.lines.push(`     pageerror: ${String(e).split('\n')[0]}`));
+    page.on('pageerror', (e) => {
+      const first = String(e).split('\n')[0];
+      sink.lines.push(`     pageerror: ${first}`);
+      sink.pageErrors.set(first, (sink.pageErrors.get(first) || 0) + 1);
+    });
+    const tBoot0 = Date.now();
     await page.goto(`http://127.0.0.1:${port}/`);
     await page.waitForFunction('window.__game && document.getElementById("loading").style.display === "none"', null, { timeout: 60000 });
+    sink.boot = (Date.now() - tBoot0) / 1000;
     // skip the ~300 ms SwiftShader draw: the loop still runs every system update
     // at full rAF speed, sim time tracks wall time, and evaluates return fast
     await page.evaluate('window.__skipRender = 1');
+    const tSettle0 = Date.now();
     await page.clock.runFor(500); // first frames: chunks spawn, ATMOS settles
+    sink.settle = (Date.now() - tSettle0) / 1000;
     const s0 = Date.now();
-    await (await import(join(suiteDir, name + '.mjs'))).default(mkT(page, mkCheck(sink)));
-    sink.ms = Date.now() - s0;
+    try {
+      await (await import(join(suiteDir, name + '.mjs'))).default(mkT(page, mkCheck(sink)));
+    } finally {
+      sink.ms = Date.now() - s0;
+      sink.body = sink.ms / 1000;
+      finalizePageErrors(sink); // fatal pageerrors count even if default() threw
+    }
     if (!QUIET) process.stderr.write(`  ✓ ${name} (${(sink.ms / 1000).toFixed(1)}s)\n`); // live progress → stderr, off the stdout report
   } finally {
+    const tCleanup0 = Date.now();
     if (page) await page.close();
+    sink.cleanup = (Date.now() - tCleanup0) / 1000;
   }
+  sink.total = (Date.now() - tTotal0) / 1000;
+  return sink;
 }
 
 async function worker() {
   let browser, ctx;
   try {
+    const tLaunch0 = Date.now();
     browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+    const launchS = (Date.now() - tLaunch0) / 1000;
     ctx = await browser.newContext({ viewport: { width: 640, height: 360 } }); // small viewport: SwiftShader fill rate limits sim fps
     await ctx.addInitScript(() => { localStorage.clear(); window.__harness = 1; });
-    while (queue.length) await runSuite(ctx, queue.shift());
+    let first = true; // browser launch time is attributed to this worker's first suite only
+    while (queue.length) {
+      const name = queue.shift();
+      results.set(name, await runSuite(ctx, name, 'pool', first ? launchS : undefined));
+      first = false;
+    }
   } finally {
     if (ctx) await ctx.close();
     if (browser) await browser.close();
@@ -358,25 +411,27 @@ try {
 
   // --- auto-confirm flakes: solo rerun, one failed suite at a time, nothing
   // co-scheduled (the -j 1 equivalent) — see the header comment for the
-  // contract. Runs before the server closes — reruns still need it.
+  // contract. Runs before the server closes — reruns still need it. The solo
+  // attempt does NOT overwrite the pool attempt in `results` — it's attached
+  // as origSink.solo, so both attempts' full timings survive to the JSON
+  // report; the solo attempt still decides the suite's counted pass/fail
+  // (report loop below reads r.solo when present).
   const soloFailed = suites.filter((s) => (results.get(s)?.failed ?? 0) > 0);
   for (const name of soloFailed) {
     const origSink = results.get(name); // the pool attempt's FAIL detail
     if (!QUIET) process.stderr.write(`  ↻ rerun solo: ${name}\n`);
     let browser, ctx;
     try {
+      const tLaunch0 = Date.now();
       browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+      const launchS = (Date.now() - tLaunch0) / 1000;
       ctx = await browser.newContext({ viewport: { width: 640, height: 360 } });
       await ctx.addInitScript(() => { localStorage.clear(); window.__harness = 1; });
-      await runSuite(ctx, name); // overwrites results.set(name, …) with the solo attempt
+      origSink.solo = await runSuite(ctx, name, 'solo', launchS);
     } finally {
       if (ctx) await ctx.close();
       if (browser) await browser.close();
     }
-    const soloSink = results.get(name);
-    soloSink.lines = soloSink.failed === 0
-      ? [...origSink.lines, `FLAKE (solo-green): ${name}`]
-      : [...origSink.lines, ...soloSink.lines, `FAIL (confirmed on rerun): ${name}`];
   }
 } finally {
   srv.close();
@@ -384,30 +439,77 @@ try {
 
 // flush in canonical suite order, same compact contract as the serial runner.
 // The full report is always written to LOG; -q prints only what r.lines holds
-// without -v (FAIL detail + FLAKE labels) plus the final summary.
-let passed = 0, failed = 0, skipped = 0;
+// without -v (FAIL detail + FLAKE labels) plus the final summary. When a suite
+// has a solo rerun attached (r.solo), IT decides the counted pass/fail and the
+// FLAKE/confirmed label — the pool attempt's raw lines/timings stay on r for
+// the JSON report untouched.
+let passed = 0, failed = 0, skipped = 0, flakes = 0;
 const FAIL_CAP = 5; // -q console cap per suite; the LOG always has every line
 const report = [];
+const wallS = process.uptime();
 for (const s of suites) {
   const r = results.get(s);
   if (!r) continue;
-  passed += r.passed; failed += r.failed; skipped += r.skipped;
+  const eff = r.solo || r; // the attempt that decides counted pass/fail
+  passed += eff.passed; failed += eff.failed; skipped += eff.skipped;
+  if (r.solo && r.solo.failed === 0) flakes++;
+  const lines = r.solo
+    ? (r.solo.failed === 0
+        ? [...r.lines, `FLAKE (solo-green): ${s}`]
+        : [...r.lines, ...r.solo.lines, `FAIL (confirmed on rerun): ${s}`])
+    : r.lines;
   if (VERBOSE) report.push(`— ${s}`);
-  report.push(...r.lines);
-  report.push(`${s}: ${r.passed} passed${r.failed ? `, ${r.failed} FAILED` : ''}${r.skipped ? `, ${r.skipped} not run` : ''}, ${(r.ms / 1000).toFixed(1)}s`);
+  report.push(...lines);
+  report.push(`${s}: ${eff.passed} passed${eff.failed ? `, ${eff.failed} FAILED` : ''}${eff.skipped ? `, ${eff.skipped} not run` : ''}, ${(eff.ms / 1000).toFixed(1)}s`);
   if (QUIET) {
     // FLAKE/confirm labels always print, even past the cap — they are the
     // signal the flake contract promises never to gate off.
-    const labels = r.lines.filter((l) => /^(FLAKE \(solo-green\)|FAIL \(confirmed on rerun\)):/.test(l));
-    const rest = r.lines.filter((l) => !/^(FLAKE \(solo-green\)|FAIL \(confirmed on rerun\)):/.test(l));
+    const labels = lines.filter((l) => /^(FLAKE \(solo-green\)|FAIL \(confirmed on rerun\)):/.test(l));
+    const rest = lines.filter((l) => !/^(FLAKE \(solo-green\)|FAIL \(confirmed on rerun\)):/.test(l));
     for (const line of rest.slice(0, FAIL_CAP)) console.log(line);
     if (rest.length > FAIL_CAP) console.log(`     … +${rest.length - FAIL_CAP} more lines in this suite (full report: ${LOG})`);
     for (const line of labels) console.log(line);
   }
 }
-const summary = `${passed} passed, ${failed} failed${skipped ? `, ${skipped} not run` : ''} (${suites.join(', ')})  [j=${C}, ${process.uptime().toFixed(0)}s wall]`;
+const summary = `${passed} passed, ${failed} failed${skipped ? `, ${skipped} not run` : ''}${flakes ? `, ${flakes} flakes (solo-green; exit-zero is temporary policy)` : ''} (${suites.join(', ')})  [j=${C}, ${wallS.toFixed(0)}s wall]`;
 report.push(summary);
 try { writeFileSync(LOG, report.join('\n') + '\n'); } catch { /* log is best-effort — never fail the run over it */ }
+
+// JSON sidecar — every run, best-effort, never fails the run. Per-attempt
+// boot/settle/body/cleanup/total/launch timings + per-check {name, ms, status}
+// (console output contract is unchanged by this — durations still print only
+// under -v / when ≥1s).
+const round1 = (x) => Math.round(x * 10) / 10;
+function attemptJSON(sink) {
+  const o = {
+    kind: sink.kind, boot: round1(sink.boot), settle: round1(sink.settle), body: round1(sink.body),
+    cleanup: round1(sink.cleanup), total: round1(sink.total),
+    passed: sink.passed, failed: sink.failed, skipped: sink.skipped, aborted: sink.aborted,
+    checks: sink.checks,
+  };
+  if (sink.launch !== undefined) o.launch = round1(sink.launch);
+  return o;
+}
+const VERIFY_JSON = process.env.VERIFY_JSON || '/tmp/lonestar-verify.json';
+const jsonReport = {
+  date: new Date().toISOString(),
+  argv: process.argv.slice(2),
+  j: { requested: jFlag || null, effective: C },
+  machine: { cpus: os.cpus().length, freememGiB: round1(os.freemem() / 2 ** 30), loadavg: os.loadavg() },
+  order,
+  wall: round1(wallS),
+  totals: { passed, failed, skipped, flakes },
+  policy: { soloGreenExitZero: 'temporary' },
+  suites: suites.map((s) => {
+    const r = results.get(s);
+    if (!r) return { name: s, flake: false, attempts: [] };
+    const attempts = [attemptJSON(r)];
+    if (r.solo) attempts.push(attemptJSON(r.solo));
+    return { name: s, flake: !!(r.solo && r.solo.failed === 0), attempts };
+  }),
+};
+try { writeFileSync(VERIFY_JSON, JSON.stringify(jsonReport, null, 2)); } catch { /* best-effort — never fail the run over it */ }
+
 if (QUIET) console.log(summary);
 else for (const line of report) console.log(line);
 process.exit(failed ? 1 : 0);
