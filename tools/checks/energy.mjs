@@ -699,4 +699,114 @@ export default async function energy(t) {
     const expected = Math.round((pay * 1.5) / 5) * 5;
     t.ok(paid === expected, `paid $${paid}, expected $${expected} (pay $${pay})`);
   });
+
+  // --- turbine-sampler wave: farm-fidelity guard over windTurbinesAt ---
+  // One farm-sweep evaluate, shared by the checks below (deterministic seeded
+  // streams — same inputs -> identical output every run, so measurements are
+  // exact and can't flake). Overlapping farm circles may double-attribute a
+  // rendered site to more than one farm — acceptable, not corrected for.
+  //
+  // 2026-07-22 sampler rework (src/world.js, already shipped): a prepass
+  // computes each overlapping farm's local expectation eLocal = density ×
+  // exact circle∩chunk overlap area (circleChunkOverlap, 64-slice x-integral);
+  // a contended chunk splits TURBINE_CAP proportionally to eLocal (min 1
+  // share, trim-largest on oversubscription) instead of first-farm-takes-all.
+  // Per-farm accepted output is bounded by stochRound(eLocal) (floor + a
+  // separate `turbinefrac:` Bernoulli stream) AND its cap share — the
+  // provable bound is per-farm total rendered ≤ baked count + (number of
+  // chunks where that farm's eLocal ≥ 0.05). coveringChunks below mirrors
+  // circleChunkOverlap exactly to compute that count independently of the
+  // sweep's own output, so check 3 isn't circular.
+  //
+  // Scope note for check 2: 83/225 baked windFarms have a CENTER outside
+  // inTexas — a pre-existing bake artifact (windFarms isn't clipped to the
+  // border polygon, unlike other energy layers), tracked separately, not a
+  // sampler defect. Those are excluded by the inTexas(f.x, f.z) filter below,
+  // not by farm identity, so the exclusion is principled rather than a
+  // hand-picked list.
+
+  let turbineSweep = null;
+  await t.check('turbine fidelity: farm-sweep evaluate covers every baked farm exactly once (rendered count + independent coveringChunks)', async () => {
+    turbineSweep = await t.ev(`(() => {
+      const CHUNK = 260;
+      // mirrors world.js circleChunkOverlap exactly — independent recompute,
+      // not derived from windTurbinesAt's own output, so check 3 is a real check
+      const circleChunkOverlap = (fx, fz, r, x0, z0) => {
+        const xa = Math.max(x0, fx - r), xb = Math.min(x0 + CHUNK, fx + r);
+        if (xb <= xa) return 0;
+        const N = 64, dx = (xb - xa) / N;
+        let area = 0;
+        for (let i = 0; i < N; i++) {
+          const x = xa + (i + 0.5) * dx, h = Math.sqrt(Math.max(0, r * r - (x - fx) * (x - fx)));
+          area += Math.max(0, Math.min(z0 + CHUNK, fz + h) - Math.max(z0, fz - h)) * dx;
+        }
+        return area;
+      };
+      const farms = g.GEO.energy.windFarms;
+      const results = [];
+      for (const f of farms) {
+        const cxMin = Math.floor((f.x - f.r) / CHUNK) - 1, cxMax = Math.floor((f.x + f.r) / CHUNK) + 1;
+        const czMin = Math.floor((f.z - f.r) / CHUNK) - 1, czMax = Math.floor((f.z + f.r) / CHUNK) + 1;
+        const density = f.count / (Math.PI * f.r * f.r);
+        let rendered = 0, coveringChunks = 0;
+        const badClear = [];
+        for (let cx = cxMin; cx <= cxMax; cx++) for (let cz = czMin; cz <= czMax; cz++) {
+          const baseX = cx * CHUNK, baseZ = cz * CHUNK;
+          const eLocal = density * circleChunkOverlap(f.x, f.z, f.r, baseX, baseZ);
+          if (eLocal >= 0.05) coveringChunks++;
+          for (const s of g.windTurbinesAt(cx, cz)) {
+            if (Math.hypot(s.x - f.x, s.z - f.z) <= f.r) {
+              rendered++;
+              if (!g.cityClear(s.x, s.z, 20)) badClear.push({ x: s.x, z: s.z });
+            }
+          }
+        }
+        results.push({ x: f.x, z: f.z, count: f.count, r: f.r, rendered, coveringChunks, badClear, inTx: g.inTexas(f.x, f.z) });
+      }
+      return results;
+    })()`);
+    t.ok(turbineSweep.length === 225, `expected 225 farms swept, got ${turbineSweep.length}`);
+    t.ok(turbineSweep.every((f) => Number.isInteger(f.rendered) && f.rendered >= 0), 'a farm produced a malformed rendered count');
+  });
+
+  await t.check('turbine fidelity: every rendered site in the sweep passes cityClear(x, z, 20) (regression guard on the generation gate)', async () => {
+    const bad = turbineSweep.flatMap((f) => f.badClear);
+    t.ok(bad.length === 0, `${bad.length} rendered turbine sites fail cityClear: ${JSON.stringify(bad.slice(0, 5))}`);
+  });
+
+  await t.check('turbine fidelity: no farm renders above the provable design bound (baked count + covering chunks at eLocal >= 0.05)', async () => {
+    const over = turbineSweep.filter((f) => f.rendered > f.count + f.coveringChunks);
+    t.ok(over.length === 0, `farms over the design bound: ${JSON.stringify(over.map((f) => ({ x: f.x, z: f.z, count: f.count, r: f.r, rendered: f.rendered, coveringChunks: f.coveringChunks })))}`);
+  });
+
+  // Check 2: no in-Texas farm renders zero, except one hardcoded, evidenced
+  // exception — main-session call 2026-07-22, ruled don't-fix: placement law
+  // (road clearance >=3, city clearance >=20) outranks a count-1 farm's
+  // presence. (x -2203.6, z -4673.7, count 1, r 20): its whole r=20 circle
+  // sits inside road/city clearance — the shipped rescue's 40 real draws in
+  // the farm's center chunk found 22 road-blocked + 3 city-blocked + 0
+  // lawful, and an independent 200-draw probe of the FULL circle (both
+  // covering chunks, fresh `hyporescue:` stream, doesn't touch real output)
+  // found 92 road-blocked + 17 city-blocked + 0 lawful. No sampler fix can
+  // seat a turbine here without loosening a placement gate. The exception is
+  // keyed by coordinates (not a farm object identity or a count/index), so a
+  // future bake reshuffle can't silently widen it to the wrong farm.
+  const TURBINE_ZERO_EXCEPTIONS = [[-2203.6, -4673.7]]; // [x, z] — see comment above
+  const isExcepted = (f) => TURBINE_ZERO_EXCEPTIONS.some(([ex, ez]) => Math.abs(f.x - ex) < 0.05 && Math.abs(f.z - ez) < 0.05);
+
+  await t.check('turbine fidelity: no in-Texas-centered farm renders zero turbines, except the one evidenced legality-exhausted exception (83 out-of-Texas-centered farms scoped out — separate bake artifact, tracked in BACKLOG.md)', async () => {
+    const zero = turbineSweep.filter((f) => f.inTx && f.count >= 1 && f.rendered === 0 && !isExcepted(f));
+    t.ok(zero.length === 0, `unexpected in-Texas farms rendering zero: ${JSON.stringify(zero.map((f) => ({ x: f.x, z: f.z, count: f.count, r: f.r })))}`);
+  });
+
+  await t.check('turbine fidelity: the exception stays honest — the excepted farm actually DOES render zero (self-cleaning: a future gate/data change that frees it fails this check first)', async () => {
+    const excepted = turbineSweep.filter((f) => isExcepted(f));
+    t.ok(excepted.length === 1, `expected exactly 1 farm to match the exception coordinates, got ${excepted.length}`);
+    t.ok(excepted[0]?.rendered === 0, `exception farm now renders ${excepted[0]?.rendered} turbines — the placement-law verdict may have changed; remove the exception in TURBINE_ZERO_EXCEPTIONS`);
+  });
+
+  await t.check('turbine fidelity: statewide total + ratio spread (curiosity stats, not a pass/fail gate)', async () => {
+    const total = turbineSweep.reduce((s, f) => s + f.rendered, 0);
+    t.ok(total > 5000, `statewide rendered turbine total implausibly low: ${total}`);
+  });
 }

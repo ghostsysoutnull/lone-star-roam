@@ -19,6 +19,21 @@ found it, whether the claim was independently verified in-session, and the
 Claude session model that ran the effort. External findings are claims
 until a probe confirms them.
 
+- **83 baked wind farms have centers outside the Texas border polygon.**
+  `tools/build-energy.mjs` bins turbines into farm cells over the raw
+  Overpass bbox without clipping cell centers to the border, so `windFarms`
+  in `data/energy.json` carries out-of-state clusters (NM/OK edges). Runtime
+  harmless — every turbine candidate gates on `inTexas`, so they render
+  nothing — but the baked list overstates the fleet and the turbine
+  farm-fidelity check must scope them out. Fix at the source per standing
+  preference: rebake with a border-polygon clip (reproduce the shipped file
+  unfixed first), not a runtime filter. *Provenance*: found 2026-07-22 by
+  the `wave-coder` agent's farm-sweep measurement during the turbine-sampler
+  wave (session model Fable 5); the 83 out-of-border centers are verified
+  by the deterministic sweep, the bbox-binning cause is inferred from
+  `build-energy.mjs` (confirm by reproducing the shipped file at rebake
+  time).
+
 - **15 real wind farms render zero turbines; 5 render more turbines than
   exist. QUEUED (2026-07-22): one wave with the city-clearance entry below,
   after the boot-cost fix, before sea-industry. Mechanism re-confirmed in

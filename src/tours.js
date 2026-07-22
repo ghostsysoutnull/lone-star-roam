@@ -110,6 +110,9 @@ export const TOURS = [
   {
     track: 'Energy (2026-07)',
     waves: [
+      { wave: 'Turbine sampler fix — faithful farms', spots: [
+        S('🌀 Resurrected compact farm', [965.6, -1475], { mode: 'DRIVE', time: 0.35, heading: 0, note: 'a real 17-turbine farm (r 20, fully inside one chunk) that rendered zero turbines before the sampler fix — the draw count was capped on the input side, so nearly every candidate missed the small circle; now the fleet stands here, proportional to the baked count' }),
+      ] },
       { wave: 'W6 — energy jobs: crude, fuel, oversize blades', spots: [
         S('🛢 Crude haul — Midland tanks to Baytown', LL(31.943, -102.03), { mode: 'DRIVE', act: 'crudeJob', note: 'a crude run injected and auto-loaded at the tank farm; the arrow points at the Baytown refinery gate — an ordinary clock, ×1.5 for staying grounded' }),
         S('⛽ Fuel run — Motiva gate to Austin', [5289.6, 1240.8], { mode: 'DRIVE', act: 'fuelJob', note: 'loads at the Motiva gate, delivers downtown Austin — refinery-to-city with the usual city-arrival radius' }),

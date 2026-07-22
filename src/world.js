@@ -968,33 +968,97 @@ export function wellSiteAt(cx, cz) {
   return sites;
 }
 
-// Wind turbines — Energy W3. windFarms[] only bakes cluster aggregates
-// ({x, z, count, r} — cell-binned, no individual turbine coords, "keeps the
-// fleet honest"), so per-chunk turbine slots are derived: density =
-// count/(π·r²), expected slots = density·CHUNK², candidates drawn uniformly
-// in the chunk and rejected if outside the farm's circle — that rejection
-// alone handles farm-edge chunks correctly (no separate overlap-fraction
-// math). Own `turbine:` stream. Capped per chunk (dense Sweetwater-corridor
-// farms would otherwise draw hundreds in one chunk).
+// Wind turbines — Energy W3, sampler made faithful 2026-07-22. windFarms[]
+// only bakes cluster aggregates ({x, z, count, r} — cell-binned, no individual
+// turbine coords, "keeps the fleet honest"); per-chunk sites are derived:
+// candidates drawn uniformly in the chunk from the `turbine:` stream, rejected
+// against the farm circle + legality gates, accepted output bounded by the
+// farm's local expectation and a proportional share of TURBINE_CAP (the
+// deliberate density limiter — dense Sweetwater-corridor farms would otherwise
+// put hundreds in one chunk).
 const TURBINE_CAP = 32;
+// Area of the circle (fx, fz, r) ∩ the chunk square at (x0, z0) — 64-slice
+// x-integration, deterministic, never misses a compact circle the way a
+// coarse point grid can.
+function circleChunkOverlap(fx, fz, r, x0, z0) {
+  const xa = Math.max(x0, fx - r), xb = Math.min(x0 + CHUNK, fx + r);
+  if (xb <= xa) return 0;
+  const N = 64, dx = (xb - xa) / N;
+  let area = 0;
+  for (let i = 0; i < N; i++) {
+    const x = xa + (i + 0.5) * dx, h = Math.sqrt(Math.max(0, r * r - (x - fx) * (x - fx)));
+    area += Math.max(0, Math.min(z0 + CHUNK, fz + h) - Math.max(z0, fz - h)) * dx;
+  }
+  return area;
+}
 export function windTurbinesAt(cx, cz) {
   const baseX = cx * CHUNK, baseZ = cz * CHUNK, midX = baseX + CHUNK / 2, midZ = baseZ + CHUNK / 2;
-  const out = [];
+  // Prepass: each overlapping farm's locally-expected turbines (density ×
+  // overlap area), so a contended chunk splits TURBINE_CAP proportionally.
+  // First-farm-takes-all in array order starved 18 real farms to zero.
+  const farms = [];
   for (const f of GEO.energy.windFarms) {
     if (Math.hypot(f.x - midX, f.z - midZ) > f.r + CHUNK * 0.75) continue; // cheap farm-overlap reject
     const density = f.count / (Math.PI * f.r * f.r);
-    const expect = Math.min(TURBINE_CAP, density * CHUNK * CHUNK);
-    if (expect < 0.05) continue;
+    const eLocal = density * circleChunkOverlap(f.x, f.z, f.r, baseX, baseZ);
+    if (eLocal < 0.05) continue;
+    farms.push({ f, density, eLocal, share: 0 });
+  }
+  if (!farms.length) return [];
+  const sumE = farms.reduce((s, o) => s + o.eLocal, 0);
+  for (const o of farms)
+    o.share = sumE <= TURBINE_CAP ? TURBINE_CAP : Math.max(1, Math.round((TURBINE_CAP * o.eLocal) / sumE));
+  for (let total = farms.reduce((s, o) => s + o.share, 0); total > TURBINE_CAP; total--)
+    farms.reduce((a, b) => (b.share > a.share ? b : a)).share--; // min-1 rounding can oversubscribe the cap
+  const out = [];
+  for (const { f, density, eLocal, share } of farms) {
+    // Accepted output per farm is bounded by its stochastically-rounded local
+    // expectation (the honest count — hard bound: farm total ≤ baked count +
+    // covering chunks) and its cap share. The `turbinefrac:` roll is a separate
+    // stream so the `turbine:` candidate stream keeps every existing position.
+    const frand = seededRand(`turbinefrac:${cx},${cz},${f.x.toFixed(1)},${f.z.toFixed(1)}`);
+    // Min-1 in the farm's center chunk: a count-1-2 farm must not vanish
+    // because a fractional-eLocal Bernoulli roll lost (boundary-split farms).
+    const centerChunk = Math.floor(f.x / CHUNK) === cx && Math.floor(f.z / CHUNK) === cz;
+    const stoch = Math.floor(eLocal) + (frand() < eLocal - Math.floor(eLocal) ? 1 : 0);
+    const bound = Math.min(share, Math.max(stoch, centerChunk ? 1 : 0));
+    if (!bound) continue;
+    // Draw count must be the UNCAPPED full-chunk expectation: candidates cover
+    // the whole chunk, so a compact farm (circle ≪ chunk) needs many draws for
+    // the circle test to accept its few turbines — capping input renders it
+    // empty. All caps act on accepted output, in the loop condition.
+    const eFull = density * CHUNK * CHUNK;
     const rand = seededRand(`turbine:${cx},${cz},${f.x.toFixed(1)},${f.z.toFixed(1)}`);
-    const draws = Math.ceil(expect) + 3; // a few extra draws — edge chunks reject some to the circle test
-    for (let i = 0; i < draws && out.length < TURBINE_CAP; i++) {
+    const draws = Math.min(Math.ceil(eFull), 4000); // bound dense-farm sliver-overlap chunks
+    let acc = 0;
+    for (let i = 0; i < draws && acc < bound && out.length < TURBINE_CAP; i++) {
       const x = baseX + rand() * CHUNK, z = baseZ + rand() * CHUNK, rot = rand() * Math.PI * 2;
       if (Math.hypot(x - f.x, z - f.z) > f.r) continue;
       if (!inTexas(x, z)) continue;
       const road = nearestAnyRoad(x, z, 3);
       if (road && road.dist < 3) continue;
       if (!airportClear(x, z)) continue;
+      if (!cityClear(x, z, 20)) continue;
       out.push({ x, z, rot });
+      acc++;
+    }
+    // Rescue: a tiny circle's whole-chunk draws can ALL miss it (binomial
+    // zero at a ~2% hit rate — absence, not thinning). Targeted draws in the
+    // circle's bbox, continuing the same stream's unconsumed tail, guarantee
+    // presence whenever a lawful spot exists in this chunk.
+    if (!acc && out.length < TURBINE_CAP) {
+      for (let i = 0; i < 40 && !acc; i++) {
+        const x = f.x - f.r + rand() * 2 * f.r, z = f.z - f.r + rand() * 2 * f.r, rot = rand() * Math.PI * 2;
+        if (Math.hypot(x - f.x, z - f.z) > f.r) continue;
+        if (x < baseX || x >= baseX + CHUNK || z < baseZ || z >= baseZ + CHUNK) continue; // neighbors run their own rescue
+        if (!inTexas(x, z)) continue;
+        const road = nearestAnyRoad(x, z, 3);
+        if (road && road.dist < 3) continue;
+        if (!airportClear(x, z)) continue;
+        if (!cityClear(x, z, 20)) continue;
+        out.push({ x, z, rot });
+        acc++;
+      }
     }
   }
   return out;

@@ -6,13 +6,13 @@ Three.js free-roam Texas game. Process law, commands, and architecture live in
 changing); per-module grep anchors in `MODULES.md`; history in `ROADMAP.md`;
 queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
-No active track: **Map W1 + W1.1 + W1.2 shipped 2026-07-20** (readable big
-map — folded into `ROADMAP.md`); a docs/memory housekeeping sweep ran
-2026-07-21. The wide-layer boot-cost fix shipped 2026-07-22 (border spatial
-index, wave-coder chunk — wide layer 3.3s → ~1.8s). **First: the turbine
-sampler wave** (zero/over farm counts + missing city-clearance gate, one
-wave — `BACKLOG.md` → Bugs; queued 2026-07-22, confirmed real by in-code
-verification). Then next per the 2026-H2 program (`VISION_2026H2.md`) is
-**sea-industry** (`VISION_SEA_INDUSTRY.md`) — spec session first. The Mexico 25-mi band conversation was discarded 2026-07-22
-(covered by `VISION_MEXICO_SHOULDER.md`). Map W2 (layers + waypoint) is
-queued in `BACKLOG.md`.
+No active track: **the turbine sampler wave shipped 2026-07-22** (faithful
+per-farm sampling + city-clearance gate + 6-check farm-fidelity guard in
+`tools/checks/energy.mjs`; zero-render farms 18 → 1 evidenced legality
+exception; the 83 out-of-border baked farm centers are queued in
+`BACKLOG.md` → Bugs as a bake artifact). Earlier 07-22: wide-layer
+boot-cost fix (border spatial index). **Next per the 2026-H2 program
+(`VISION_2026H2.md`): sea-industry (`VISION_SEA_INDUSTRY.md`) — spec
+session first.** The Mexico 25-mi band conversation was discarded
+2026-07-22 (covered by `VISION_MEXICO_SHOULDER.md`). Map W2 (layers +
+waypoint) is queued in `BACKLOG.md`.
