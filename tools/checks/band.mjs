@@ -79,12 +79,14 @@ export default async function band(t) {
     await t.tp(-2767, 334); // I-10 west of Fort Stockton — deep in Texas
     await t.ev(`g.hud.toast('')`);
     await t.tp(5218.5, -3287.4); // past the shoulder near Texarkana
+    await t.until(`document.getElementById('toast').textContent.includes('far as this road goes')`, 8000);
     const landMsg = await t.ev(`document.getElementById('toast').textContent`);
     t.ok(landMsg.includes('far as this road goes'), `no/wrong land-edge wall toast: "${landMsg}"`);
 
     await t.tp(-2767, 334);
     await t.ev(`g.hud.toast('')`);
     await t.tp(3768.8, 3937.2); // past the shelf, offshore
+    await t.until(`document.getElementById('toast').textContent.includes('blue water')`, 8000);
     const waterMsg = await t.ev(`document.getElementById('toast').textContent`);
     t.ok(waterMsg.includes('blue water'), `no/wrong Gulf wall toast: "${waterMsg}"`);
   });
@@ -249,7 +251,7 @@ export default async function band(t) {
   await t.check('Passport state stamp on first crossing (direct call, W1 enterBandCounty idiom)', async () => {
     await t.ev(`(() => { g.gameplay.save.passport.stamps = []; g.hud.toast(''); })()`);
     await t.ev(`g.gameplay.stampState('LA', 'Louisiana')`);
-    await t.wait(0.2); // hud.update() runs on its own throttled rAF tick, not synchronously with the mutation above
+    await t.until(`document.getElementById('toast').textContent.includes('Louisiana')`, 8000); // hud.update() runs on its own throttled rAF tick, not synchronously with the mutation above
     const res = await t.ev(`({
       stamps: g.gameplay.save.passport.stamps.slice(),
       toast: document.getElementById('toast').textContent,

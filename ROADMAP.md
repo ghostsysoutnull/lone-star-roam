@@ -1011,6 +1011,25 @@ Rails Operations followed and are folded in below). Queued work lives in
   route ref or night-state changes (`_shieldRaster` cache key). At night the
   face traces an amber wireframe lattice with a CSS bloom/pulse, gated on
   `ATMOS.night`. `parseShield`'s grammar is unchanged.
+- [x] ~~Verify Ops (interstitial, 1 wave)~~ — done 2026-07-23: the verify
+  runner refuses concurrent launches — pid lockfile
+  (`~/.cache/lonestar-verify/lock.json`, `wx` exclusive-create, exit 3 with
+  the holder's pid/started/argv), guard-protected stale reclaim (no
+  automatic guard reclamation — a stuck guard is manual), ownership-checked
+  idempotent release in a whole-lifecycle `finally` plus
+  `SIGINT`/`SIGTERM` release-then-re-raise handlers, `VERIFY_LOCK` selftest
+  override. Startup load warning when 1-min load exceeds cores (warning
+  only). Toast-assertion flake class fixed everywhere it existed: 6
+  fixed-wait single reads converted to `t.until` polling (band ×3, sea
+  Brownsville + the combined save+DOM Ports-log condition, padre Queen
+  Isabella); shoulder's settled-toast ordering assertions deliberately
+  excluded. Selftest 51→62 assertions (concurrency refusal, stale reclaim,
+  SIGTERM release, normal-exit cleanup, pre-lock exit-2 no-op).
+  Launch-discipline law merged into the GOTCHAS full-verify-run-discipline
+  bullet (own single background command, one instance at a time,
+  runner-owned `/tmp/lonestar-verify.log` authoritative after the run).
+  Born from the Sea W1 wave-close 3-run pile-up at load 33 —
+  `VERIFY_OPS_SPEC.md` keeps the incident record.
 - [ ] Mobile touch controls (virtual stick + buttons)
 
 ## Non-goals

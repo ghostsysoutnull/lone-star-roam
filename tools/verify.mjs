@@ -64,7 +64,7 @@
 // stderr — test-result exit semantics are unaffected either way.
 import { createServer } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
-import { existsSync, mkdirSync, readdirSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -344,6 +344,107 @@ const suites = wanted.length ? wanted : all;
 const unknown = suites.filter((s) => !all.includes(s));
 if (unknown.length) { console.error(`unknown suite(s): ${unknown.join(', ')} — have: ${all.join(', ')}`); process.exit(2); }
 
+// --- single-instance lock ---
+// Only one verify.mjs run at a time (parallel runs would contend for cores/
+// RAM and produce misleading timings). Lock is a plain file created with the
+// 'wx' exclusive-create flag — the create IS the acquisition, no separate
+// check-then-write race. VERIFY_LOCK overrides the path (selftest only; the
+// production default is this fixed path).
+const LOCK_PATH = process.env.VERIFY_LOCK || join(os.homedir(), '.cache/lonestar-verify/lock.json');
+const GUARD_PATH = join(dirname(LOCK_PATH), 'lock.reclaim.json');
+
+function probeAlive(pid) {
+  try { process.kill(pid, 0); return true; } // succeeded => alive
+  catch (e) {
+    if (e.code === 'EPERM') return true; // exists, just not ours to signal
+    if (e.code === 'ESRCH') return false; // no such process
+    throw e;
+  }
+}
+
+function acquireLock() {
+  mkdirSync(dirname(LOCK_PATH), { recursive: true });
+  const mine = { pid: process.pid, startedAt: new Date().toISOString(), argv: process.argv.slice(2) };
+  for (;;) {
+    try {
+      writeFileSync(LOCK_PATH, JSON.stringify(mine), { flag: 'wx' });
+      return mine;
+    } catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+    }
+    // EEXIST: read + parse the existing lock.
+    let lock;
+    try {
+      lock = JSON.parse(readFileSync(LOCK_PATH, 'utf8'));
+      if (!lock || typeof lock.pid !== 'number' || typeof lock.startedAt !== 'string') throw new Error('bad shape');
+    } catch {
+      process.stderr.write(`verify: lock file ${LOCK_PATH} is unreadable or malformed — refusing; inspect and remove it manually\n`);
+      process.exit(3);
+    }
+    if (probeAlive(lock.pid)) {
+      process.stderr.write(`verify: another run is active (pid ${lock.pid}, started ${lock.startedAt}, argv ${JSON.stringify(lock.argv)}) — refusing; wait or kill it\n`);
+      process.exit(3);
+    }
+    // Dead — reclaim, but only under a guard file so two simultaneous
+    // reclaimers can't both unlink/recreate the lock. No automatic guard
+    // reclamation, ever: a stuck guard is a manual-intervention case.
+    try {
+      writeFileSync(GUARD_PATH, JSON.stringify({ pid: process.pid }), { flag: 'wx' });
+    } catch {
+      process.stderr.write(`verify: reclaim guard ${GUARD_PATH} exists — refusing; if no verify is running, remove it manually\n`);
+      process.exit(3);
+    }
+    // Guard held: re-verify the pid is still dead and the lock is still the
+    // same one we inspected before touching anything.
+    let recheck = null;
+    try { recheck = JSON.parse(readFileSync(LOCK_PATH, 'utf8')); } catch { /* vanished or malformed now */ }
+    const sameLock = !!recheck && recheck.pid === lock.pid && recheck.startedAt === lock.startedAt;
+    const confirmedDead = sameLock && !probeAlive(recheck.pid);
+    if (!confirmedDead) {
+      // alive now, or the file changed/vanished under us — release the guard
+      // and restart the acquire loop conservatively (from the top: wx again).
+      try { unlinkSync(GUARD_PATH); } catch { /* best-effort */ }
+      continue;
+    }
+    try { unlinkSync(LOCK_PATH); } catch { /* best-effort */ }
+    process.stderr.write(`verify: reclaiming stale lock (pid ${lock.pid} dead, started ${lock.startedAt})\n`);
+    try { unlinkSync(GUARD_PATH); } catch { /* best-effort */ }
+    // loop back to the wx acquire attempt
+  }
+}
+
+// Ownership-checked and idempotent: unlinks only files this process itself
+// owns, so calling it more than once (finally + a signal handler) is safe.
+function releaseLock(mine) {
+  try {
+    const l = JSON.parse(readFileSync(LOCK_PATH, 'utf8'));
+    if (l && l.pid === mine.pid && l.startedAt === mine.startedAt) unlinkSync(LOCK_PATH);
+  } catch { /* missing/malformed — nothing of ours to release */ }
+  try {
+    const g = JSON.parse(readFileSync(GUARD_PATH, 'utf8'));
+    if (g && g.pid === mine.pid) unlinkSync(GUARD_PATH);
+  } catch { /* missing/malformed — nothing of ours to release */ }
+}
+
+const LOCK = acquireLock();
+
+// Load warning: never gates or changes behavior, just flags a machine that's
+// likely to produce flaky boot timeouts under the pool.
+{
+  const load1 = os.loadavg()[0];
+  const cores = os.cpus().length;
+  if (load1 > cores) {
+    process.stderr.write(`verify: load ${round1(load1)} on ${cores} cores — boot timeouts likely, results may flake; prefer an idle machine\n`);
+  }
+}
+
+// Release-then-re-raise: the once-handler is already removed by the time this
+// runs, so re-signaling falls through to default termination — exit-code
+// semantics for SIGINT/SIGTERM are unchanged by having a lock at all.
+for (const sig of ['SIGINT', 'SIGTERM']) {
+  process.once(sig, () => { releaseLock(LOCK); process.kill(process.pid, sig); });
+}
+
 // Approx per-suite seconds — a SCHEDULING HINT only (longest-processing-time
 // packing so the heavy suites start first); wrong values just cost a little
 // packing efficiency, never correctness. Keep every suite represented: an
@@ -375,6 +476,10 @@ const memCap = Math.floor(startFreemem / (0.8 * 2 ** 30));
 const DEFAULT_J = Math.min(suites.length, Math.max(2, Math.min(Math.ceil(os.cpus().length / 3), memCap)));
 const C = Math.max(1, Math.min(suites.length, jFlag > 0 ? jFlag : DEFAULT_J));
 
+// Everything from the static server through reporting/sidecar/telemetry runs
+// under one lock hold — the finally below is the ENTIRE run lifecycle's
+// release point (paired with the SIGINT/SIGTERM handlers registered above).
+try {
 const srv = await serve();
 const port = srv.address().port;
 const queue = suites.slice().sort((a, b) => (WEIGHTS[b] ?? 5) - (WEIGHTS[a] ?? 5));
@@ -768,4 +873,7 @@ try {
 
 if (QUIET) console.log(summary);
 else for (const line of report) console.log(line);
-process.exit(exitCode);
+process.exitCode = exitCode; // not process.exit — let this finally (and the natural exit) run
+} finally {
+  releaseLock(LOCK);
+}

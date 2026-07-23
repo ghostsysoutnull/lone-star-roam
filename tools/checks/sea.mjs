@@ -81,7 +81,7 @@ export default async function sea(t) {
     // game water) — the port site can't lose the nearest-wins toast race
     const p = await t.ev(`g.GEO.sea.ports.find((p) => p.id === 'brownsville')`);
     await t.tp(p.x + 15, p.z); // inside the 25u ring, off the kit itself
-    await t.wait(1.0); // energy.update runs at HUD cadence in the real loop
+    await t.until(`document.getElementById('toast').textContent.includes('Port of Brownsville')`, 8000); // energy.update runs at HUD cadence in the real loop
     const toast = await t.ev(`document.getElementById('toast').textContent`);
     t.ok(toast.includes('Port of Brownsville'), `approach toast reads "${toast}" — expected the Brownsville announce`);
   });
@@ -92,7 +92,9 @@ export default async function sea(t) {
     t.ok(totals.isArray, 'save.ports missing — the additive key never initialized');
     const p = await t.ev(`g.GEO.sea.ports.find((p) => p.id === 'texascity')`);
     await t.tp(p.x + 12, p.z + 12);
-    await t.wait(1.0);
+    // save mutates in energy.update; #score-ports refreshes on the HUD's own
+    // throttled tick — poll both so neither lags the assertion below.
+    await t.until(`g.gameplay.save.ports.includes('texascity') && document.getElementById('score-ports').textContent === String(g.gameplay.save.ports.length)`, 8000);
     const logged = await t.ev(`({ has: g.gameplay.save.ports.includes('texascity'), n: g.gameplay.save.ports.length, score: document.getElementById('score-ports').textContent })`);
     t.ok(logged.has, 'parking at the wharf did not stamp the Ports log');
     t.ok(logged.score === String(logged.n), `score-ports DOM (${logged.score}) out of sync with save (${logged.n})`);

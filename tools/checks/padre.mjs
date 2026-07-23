@@ -63,7 +63,7 @@ export default async function padre(t) {
   await t.check('Queen Isabella Causeway: ceremony toast fires mid-deck in DRIVE', async () => {
     await t.ev(`document.getElementById('toast').textContent = ''`);
     await t.tp(2207.3, 5473.3); // mid-span over the laguna
-    await t.wait(0.4);          // ceremony lives in the real hudTick loop
+    await t.until(`/Queen Isabella/.test(document.getElementById('toast').textContent)`, 8000); // ceremony lives in the real hudTick loop
     const res = await t.ev(`({
       toast: document.getElementById('toast').textContent,
       road: !!g.nearestRoad(g.player.pos.x, g.player.pos.z, 4),

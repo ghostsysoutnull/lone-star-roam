@@ -6,29 +6,31 @@ Three.js free-roam Texas game. Process law, commands, and architecture live in
 changing); per-module grep anchors in `MODULES.md`; history in `ROADMAP.md`;
 queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
-Active track: **Verify Ops** (interstitial, 1 wave — `VERIFY_OPS_SPEC.md`),
-then back to **Sea-Industry Realism** (`SEA_INDUSTRY_SPEC.md`, W2 of 3).
-Sea W1 (ports + AIS routes + Ports log) shipped 2026-07-23, commit eeca211.
+Active track: **Sea-Industry Realism** (`SEA_INDUSTRY_SPEC.md`, W2 of 3).
+Sea W1 (ports + AIS routes + Ports log) shipped 2026-07-23, commit eeca211;
+the Verify Ops interstitial (runner single-instance lock + load warning +
+toast-class fix, `VERIFY_OPS_SPEC.md`) shipped 2026-07-23.
 
 ## Session briefing
-- **This session**: Verify Ops, wave 1 of 1 — verify single-instance lock
-  (exit 3 refusal + stale reclaim), startup load warning, toast-assertion
-  class fixed via `t.until` (band + sea + mandatory class sweep), launch-
-  discipline law in GOTCHAS. Full contracts settled in `VERIFY_OPS_SPEC.md`
-  (lock path/content/messages verbatim, selftest cases, sweep recipe).
-  Born from the Sea W1 wave-close incident (3-run pile-up, load 33,
-  20 solo-green flakes — incident record in the spec).
-- **Recommended setup**: handoff **yes** (wave-coder — settled-design
-  execution; the runner selftest is the safety net), effort **high**.
-  Session runs Fable 5; flag it if another model is running.
-- **Budget**: code + selftest + named suites (band, sea) + one full run at
-  close, no shots, no tours, grep-first. Perf: none (no game code).
-- **Then**: rewrite this block for Sea-Industry W2 — named ships (seeded
-  `shipid:` identity + placard), VHF chatter, CG cutters + rotors joint
-  moment, shrimp fleet dawn/dusk, life offshore (5 species); handoff no,
-  effort high (chatter register + wildlife feel).
+- **This session**: Sea-Industry Realism, wave 2 of 3 — named ships (seeded
+  `shipid:` identity + approach placard, trains' idiom), VHF channel-16
+  chatter near ships and ports, Coast Guard cutters on patrol + joint
+  moments with the CG helicopter, shrimp fleet working real grounds on a
+  dawn/dusk cycle, life offshore (5 water-gated species in the critter log,
+  gulls trailing live shrimpers). Wave 1 (ports + AIS routes + Ports log)
+  shipped 2026-07-23, commit eeca211.
+- **Recommended setup**: handoff **no**, effort **high** — chatter register,
+  new behaviors, and wildlife feel are the wave's risk; mechanical chunks
+  delegate per chunk mode. Session runs Fable 5; flag it if another model
+  is running.
+- **Budget**: code + checks + tours + one staged shot (spec: suite checks +
+  one shot), grep-first, one full run at close per the launch-discipline
+  law. Perf: within caps (instanced fleets + species rows).
+- **Then**: rewrite this block for Sea-Industry W3 (sea cargo jobs + boat
+  shop) — W3 closes the track: fold into ROADMAP, sweep satellite docs,
+  graduate surviving gotchas.
 
-Gotchas carried over (Sea W1 → W2, keep through the interstitial): ships
+Gotchas carried over (Sea W1 → W2): ships
 pingpong routes — never wrap (never-vanish law); `maritime.force(x,z)` /
 `shipHere` is the ship-forcing pattern — W2's shrimper cycle and chatter
 need their own forcing actions per the tour law; W2 cutters ride

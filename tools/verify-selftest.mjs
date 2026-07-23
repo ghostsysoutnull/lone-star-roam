@@ -6,8 +6,8 @@
 // shot instrumentation. Six child `verify.mjs` runs (A–F), ~18 boots total,
 // ~2.5–3 min wall — expected, not a bug. Run on demand, and always after
 // changing verify.mjs's runner internals (sink/report/JSON/history shape).
-import { spawnSync } from 'node:child_process';
-import { readFileSync, readdirSync, mkdtempSync, existsSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { readFileSync, readdirSync, mkdtempSync, existsSync, writeFileSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
@@ -15,6 +15,10 @@ import os from 'node:os';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FIXTURES = join(ROOT, 'tools/checks-fixtures');
 const tmp = mkdtempSync(join(os.tmpdir(), 'lonestar-verify-selftest-'));
+
+// Every child run below gets a VERIFY_LOCK inside this tmp dir — the selftest
+// must never touch the production lock at ~/.cache/lonestar-verify/lock.json.
+const LOCK_DEFAULT = join(tmp, 'lock-default.json');
 
 const results = [];
 function assert(name, cond) { results.push({ name, pass: !!cond }); }
@@ -24,8 +28,28 @@ function run(args, envExtra, timeout = 180000) {
     cwd: ROOT,
     encoding: 'utf8',
     timeout,
-    env: { ...process.env, VERIFY_CHECKS: FIXTURES, ...envExtra },
+    env: { ...process.env, VERIFY_CHECKS: FIXTURES, VERIFY_LOCK: LOCK_DEFAULT, ...envExtra },
   });
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Poll until the lock file at `path` contains valid JSON whose pid === `pid`
+// (not merely until the path exists — a partial/mid-write read must not pass).
+async function waitForLockHolder(path, pid, timeoutMs = 15000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const j = JSON.parse(readFileSync(path, 'utf8'));
+      if (j && typeof j.pid === 'number' && j.pid === pid) return true;
+    } catch { /* not written yet, or a torn read mid-write — keep polling */ }
+    await sleep(30);
+  }
+  return false;
+}
+
+function waitClose(child) {
+  return new Promise((res) => child.once('close', (code, signal) => res({ code, signal })));
 }
 
 function parseJSON(path) {
@@ -86,6 +110,9 @@ if (jsonAParsed) {
   for (const s of jsonAParsed.suites || []) for (const a of s.attempts) if (a.failed !== a.failures.length) reconciles = false;
   assert('A: every attempt reconciles failed === failures.length', reconciles);
 }
+
+// --- lock case 3: normal run leaves no lock file behind ---
+assert('lock: a normal run\'s lock file is gone after exit', !existsSync(LOCK_DEFAULT));
 
 // --- run B: flakyonce, shotfix -> exit 0 ---
 const markerFlaky = join(tmp, 'flakyonce-marker');
@@ -174,12 +201,81 @@ assert('E: exit code 3', resE.status === 3);
 assert('E: summary has the infra clause', /infra \(browser casualty, not verified\)/.test(resE.stdout));
 assert('E: stderr has the telemetry write warning', /verify: telemetry write failed/.test(resE.stderr));
 
-// --- run F: unknown suite -> exit 2 (unchanged) ---
+// --- run F: unknown suite -> exit 2 (unchanged); pre-lock, so no lock file ---
+const lockF = join(tmp, 'lock-f.json');
 const resF = keep('F', spawnSync('node', ['tools/verify.mjs', 'bogus-suite-does-not-exist'], {
   cwd: ROOT, encoding: 'utf8', timeout: 20000,
+  env: { ...process.env, VERIFY_LOCK: lockF },
 }));
 assert('F: unknown suite exit code 2', resF.status === 2);
 assert('F: stderr names it', resF.stderr.includes('unknown suite'));
+assert('F: no lock file created (bad-arg exit is pre-lock)', !existsSync(lockF));
+
+// --- lock case 1: concurrency refusal ---
+const lockConcurrency = join(tmp, 'lock-concurrency.json');
+let procConcA = null;
+try {
+  procConcA = spawn('node', ['tools/verify.mjs', '-q', 'green'], {
+    cwd: ROOT,
+    env: {
+      ...process.env, VERIFY_CHECKS: FIXTURES, VERIFY_LOCK: lockConcurrency,
+      VERIFY_LOG: join(tmp, 'concurrency-a.log'), VERIFY_JSON: join(tmp, 'concurrency-a.json'),
+      VERIFY_HISTORY_DIR: join(tmp, 'history-concurrency-a'),
+    },
+  });
+  const gotA = await waitForLockHolder(lockConcurrency, procConcA.pid, 15000);
+  assert('concurrency: run A holds the lock (valid JSON, A\'s pid) before B is spawned', gotA);
+
+  const resConcB = run(['-q', 'green'], {
+    VERIFY_LOCK: lockConcurrency, VERIFY_LOG: join(tmp, 'concurrency-b.log'),
+    VERIFY_JSON: join(tmp, 'concurrency-b.json'), VERIFY_HISTORY_DIR: join(tmp, 'history-concurrency-b'),
+  });
+  assert('concurrency: run B exits 3', resConcB.status === 3);
+  assert('concurrency: B stderr has the refusal line with A\'s pid',
+    new RegExp(`another run is active \\(pid ${procConcA.pid}, started`).test(resConcB.stderr));
+} finally {
+  if (procConcA) {
+    try { procConcA.kill('SIGKILL'); } catch { /* already gone */ }
+    await waitClose(procConcA);
+  }
+}
+
+// --- lock case 2: stale reclaim ---
+const lockStale = join(tmp, 'lock-stale.json');
+const deadChild = spawnSync('node', ['-e', '0']); // exits immediately -> its pid is now dead
+const deadPid = deadChild.pid;
+writeFileSync(lockStale, JSON.stringify({ pid: deadPid, startedAt: new Date().toISOString(), argv: ['stale-fixture'] }));
+const resStale = run(['-q', 'green'], {
+  VERIFY_LOCK: lockStale, VERIFY_LOG: join(tmp, 'stale.log'), VERIFY_JSON: join(tmp, 'stale.json'),
+  VERIFY_HISTORY_DIR: join(tmp, 'history-stale'),
+});
+assert('stale reclaim: run proceeds to a normal exit (0)', resStale.status === 0);
+assert('stale reclaim: stderr has the reclaim line',
+  new RegExp(`reclaiming stale lock \\(pid ${deadPid} dead`).test(resStale.stderr));
+assert('stale reclaim: lock file gone after', !existsSync(lockStale));
+
+// --- lock case 4: SIGTERM releases the lock ---
+const lockSigterm = join(tmp, 'lock-sigterm.json');
+let procSigterm = null;
+try {
+  procSigterm = spawn('node', ['tools/verify.mjs', '-q', 'green'], {
+    cwd: ROOT,
+    env: {
+      ...process.env, VERIFY_CHECKS: FIXTURES, VERIFY_LOCK: lockSigterm,
+      VERIFY_LOG: join(tmp, 'sigterm.log'), VERIFY_JSON: join(tmp, 'sigterm.json'),
+      VERIFY_HISTORY_DIR: join(tmp, 'history-sigterm'),
+    },
+  });
+  const gotSigterm = await waitForLockHolder(lockSigterm, procSigterm.pid, 15000);
+  assert('sigterm: run holds the lock before signaling', gotSigterm);
+  procSigterm.kill('SIGTERM');
+  await waitClose(procSigterm);
+  assert('sigterm: no lock file remains after termination', !existsSync(lockSigterm));
+} finally {
+  if (procSigterm && procSigterm.exitCode === null && !procSigterm.killed) {
+    try { procSigterm.kill('SIGKILL'); } catch { /* already gone */ }
+  }
+}
 
 // --- history assertions across A + B ---
 let historyFilesAB = [];

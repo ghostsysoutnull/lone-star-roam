@@ -407,17 +407,28 @@ graduate here (and out of `NEXT_SESSION.md`).
   lights' flashlight-timer + Levelland flicker, ferries' ramp-arrival ±0.6u,
   onboarding's tip order — all clean standalone). Policy: one standalone rerun
   before assuming a regression, and never treat "a new suite flaked" as news.
-- **Full-verify run discipline** (2026-07-19 — a quarter of a wave session went
-  to avoidable reruns): (1) *capture-once* — pipe every full run to a file
-  (`node tools/verify.mjs > /tmp/verify-run.log 2>&1`), then `tail`/`rg FAIL`
-  the file; NEVER re-run the suite just to re-see failures that scrolled past a
-  `| tail`. (2) *the flake tax is automated* (2026-07-20): verify.mjs reruns
-  each pool-failed suite once solo after the pool drains — `FLAKE
+- **Full-verify run discipline** (2026-07-19, rewritten 2026-07-23 — a quarter
+  of a wave session went to avoidable reruns, then a launch-discipline
+  incident and a repeat `tail`/`head` piping breach): (1) *launch it alone* —
+  the full verify runs as its own single background command, never chained
+  behind anything with `&&`/`|` (a compound background command can notify
+  completion early) and never in the foreground (the 600 s Bash cap orphans
+  the run). (2) *one instance at a time* — the runner itself enforces this
+  (single-instance lock, exit 3 + the pid/started/argv line on a live
+  holder); on a refusal, wait for the holder and re-run, don't relaunch or
+  fight the lock. (3) *the runner-owned `/tmp/lonestar-verify.log` is
+  authoritative* — every run auto-writes the full compact report there, so
+  the old manual capture-once redirect instruction is retired; reading that
+  log AFTER a run ends is fine and is a different thing from piping *live*
+  verify/status output through `tail`/`head`, which stays banned (`-q` is
+  already the trim; a pipe can cut the root-cause FAIL line — breached again
+  2026-07-23). (4) *the flake tax is automated* (2026-07-20): verify.mjs
+  reruns each pool-failed suite once solo after the pool drains — `FLAKE
   (solo-green)` exits 0 (label + original failure detail always print), `FAIL
   (confirmed on rerun)` stays nonzero; no manual `-j 1` confirm pass anymore,
   but READ the flake labels — a suite flaking every run is a real bug wearing
-  the label. (3) full runs are for the protocol points (wave end,
-  pre-push); mid-wave iteration stays on named suites. (4) a mid-wave
+  the label. (5) full runs are for the protocol points (wave end,
+  pre-push); mid-wave iteration stays on named suites. (6) a mid-wave
   named-suite run must gate a decision — something done differently on FAIL
   before the wave-end full run; assurance-only runs wait for the full run,
   which covers them anyway (W2 2026-07-19: a 4-suite "thoroughness" run

@@ -1,9 +1,11 @@
 # Backlog — queued work
 
 Active track: **Sea-Industry Realism** (`SEA_INDUSTRY_SPEC.md`, spec'd
-2026-07-22, 3 waves, none coded yet). Next up: **sea-industry W1**
-(ports + AIS routes). The wind-farm bake-clip rebake (+ solar-decal
-re-check) shipped 2026-07-22.
+2026-07-22, 3 waves). W1 (ports + AIS routes + Ports log) shipped
+2026-07-23; next up: **sea-industry W2** (named ships, VHF chatter, CG
+cutters, shrimp fleet, life offshore). The Verify Ops interstitial
+(runner single-instance lock + load warning + toast-class fix) shipped
+2026-07-23.
 Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
