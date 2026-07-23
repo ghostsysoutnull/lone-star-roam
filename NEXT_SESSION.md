@@ -27,7 +27,31 @@ terrain painter's `bandTint` (`world.js`), ~2.8s of a ~10.7s boot profile
 decision waits on this table plus the accumulating
 `/tmp/lonestar-verify.json` history — no track opened yet.
 
-**Next per the 2026-H2 program (`VISION_2026H2.md`): sea-industry
-(`VISION_SEA_INDUSTRY.md`) — spec session first.** The Mexico 25-mi band
-conversation was discarded 2026-07-22 (covered by `VISION_MEXICO_SHOULDER.md`).
-Map W2 (layers + waypoint) is queued in `BACKLOG.md`.
+**Queue order (set 2026-07-22)**: runner-telemetry wave (below), then the
+turbine-sampler wave (`BACKLOG.md` → Bugs), then sea-industry
+(`VISION_SEA_INDUSTRY.md`, spec session first — doc-only, may interleave
+anywhere). The Mexico 25-mi band conversation was discarded 2026-07-22
+(covered by `VISION_MEXICO_SHOULDER.md`). Map W2 (layers + waypoint) is
+queued in `BACKLOG.md`.
+
+## Session briefing
+- **This session**: runner telemetry + durable history, single wave —
+  settle the failure matrix + retention in the plan, then hand off. Scope
+  doc: `TEST_RUNNER_FOLLOWUP.md`; amendments + provenance in `BACKLOG.md`
+  → Test harness follow-ups. Hardening wave (gate hardening + JSON
+  sidecar) shipped 2026-07-22, commit ecad959.
+- **Recommended setup**: handoff **yes**, effort **high** — mechanical
+  runner work once the plan settles the two open contracts (per-phase
+  failure matrix incl. the browser-crash relaunch-vs-abort cell; retention
+  knobs). Session runs Fable 5; flag it if another model is running.
+- **Budget**: code + fixtures + self-test expansion; no game perf cost, no
+  judged shots (self-test adds a few boots + one capture fixture asserted
+  numerically); one full verify at wave close, retained as the first
+  trusted history entry.
+- **Then**: rewrite this block for the turbine-sampler + city-clearance
+  wave (`BACKLOG.md` → Bugs); sea-industry spec session may interleave
+  anytime (doc-only).
+
+Gotchas carried over: history dir must be reboot-durable
+(`~/.cache/lonestar-verify/history/`); browser-crash casualties are
+`infra`, never FAIL — signature-history integrity is the wave's point.

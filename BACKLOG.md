@@ -1,9 +1,10 @@
 # Backlog — queued work
 
 No active track. Rails Operations shipped in full 2026-07-19 (folded into
-`ROADMAP.md`); next up per the 2026-H2 program is sea-industry
-(`VISION_SEA_INDUSTRY.md`), which needs its spec session first.
-Items below are the queue.
+`ROADMAP.md`). Queue order set 2026-07-22: the **runner-telemetry wave**
+(Test harness follow-ups below), then the **turbine-sampler wave** (Bugs
+below), then sea-industry (`VISION_SEA_INDUSTRY.md`, spec session first —
+doc-only, may interleave anywhere). Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Bugs (live in shipped code)
@@ -225,12 +226,40 @@ until a probe confirms them.
   near-uniform, so body-only ordering can still strand a worker on an
   extra boot wave.
 
-- **Runner infra-failure normalization** (2026-07-22): a navigation/import
+- ~~Runner infra-failure normalization~~ (2026-07-22): a navigation/import
   failure outside `t.check()` rejects its worker, kills the pool via
   `Promise.all`, and exits with **no report, no LOG, no JSON**. Needs a
   normalized fatal-suite result + cleanup that still writes the reports
   (suite watchdogs optional, same family). Known and deliberately excluded
-  from the hardening wave's scope.
+  from the hardening wave's scope. → **Folded into the runner-telemetry
+  wave below (2026-07-22)**, gated on its plan-settled failure matrix.
+
+- **Runner telemetry + durable history wave** (queued 2026-07-22 — next
+  coding wave, before the turbine-sampler wave and sea-industry coding).
+  Scope: `TEST_RUNNER_FOLLOWUP.md` (history retention, structured failure
+  identity/signatures, self-test coverage of the NaN-guard and solo-green
+  paths, start/end machine snapshots + shot instrumentation) with three
+  amendments settled in-chat 2026-07-22: (1) history lives in
+  `~/.cache/lonestar-verify/history/`, not `/tmp` — reboot-durable;
+  `/tmp/lonestar-verify.json` stays as the latest-run pointer; (2) the
+  infra-failure normalization entry above folds in, gated on a plan-settled
+  **per-phase failure matrix** (scope/retry/continuation/reporting per
+  phase; browser-crash casualties get an `infra` status distinct from
+  fail/flake so they never poison signature history; relaunch-vs-abort is
+  the one open cell); (3) strict telemetry mode dropped — loud stderr
+  warning suffices, no CI consumer exists. Plan-session items (contract
+  settles before handoff): the failure matrix + retention knobs (age-based
+  prune with safety margin, concurrency-safe, never count-only). Handoff:
+  **yes** (wave-coder) once the plan settles those. Cost line: no game perf
+  cost, no judged shots; the self-test grows by a few boots + one capture
+  fixture asserted numerically. The wave-close full verify is retained as
+  the first trusted history entry. Unblocks the flake-policy and
+  startup-optimization gates (both wait on accumulated history, which
+  currently overwrites itself every run). *Provenance*: doc by the codex
+  lane (`gpt-5.6-sol`); four central claims (single-file overwrite + silent
+  write catch, `{name,ms,status}`-only check records, missing `t.near`/
+  solo-green fixtures, post-teardown machine block) verified in-session at
+  HEAD `09941ed` by Fable 5.
 
 ## Playtest findings 2026-07-15 (Bruno's tx-urgent notes; ocean-zone fix
 already shipped as `54b3511` — these are the remaining items)
