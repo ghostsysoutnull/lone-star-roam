@@ -1,11 +1,11 @@
 # Backlog — queued work
 
 Active track: **Sea-Industry Realism** (`SEA_INDUSTRY_SPEC.md`, spec'd
-2026-07-22, 3 waves). W1 (ports + AIS routes + Ports log) shipped
-2026-07-23; next up: **sea-industry W2** (named ships, VHF chatter, CG
-cutters, shrimp fleet, life offshore). The Verify Ops interstitial
-(runner single-instance lock + load warning + toast-class fix) shipped
-2026-07-23.
+2026-07-22, 3 waves). W1 (ports + AIS routes + Ports log) and W2 (named
+ships, VHF chatter, CG cutters, shrimp fleet, life offshore) shipped
+2026-07-23; next up: **sea-industry W3** (sea cargo jobs + boat shop —
+closes the track). The Verify Ops interstitial (runner single-instance
+lock + load warning + toast-class fix) shipped 2026-07-23.
 Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
@@ -135,6 +135,18 @@ until a probe confirms them.
   separate conversation needed before that track is scheduled.
 
 ## Test harness follow-ups (verify.mjs is now a parallel pool, 2026-07-12)
+
+- **Fix the `tools/judge-shot.sh` Copilot lockdown** (broke mid-Sea-W2,
+  2026-07-23): the CLI now rejects the bogus `--available-tools ask_user`
+  name ("Unknown tool name") and in that mode announces its FULL default
+  tool loadout — the zero-tools trick no longer pins it, intermittently at
+  first, then persistently. Find the currently-supported way to run Copilot
+  with no tools at all; if none exists, the wrapper must refuse to run
+  rather than run unlocked (it must never be able to read repo files —
+  GOTCHAS → Verification law). Until fixed, staged shots are judged by
+  Bruno's eye only. Provenance: three consecutive failed invocations during
+  the Sea W2 legibility rounds; two shots (sealife, shrimper-fixed) shipped
+  eye-judged.
 
 - ~~Auto-confirm flaked suites in verify.mjs~~ — shipped 2026-07-20; rules
   in `GOTCHAS.md` → Verification.

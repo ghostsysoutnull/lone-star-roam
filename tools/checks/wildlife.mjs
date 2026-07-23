@@ -182,4 +182,197 @@ export default async function wildlife(t) {
     const stillBand = await t.ev(`g.inTexasOrBand(${res.end.x}, ${res.end.z}) && !g.inTexas(${res.end.x}, ${res.end.z})`);
     t.ok(stillBand, `animal left the band without crossing into Texas: ${JSON.stringify(res.end)}`);
   });
+
+  // --- Sea-Industry W2: life offshore (5 new sea species, gull/maritime bridge) ---
+
+  await t.check('sea tables: SPECIES_COUNT, the 5 new rows, and their region-table siting', async () => {
+    const tables = await t.ev(`(() => {
+      const keys = ['spotteddolphin', 'greenturtle', 'cownose', 'tarpon', 'gull'];
+      const specs = Object.fromEntries(keys.map((k) => [k, g.SPECIES[k]]));
+      const factsOk = keys.every((k) => !!specs[k] && !!specs[k].fact && specs[k].fact.length > 0);
+      const behaviorsOk = ['spotteddolphin', 'greenturtle', 'cownose', 'tarpon'].every((k) =>
+        specs[k].sea === true && ['graze', 'lurk', 'coil'].includes(specs[k].behavior));
+      const offshore = g.animals.regionTable(4200, 2350).map((r) => r[0]);
+      return { count: Object.keys(g.SPECIES).length, present: keys.every((k) => !!specs[k]), factsOk, behaviorsOk, offshore };
+    })()`);
+    t.ok(tables.present, 'one or more of the 5 new sea species keys is missing from SPECIES');
+    t.ok(tables.count === 34, `SPECIES_COUNT is ${tables.count}, plan expects 34`);
+    t.ok(tables.factsOk, 'a new sea species has an empty/missing fact');
+    t.ok(tables.behaviorsOk, 'a non-gull sea row is missing sea:true or has a behavior outside graze/lurk/coil');
+    t.ok(tables.offshore.includes('spotteddolphin'), `offshore regionTable(4200,2350) missing spotteddolphin: ${tables.offshore}`);
+
+    const laguna = await t.ev(`(() => {
+      let minCoastDist = Infinity;
+      for (let x = 2150; x <= 2350; x += 10) {
+        for (let z = 5150; z <= 5350; z += 10) {
+          const w = g.boatableAt(x, z);
+          if (!w || w.kind !== 'gulf') continue;
+          const cd = g.coastDist(x, z);
+          minCoastDist = Math.min(minCoastDist, cd);
+          if (cd < 25) return { x, z, coastDist: cd, species: g.animals.regionTable(x, z).map((r) => r[0]) };
+        }
+      }
+      return { found: false, minCoastDist };
+    })()`);
+    t.ok(laguna.x !== undefined, `no Laguna Madre flats point in x∈[2150,2350] z∈[5150,5350] step 10 (boatableAt gulf, coastDist<25) — minimum coastDist found in the box: ${laguna.minCoastDist}`);
+    if (laguna.x !== undefined) {
+      t.ok(laguna.species.includes('cownose') && laguna.species.includes('greenturtle'),
+        `flats regionTable at (${laguna.x},${laguna.z}, coastDist ${laguna.coastDist.toFixed(1)}) missing cownose/greenturtle: ${laguna.species}`);
+    }
+
+    const site = await t.ev(`(() => {
+      const offsets = [[0, 0], [30, 0], [-30, 0], [0, 30], [0, -30], [30, 30], [-30, -30], [30, -30], [-30, 30]];
+      for (const [ox, oz] of offsets) {
+        const x = 4580.2 + ox, z = 1859.0 + oz; // SEA_SITES: Galveston south jetty
+        const w = g.boatableAt(x, z);
+        if (w && w.kind === 'gulf') return { x, z, species: g.animals.regionTable(x, z).map((r) => r[0]) };
+      }
+      return null;
+    })()`);
+    t.ok(site, 'no gulf water within ±30u of the SEA_SITES jetty center [4580.2,1859.0]');
+    if (site) t.ok(site.species.includes('tarpon'), `regionTable at the jetty site (${site.x},${site.z}) missing tarpon: ${site.species}`);
+  });
+
+  await t.check('sea species spawn legality: every gulf animal rides real water at the waterline', async () => {
+    await t.tp(4200, 2350, 'BOAT');
+    await t.ev(`g.animals.update(0.1, g.player.pos.x, g.player.pos.z, 0)`);
+    const res = await t.ev(`(() => {
+      const bad = [];
+      let seaCount = 0;
+      for (const { animals } of g.animals.live.values())
+        for (const a of animals) {
+          const spec = g.SPECIES[a.species];
+          if (!spec.sea) continue;
+          seaCount++;
+          const w = g.boatableAt(a.g.position.x, a.g.position.z);
+          const dy = Math.abs(a.g.position.y - g.SEA_Y);
+          if (!w || w.kind !== 'gulf' || dy >= 1.2) bad.push({ species: a.species, x: a.g.position.x, z: a.g.position.z, y: a.g.position.y, water: w });
+        }
+      return { seaCount, bad };
+    })()`);
+    t.ok(res.seaCount > 0, 'no sea-flagged animals spawned near [4200,2350]');
+    t.ok(res.bad.length === 0, `sea animal off legal gulf water or off the waterline: ${JSON.stringify(res.bad.slice(0, 3))}`);
+  });
+
+  await t.check('seaLife: conjures & logs all four species, tarpon rolls at the waterline', async () => {
+    await t.tp(4200, 2350, 'BOAT');
+    await t.ev(`g.debug.actions.seaLife()`);
+    await t.step(3, 'g.animals.update(dt, g.player.pos.x, g.player.pos.z, 0);');
+    const logged = await t.ev(`g.gameplay.save.species`);
+    for (const sp of ['spotteddolphin', 'greenturtle', 'cownose', 'tarpon']) {
+      t.ok(logged.includes(sp), `${sp} missing from save.species after seaLife + close approach`);
+    }
+    // tarpon W2.1 contract: the Silver King leap (first one early after spawn)
+    // + calm between leaps — the ±52° stationary rock shipped once and read
+    // as a small submarine (Bruno, 2026-07-23); the old check enforced it
+    const seaY = await t.ev('g.SEA_Y');
+    const foundTarpon = await t.ev(`(() => {
+      const px = g.player.pos.x, pz = g.player.pos.z;
+      let best = null, bd = 100;
+      for (const e of g.animals.live.values()) for (const a of e.animals) {
+        if (a.species !== 'tarpon') continue;
+        const d = Math.hypot(a.g.position.x - px, a.g.position.z - pz);
+        if (d < bd) { bd = d; best = a; }
+      }
+      window.__tarpA = best; window.__tmax = -99; window.__zcalm = 0;
+      // drive to the asserted state (hermetic law): the natural first leap
+      // often fires during the earlier stepping above, and waiting on the
+      // random 8–18s re-arm is a coin flip against a fixed window (it flaked
+      // exactly that way under the j=4 full run, 2026-07-23)
+      if (best) { best.leap = null; best.leapT = 0.1; }
+      return !!best;
+    })()`);
+    t.ok(foundTarpon, 'no tarpon within 100u after seaLife');
+    await t.step(4,
+      `g.animals.update(dt, g.player.pos.x, g.player.pos.z, 0); window.__tmax = Math.max(window.__tmax, window.__tarpA.g.position.y); if (window.__tarpA.g.position.y < ${seaY + 0.3}) window.__zcalm = Math.max(window.__zcalm, Math.abs(window.__tarpA.g.rotation.z));`,
+      `window.__tmax > ${seaY + 0.8} && window.__tarpA.leap == null`); // early-exit once the forced leap has peaked and landed
+    const tarp = await t.ev(`({ tmax: window.__tmax, zcalm: window.__zcalm })`);
+    t.ok(tarp.tmax > seaY + 0.8, `forced leap not observed in 4s: max y ${tarp.tmax.toFixed(2)} (need > ${(seaY + 0.8).toFixed(2)})`);
+    t.ok(tarp.zcalm <= 0.25, `calm-phase sway too big: |rotation.z| ${tarp.zcalm.toFixed(2)} — the submarine rock is back`);
+
+    // legibility pass: the dolphin is a cruiser — always under way so the
+    // porpoise arc plays, never parked as an invisible sliver at the waterline.
+    // Assert on the NEAREST dolphin: only animals inside ACTIVE_R (150u) are
+    // simulated — a far natural spawn legitimately never ticks its state.
+    // Path length, not net displacement — a random heading re-roll can fold a
+    // genuinely cruising fish back near its start (that displacement version
+    // flaked on direction luck under the j=4 full run, 2026-07-23)
+    const d0 = await t.ev(`(() => {
+      const px = g.player.pos.x, pz = g.player.pos.z;
+      let best = null, bd = 100;
+      for (const e of g.animals.live.values()) for (const a of e.animals) {
+        if (a.species !== 'spotteddolphin') continue;
+        const d = Math.hypot(a.g.position.x - px, a.g.position.z - pz);
+        if (d < bd) { bd = d; best = a; }
+      }
+      window.__dolA = best; window.__dsum = 0; window.__dp = null;
+      return !!best;
+    })()`);
+    t.ok(d0, 'no spotteddolphin within 100u after seaLife');
+    await t.step(3,
+      'g.animals.update(dt, g.player.pos.x, g.player.pos.z, 0); if (window.__dp) window.__dsum += Math.hypot(window.__dolA.g.position.x - window.__dp.x, window.__dolA.g.position.z - window.__dp.z); window.__dp = { x: window.__dolA.g.position.x, z: window.__dolA.g.position.z };');
+    const dol = await t.ev(`({ ambling: window.__dolA.ambling, dsum: window.__dsum })`);
+    t.ok(dol.ambling === true, 'cruise dolphin is parked (ambling false) — the arc cue is off');
+    t.ok(dol.dsum > 6, `cruise dolphin swam only ${dol.dsum.toFixed(2)}u of path over 3s — should be continuously under way`);
+  });
+
+  await t.check('flee stays wet: a scared cownose never leaves legal gulf water', async () => {
+    await t.tp(4200, 2350, 'BOAT');
+    await t.ev(`g.debug.actions.seaLife()`);
+    await t.step(1, 'g.animals.update(dt, g.player.pos.x, g.player.pos.z, 0);');
+    const ray = await t.ev(`(() => { const a = [...g.animals.live.values()].flatMap((e) => e.animals).find((a) => a.species === 'cownose'); return a ? { x: a.g.position.x, z: a.g.position.z } : null; })()`);
+    t.ok(ray, 'no cownose found after seaLife');
+    if (!ray) return;
+    await t.tp(ray.x, ray.z, 'BOAT'); // right on top of it — inside its 6u fleeR
+    await t.step(3, 'g.animals.update(dt, g.player.pos.x, g.player.pos.z, 0);');
+    const res = await t.ev(`(() => {
+      const a = [...g.animals.live.values()].flatMap((e) => e.animals).find((a) => a.species === 'cownose');
+      const w = g.boatableAt(a.g.position.x, a.g.position.z);
+      return { d: Math.hypot(a.g.position.x - ${ray.x}, a.g.position.z - ${ray.z}), wet: !!(w && w.kind === 'gulf') };
+    })()`);
+    t.ok(res.d > 1.5, `cownose didn't gain ground when scared: ${res.d.toFixed(2)}`);
+    t.ok(res.wet, 'fleeing cownose left legal gulf water');
+  });
+
+  await t.check('gull flock: anchors from seaFlocks, wheels near it, clears with no anchor, logs on approach', async () => {
+    await t.tp(4200, 2350, 'BOAT');
+    const res = await t.ev(`(() => {
+      const px = g.player.pos.x, pz = g.player.pos.z;
+      g.animals.seaFlocks = [{ x: px + 10, z: pz }];
+      g.animals.update(0.1, px, pz, 0);
+      const visible = g.animals.gullGroup?.visible;
+      const seaY = g.SEA_Y;
+      const gulls = g.animals.gulls.map((b) => ({ d: Math.hypot(b.g.position.x - (px + 10), b.g.position.z - pz), y: b.g.position.y }));
+      g.animals.seaFlocks = [];
+      g.animals.update(0.1, px, pz, 0);
+      const clearedVisible = g.animals.gullGroup?.visible;
+      return { visible, gulls, seaY, clearedVisible };
+    })()`);
+    t.ok(res.visible === true, 'gullGroup not visible with a live anchor in range');
+    t.ok(res.gulls.length === 4, `expected 4 gulls, got ${res.gulls.length}`);
+    for (const [i, gu] of res.gulls.entries()) {
+      t.ok(gu.d < 13, `gull ${i} is ${gu.d.toFixed(1)}u from its anchor — expected < 13`);
+      t.ok(gu.y >= res.seaY + 1.5 && gu.y <= res.seaY + 7, `gull ${i} y ${gu.y.toFixed(2)} out of [SEA_Y+1.5, SEA_Y+7]`);
+    }
+    t.ok(res.clearedVisible === false, 'gullGroup stayed visible after seaFlocks cleared');
+
+    // clear the dedup so this SPOT_R approach is the one that logs it, not the
+    // px+10 anchor above (also within SPOT_R and would otherwise mask this)
+    await t.ev(`g.gameplay.save.species = g.gameplay.save.species.filter((s) => s !== 'gull')`);
+    const logged = await t.ev(`(() => {
+      const px = g.player.pos.x, pz = g.player.pos.z;
+      g.animals.seaFlocks = [{ x: px + 8, z: pz }];
+      g.animals.update(0.1, px, pz, 0);
+      return g.gameplay.save.species.includes('gull');
+    })()`);
+    t.ok(logged, 'gull did not land in the critter save within SPOT_R');
+  });
+
+  await t.check('real-loop bridge: main.js wires maritime.workingShrimpers() into animals.seaFlocks every frame', async () => {
+    await t.tp(4752, 1993); // Galveston ground
+    await t.ev(`g.debug.actions.shrimpFleet()`);
+    await t.simWait(2);
+    const n = await t.ev(`g.animals.seaFlocks.length`);
+    t.ok(n === 10, `animals.seaFlocks has ${n} entries after 2s of real loop — main.js bridge (maritime.workingShrimpers()) not wired?`);
+  });
 }

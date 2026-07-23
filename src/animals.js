@@ -6,7 +6,7 @@
 // Band land (LA/AR/OK/NM) gets its own flavor per neighbor state instead —
 // see regionTable's band branch.
 import * as THREE from 'three';
-import { seededRand, inTexas, inTexasOrBand, nearestRoad, nearestAnyRoad, neighborStateAt, hAt, waterAt, agAt, bandAgAt } from './geo.js';
+import { seededRand, inTexas, inTexasOrBand, nearestRoad, nearestAnyRoad, neighborStateAt, hAt, waterAt, agAt, bandAgAt, SEA_Y, boatableAt, coastDist } from './geo.js';
 import { farmsteadAt, feedlotAt, ranchHQAt } from './world.js';
 import { ATMOS } from './sky.js';
 
@@ -69,6 +69,20 @@ export const SPECIES = {
     fact: 'The tallest bird in America, and nearly lost — the whole wild flock winters at Aransas, and every one of them gets counted.' },
   blackbear: { name: 'Black Bear', speed: 16, fleeR: 26, behavior: 'flee', bob: true,
     fact: 'Louisiana bears have been walking back into the Sabine pines for years — quiet, shy, and gone the moment they smell a truck.' },
+  // Sea-Industry W2 — life offshore: sea rows spawn on gulf water (boatableAt,
+  // never the land legality), ride SEA_Y instead of terrain (seaOff = resting
+  // depth around the waterline), and ignore roads. bob on a sea species is the
+  // porpoising arc.
+  spotteddolphin: { name: 'Atlantic Spotted Dolphin', speed: 6, fleeR: 0, behavior: 'graze', bob: true, sea: true, seaOff: -0.12, leash: 30, cruise: true, // always under way — the porpoise arc is the read
+    fact: 'The offshore pod — spots come with age, and the blue-water crowd rarely follows the ferries inshore.' },
+  greenturtle: { name: 'Green Sea Turtle', speed: 1.2, fleeR: 0, behavior: 'lurk', bob: false, sea: true, seaOff: 0.02,
+    fact: 'Grazes the Laguna Madre seagrass meadows — the shell breaks the surface like a slow stone.' },
+  cownose: { name: 'Cownose Ray', speed: 2.5, fleeR: 6, behavior: 'graze', bob: false, sea: true, seaOff: 0.02,
+    fact: 'Schools glide the flats like slow brown kites, wingtips breaking the surface.' },
+  tarpon: { name: 'Tarpon', speed: 0, fleeR: 0, behavior: 'coil', bob: false, sea: true, seaOff: -0.05, roll: true,
+    fact: 'The Silver King rolls off the jetties for a gulp of air — Port Aransas was named Tarpon before the fish moved on.' },
+  gull: { name: 'Laughing Gull', event: true, sea: true, // trails the working shrimp fleet (maritime bridge)
+    fact: 'Finds every working shrimp boat on the coast — the try net never lifts unwatched.' },
   bat: { name: 'Mexican Free-tailed Bat', event: true,
     fact: 'Austin hosts the largest urban bat colony on Earth.' },
   kempsridley: { name: 'Kemp’s Ridley Sea Turtle', event: true, // turtles.js dawn release at Malaquite
@@ -78,9 +92,36 @@ export const SPECIES = {
 };
 export const SPECIES_COUNT = Object.keys(SPECIES).length;
 
+// Sea-Industry W2: jetty tarpon sites — hand-laid LL projections at the real
+// passes (RANCH_ARCHES pattern, chunk-mid radii). Galveston south jetty,
+// Port Aransas jetties, Brazos Santiago, Mansfield Cut.
+const SEA_SITES = [
+  { x: 4580.2, z: 1859.0, r: 200, rows: [['tarpon', 2, 4, 1, 0.6]] },
+  { x: 2352.1, z: 3519.9, r: 200, rows: [['tarpon', 2, 4, 1, 0.6]] },
+  { x: 2240.5, z: 5490.3, r: 200, rows: [['tarpon', 2, 4, 1, 0.6]] },
+  { x: 2127.9, z: 4942.6, r: 200, rows: [['tarpon', 2, 4, 1, 0.6]] },
+];
+
+// Sea-Industry W2: the open gulf gets its own table — checked FIRST, since
+// water is neither Texas nor band land. Flats species inshore, the pod
+// offshore; the coastDist split keys rays/turtles to the shallows.
+function seaTable(x, z) {
+  const w = boatableAt(x, z);
+  if (!w || w.kind !== 'gulf') return null; // lakes stay wild-row-free
+  const d = coastDist(x, z);
+  const rows = [];
+  if (d > 25) rows.push(['spotteddolphin', 3, 5, 1, 0.3], ['greenturtle', 1, 1, 1, 0.12]);
+  else rows.push(['cownose', 3, 6, 1, 0.3], ['greenturtle', 1, 2, 1, 0.25]);
+  for (const s of SEA_SITES)
+    if ((x - s.x) ** 2 + (z - s.z) ** 2 < s.r * s.r) rows.push(...s.rows);
+  return rows;
+}
+
 // regional spawn tables: [species, herd min, herd max, groups per chunk, keep odds]
 // boxes mirror world.js (plains/Hill Country) — keep the two files consistent
 function regionTable(x, z) {
+  const sea = seaTable(x, z);
+  if (sea) return sea;
   if (!inTexas(x, z)) { // band land: one flavor per neighbor state, the same four the W3 ground tints paint
     const ns = neighborStateAt(x, z);
     if (ns === 'LA') return [['gator', 1, 2, 1, 0.35], ['deer', 2, 4, 1, 0.5], ['hog', 2, 4, 1, 0.5], ['armadillo', 1, 2, 1, 0.45]];
@@ -171,6 +212,11 @@ export class AnimalSystem {
     this.aransasSite = ARANSAS_SITE;
     this.ranchArches = RANCH_ARCHES; // ditto for the wave-4 arch herd boost
     this.nearby = null; // {species, d2} — nearest visible animal within NEARBY_R, for the HUD readout
+    // Sea-Industry W2: gull flock anchors — live working-shrimper positions,
+    // written by main.js each frame from maritime (no maritime import here)
+    this.seaFlocks = [];
+    this.gullGroup = null; // lazy pool, built on first working shrimper in range
+    this.gulls = [];
   }
 
   update(dt, px, pz, py = 0) {
@@ -189,6 +235,8 @@ export class AnimalSystem {
     }
     for (const k of want) if (!this.live.has(k)) this.spawn(k);
 
+    this.updateGulls(dt, px, pz);
+
     this.nearby = null;
     const night = ATMOS.night;
     for (const { animals } of this.live.values()) {
@@ -201,6 +249,40 @@ export class AnimalSystem {
         if (vis) this.step(a, animals, dt, px, pz);
       }
     }
+  }
+
+  // Sea-Industry W2: laughing gulls wheel over the nearest working shrimper.
+  // Event species (bats pattern): a 4-bird pool follows the closest anchor
+  // within range; no anchor, no gulls. Logged like any close encounter.
+  updateGulls(dt, px, pz) {
+    let anchor = null, ad = Infinity;
+    for (const f of this.seaFlocks) {
+      const d = Math.hypot(f.x - px, f.z - pz);
+      if (d < 260 && d < ad) { ad = d; anchor = f; }
+    }
+    if (!anchor) { if (this.gullGroup) this.gullGroup.visible = false; return; }
+    if (!this.gullGroup) {
+      this.gullGroup = new THREE.Group();
+      const rand = seededRand('gullflock');
+      for (let i = 0; i < 4; i++) {
+        const { g } = mkAnimal('gull', rand);
+        this.gullGroup.add(g);
+        this.gulls.push({ g, phase: rand() * Math.PI * 2, r: 5 + rand() * 5, h: 2.5 + rand() * 3, spd: 0.55 + rand() * 0.3 });
+      }
+      this.scene.add(this.gullGroup);
+    }
+    this.gullGroup.visible = true;
+    for (const b of this.gulls) {
+      b.phase += dt * b.spd;
+      b.g.position.set(
+        anchor.x + Math.cos(b.phase) * b.r,
+        SEA_Y + b.h + Math.sin(b.phase * 2.1) * 0.8,
+        anchor.z + Math.sin(b.phase) * b.r
+      );
+      b.g.rotation.y = -b.phase - Math.PI / 2;
+      b.g.rotation.z = 0.2; // banked into the wheel
+    }
+    if (ad < SPOT_R && this.py < 15) this.onSpotted?.('gull');
   }
 
   // player honked (or similar scare) at (px,pz): everything skittish bolts
@@ -263,7 +345,47 @@ export class AnimalSystem {
       a.g.rotation.z = 0.18; // banked into the turn
       return;
     }
-    if (spec.behavior === 'coil') return; // rattlesnakes hold their ground
+    if (spec.behavior === 'coil') { // rattlesnakes (and tarpon) hold their ground
+      if (spec.roll) {
+        // Sea W2.1 tarpon: calm lurk broken by the Silver King leap. The first
+        // cut was a stationary ±52° z-rock — it read as a small submarine
+        // (Bruno, 2026-07-23). Now: mostly under with dorsal/tail showing and
+        // a gentle sway, and every 8–18 s a ~1.2 s clear-of-the-water leap
+        // with the nose pitching through the arc. First leap comes early so
+        // the tour spot (and the wildlife check) see one within seconds.
+        const base = SEA_Y + (spec.seaOff ?? 0);
+        if (a.leap != null) {
+          a.leap += dt / 1.2;
+          if (a.leap >= 1) {
+            a.leap = null;
+            a.leapT = 8 + Math.random() * 10;
+            a.g.rotation.x = 0;
+          } else {
+            const ph = a.leap;
+            a.g.position.x -= Math.sin(a.heading) * (2.2 / 1.2) * dt; // short hop along the heading
+            a.g.position.z -= Math.cos(a.heading) * (2.2 / 1.2) * dt;
+            a.g.position.y = base + Math.sin(ph * Math.PI) * 1.3;    // clears the water
+            a.g.rotation.y = a.heading;
+            a.g.rotation.x = (ph - 0.5) * 1.6; // nose up on the rise, over and down into the dive
+            a.g.rotation.z = 0;
+          }
+        } else {
+          a.leapT = (a.leapT ?? 1 + Math.random() * 3) - dt;
+          if (a.leapT <= 0) {
+            a.heading = Math.random() * Math.PI * 2;
+            const lx = a.g.position.x - Math.sin(a.heading) * 2.4, lz = a.g.position.z - Math.cos(a.heading) * 2.4;
+            // only leap toward legal water inside the leash — else re-roll shortly
+            if (boatableAt(lx, lz)?.kind === 'gulf' && Math.hypot(lx - a.homeX, lz - a.homeZ) < (spec.leash ?? 45)) a.leap = 0;
+            else a.leapT = 0.5;
+          }
+          // between leaps: dorsal and tail tip showing, gentle breathing sway
+          a.g.position.y = base - 0.06 + Math.sin(this.t * 0.7 + a.phase) * 0.08;
+          a.g.rotation.z = Math.sin(this.t * 0.9 + a.phase) * 0.17;
+          a.g.rotation.x = Math.sin(this.t * 0.7 + a.phase + 1.2) * 0.12; // pitch follows the bob
+        }
+      }
+      return;
+    }
 
     let moving = false;
     const dist = Math.sqrt(d2);
@@ -291,7 +413,7 @@ export class AnimalSystem {
       a.stateT -= dt;
       if (a.stateT <= 0) {
         a.stateT = 2 + Math.random() * 4;
-        let p = spec.behavior === 'graze' ? 0.3 : spec.behavior === 'lurk' ? 0.12 : 0.6;
+        let p = spec.cruise ? 1 : spec.behavior === 'graze' ? 0.3 : spec.behavior === 'lurk' ? 0.12 : 0.6; // cruisers never idle — motion is their silhouette
         if (a.species === 'deer' && ATMOS.night > 0.15 && ATMOS.night < 0.6) p = 0.85; // crepuscular rush
         a.ambling = Math.random() < p;
         a.heading = Math.random() * Math.PI * 2;
@@ -311,7 +433,17 @@ export class AnimalSystem {
           : a.legs[i].rotation.x * Math.pow(0.005, dt);
       }
     }
-    a.g.position.y = hAt(a.g.position.x, a.g.position.z) + (moving && spec.bob ? Math.abs(Math.sin(this.t * 9 + a.phase)) * 0.35 : 0);
+    // sea species ride the waterline, never the terrain; a sea bob is the
+    // porpoising arc — slower and taller than a land bound, so it clears water
+    const baseY = spec.sea ? SEA_Y + (spec.seaOff ?? 0) : hAt(a.g.position.x, a.g.position.z);
+    a.g.position.y = baseY + (moving && spec.bob ? Math.abs(Math.sin(this.t * (spec.sea ? 3 : 9) + a.phase)) * (spec.sea ? 0.45 : 0.35) : 0);
+    // cownose wingtips lift clear of the surface on a slow beat
+    const wings = a.g.userData.wings;
+    if (wings) {
+      const f = Math.sin(this.t * 2.1 + a.phase) * 0.3;
+      wings[0].rotation.z = -0.12 - f;
+      wings[1].rotation.z = 0.12 + f;
+    }
   }
 
   sound(kind, cooldown) {
@@ -323,11 +455,11 @@ export class AnimalSystem {
   move(a, speed, dt) {
     const nx = a.g.position.x - Math.sin(a.heading) * speed * dt;
     const nz = a.g.position.z - Math.cos(a.heading) * speed * dt;
-    // stay in Texas or the band, off roads, and near home (leash)
-    if (!inTexasOrBand(nx, nz)) { a.heading += Math.PI; return; }
     const spec = SPECIES[a.species];
+    // stay in legal water (sea) or in Texas/band land, off roads, near home
+    if (spec.sea ? boatableAt(nx, nz)?.kind !== 'gulf' : !inTexasOrBand(nx, nz)) { a.heading += Math.PI; return; }
     if (Math.hypot(nx - a.homeX, nz - a.homeZ) > (spec.leash ?? 45)) { a.heading += Math.PI / 2; return; } // feedlot cattle stay penned
-    if (!spec.roadSprint) { // roadrunners own the road
+    if (!spec.roadSprint && !spec.sea) { // roadrunners own the road; the gulf has none
       const road = nearestAnyRoad(nx, nz, 3);
       if (road && a.state !== 'flee') { a.heading += Math.PI / 2; return; } // fleeing animals may cross roads
     }
@@ -354,13 +486,23 @@ export class AnimalSystem {
             if (waterAt(wx + 1.8, wz)) { hx = wx; hz = wz; break; }
           }
         }
-        if (!inTexasOrBand(hx, hz)) continue;
-        if (nearestAnyRoad(hx, hz, 6)) continue; // herds keep off the highway
+        const wet = SPECIES[species].sea;
+        if (wet) { // sea rows want open gulf under the home — the gator search, at sea
+          let found = false;
+          for (let tries = 0; tries < 8; tries++) {
+            const wx = baseX + rand() * CHUNK, wz = baseZ + rand() * CHUNK;
+            if (boatableAt(wx, wz)?.kind === 'gulf') { hx = wx; hz = wz; found = true; break; }
+          }
+          if (!found) continue;
+        } else {
+          if (!inTexasOrBand(hx, hz)) continue;
+          if (nearestAnyRoad(hx, hz, 6)) continue; // herds keep off the highway
+        }
         const n = lo + ((rand() * (hi - lo + 1)) | 0);
         for (let i = 0; i < n; i++) {
           const { g, legs } = mkAnimal(species, rand);
           const ax = hx + (rand() - 0.5) * 8, az = hz + (rand() - 0.5) * 8;
-          g.position.set(ax, hAt(ax, az), az);
+          g.position.set(ax, wet ? SEA_Y + (SPECIES[species].seaOff ?? 0) : hAt(ax, az), az);
           g.rotation.y = rand() * Math.PI * 2;
           group.add(g);
           animals.push({
@@ -475,7 +617,8 @@ export class AnimalSystem {
     const rec = this.live.get(key);
     const rand = seededRand(`force:${species}:${key}`);
     const { g, legs } = mkAnimal(species, rand);
-    g.position.set(x, hAt(x, z), z);
+    const spec = SPECIES[species];
+    g.position.set(x, spec.sea ? SEA_Y + (spec.seaOff ?? 0) : hAt(x, z), z);
     rec.group.add(g);
     const a = {
       g, legs, species, homeX: x, homeZ: z,
@@ -663,6 +806,92 @@ function mkAnimal(species, rand) {
       box(g, 0.3, 0.03, 0.34, 1.32, 0.13, 0, mat(0x2a2622));
       box(g, 0.14, 0.14, 0.18, 0, 0.08, -0.36, white);        // head
       box(g, 0.06, 0.05, 0.34, 0, 0.02, -0.58, mat(0xd8a04a)); // the famous beak
+      break;
+    }
+    // --- Sea-Industry W2: life offshore (y = waterline, set by the caller).
+    // Round-bodied swimmers get curved geometry (the turtle-shell precedent —
+    // boxes are not their correct silhouette; W6b scatter tier, 8–10 segs) ---
+    case 'spotteddolphin': {
+      const gray = mat(0x7a8898);
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), gray);
+      body.scale.set(0.32, 0.3, 1.15);                        // sleek tapered body
+      g.add(body);
+      const belly = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), mat(0xb8c0c8));
+      belly.scale.set(0.28, 0.24, 1.02);
+      belly.position.y = -0.07;                               // pale underside
+      g.add(belly);
+      const beak = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), gray);
+      beak.scale.set(0.11, 0.09, 0.3);
+      beak.position.set(0, 0.02, -0.55);
+      g.add(beak);
+      const fin = box(g, 0.05, 0.3, 0.2, 0, 0.28, 0.05, gray); // taller raked dorsal — the surface cue
+      fin.rotation.x = 0.4;
+      box(g, 0.42, 0.04, 0.18, 0, 0.02, 0.58, gray);          // flukes
+      box(g, 0.26, 0.03, 0.14, 0, -0.08, -0.25, gray);        // pectorals
+      g.scale.setScalar(1.9); // mini-world legibility: reads from the boat, like the pelican's span
+      break;
+    }
+    case 'greenturtle': {
+      const shell = new THREE.Mesh(new THREE.SphereGeometry(0.32, 8, 6), mat(0x5a6a3a));
+      shell.scale.set(1, 0.42, 1.25);
+      shell.position.y = 0.1;
+      g.add(shell);
+      box(g, 0.14, 0.1, 0.2, 0, 0.06, -0.46, mat(0x6a7a4a));  // head, up for a breath
+      const flip = mat(0x4a5a32);
+      for (const [fx, fz, r] of [[-0.3, -0.2, 0.6], [0.3, -0.2, -0.6], [-0.26, 0.28, 0.9], [0.26, 0.28, -0.9]]) {
+        const f = box(g, 0.3, 0.04, 0.14, fx, 0.04, fz, flip);
+        f.rotation.y = r;
+      }
+      break;
+    }
+    case 'cownose': {
+      const brown = mat(0x6a5038);
+      const disc = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 6), brown);
+      disc.scale.set(0.5, 0.09, 0.62);                        // smooth disc body
+      g.add(disc);
+      const wings = [];
+      for (const side of [-1, 1]) {
+        const w = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 5), brown);
+        w.scale.set(0.46, 0.05, 0.44);
+        w.position.set(side * 0.4, 0.02, 0);
+        w.rotation.z = side * 0.12; // tips rest lifted; step() beats them clear of the water
+        g.add(w);
+        wings.push(w);
+      }
+      g.userData.wings = wings;                               // step() flaps these — tips flash above water
+      const nose = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 5), mat(0x5a4430));
+      nose.scale.set(0.16, 0.06, 0.16);
+      nose.position.set(0, 0, -0.32);
+      g.add(nose);
+      box(g, 0.03, 0.03, 0.5, 0, 0.02, 0.5, mat(0x4a3a2a));   // whip tail
+      g.scale.setScalar(1.6); // mini-world legibility
+      break;
+    }
+    case 'tarpon': {
+      const silver = mat(0xb8c2ca);
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 8), silver);
+      body.scale.set(0.2, 0.36, 1.08);                        // deep laterally-flat body
+      g.add(body);
+      const back = new THREE.Mesh(new THREE.SphereGeometry(0.5, 10, 6), mat(0x4a5a66));
+      back.scale.set(0.21, 0.16, 0.98);
+      back.position.y = 0.11;                                 // dark dorsal shading
+      g.add(back);
+      box(g, 0.04, 0.2, 0.14, 0, 0.32, 0.18, mat(0x5a6a76));  // dorsal
+      box(g, 0.05, 0.36, 0.22, 0, 0, 0.58, mat(0x8a98a2));    // forked tail (read as one)
+      g.scale.setScalar(1.9); // mini-world legibility
+      break;
+    }
+    case 'gull': {
+      const white = mat(0xeeeae2);
+      const grey = mat(0xa8b0b4);
+      box(g, 0.16, 0.1, 0.34, 0, 0, 0, white);                // body
+      const l = box(g, 0.55, 0.02, 0.2, -0.32, 0.04, 0, grey);
+      const r = box(g, 0.55, 0.02, 0.2, 0.32, 0.04, 0, grey);
+      l.rotation.z = 0.2; r.rotation.z = -0.2;
+      box(g, 0.14, 0.02, 0.2, -0.58, 0.1, 0, mat(0x2a2622));  // black wingtips
+      box(g, 0.14, 0.02, 0.2, 0.58, 0.1, 0, mat(0x2a2622));
+      box(g, 0.09, 0.09, 0.11, 0, 0.06, -0.2, mat(0x30302c)); // the black hood
+      box(g, 0.03, 0.03, 0.12, 0, 0.05, -0.3, mat(0xb03a30)); // red bill
       break;
     }
     case 'spoonbill': {

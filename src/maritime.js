@@ -40,6 +40,79 @@ const ICW = [
   LL(26.56, -97.34), LL(26.84, -97.43), LL(27.06, -97.45), LL(27.28, -97.42),
 ];
 
+// --- Sea-Industry W2: per-vessel identity -----------------------------------
+// Seeded `shipid:` stream (never rename — blanket seed-string law). Names are
+// curated per-type pools, invented-but-flavored, never real operators (the
+// chatter law); trip ends resolve from GEO.sea.ports at build time. The
+// placard rides the trains 60-u toast idiom via onIdentity, re-arms on exit.
+const SHIP_NAMES = {
+  container: ['Gulf Palmetto', 'Bluebonnet Star', 'San Jacinto', 'Yellow Rose', 'Copano Bay', 'Matagorda Trader'],
+  tanker: ['Sabine Spirit', 'Permian Dawn', 'Neches Voyager', 'Llano Estacado', 'Aransas Pioneer', 'Big Thicket'],
+  bulk: ['Brazos Harvest', 'Panhandle Grain', 'Rio Bravo', 'Caprock Ridge'],
+  chemical: ['Bay Chemist', 'Clear Lake', 'Pelican Point', 'Ship Channel Star'],
+  shrimp: ['Miss Amelia', 'Lady Grace', 'Miss Lupita', 'Sea Darlin’', 'Gulf Pearl', 'Lady Aransas', 'Miss Carmen', 'Bayou Belle', 'Miss Palacios', 'Capt. Delgado'],
+  cutter: ['Skimmer', 'Sabal'],
+};
+const SHIP_PREFIX = { container: 'MV', bulk: 'MV', tanker: 'MT', chemical: 'MT', shrimp: '', cutter: 'USCGC' };
+const TYPE_LABEL = { container: 'container ship', tanker: 'tanker', bulk: 'bulker', chemical: 'chemical carrier', shrimp: 'shrimp boat', cutter: 'Coast Guard cutter' };
+const SHIP_TOAST_R = 60, SHIP_REARM_R = 90;
+
+// VHF channel 16 — the scanner frame (chatter.js pattern): {token}-gated
+// pools, so a line only plays when every token is live; nothing is invented.
+// maritime owns its transmitter (the trains onChatter idiom) — radio.js stays
+// aviation-scoped. Humor rationed ~1-in-4 (the chatter law).
+const VHF_GAP_MIN = 25, VHF_GAP_VAR = 35, VHF_FLOOR = 14;
+const VHF_R = 90, VHF_BOAT_R = 220; // audible near vessels/ports; BOAT extends the ear (W3 handheld lifts it entirely)
+const VHF_POOLS = {
+  pilot: [ // big ship with a port close aboard — boarding + berth work
+    { t: '{port} traffic, {ship}, pilot aboard, commencing the inbound run.' },
+    { t: '{port} pilots, {ship}, off the station, ready for boarding.' },
+    { t: '{ship}, tug alongside — we have your lines when you’re at the wall.' },
+    { t: '{port} ops, {ship}, berth is clear, bring her in on the flood.' },
+    { t: '{ship}, {port} harbormaster — hold for the outbound tow, then she’s all yours.' },
+  ],
+  traffic: [ // big ship out on the trunk / mid-approach
+    { t: 'All stations, {ship}, coastwise en route {dest}, standing by one-six.' },
+    { t: '{ship}, steady on, {wx} out here, seas easy.' },
+    { t: '{ship} — engine room answers all bells. {dest} on schedule.' },
+    { t: '{ship}, watch change on the hour. Coffee’s gone again.', funny: true },
+  ],
+  fleet: [ // shrimpers, only while working the grounds
+    { t: '{ship}, try net’s comin’ up. Decent count this drag.' },
+    { t: '{ship} here — good water, keepin’ the rigs down a while yet.' },
+    { t: '{ship} — gulls found us again. No secrets out here.', funny: true },
+    { t: '{ship}, we’ll head the fleet home ’fore the light goes.' },
+  ],
+  patrol: [ // cutters — routine traffic + the rationed securité
+    { t: '{ship}, underway on routine patrol, out.' },
+    { t: '{ship} to {port} traffic — maintain your interval in the channel, thank you kindly.' },
+    { t: 'Sécurité, sécurité — all stations, this is {ship}: shrimp fleet working {port} grounds, give the tows a wide berth. Out.' },
+    { t: 'Sécurité — all stations, {ship}: {wx} over the gulf this afternoon. Small craft, mind the weather. Out.' },
+  ],
+};
+const VHF_TOKEN = /\{(\w+)\}/g;
+const vhfTokens = (t) => [...t.matchAll(VHF_TOKEN)].map((m) => m[1]);
+const vhfFill = (t, ctx) => t.replace(VHF_TOKEN, (_, k) => ctx[k]);
+const nextVhfCooldown = (name, n) => VHF_GAP_MIN + seededRand(`shipid:chat:${name}:${n}`)() * VHF_GAP_VAR;
+
+// The shrimp fleet — 5 real fishing ports, 2 boats each. Hand-laid transit
+// paths (harbor → pass → ground disc): straight lines would cross the barrier
+// islands, so each path threads its real pass. Brownsville's harbor is NOT
+// game water (roadstead law) — its pair homes at the baked roadstead.
+// Dawn-out / dusk-home on the game clock (sky.t), per-boat seeded offsets.
+const DAWN_T = 0.24, DUSK_T = 0.72;
+// Every point below is probe-verified boatableAt gulf water (2026-07-23) —
+// hand-laid literals where the raw LL projection landed dry (harbor shorelines
+// render land at this scale; the first Brownsville ground sat south of the
+// Rio Grande, outside the world).
+const FISHING = [
+  { id: 'galveston', name: 'Galveston', pts: [[4512.8, 1889], LL(29.33, -94.7), LL(29.21, -94.52)] }, // home = the baked port berth in the channel
+  { id: 'palacios', name: 'Palacios', pts: [LL(28.68, -96.22), LL(28.52, -96.3), LL(28.36, -96.32), LL(28.26, -96.2)] },
+  { id: 'aransaspass', name: 'Aransas Pass', pts: [LL(27.9, -97.12), LL(27.838, -97.035), LL(27.72, -96.88)] },
+  { id: 'portisabel', name: 'Port Isabel', pts: [[2204.2, 5482.5], [2251.9, 5488.1], LL(26.15, -97.03)] }, // waterfront + Brazos Santiago pass (≈26.075/-97.19, 26.07/-97.14)
+  { id: 'brownsville', name: 'Brownsville', pts: [[2262, 5472], [2337.8, 5566]] }, // roadstead home (harbor is not game water) → ground ≈26.0/-97.05, north of the border
+];
+
 export class MaritimeSystem {
   constructor(scene, sky, landmarks = []) {
     this.landmarks = landmarks; // W3 marina standoff (passed in — importing gameplay.js here would cycle via vehicle.js)
@@ -71,7 +144,15 @@ export class MaritimeSystem {
     this.len = this.trunk?.len ?? 1; // laneAt() domain (rotors.js CG patrol)
     this.buildPorts(scene);
     this.buildPlatforms(scene);
+    this.usedNames = new Set(); // per-boot placard dedup — linear probe keeps the pick seeded
     this.ships = this.buildShips(scene);
+    // Sea W2: cutters + the shrimp fleet + VHF transmitter state
+    this.cutters = this.buildCutters(scene);
+    this.shrimpers = this.buildShrimpers(scene);
+    this.updateShrimpers(0, 0); // fleet stands at its moorings before frame one
+    this.onIdentity = null; // (text) => placard toast (trains idiom)
+    this.onChatter = null;  // (text, voice) => audio.radio + hud.subtitle
+    this.vhfFloor = 0;      // global floor between any two channel-16 lines
     this.buoy = this.buildBuoy(scene);
     // Water Vehicles W3: small-craft marinas + ICW channel markers
     this.marinas = this.buildMarinas(scene);
@@ -122,6 +203,118 @@ export class MaritimeSystem {
     if (!best) return null;
     best.ship.s = Math.min(best.ship.route.len, Math.max(0, best.s));
     return best.ship;
+  }
+
+  // Sea W2 identity — one per vessel, built at construction, stable for life.
+  // seedKey names the stream slot; homeId (shrimpers) fixes the "out of" port.
+  buildShipId(type, seedKey, homeName = null) {
+    const rnd = seededRand('shipid:' + seedKey);
+    const pool = SHIP_NAMES[type];
+    let pick = (rnd() * pool.length) | 0;
+    for (let probe = 0; probe < pool.length && this.usedNames.has(type + pool[pick]); probe++) pick = (pick + 1) % pool.length;
+    this.usedNames.add(type + pool[pick]);
+    const name = (SHIP_PREFIX[type] ? SHIP_PREFIX[type] + ' ' : '') + pool[pick];
+    const voice = { p: 0.8 + rnd() * 0.35, r: 0.85 + rnd() * 0.3 };
+    // trip ends from the baked ports — character-matched where possible
+    let orig = null, dest = null;
+    if (type !== 'shrimp' && type !== 'cutter') {
+      const ports = GEO.sea.ports;
+      const match = ports.filter((p) => p.character === type);
+      const a = (match.length ? match : ports)[(rnd() * (match.length ? match.length : ports.length)) | 0];
+      const rest = ports.filter((p) => p !== a);
+      const b = rest[(rnd() * rest.length) | 0];
+      [orig, dest] = rnd() < 0.5 ? [a.name, b.name] : [b.name, a.name];
+    }
+    return { name, orig, dest, home: homeName, voice, toasted: false, chatN: 1, chatT: nextVhfCooldown(name, 0) };
+  }
+
+  // the ⚓ placard — every vessel announces itself once per approach
+  shipText(s) {
+    const id = s.id;
+    if (s.type === 'cutter') return `🛥️ ${id.name} — Coast Guard cutter · on patrol`;
+    if (s.type === 'shrimp') return `🚤 ${id.name} — shrimp boat · out of ${id.home}`;
+    return `🚢 ${id.name} — ${TYPE_LABEL[s.type]} · ${id.orig} → ${id.dest}`;
+  }
+
+  // arc-length on the trunk nearest (x,z) — the CG-heli joint stage needs it
+  trunkS(x, z) {
+    let bs = 0, bd = Infinity;
+    for (let i = 0; i < this.trunk.pts.length; i++) {
+      const d = Math.hypot(this.trunk.pts[i][0] - x, this.trunk.pts[i][1] - z);
+      if (d < bd) { bd = d; bs = this.trunk.cum[i]; }
+    }
+    return bs;
+  }
+
+  // tours/harness: jump the nearest cutter to the route point closest to (x,z)
+  forceCutter(x, z) {
+    let best = null;
+    for (const c of this.cutters) {
+      for (let i = 0; i < c.route.pts.length; i++) {
+        const d = Math.hypot(c.route.pts[i][0] - x, c.route.pts[i][1] - z);
+        if (!best || d < best.d) best = { d, c, s: c.route.cum[i] };
+      }
+    }
+    if (!best) return null;
+    best.c.s = Math.min(best.c.route.len, Math.max(0, best.s));
+    return best.c;
+  }
+
+  // tours/harness: key channel 16 right now — nearest vessel to (x,z) speaks
+  // its seeded next line, cooldowns bypassed. Returns the line (null = nobody).
+  forceChatter(x, z) {
+    let best = null;
+    for (const s of [...this.ships, ...this.shrimpers]) {
+      const d = Math.hypot(s.g.position.x - x, s.g.position.z - z);
+      if (!best || d < best.d) best = { d, s };
+    }
+    if (!best) return null;
+    const line = this.vhfLine(best.s);
+    if (!line) return null;
+    this.onChatter?.(line, best.s.id.voice);
+    best.s.id.chatT = nextVhfCooldown(best.s.id.name, best.s.id.chatN++);
+    this.vhfFloor = VHF_FLOOR;
+    return line;
+  }
+
+  // tours/harness: the whole fleet snapped to its grounds in working trim
+  forceShrimpDay() {
+    for (const b of this.shrimpers) { b.p = 1; b.r = b.trawlR; b.working = true; }
+    return this.shrimpers.length;
+  }
+
+  // live positions of boats working a ground — animals.js gulls ride these
+  // (main.js wires the bridge; no animals→maritime import)
+  workingShrimpers() {
+    const out = [];
+    for (const b of this.shrimpers) if (b.working) out.push({ x: b.g.position.x, z: b.g.position.z });
+    return out;
+  }
+
+  // seeded next channel-16 line for a vessel, token-gated (null = nothing live)
+  vhfLine(s) {
+    const id = s.id;
+    let port = null, pd = Infinity;
+    for (const p of GEO.sea.ports) {
+      const d = Math.hypot(p.x - s.g.position.x, p.z - s.g.position.z);
+      if (d < pd) { pd = d; port = p; }
+    }
+    const ctx = {
+      ship: id.name,
+      dest: id.dest,
+      wx: ATMOS.weather,
+      port: s.type === 'shrimp' ? id.home : pd < 150 ? port.name : s.type === 'cutter' && pd < 400 ? port.name : null,
+    };
+    const event = s.type === 'cutter' ? 'patrol'
+      : s.type === 'shrimp' ? (s.working ? 'fleet' : null)
+        : pd < 120 ? 'pilot' : 'traffic';
+    if (!event) return null;
+    const ok = (VHF_POOLS[event] ?? []).filter((l) => vhfTokens(l.t).every((k) => ctx[k] != null));
+    if (!ok.length) return null;
+    const r = seededRand(`shipid:line:${id.name}:${id.chatN}`);
+    const funny = ok.filter((l) => l.funny), plain = ok.filter((l) => !l.funny);
+    const set = r() < 0.25 && funny.length ? funny : plain.length ? plain : funny;
+    return vhfFill(set[Math.floor(r() * set.length)].t, ctx);
   }
 
   buildPorts(scene) {
@@ -536,24 +729,6 @@ export class MaritimeSystem {
       g.add(bridge);
       return g;
     };
-    const mkShrimper = () => {
-      const g = new THREE.Group();
-      const hull = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 3.2), new THREE.MeshLambertMaterial({ color: 0xe8e4d8, flatShading: true }));
-      hull.position.y = SEA + 0.3;
-      const cabin = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.8, 1), new THREE.MeshLambertMaterial({ color: 0x4a6a8a }));
-      cabin.position.set(0, SEA + 1, -0.5);
-      const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 4), new THREE.MeshLambertMaterial({ color: 0x6a5a3a }));
-      boom.position.set(0, SEA + 1.6, 0.6);
-      boom.rotation.z = 0.7;
-      // night work-lights — shrimpers fish after dark, decks lit up
-      const l1 = new THREE.Mesh(new THREE.SphereGeometry(0.3, 6, 5), this.workGlow);
-      l1.position.set(0.8, SEA + 2.4, 1.2);
-      const l2 = new THREE.Mesh(new THREE.SphereGeometry(0.24, 6, 5), this.workGlow);
-      l2.position.set(0, SEA + 1.5, -0.5);
-      g.add(hull, cabin, boom, l1, l2);
-      return g;
-    };
-
     // ships ride the baked routes, each the right kind for its port: the trunk
     // carries three (its top type weights — tanker/container/bulker), every
     // approach >=200u carries one of its dominant type. 7 big ships total —
@@ -573,20 +748,101 @@ export class MaritimeSystem {
         const type = types[i % types.length];
         const g = mkByType[type](i);
         scene.add(g);
-        ships.push({ g, route, s: rnd() * route.len, dir: rnd() < 0.5 ? -1 : 1, speed: 2.2 + rnd() * 0.9, type });
+        // Sea W2: every vessel carries an identity (the seaship: motion stream
+        // is untouched — shipid: is its own stream, seed law)
+        ships.push({ g, route, s: rnd() * route.len, dir: rnd() < 0.5 ? -1 : 1, speed: 2.2 + rnd() * 0.9, type, id: this.buildShipId(type, route.id + ':' + i) });
       }
-    }
-    // shrimp boats off Padre / Galveston
-    for (const [x, z] of [LL(26.7, -97.1), LL(26.3, -97.0), LL(29.25, -94.6), LL(27.6, -96.9)]) {
-      const g = mkShrimper();
-      g.position.set(x, 0, z);
-      scene.add(g);
-      ships.push({ g, x, z, a: Math.random() * 6.28 });
     }
     return ships;
   }
 
-  update(dt, t) {
+  // Sea W2: two cutters on patrol — the trunk + the longest approach. They
+  // ride routeAt/pingpong like any ship (never a new lane); one merged
+  // vertex-colored mesh each (the port-kit idiom), boxy subject so box-built.
+  buildCutters(scene) {
+    const tint = (geo, hex) => {
+      const g = geo.toNonIndexed(), c = new THREE.Color(hex);
+      const n = g.attributes.position.count, arr = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+      return g;
+    };
+    const mkCutter = () => {
+      const parts = [];
+      const add = (geo, hex, x, y, z) => { geo.translate(x, y, z); parts.push(tint(geo, hex)); };
+      add(new THREE.BoxGeometry(1.8, 0.9, 6.5), 0xf0efe8, 0, SEA + 0.35, 0);            // white hull
+      add(new THREE.BoxGeometry(1.85, 0.55, 0.6), 0xe8501e, 0, SEA + 0.55, -2.2);       // the racing stripe pair
+      add(new THREE.BoxGeometry(1.85, 0.55, 0.18), 0x1e3a5e, 0, SEA + 0.55, -1.75);
+      add(new THREE.BoxGeometry(1.4, 0.9, 2.4), 0xdddbd2, 0, SEA + 1.25, 0.4);          // deckhouse
+      add(new THREE.BoxGeometry(1.15, 0.7, 1.1), 0xdddbd2, 0, SEA + 2.05, -0.2);        // bridge
+      add(new THREE.BoxGeometry(0.12, 1.5, 0.12), 0x4a4a52, 0, SEA + 3.1, 0.1);         // mast
+      add(new THREE.BoxGeometry(0.7, 0.08, 0.08), 0x4a4a52, 0, SEA + 3.4, 0.1);         // yard
+      add(new THREE.CylinderGeometry(0.28, 0.34, 0.4, 8), 0x4a4a52, 0, SEA + 1, -2.6);  // gun mount
+      add(new THREE.BoxGeometry(0.08, 0.08, 0.9), 0x4a4a52, 0, SEA + 1.15, -3.1);       // barrel
+      const mesh = new THREE.Mesh(mergeGeoms(parts), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+      scene.add(mesh);
+      return mesh;
+    };
+    const longest = this.routes.filter((r) => r.kind !== 'trunk').reduce((b, r) => (!b || r.len > b.len ? r : b), null);
+    const cutters = [];
+    [this.trunk, longest ?? this.trunk].forEach((route, i) => {
+      const rnd = seededRand('shipid:cutter:' + i);
+      cutters.push({
+        g: mkCutter(), route, s: rnd() * route.len, dir: rnd() < 0.5 ? -1 : 1,
+        speed: 3.4, type: 'cutter', cutter: true, id: this.buildShipId('cutter', 'cutter:' + i),
+      });
+    });
+    this.ships.push(...cutters); // motion/force/placard/VHF all see them as ships
+    return cutters;
+  }
+
+  // Sea W2: the shrimp fleet — 2 boats per fishing port, instanced components
+  // (hull/cabin/mast/outriggers/lights ≈ 5 draws for all 10 boats, replacing
+  // the four W1-era per-mesh groups). Outriggers swing down while working.
+  buildShrimpers(scene) {
+    const boats = [];
+    for (const port of FISHING) {
+      // transit path arc-length table (routeAt-compatible shape)
+      const cum = [0];
+      for (let i = 1; i < port.pts.length; i++) {
+        cum.push(cum[i - 1] + Math.hypot(port.pts[i][0] - port.pts[i - 1][0], port.pts[i][1] - port.pts[i - 1][1]));
+      }
+      const path = { pts: port.pts, cum, len: cum[cum.length - 1] };
+      for (let i = 0; i < 2; i++) {
+        const rnd = seededRand(`shrimper:${port.id}:${i}`);
+        const ma = rnd() * Math.PI * 2, md = 1.5 + rnd() * 2.5; // seeded mooring spot off the harbor anchor
+        const g = new THREE.Group();
+        g.position.set(port.pts[0][0] + Math.cos(ma) * md, 0, port.pts[0][1] + Math.sin(ma) * md);
+        boats.push({
+          g, port, path, // g is the invisible position carrier — placard/VHF/gulls read it
+          moorX: g.position.x, moorZ: g.position.z,
+          moorHdg: rnd() * Math.PI * 2,
+          dawnOff: rnd() * 0.03, speed: 2.6 + rnd() * 0.6,
+          trawlR: 6 + rnd() * 6, trawlA: rnd() * Math.PI * 2, trawlW: 0.04 + rnd() * 0.03,
+          p: 0, r: 0, working: false, heading: 0,
+          id: this.buildShipId('shrimp', `shrimper:${port.id}:${i}`, port.name),
+        });
+      }
+    }
+    // instanced fleet — one mesh per component, matrices composed in update
+    const lam = (hex) => new THREE.MeshLambertMaterial({ color: hex, flatShading: true });
+    // geometries are origin-centered — the FULL local offset lives in the
+    // instance matrix (updateShrimpers `at()`); the one exception is the rig
+    // boom, whose baked +y shift puts its rotation pivot at the boom base.
+    // (Baking an offset AND offsetting the instance double-translates — the
+    // W2 staged shot caught exactly that on the cabin/mast.)
+    this.shrimpMeshes = {
+      hull: new THREE.InstancedMesh(new THREE.BoxGeometry(1.2, 0.7, 3.2), lam(0xe8e4d8), boats.length),
+      cabin: new THREE.InstancedMesh(new THREE.BoxGeometry(0.9, 0.8, 1), lam(0x4a6a8a), boats.length),
+      mast: new THREE.InstancedMesh(new THREE.BoxGeometry(0.1, 1.8, 0.1), lam(0x6a5a3a), boats.length),
+      rig: new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, 2.4, 0.07).translate(0, 1.2, 0), lam(0x6a5a3a), boats.length * 2),
+      glow: new THREE.InstancedMesh(new THREE.SphereGeometry(0.22, 6, 5), this.workGlow, boats.length * 2),
+    };
+    for (const m of Object.values(this.shrimpMeshes)) { m.frustumCulled = false; scene.add(m); }
+    return boats;
+  }
+
+  update(dt, t, player = null) {
     // night gate for every glow (rig flares, work lights, buoy lamp)
     this.rigGlow.opacity = ATMOS.night;
     this.workGlow.opacity = ATMOS.night;
@@ -595,20 +851,93 @@ export class MaritimeSystem {
     this.buoy.position.y = Math.sin(t * 0.8) * 0.12;
     this.buoy.rotation.z = Math.sin(t * 0.55) * 0.06;
     for (const s of this.ships) {
-      if (s.route) {
-        // pingpong the route — never leaves the channel, never wrap-teleports
-        s.s += s.speed * s.dir * dt;
-        if (s.s >= s.route.len) { s.s = s.route.len; s.dir = -1; }
-        else if (s.s <= 0) { s.s = 0; s.dir = 1; }
-        const [x, z, dx, dz] = this.routeAt(s.route, s.s);
-        s.g.position.set(x, Math.sin(t * 0.6 + s.s) * 0.06, z);
-        s.g.rotation.y = Math.atan2(-dx * s.dir, -dz * s.dir);
-      } else {
-        // shrimpers circle their grounds slowly, bobbing
-        s.a += dt * 0.05;
-        s.g.position.set(s.x + Math.cos(s.a) * 6, Math.sin(t * 0.9 + s.a * 7) * 0.08, s.z + Math.sin(s.a) * 6);
-        s.g.rotation.y = -s.a - Math.PI / 2;
-      }
+      // pingpong the route — never leaves the channel, never wrap-teleports
+      s.s += s.speed * s.dir * dt;
+      if (s.s >= s.route.len) { s.s = s.route.len; s.dir = -1; }
+      else if (s.s <= 0) { s.s = 0; s.dir = 1; }
+      const [x, z, dx, dz] = this.routeAt(s.route, s.s);
+      s.g.position.set(x, Math.sin(t * 0.6 + s.s) * 0.06, z);
+      s.g.rotation.y = Math.atan2(-dx * s.dir, -dz * s.dir);
     }
+    this.updateShrimpers(dt, t);
+    if (!player) return;
+    // Sea W2: placard on approach — every vessel, once, re-arms on exit
+    const px = player.pos.x, pz = player.pos.z;
+    this.vhfFloor -= dt;
+    let chatFired = false;
+    const vhfRange = player.mode === 'BOAT' ? VHF_BOAT_R : VHF_R;
+    const vessels = (fn) => { for (const s of this.ships) fn(s); for (const b of this.shrimpers) fn(b); };
+    vessels((s) => {
+      const d = Math.hypot(s.g.position.x - px, s.g.position.z - pz);
+      if (d < SHIP_TOAST_R && !s.id.toasted) { s.id.toasted = true; this.onIdentity?.(this.shipText(s)); }
+      else if (d > SHIP_REARM_R) s.id.toasted = false;
+      // channel 16 — seeded per-vessel cooldowns, global floor, one line max
+      s.id.chatT -= dt;
+      if (chatFired || this.vhfFloor > 0 || s.id.chatT > 0 || d > vhfRange) return;
+      const line = this.vhfLine(s);
+      s.id.chatT = nextVhfCooldown(s.id.name, s.id.chatN++); // rolls even on a quiet vessel — no per-frame retry
+      if (!line) return;
+      chatFired = true;
+      this.onChatter?.(line, s.id.voice);
+      this.vhfFloor = VHF_FLOOR;
+    });
+  }
+
+  // the fleet's day: moored (night) → outbound at dawn → trawling the ground
+  // (outriggers down, gulls find them) → home by dusk. All on sky.t; per-boat
+  // seeded offsets stagger the fleet so it never moves as one block.
+  updateShrimpers(dt, t) {
+    const dayT = this.sky?.t ?? 0.5;
+    const m4 = this.m4 ??= new THREE.Matrix4();
+    const q = this.q ??= new THREE.Quaternion();
+    const e = this.e ??= new THREE.Euler();
+    const v = this.v ??= new THREE.Vector3();
+    const one = this.one ??= new THREE.Vector3(1, 1, 1);
+    let ri = 0, gi = 0;
+    this.shrimpers.forEach((b, i) => {
+      const out = dayT >= DAWN_T + b.dawnOff && dayT < DUSK_T + b.dawnOff;
+      let x, z, vx = 0, vz = 0;
+      if (b.p >= 1) {
+        // on the ground: circle grows outward from the path end (no snap),
+        // shrinks back before the run home
+        if (out) { b.r = Math.min(b.trawlR, b.r + dt * 1.2); b.trawlA += b.trawlW * dt; } // trawlW is rad/s — a lap in ~2 min, the W1 circling feel
+        else { b.r -= dt * 1.5; if (b.r <= 0) { b.r = 0; b.p = 0.999; } }
+        const [gx, gz] = b.path.pts[b.path.pts.length - 1];
+        x = gx + Math.cos(b.trawlA) * b.r;
+        z = gz + Math.sin(b.trawlA) * b.r;
+        vx = -Math.sin(b.trawlA); vz = Math.cos(b.trawlA);
+        b.working = out && b.r > b.trawlR * 0.5;
+      } else {
+        b.working = false;
+        const step = (b.speed * dt) / b.path.len;
+        b.p = out ? Math.min(1, b.p + step) : Math.max(0, b.p - step);
+        const [rx, rz, dx, dz] = this.routeAt(b.path, b.p * b.path.len);
+        const sgn = out ? 1 : -1;
+        if (b.p <= 0) { // alongside — ease onto the seeded mooring spot, no snap
+          const k = Math.min(1, dt * 0.8);
+          x = b.g.position.x + (b.moorX - b.g.position.x) * k;
+          z = b.g.position.z + (b.moorZ - b.g.position.z) * k;
+        } else { x = rx; z = rz; vx = dx * sgn; vz = dz * sgn; }
+      }
+      const y = SEA - 0.1 + Math.sin(t * 0.9 + i * 1.7) * 0.06;
+      b.heading = (vx || vz) ? Math.atan2(-vx, -vz) : b.p <= 0 ? b.moorHdg : b.heading;
+      b.g.position.set(x, y, z); // invisible carrier — placard/VHF/gull range all read g.position
+      const cr = Math.cos(b.heading), sr = Math.sin(b.heading);
+      const at = (lx, ly, lz) => v.set(x + lx * cr + lz * sr, y + ly, z - lx * sr + lz * cr);
+      e.set(0, b.heading, 0); q.setFromEuler(e);
+      this.shrimpMeshes.hull.setMatrixAt(i, m4.compose(at(0, 0.3, 0), q, one));
+      this.shrimpMeshes.cabin.setMatrixAt(i, m4.compose(at(0, 1, -0.5), q, one));
+      this.shrimpMeshes.mast.setMatrixAt(i, m4.compose(at(0, 1.5, 0.4), q, one));
+      // outriggers swing down and out while the boat works its ground
+      const tilt = b.working ? 1.15 : 0.35;
+      for (const side of [-1, 1]) {
+        e.set(0, b.heading, side * tilt); q.setFromEuler(e);
+        this.shrimpMeshes.rig.setMatrixAt(ri++, m4.compose(at(side * 0.45, 0.6, 0.3), q, one));
+      }
+      e.set(0, b.heading, 0); q.setFromEuler(e);
+      this.shrimpMeshes.glow.setMatrixAt(gi++, m4.compose(at(0.4, 1.9, 0.6), q, one));
+      this.shrimpMeshes.glow.setMatrixAt(gi++, m4.compose(at(-0.4, 1.4, -0.5), q, one));
+    });
+    for (const mesh of Object.values(this.shrimpMeshes)) mesh.instanceMatrix.needsUpdate = true;
   }
 }

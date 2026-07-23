@@ -21,6 +21,13 @@ export const TOURS = [
         S('⚓ Port Freeport', LL(28.95, -95.35), { mode: 'DRIVE', time: 0.35, note: 'new port, chemical character on the Brazos mouth; the freeport approach route heads out from the jetties to join the coastal trunk' }),
         S('🚢 Bolivar Roads — ship watching', [4507, 1834], { mode: 'BOAT', time: 0.35, act: 'shipHere', note: 'the Houston route threads this pass on real AIS geometry — the route\'s container ship is brought close aboard; the old hand-laid LANE is retired, every ship now rides a baked route' }),
       ] },
+      { wave: 'W2 — the working Gulf', spots: [
+        S('🚢 name that ship', [4507, 1834], { mode: 'BOAT', time: 0.35, act: 'shipHere', note: 'the forced ship closes to placard range — within 60 units the toast reads her name, type, and voyage; stand off past 90 and return to re-arm it' }),
+        S('📻 channel 16', [4507, 1834], { mode: 'BOAT', time: 0.35, act: 'vhfNow', note: 'the nearest vessel is brought close and keys the radio — pilot, port-ops, and traffic calls near the ports, securité from the cutters; the subtitle header reads channel 16' }),
+        S('🛥️ joint patrol', [4034, 2576], { mode: 'BOAT', time: 0.35, act: 'cgMeet', note: 'a cutter is brought to the trunk route here and Rescue 6-0 anchors a hover over her — the Sea W2 joint moment, cutters ride the same baked routes as the ships' }),
+        S('🦐 the fleet works the grounds', [4752, 1993], { mode: 'BOAT', time: 0.5, act: 'shrimpFleet', note: 'the Galveston pair trawls this ground at midday, outriggers down, gulls wheeling over the nets — dawn-out, dusk-home on the real clock; idle in close for the gull log entry' }),
+        S('🐬 life offshore', [4200, 2350], { mode: 'BOAT', time: 0.35, act: 'seaLife', note: 'an offshore pod, a surfacing green turtle, a cownose ray, and a rolling tarpon conjured around the boat — all five W2 species log as critters (the gull logs at the shrimp fleet)' }),
+      ] },
     ],
   },
   {

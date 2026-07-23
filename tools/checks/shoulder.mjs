@@ -253,7 +253,7 @@ export default async function shoulder(t) {
       west: g.animals.regionTable(3600, -800).some((r) => r[0] === 'blackbear'),
       coast: g.animals.regionTable(4700, 900).some((r) => r[0] === 'blackbear'),
     })`);
-    t.ok(table.total === 29 && table.dom === '29', `species ${table.total}, DOM ${table.dom}`);
+    t.ok(table.total === 34 && table.dom === '34', `species ${table.total}, DOM ${table.dom}`); // 29 + Sea W2's five offshore
     t.ok(table.sabine, 'no bear row in the Sabine strip table');
     t.ok(!table.west && !table.coast, 'bear escaped the Sabine strip (western pines / coast tables)');
     // hunt a live one — seeded chunks, so whichever spot works keeps working

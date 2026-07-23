@@ -16,7 +16,7 @@ test('collectible tables retain their documented totals and unique labels', asyn
 
   const animals = await source('animals.js');
   const species = [...animals.matchAll(/^\s{2}([a-z]+): \{ name:/gm)].map(([, key]) => key);
-  assert.equal(species.length, 29, 'species count');
+  assert.equal(species.length, 34, 'species count'); // 29 + Sea W2's five offshore
   unique(species, 'species IDs');
 
   const haunts = await source('haunts.js');

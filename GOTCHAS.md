@@ -44,8 +44,10 @@ graduate here (and out of `NEXT_SESSION.md`).
   into the Texas tallies. Collectible totals in the DOM are dynamic spans filled
   at boot — never hardcode a total in `index.html` again.
 - **Table-size checks to bump on any addition**: 27 airports / 7-15-5 by tier /
-  22 gate signs (`aviation.mjs`, `hud.mjs`), species **29** (`ag.mjs`,
-  `padre.mjs`), landmarks **38** (`padre.mjs`), legends **3** (`shelf.mjs`),
+  22 gate signs (`aviation.mjs`, `hud.mjs`), species **34** (`ag.mjs`,
+  `padre.mjs`, `shoulder.mjs`, `tools/unit/progress.test.mjs` — all four,
+  Sea W2 missed the last two on the first pass), landmarks **38**
+  (`padre.mjs`), legends **3** (`shelf.mjs`),
   stones 7 + monuments 10–15 + plaques **15** + signs 4 + glows 4
   (`shoulder.mjs`).
 - **Any new airport MUST get a `ROUTES` entry in aviation.js** — a missing entry

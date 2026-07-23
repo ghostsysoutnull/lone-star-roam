@@ -280,11 +280,29 @@ function advanceNews(c, dt) {
 }
 
 function advanceCoastGuard(c, dt, maritime) {
-  if (c.hoverT > 0) { c.hoverT -= dt; c.ph = 'hover'; return; }
+  if (c.hoverT > 0) {
+    c.hoverT -= dt; c.ph = 'hover';
+    // Sea W2 joint moment: an anchored hover tracks the cutter underneath
+    const a = c.anchor;
+    if (a) {
+      const k = Math.min(1, dt * 1.5);
+      c.x += (a.g.position.x - c.x) * k;
+      c.z += (a.g.position.z - c.z) * k;
+    }
+    if (c.hoverT <= 0) c.anchor = null;
+    return;
+  }
   c.ph = 'patrol';
   c.s += dt * CG_SPD;
   const [lx, lz, dx, dz] = maritime.laneAt(c.s);
   c.x = lx; c.z = lz; c.y = hAt(lx, lz) + CG_ALT; c.heading = Math.atan2(-dx, -dz);
+  // Sea W2: a cutter below anchors a long joint hover; any other vessel keeps
+  // the brief look-down from A4
+  let cut = null;
+  for (const k of maritime.cutters ?? []) {
+    if (Math.hypot(k.g.position.x - c.x, k.g.position.z - c.z) < 70) cut = k;
+  }
+  if (cut && Math.random() < 0.02) { c.hoverT = 14 + Math.random() * 8; c.anchor = cut; return; }
   let nd = Infinity;
   for (const s of maritime.ships) nd = Math.min(nd, Math.hypot(s.g.position.x - c.x, s.g.position.z - c.z));
   if (nd < 60 && Math.random() < 0.01) c.hoverT = 8 + Math.random() * 6;

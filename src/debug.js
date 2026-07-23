@@ -81,6 +81,39 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       const s = maritime.force(player.pos.x, player.pos.z);
       hud.toast(s ? `🚢 ${s.type} ship on the ${s.route.id} route, close aboard` : '🚢 no route ship to bring in');
     },
+    // Sea W2: fleet snapped to its grounds in working trim (midday staged so
+    // the cycle holds them there), gulls in tow
+    shrimpFleet() {
+      sky.t = 0.5;
+      maritime.forceShrimpDay();
+      hud.toast('🚤 the shrimp fleet is working its grounds — outriggers down, watch for gulls');
+    },
+    // Sea W2: joint moment staged deterministically — nearest cutter brought
+    // to the player, Rescue 6-0 forced up and anchored over it
+    cgMeet() {
+      const c = maritime.forceCutter(player.pos.x, player.pos.z);
+      if (!c) { hud.toast('🛥️ no cutter to bring in'); return; }
+      heli.force('coastguard');
+      const cand = heli.candidates.find((k) => k.kind === 'coastguard' && k.flying);
+      if (cand) {
+        cand.s = maritime.trunkS(c.g.position.x, c.g.position.z);
+        cand.x = c.g.position.x; cand.z = c.g.position.z;
+        cand.hoverT = 20; cand.anchor = c;
+      }
+      hud.toast(`🛥️ ${c.id.name} close aboard — the Coast Guard helicopter is anchoring overhead`);
+    },
+    // Sea W2: key channel 16 now — nearest vessel forced close, then speaks
+    vhfNow() {
+      maritime.force(player.pos.x, player.pos.z);
+      const line = maritime.forceChatter(player.pos.x, player.pos.z);
+      hud.toast(line ? '📻 channel 16 keyed' : '📻 nobody in range with traffic');
+    },
+    // Sea W2: one of each offshore species conjured around the player (afloat)
+    seaLife() {
+      const ring = [['spotteddolphin', 14, 0], ['greenturtle', 0, 14], ['cownose', -14, 0], ['tarpon', 0, -14]];
+      for (const [sp, ox, oz] of ring) animals.forceSpawn(sp, player.pos.x + ox, player.pos.z + oz);
+      hud.toast('🐬 pod, turtle, ray, and tarpon conjured — idle close to log them');
+    },
     // Rails W2: named trains forced onto their routes, schedule bypassed
     'railCrossing:laredo'() {
       const tr = trains.startNamed('laredo', 0, undefined, undefined, sky.days);

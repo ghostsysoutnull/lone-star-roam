@@ -139,6 +139,9 @@ async function boot() {
   trains.onHorn = () => audio.trainHorn();
   trains.onIdentity = (text) => hud.toast(text);
   trains.onChatter = (text, voice) => { audio.radio(text, { voice }); hud.subtitle(text, `📻 rail radio`); };
+  // Sea W2: vessel placards + channel 16 (the trains idiom, sea register)
+  maritime.onIdentity = (text) => hud.toast(text);
+  maritime.onChatter = (text, voice) => { audio.radio(text, { voice }); hud.subtitle(text, `📻 channel 16`); };
   traffic.onHonk = (type) => audio.honk(type);
   traffic.groundYAt = (x, z) => groundYAt(x, z) ?? brandGroundYAt(x, z);
   animals.onSound = (kind) => audio[kind]?.();
@@ -387,7 +390,9 @@ async function boot() {
     traffic.update(dt, player.pos.x, player.pos.z, player.pos.y);
     traffic.setNight(ATMOS.night); perf.lap('traffic');
     trains.update(dt, player.pos.x, player.pos.z, sky.days, player.perks.radio); perf.lap('trains');
-    maritime.update(dt, clock.elapsedTime); perf.lap('maritime');
+    maritime.update(dt, clock.elapsedTime, player);
+    animals.seaFlocks = maritime.workingShrimpers(); // Sea W2 gull bridge — no animals→maritime import
+    perf.lap('maritime');
     energy.update(dt, player.pos.x, player.pos.z); perf.lap('energy');
     heli.update(dt, player.pos.x, player.pos.z, sky.days); perf.lap('heli');
     blimp.update(dt, sky.days); perf.lap('blimp');

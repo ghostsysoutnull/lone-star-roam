@@ -6,35 +6,46 @@ Three.js free-roam Texas game. Process law, commands, and architecture live in
 changing); per-module grep anchors in `MODULES.md`; history in `ROADMAP.md`;
 queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
-Active track: **Sea-Industry Realism** (`SEA_INDUSTRY_SPEC.md`, W2 of 3).
-Sea W1 (ports + AIS routes + Ports log) shipped 2026-07-23, commit eeca211;
-the Verify Ops interstitial (runner single-instance lock + load warning +
-toast-class fix, `VERIFY_OPS_SPEC.md`) shipped 2026-07-23.
+Active track: **Sea-Industry Realism** (`SEA_INDUSTRY_SPEC.md`, W3 of 3).
+Sea W2 (named ships + VHF + cutters + shrimp fleet + life offshore) shipped
+2026-07-23; Sea W1 (ports + AIS routes + Ports log) shipped 2026-07-23,
+commit eeca211.
 
 ## Session briefing
-- **This session**: Sea-Industry Realism, wave 2 of 3 — named ships (seeded
-  `shipid:` identity + approach placard, trains' idiom), VHF channel-16
-  chatter near ships and ports, Coast Guard cutters on patrol + joint
-  moments with the CG helicopter, shrimp fleet working real grounds on a
-  dawn/dusk cycle, life offshore (5 water-gated species in the critter log,
-  gulls trailing live shrimpers). Wave 1 (ports + AIS routes + Ports log)
-  shipped 2026-07-23, commit eeca211.
-- **Recommended setup**: handoff **no**, effort **high** — chatter register,
-  new behaviors, and wildlife feel are the wave's risk; mechanical chunks
-  delegate per chunk mode. Session runs Fable 5; flag it if another model
-  is running.
-- **Budget**: code + checks + tours + one staged shot (spec: suite checks +
-  one shot), grep-first, one full run at close per the launch-discipline
-  law. Perf: within caps (instanced fleets + species rows).
-- **Then**: rewrite this block for Sea-Industry W3 (sea cargo jobs + boat
-  shop) — W3 closes the track: fold into ROADMAP, sweep satellite docs,
-  graduate surviving gotchas.
+- **This session**: Sea-Industry Realism, wave 3 of 3 — sea cargo jobs
+  between ports (kind `'sea'`, the charter precedent) + the boat shop
+  (six upgrades: outboard tiers, hull paint, VHF handheld, running
+  lights, shrimp rig, fish finder). Wave 2 (the working Gulf) shipped
+  2026-07-23, the commit before this file's.
+- **Recommended setup**: handoff **yes** (wave-coder), effort **high** —
+  settled-design execution: pure terms in mission-rules.js, catalog +
+  applyGear plumbing; the handoff plan must be the full contract (every
+  player-visible string verbatim, all knob values stated). Session runs
+  Fable 5; flag it if another model is running.
+- **Budget**: code + checks, no shots, grep-first, one full run at close
+  (launch-discipline law). Perf: none (logic + catalog + small light
+  meshes).
+- **Then**: W3 closes the track — fold Sea-Industry into `ROADMAP.md`,
+  sweep satellite docs (`BACKLOG.md` header, anything naming the active
+  track), graduate surviving gotchas into `GOTCHAS.md`, delete this
+  briefing block (this file returns to kickoff-only).
 
-Gotchas carried over (Sea W1 → W2): ships
-pingpong routes — never wrap (never-vanish law); `maritime.force(x,z)` /
-`shipHere` is the ship-forcing pattern — W2's shrimper cycle and chatter
-need their own forcing actions per the tour law; W2 cutters ride
-`maritime.routes` (`routeAt`) — never a new lane; Beaumont/Port Arthur/
-Brownsville harbors are NOT game water (roadsteads only — no water content
-at their anchors); announcer toasts race nearest-wins — test at Brownsville
-(no competing sites).
+Gotchas carried over (Sea W2 → W3): `shipid:` / `shrimper:` seed streams
+are shipped — never rename; three ports have `berth: null` (Beaumont /
+Port Arthur / Brownsville — roadstead law), so W3 dock pickup/delivery
+must resolve `berth ?? roadstead` and only fishing ports host shrimp-rig
+landings; `FISHING` path points in maritime.js are probe-verified water
+literals — never "simplify" them back to raw LL projections (harbor
+shorelines render land at this scale); outboard knob arrays follow the
+index-0-is-stock law against `BOAT_*` in vehicle.js; the W3 VHF handheld
+extends the existing maritime `onChatter` range gate (`VHF_R`/
+`VHF_BOAT_R`), not a new transmitter; W2's shot lesson is now a check —
+instanced-component geometries stay origin-centered (offsets live in the
+instance matrix, rig boom's base-pivot translate is the one exception);
+sea-surface legibility law from the W2.1 playtest rounds — a waterline
+subject reads only by proud silhouette + motion cue + mini-world scale
+(turtle dome / dolphin arc / ray wingtips / tarpon leap — Bruno's eye
+caught all three misses); **`tools/judge-shot.sh` is broken** (Copilot CLI
+rejects the zero-tools lockdown — BACKLOG "Test harness follow-ups" entry;
+until fixed, staged shots are judged by Bruno only, which W3 sidesteps —
+its budget is no-shots).
