@@ -1,13 +1,10 @@
 # Backlog — queued work
 
-No active track. Rails Operations shipped in full 2026-07-19 (folded into
-`ROADMAP.md`). Queue order (corrected 2026-07-22 at runner-telemetry wave
-close): the **sea-industry spec session** (`VISION_SEA_INDUSTRY.md`,
-doc-only), then the **wind-farm bake-clip rebake** (Bugs below; the
-solar-decal re-check may fold in). The runner-telemetry wave shipped
-2026-07-22; the turbine-sampler wave had already shipped 2026-07-22
-(`3172eb3`) but its two Bugs entries were left unstruck by that session's
-sweep — corrected below. Items below are the queue.
+Active track: **Sea-Industry Realism** (`SEA_INDUSTRY_SPEC.md`, spec'd
+2026-07-22, 3 waves, none coded yet). Queue order: the **wind-farm
+bake-clip rebake** first (Bugs below; the solar-decal re-check may fold
+in), then sea-industry W1. The runner-telemetry wave shipped 2026-07-22.
+Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Bugs (live in shipped code)
@@ -353,11 +350,16 @@ confirmed; silhouette axis needs the audit step):
 
 ## Later
 
-AIS-based real ship routes (marinecadastre.gov track data): the
-full-realism alternative to the hand-laid coastal lane. The Energy track
-kept the lane under its scarcity exception (0 OSM separation lanes off
-Texas; port legs snap to the 8 real fairways) — revisit only if maritime
-gets its own track; heavy input pipeline, poor ROI standalone.
+~~AIS-based real ship routes (marinecadastre.gov track data)~~ —
+graduated into Sea-Industry W1 (2026-07-22, `SEA_INDUSTRY_SPEC.md`): the
+condition "revisit only if maritime gets its own track" is met.
+AIS-informed hand lanes are the decided default (small sample, numeric
+gate); the full track-data bake survives only as the gate's fallback.
+
+Boat trim tabs (handling character, planing feel): deferred from the
+Sea-Industry W3 shop slate (Bruno, 2026-07-22) — feel-tuning risk inside
+a handoff wave. Revisit as a small Fable in-loop tune if boat handling
+ever gets a pass.
 
 Placement audit follow-on (2026-07-16): coastal city-building scatter vs
 water is unaudited — `cities.js` rejects roads (<1.3u) but never `waterAt`,

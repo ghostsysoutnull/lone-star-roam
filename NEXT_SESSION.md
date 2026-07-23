@@ -6,42 +6,33 @@ Three.js free-roam Texas game. Process law, commands, and architecture live in
 changing); per-module grep anchors in `MODULES.md`; history in `ROADMAP.md`;
 queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
-No active track: **the runner-telemetry + durable-history wave shipped
-2026-07-22** (handoff via `wave-coder`) — every verify run now writes a
-schema-2 JSON with structured failure signatures to a reboot-durable
-history (`~/.cache/lonestar-verify/history/`, 180-day/keep-100 prune) plus
-the atomic latest pointer (`/tmp/lonestar-verify.json`); browser crashes
-are `infra` casualties (bounded relaunch, exit 3 = infra-incomplete, never
-FAIL, zero signatures) so crash noise can't poison flake-policy evidence;
-the runner self-test grew to 51 assertions across 6 child runs. The
-wave-close full verify (572 passed, 0 failed, 0 flakes) is the first
-trusted history entry. History now accumulates run over run — the
-flake-policy and startup-optimization gates (`BACKLOG.md`) are unblocked
-and waiting on volume.
-
-**Queue order (corrected 2026-07-22)**: sea-industry spec session (below),
-then the wind-farm bake-clip rebake (`BACKLOG.md` → Bugs; the solar-decal
-re-check may fold in). The turbine-sampler + city-clearance wave had
-already shipped 2026-07-22 (`3172eb3`); its stale BACKLOG entries are now
-struck. Map W2 (layers + waypoint) stays queued in `BACKLOG.md`.
+Active track: **Sea-Industry Realism** — `SEA_INDUSTRY_SPEC.md` written
+2026-07-22 (3 waves: ports + AIS-informed routes / the working Gulf +
+life offshore / sea economy + boat shop; all open calls resolved, per-wave
+design-settled sections in the spec). No sea code exists yet. Queue order:
+the **wind-farm bake-clip rebake** ships first (`BACKLOG.md` → Bugs; the
+solar-decal re-check may fold in), then sea W1.
 
 ## Session briefing
-- **This session**: sea-industry spec session — write `SEA_INDUSTRY_SPEC.md`
-  from `VISION_SEA_INDUSTRY.md` (goals, wave split, open calls resolved
-  before any wave codes, per-wave handoff grades + design-settled
-  sections; `NEWPLAYER_SPEC.md` is the format reference). Doc-only, no
-  code. Runner-telemetry wave shipped 2026-07-22 (the commit carrying this
-  briefing).
-- **Recommended setup**: handoff **no**, effort **high** — specs and tech
-  design are always Fable 5 in-loop. Session runs Fable 5; flag it if
+- **This session**: wind-farm bake-clip rebake — 83 baked wind-farm
+  centers sit outside the Texas border polygon (`tools/build-energy.mjs`
+  bins over the raw Overpass bbox without clipping); clip farm cells to
+  the border and rebake `data/energy.json`. Full entry with provenance in
+  `BACKLOG.md` → Bugs. The solar-decal re-check may fold in. Sea-industry
+  spec session shipped 2026-07-22 (the commit carrying this briefing).
+- **Recommended setup**: handoff **no**, effort **high** — bake-pipeline
+  work with a reproduce-first gate needs in-loop judgment; the diff is
+  small but the verification is the wave. Session runs Fable 5; flag it if
   another model is running.
-- **Budget**: the spec doc + queue/briefing rewrite only; doc-only diff —
-  no tests, no shots; grep-first for module touchpoints (maritime.js,
-  world.js, geo.js are the likely borders).
-- **Then**: rewrite this block for the spec's wave 1 — or, if the spec
-  defers coding, for the wind-farm bake-clip rebake wave.
+- **Budget**: reproduce + clip + rebake + checks (energy suite + affected
+  fast groups), no shots; grep-first. Perf: none (data-only rebake).
+- **Then**: rewrite this block for Sea-Industry W1 (ports + routes; the
+  W1 scout's AIS sample download can be requested from Bruno early —
+  marinecadastre.gov daily extract).
 
-Gotchas carried over: the rebake wave (next coding work) must reproduce the
-shipped `data/energy.json` unfixed before applying the border clip
-(prefer-true-source rule); Overpass from this environment is GET, never
-POST (`curl -sG --data-urlencode`).
+Gotchas carried over: the rebake must reproduce the shipped
+`data/energy.json` unfixed from raw inputs *before* applying the border
+clip (prefer-true-source rule); Overpass from this environment is GET,
+never POST (`curl -sG --data-urlencode`); wind-farm records feed
+`GEO.energy.windFarms` — turbine *candidates* already gate on `inTexas`,
+so the visible change is announcer/HUD-side only.
