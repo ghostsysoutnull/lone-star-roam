@@ -173,22 +173,28 @@ export default async function energy(t) {
     t.ok(res.far, 'no bespoke Far Rig group after the rebase');
   });
 
-  await t.check('fairway legs: port approaches snap to the baked points, an approach tanker works one', async () => {
+  await t.check('fairways: the corpus sea route runs the baked through-channels (Sea W1 heir of the leg system)', async () => {
+    // fairwayLegs retired with the LANE — the corpus approach route now owns
+    // the join. The two through-channels must lie on the route; the side
+    // canals (Viola, Tule Lake, Industrial) legitimately sit off it.
     const res = await t.ev(`(() => {
-      const baked = g.GEO.energy.fairways.flatMap((f) => f.pts);
-      const legs = g.maritime.fairwayLegs;
-      // every leg point past the lane-join head must be a real baked point
-      const stray = legs.flatMap((l) => l.slice(1)).filter(([x, z]) => !baked.some(([bx, bz]) => Math.hypot(bx - x, bz - z) < 0.01));
-      const tanker = g.maritime.ships.find((s) => s.leg);
-      return { legs: legs.length, stray: stray.length, tanker: !!tanker, s0: tanker?.s ?? -1 };
+      const route = g.GEO.sea.routes.find((r) => r.id === 'corpus');
+      const distTo = ([x, z]) => Math.min(...route.pts.map(([px, pz], i) => {
+        if (!i) return Infinity;
+        const [ax, az] = route.pts[i - 1], dx = px - ax, dz = pz - az, L2 = dx * dx + dz * dz || 1;
+        const t2 = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2));
+        return Math.hypot(x - (ax + dx * t2), z - (az + dz * t2));
+      }));
+      const near = (name) => {
+        const f = g.GEO.energy.fairways.find((f) => f.name === name);
+        return Math.min(...f.pts.map(distTo));
+      };
+      const tanker = g.maritime.ships.find((s) => s.route?.id === 'corpus');
+      return { rincon: near('Rincon Canal'), ship: near('Corpus Christi Ship Channel'), tanker: !!tanker, type: tanker?.type };
     })()`);
-    t.ok(res.legs > 0, 'no fairway approach legs built');
-    t.ok(res.stray === 0, `${res.stray} leg points are not baked fairway points`);
-    t.ok(res.tanker, 'no approach tanker assigned to a fairway leg');
-    const s1 = await t.ev('g.maritime.ships.find((s) => s.leg).s');
-    await t.wait(1.2);
-    const s2 = await t.ev('g.maritime.ships.find((s) => s.leg).s');
-    t.ok(s2 !== s1, 'approach tanker not moving along its leg');
+    t.ok(res.rincon < 10, `Rincon Canal ${res.rincon.toFixed(1)}u off the corpus route (must be < 10)`);
+    t.ok(res.ship < 10, `CC Ship Channel ${res.ship.toFixed(1)}u off the corpus route (must be < 10)`);
+    t.ok(res.tanker && res.type === 'tanker', `corpus route ship missing or wrong kind (${res.type})`);
   });
 
   await t.check('hero sites: every Energy hero stands clear of roads (the Spindletop lesson)', async () => {

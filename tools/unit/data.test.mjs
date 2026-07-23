@@ -117,3 +117,36 @@ test('county agriculture records resolve one-to-one', async () => {
     assert.equal(record.areaKm2 > 0, true, `agriculture.${county.name}.areaKm2 must be positive`);
   }
 });
+
+test('sea routes and ports retain shape, identity, and cross-references', async () => {
+  const sea = await json('sea.json');
+  const CHARACTERS = new Set(['container', 'tanker', 'bulk', 'chemical', 'fishing']);
+  const ROADSTEAD_ONLY = new Set(['beaumont', 'portarthur', 'brownsville']); // harbors that are not game water
+
+  assert.equal(sea.routes.length, 6, 'route count');
+  unique(sea.routes.map(({ id }) => id), 'route ids');
+  assert.equal(sea.routes.filter((r) => r.kind === 'trunk').length, 1, 'exactly one trunk route');
+  for (const route of sea.routes) {
+    assert.equal(route.pts.length >= 2, true, `route ${route.id} needs two points`);
+    for (const [i, [x, z]] of route.pts.entries()) {
+      finite(x, `route ${route.id}.pts[${i}][0]`);
+      finite(z, `route ${route.id}.pts[${i}][1]`);
+    }
+    const weight = Object.values(route.types).reduce((a, b) => a + b, 0);
+    assert.equal(Math.abs(weight - 1) < 1e-6, true, `route ${route.id} type weights sum to 1 (${weight})`);
+  }
+
+  assert.equal(sea.ports.length, 8, 'port count');
+  unique(sea.ports.map(({ id }) => id), 'port ids');
+  unique(sea.ports.map(({ name }) => name), 'port names');
+  for (const port of sea.ports) {
+    finite(port.x, `port ${port.id}.x`);
+    finite(port.z, `port ${port.id}.z`);
+    assert.equal(CHARACTERS.has(port.character), true, `port ${port.id}.character (${port.character})`);
+    assert.equal(typeof port.info, 'string', `port ${port.id}.info`);
+    assert.ok(sea.routes.some((r) => r.id === port.route), `port ${port.id} route ref ${port.route}`);
+    assert.ok(Array.isArray(port.roadstead) && port.roadstead.length === 2, `port ${port.id}.roadstead`);
+    if (ROADSTEAD_ONLY.has(port.id)) assert.equal(port.berth, null, `port ${port.id} must be roadstead-only`);
+    else assert.ok(Array.isArray(port.berth), `port ${port.id} needs a berth`);
+  }
+});

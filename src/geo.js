@@ -30,6 +30,9 @@ export const GEO = {
   // energy.counties: county name -> {wells, wellKm2} (all 254, ag idiom).
   // Site lists read directly off GEO.energy (GEO.cities idiom) — no per-list
   // accessor, only energyAt() for the per-county record. tools/build-energy.mjs.
+  sea: { routes: [], ports: [] },
+  // sea: AIS-informed ship routes + the 8 real ports (quays/berth/roadstead,
+  // character). Read directly off GEO.sea (GEO.cities idiom). tools/build-sea.mjs.
 };
 
 export async function loadGeo(onStatus) {
@@ -76,6 +79,8 @@ export async function loadGeo(onStatus) {
   GEO.bandAg = await get('band-agriculture.json').catch(() => ({}));
   onStatus?.('Mapping the energy grid…');
   GEO.energy = await get('energy.json').catch(() => GEO.energy);
+  onStatus?.('Charting the shipping lanes…');
+  GEO.sea = await get('sea.json').catch(() => GEO.sea);
   for (const c of GEO.counties) {
     // bbox per county for cheap point-in-county prefiltering
     let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;

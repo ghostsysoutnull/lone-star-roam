@@ -152,6 +152,9 @@ export class EnergySystem {
       subAnnounced.push(s);
       this.register(s.x, s.z, 16, `⚡ ${s.name}`);
     }
+    // Sea W1: the eight real ports — announce on approach, per the register()
+    // law (no new machinery); the Ports log fires in update at visit distance
+    for (const p of GEO.sea.ports) this.register(p.x, p.z, 25, `⚓ ${p.name} — ${p.info}`);
     // Water Vehicles W3: named fairways — one site per baked polyline, centroid
     // + bounding radius so a boat crossing anywhere in the channel announces it
     // (unnamed fairways stay silent — the standing announcer law)
@@ -241,6 +244,11 @@ export class EnergySystem {
     // hero log — once per save, at parked-truck distance (inside the announce ring)
     for (const h of HEROES) {
       if (Math.hypot(h.at[0] - px, h.at[1] - pz) < 12) this.gameplay.logEnergy(h.id, h.name, ENERGY_TOTAL, h.fact);
+    }
+    // Sea W1 Ports log — port kits are big, so visit distance is the wharf
+    // apron (25u), not the hero's 12u marker ring
+    for (const p of GEO.sea.ports) {
+      if (Math.hypot(p.x - px, p.z - pz) < 25) this.gameplay.logPort(p.id, p.name, GEO.sea.ports.length, p.info);
     }
   }
 

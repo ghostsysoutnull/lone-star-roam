@@ -7,35 +7,32 @@ changing); per-module grep anchors in `MODULES.md`; history in `ROADMAP.md`;
 queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
 Active track: **Sea-Industry Realism** — `SEA_INDUSTRY_SPEC.md` (3 waves:
-ports + AIS-informed routes / the working Gulf + life offshore / sea
-economy + boat shop; all open calls resolved, per-wave design-settled
-sections in the spec). No sea code exists yet. The wind-farm bake-clip
-rebake and the solar-decal re-check shipped 2026-07-22.
+ports + AIS routes / the working Gulf + life offshore / sea economy + boat
+shop). W1 shipped 2026-07-23: `data/sea.json` (6th boot data file — AIS-traced
+routes + 8 port records), 8 dressed ports, 7 route ships, Ports log (12th
+collectible), `LANE`/`fairwayLegs` retired.
 
 ## Session briefing
-- **This session**: Sea-Industry, wave 1 of 3 — eight real named ports
-  (dressed, visitable, HUD announce), ship traffic on AIS-informed routes
-  replacing the hand-laid `LANE`, Ports log (12th collectible,
-  `save.ports`). The wind-farm bake-clip rebake (queue predecessor)
-  shipped 2026-07-22.
-- **Recommended setup**: handoff **no**, effort **high** — new bake + new
-  visible surface + route judgment (spec's suggested setup). Session runs
+- **This session**: Sea-Industry, wave 2 of 3 — named ships (seeded `shipid:`
+  identity + placard toast), VHF channel-16 chatter, Coast Guard cutters +
+  the rotors.js joint moment, the shrimp fleet on a dawn/dusk cycle, life
+  offshore (5 water-gated species). W1 (ports + AIS routes) shipped
+  2026-07-23.
+- **Recommended setup**: handoff **no**, effort **high** — chatter register +
+  new behaviors + wildlife feel (spec's suggested setup). Session runs
   Fable 5; flag it if another model is running.
-- **Budget**: route scout numbers before any lane ships, code + checks,
-  one staged shot (new visible surface: the dressed ports), grep-first.
-  Perf: port kits must fit the caps in `tools/checks/perf.mjs` (spec's
-  W6b poly bar).
-- **Then**: rewrite this block for Sea-Industry W2 (working Gulf + life
-  offshore).
+- **Budget**: code + checks, one staged shot (the working Gulf surface —
+  cutters/shrimpers), grep-first; chunk-mode delegation for settled-contract
+  suites per the Map-session rule.
+- **Then**: rewrite this block for Sea-Industry W3 (sea economy + boat shop,
+  handoff **yes**).
 
-**W1 prerequisite (ask first thing if absent)**: one AIS daily extract in
-`~/claude-area/devel/tx-inputs/` — marinecadastre.gov → AIS Vessel
-Traffic Data → any recent day's national CSV zip (~0.5–1 GB). One day is
-enough; the scout clips it to the Texas Gulf bbox offline.
-
-Gotchas carried over: the W1 scout produces numbers (median lateral
-offset vs the AIS density ridge, approaches joining the 8 baked fairways)
-*before* any lane ships; retiring the hand-laid `LANE` is the scarcity
-exception's planned end — grep `GOTCHAS.md` for the maritime/lane rules
-before touching `maritime.js`; Overpass from this environment is GET,
-never POST (`curl -sG --data-urlencode`).
+Gotchas carried over: ships pingpong routes — never wrap (a teleport can pop
+in view; the never-vanish law); `maritime.force(x,z)` is the ship-forcing
+debug action (`shipHere`) — W2's shrimper cycle and chatter need their own
+forcing actions per the tour law; W2 cutters patrol route legs — ride
+`maritime.routes` (`routeAt`), never a new lane; Beaumont/Port Arthur/
+Brownsville harbors are NOT game water (ships hold roadsteads; quays have no
+adjacent water — don't spawn water content at their anchors); the announcer
+nearest-wins race — Beaumont port toast can lose to the Exxon refinery site,
+test toasts at Brownsville (no competing sites).

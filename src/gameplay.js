@@ -106,6 +106,7 @@ export class Gameplay {
     save.legends ??= [];  // haunts witnessed (haunts.js LEGENDS keys)
     save.airports ??= []; // logbook: towered fields actually landed at (radio.js)
     save.energy ??= [];   // Energy log: hero sites visited (energy.js HEROES ids)
+    save.ports ??= [];    // Ports log: real ports called at (GEO.sea.ports ids)
     // Passport: the shoulder's own progress container — NEVER folds into the
     // Texas tallies above (Law). stamps = neighbor states first-crossed,
     // towns = band cities visited (silver stars), landings = band airports
@@ -160,7 +161,7 @@ export class Gameplay {
       roses: this.save.roses.length, species: this.save.species.length,
       counties: this.save.counties.length, bank: this.save.bank,
       legends: this.save.legends.length, airports: this.save.airports.length,
-      energy: this.save.energy.length,
+      energy: this.save.energy.length, ports: this.save.ports.length,
       passportStamps: this.save.passport.stamps.length, passportTowns: this.save.passport.towns.length,
       passportLandings: this.save.passport.landings.length, passportStones: this.save.passport.stones.length,
     };
@@ -249,6 +250,16 @@ export class Gameplay {
     this.persist();
     this.onToast?.(`🛢 ${name} (${this.save.energy.length}/${total}) — ${fact}`);
     this.onCollect?.('energy');
+  }
+
+  // port call — drive or sail up to a working port (energy.js proximity),
+  // the 12th collectible
+  logPort(id, name, total, info) {
+    if (this.save.ports.includes(id)) return;
+    this.save.ports.push(id);
+    this.persist();
+    this.onToast?.(`⚓ ${name} (${this.save.ports.length}/${total}) — ${info}`);
+    this.onCollect?.('port');
   }
 
   // logbook stamp — landing-only (radio.js), the 10th collectible

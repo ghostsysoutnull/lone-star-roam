@@ -13,6 +13,17 @@ const TXK = LL(33.4183, -94.0429); // Texarkana federal building — straddle is
 
 export const TOURS = [
   {
+    track: 'Sea-Industry (2026-07)',
+    waves: [
+      { wave: 'W1 — ports + AIS routes', spots: [
+        S('⚓ Port of Beaumont', LL(30.08, -94.09), { mode: 'DRIVE', time: 0.35, note: 'new port, bulk character — silo row, conveyor, warehouses; the HUD announces on approach and the Ports log stamps at the wharf apron (12th collectible, ⚓ row in the score panel)' }),
+        S('⚓ Port of Texas City', LL(29.38, -94.90), { mode: 'DRIVE', time: 0.35, note: 'new port, chemical character — tank rows, sphere tanks, process stack; announce + log like every port' }),
+        S('⚓ Port Freeport', LL(28.95, -95.35), { mode: 'DRIVE', time: 0.35, note: 'new port, chemical character on the Brazos mouth; the freeport approach route heads out from the jetties to join the coastal trunk' }),
+        S('🚢 Bolivar Roads — ship watching', [4507, 1834], { mode: 'BOAT', time: 0.35, act: 'shipHere', note: 'the Houston route threads this pass on real AIS geometry — the route\'s container ship is brought close aboard; the old hand-laid LANE is retired, every ship now rides a baked route' }),
+      ] },
+    ],
+  },
+  {
     track: 'Map (2026-07)',
     waves: [
       { wave: 'W1 — readable big map', spots: [

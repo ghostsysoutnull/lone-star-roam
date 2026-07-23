@@ -25,7 +25,7 @@ const AIRPORT_TAG = {
 };
 const AIRPORT_STATE = { SHV: 'LA', TXK: 'AR', CVN: 'NM', HOB: 'NM', CVS: 'NM', BAD: 'LA' };
 
-export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf, trains, dog }) {
+export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli, blimp, military, missions, animals, gameplay, title, tutorial, perf, trains, dog, maritime }) {
   const tp = (x, z, heading) => {
     player.pos.set(x, 0, z);
     player.speed = 0; player.vy = 0;
@@ -74,6 +74,12 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       const tr = trains.force(player.pos.x, player.pos.z, sky.days);
       if (tr) { tr.id.chatT = 0; trains.chatFloor = 0; }
       hud.toast(tr ? `🚂 ${tr.rail.operator ?? 'freight'} inbound` : '🚂 no eligible rail near here');
+    },
+    // Sea W1: jump the nearest route ship to the route point closest to the
+    // player — the tour's guaranteed-subject pattern for ship watching
+    shipHere() {
+      const s = maritime.force(player.pos.x, player.pos.z);
+      hud.toast(s ? `🚢 ${s.type} ship on the ${s.route.id} route, close aboard` : '🚢 no route ship to bring in');
     },
     // Rails W2: named trains forced onto their routes, schedule bypassed
     'railCrossing:laredo'() {

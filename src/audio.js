@@ -298,6 +298,7 @@ export class AudioSystem {
       legend: [[392, 0, 0.55, 0.06], [466, 0.18, 0.55, 0.06], [587, 0.36, 1.0, 0.07]], // minor rise — something's out there
       stamp: [[660, 0, 0.12, 0.07], [880, 0.09, 0.14, 0.08], [1320, 0.18, 0.4, 0.09]], // logbook stamped
       texas: [[392, 0, 0.4, 0.07], [494, 0.12, 0.4, 0.07], [587, 0.24, 0.7, 0.08]], // warm come-on-home rise (crossing ceremony)
+      port: [[262, 0, 0.4, 0.08], [330, 0.14, 0.45, 0.09], [392, 0.28, 0.8, 0.1]], // low harbor-horn rise (Ports log)
     };
     for (const [f, w, d, g] of SONGS[kind] || []) this.note(f, w, d, g ?? 0.1, 'triangle');
   }

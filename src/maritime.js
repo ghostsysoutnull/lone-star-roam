@@ -22,20 +22,11 @@ export function fadeDisc(geo, r = 1) {
   return geo;
 }
 
-// real port locations
-const PORTS = [
-  { name: 'Port of Houston', at: LL(29.735, -95.01), cranes: 4 },
-  { name: 'Port of Galveston', at: LL(29.31, -94.79), cranes: 2 },
-  { name: 'Port of Corpus Christi', at: LL(27.815, -97.40), cranes: 3 },
-  { name: 'Port Arthur', at: LL(29.83, -93.93), cranes: 2 },
-  { name: 'Port of Brownsville', at: LL(25.95, -97.40), cranes: 2 },
-];
-
-// hand-laid shipping lane hugging the coast, Brownsville -> Sabine (offshore)
-const LANE = [
-  LL(25.9, -96.9), LL(26.6, -96.9), LL(27.5, -96.7), LL(28.2, -96.2),
-  LL(28.8, -95.5), LL(29.2, -94.8), LL(29.4, -94.2), LL(29.55, -93.7),
-];
+// Sea-Industry W1: ports + routes are baked data (GEO.sea, tools/build-sea.mjs)
+// — 8 real ports with OSM quays/character, ship lanes traced from a real AIS
+// day and clamped to in-game navigable water. The old hand-laid LANE (the
+// scarcity exception) retired here as planned; the trunk route is its heir,
+// and laneAt()/len stay as the trunk accessor (rotors.js CG patrol, W2 cutters).
 
 // Tidelands buoy — ON the line (coastDist ≈ 166.7u, converged against
 // border + island rings offline), off the Bolivar Roads entrance channel
@@ -68,12 +59,18 @@ export class MaritimeSystem {
       .filter((p) => p.tier === 'major' && inWorld(p.x, p.z))
       .reduce((b, p) => (!b || coastDist(p.x, p.z) > coastDist(b.x, b.z) ? p : b), null);
     this.farMiles = this.farSite ? coastDist(this.farSite.x, this.farSite.z) / 16.09 : 0;
+    // routes first: arc-length tables for ships + the trunk accessor
+    this.routes = GEO.sea.routes.map((r) => {
+      const cum = [0];
+      for (let i = 1; i < r.pts.length; i++) {
+        cum.push(cum[i - 1] + Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]));
+      }
+      return { ...r, cum, len: cum[cum.length - 1] };
+    });
+    this.trunk = this.routes.find((r) => r.kind === 'trunk');
+    this.len = this.trunk?.len ?? 1; // laneAt() domain (rotors.js CG patrol)
     this.buildPorts(scene);
     this.buildPlatforms(scene);
-    // Energy W2: the lane itself keeps the scarcity exception (hand-laid), but
-    // its port-approach legs snap to the 8 real baked fairways (buildShips
-    // routes a tanker on one, so legs must exist first)
-    this.fairwayLegs = this.buildFairwayLegs();
     this.ships = this.buildShips(scene);
     this.buoy = this.buildBuoy(scene);
     // Water Vehicles W3: small-craft marinas + ICW channel markers
@@ -92,83 +89,126 @@ export class MaritimeSystem {
         text: `${fs?.name ?? 'The farthest platform'} — the farthest platform off this coast, ${Math.round(this.farMiles)} miles from the sand, long past the blue line, alone.${fs?.operator ? ` ${fs.operator} crews` : ' Crews'} rotate out by helicopter, two weeks at a stretch. At night her flare is the only thing on the whole horizon that stays put, and the shrimpers steer home by her like a lit porch.`,
       },
     ];
-    // lane cumulative lengths
-    this.cum = [0];
-    for (let i = 1; i < LANE.length; i++) {
-      this.cum.push(this.cum[i - 1] + Math.hypot(LANE[i][0] - LANE[i - 1][0], LANE[i][1] - LANE[i - 1][1]));
-    }
-    this.len = this.cum[this.cum.length - 1];
   }
 
-  // each leg: the real fairway points ordered sea→port, joined to the nearest
-  // hand-laid lane vertex; a dedicated tanker works the longest leg in and out
-  buildFairwayLegs() {
-    const pts = GEO.energy.fairways.flatMap((f) => f.pts);
-    const clusters = [];
-    for (const p of pts) {
-      const c = clusters.find((cl) => cl.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < 150));
-      if (c) c.push(p); else clusters.push([p]);
-    }
-    return clusters.map((c) => {
-      c.sort((a, b) => coastDist(b[0], b[1]) - coastDist(a[0], a[1])); // seaward end first
-      const out = c[0];
-      const lv = LANE.reduce((b, v) =>
-        (!b || Math.hypot(v[0] - out[0], v[1] - out[1]) < Math.hypot(b[0] - out[0], b[1] - out[1]) ? v : b), null);
-      return [lv, ...c];
-    });
-  }
-
-  laneAt(s) {
-    s = ((s % this.len) + this.len) % this.len;
+  // position + tangent at arc-length s along a route polyline
+  routeAt(route, s) {
     let lo = 0;
-    while (lo < this.cum.length - 2 && this.cum[lo + 1] <= s) lo++;
-    const a = LANE[lo], b = LANE[lo + 1];
-    const seg = this.cum[lo + 1] - this.cum[lo] || 1;
-    const t = (s - this.cum[lo]) / seg;
+    while (lo < route.cum.length - 2 && route.cum[lo + 1] <= s) lo++;
+    const a = route.pts[lo], b = route.pts[lo + 1];
+    const seg = route.cum[lo + 1] - route.cum[lo] || 1;
+    const t = (s - route.cum[lo]) / seg;
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / seg, (b[1] - a[1]) / seg];
   }
 
-  buildPorts(scene) {
-    const steel = new THREE.MeshLambertMaterial({ color: 0xc85a28, flatShading: true }); // port crane orange
-    const grey = new THREE.MeshLambertMaterial({ color: 0x8a8f98, flatShading: true });
-    const boxColors = [0xc23b3b, 0x3b62c2, 0x3f7a3f, 0xd8a13b, 0x5e8a8a].map((c) => new THREE.MeshLambertMaterial({ color: c }));
-    for (const port of PORTS) {
-      const [px, pz] = port.at;
-      const g = new THREE.Group();
-      const y = hAt(px, pz);
-      // wharf pad
-      const pad = new THREE.Mesh(new THREE.BoxGeometry(26, 0.6, 12), grey);
-      pad.position.set(0, y + 0.3, 0);
-      g.add(pad);
-      // gantry cranes
-      for (let i = 0; i < port.cranes; i++) {
-        const cx = -10 + i * (22 / Math.max(1, port.cranes - 1) || 0);
-        for (const lx of [-1.6, 1.6]) {
-          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.5, 7, 0.5), steel);
-          leg.position.set(cx + lx, y + 4, -3);
-          g.add(leg);
-        }
-        const beam = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.6, 10), steel);
-        beam.position.set(cx, y + 7.4, -6);
-        beam.rotation.x = 0.06;
-        g.add(beam);
-        const cab = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1, 1.2), grey);
-        cab.position.set(cx, y + 6.6, -4);
-        g.add(cab);
+  // trunk-route accessor, wrap-around — the old LANE's contract (rotors.js)
+  laneAt(s) {
+    s = ((s % this.len) + this.len) % this.len;
+    return this.routeAt(this.trunk, s);
+  }
+
+  // debug/tour forcing (trains.force idiom): jump the nearest-route ship to
+  // the route arc-length closest to (x,z) — deterministic, no spawn
+  force(x, z) {
+    let best = null;
+    for (const s of this.ships) {
+      if (!s.route) continue;
+      for (let i = 0; i < s.route.pts.length; i++) {
+        const [px, pz] = s.route.pts[i];
+        const d = Math.hypot(px - x, pz - z);
+        if (!best || d < best.d) best = { d, ship: s, s: s.route.cum[i] };
       }
-      // container stacks
-      for (let i = 0; i < 14; i++) {
-        const c = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 2.4), boxColors[i % boxColors.length]);
-        c.position.set(-11 + (i % 7) * 3.6, y + 0.6 + Math.floor(i / 7) * 1.05, 2.5 + (i % 2) * 2.6);
-        g.add(c);
-      }
-      // warehouse
-      const wh = new THREE.Mesh(new THREE.BoxGeometry(9, 2.6, 5), new THREE.MeshLambertMaterial({ color: 0xb0a890 }));
-      wh.position.set(8, y + 1.6, 3);
-      g.add(wh);
-      g.position.set(px, 0, pz);
-      scene.add(g);
     }
+    if (!best) return null;
+    best.ship.s = Math.min(best.ship.route.len, Math.max(0, best.s));
+    return best.ship;
+  }
+
+  buildPorts(scene) {
+    // Sea W1: one merged vertex-colored mesh per port (8 draws), kit picked by
+    // baked character, W6b poly bar (10-12 radial segments on tanks/silos).
+    // Local frame: wharf long axis on x, open water toward +z; the whole kit
+    // rotates to face the port's berth (or roadstead when the harbor is not
+    // game water — Beaumont / Port Arthur / Brownsville).
+    const tint = (geo, hex) => {
+      const g = geo.toNonIndexed(), c = new THREE.Color(hex);
+      const n = g.attributes.position.count, arr = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) { arr[i * 3] = c.r; arr[i * 3 + 1] = c.g; arr[i * 3 + 2] = c.b; }
+      g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+      return g;
+    };
+    const COL = {
+      crane: 0xc85a28, steel: 0x8a8f98, shed: 0xb0a890, dark: 0x4a4a52,
+      tankA: 0xe8e5dc, tankB: 0xd8d0c0, silo: 0xcfc8b8,
+      boxes: [0xc23b3b, 0x3b62c2, 0x3f7a3f, 0xd8a13b, 0x5e8a8a],
+    };
+    this.portGlowSpots = []; // night work-lights, one instanced mesh below
+    for (const port of GEO.sea.ports) {
+      const y = hAt(port.x, port.z);
+      const parts = [];
+      const add = (geo, hex, x, py, z, ry = 0) => {
+        if (ry) geo.rotateY(ry);
+        geo.translate(x, py, z);
+        parts.push(tint(geo, hex));
+      };
+      // wharf apron + a warehouse — every character
+      add(new THREE.BoxGeometry(42, 0.8, 11), COL.steel, 0, 0.4, 0);
+      add(new THREE.BoxGeometry(9, 2.8, 5.5), COL.shed, -14, 2.2, -2);
+      const ch = port.character;
+      if (ch === 'container') {
+        // gantry silhouette needs the boom to READ (the port-shot judgment:
+        // thin poles don't) — sturdy A-legs, long boom over the water with a
+        // counterweight tail and a trolley cab mid-boom
+        const nCranes = port.id === 'houston' ? 4 : 3;
+        for (let i = 0; i < nCranes; i++) {
+          const cx = -9 + i * (port.id === 'houston' ? 7 : 8);
+          for (const lx of [-1.7, 1.7]) add(new THREE.BoxGeometry(0.8, 7.5, 0.8), COL.crane, cx + lx, 4.55, 2);
+          add(new THREE.BoxGeometry(4.2, 0.6, 0.8), COL.crane, cx, 8, 2); // portal cross-beam
+          add(new THREE.BoxGeometry(0.8, 0.8, 14), COL.crane, cx, 8.9, 4.5); // boom, water-reaching
+          add(new THREE.BoxGeometry(1.6, 1.6, 1.6), COL.dark, cx, 8.9, -2.2); // counterweight tail
+          add(new THREE.BoxGeometry(1.4, 1.2, 1.4), COL.steel, cx, 7.9, 6.5); // trolley cab
+        }
+        const rows = port.id === 'houston' ? 20 : 12;
+        for (let i = 0; i < rows; i++) {
+          add(new THREE.BoxGeometry(1.2, 1.1, 2.6), COL.boxes[i % 5],
+            -12 + (i % 5) * 3.4, 1.35 + Math.floor(i / 10) * 1.15, -3.5 - Math.floor((i % 10) / 5) * 3);
+        }
+      } else if (ch === 'tanker') {
+        for (let i = 0; i < 5; i++) {
+          add(new THREE.CylinderGeometry(2.3, 2.3, 2.4, 12), i === 2 ? COL.tankB : COL.tankA, -13 + i * 6.5, 2, -4);
+        }
+        add(new THREE.BoxGeometry(26, 0.5, 1), COL.dark, -1, 2.2, 0.5); // pipe rack
+        add(new THREE.BoxGeometry(0.7, 5.5, 0.7), COL.crane, 14, 3.55, 3); // loading arm mast
+        add(new THREE.BoxGeometry(0.5, 0.5, 4.5), COL.crane, 14, 6, 5);
+      } else if (ch === 'chemical') {
+        for (let i = 0; i < 3; i++) add(new THREE.CylinderGeometry(1.8, 1.8, 3.2, 12), COL.tankA, -12 + i * 5, 2.4, -4);
+        for (let i = 0; i < 2; i++) add(new THREE.SphereGeometry(1.9, 10, 8), COL.tankB, 6 + i * 5.5, 2.7, -4);
+        add(new THREE.CylinderGeometry(0.4, 0.45, 7, 10), COL.steel, 15, 4.3, -4); // process stack
+      } else { // bulk
+        add(new THREE.BoxGeometry(11, 3.2, 6), COL.shed, 8, 2.4, -3);
+        for (let i = 0; i < 5; i++) add(new THREE.CylinderGeometry(1.5, 1.5, 5, 10), COL.silo, -12 + i * 3.4, 3.3, -4);
+        const belt = new THREE.BoxGeometry(15, 0.5, 1.2);
+        belt.rotateZ(0.32);
+        add(belt, COL.dark, -4, 4.2, -1.5); // conveyor up to the silo tops
+      }
+      // face the water: +z_local -> berth (or roadstead)
+      const [wx, wz] = port.berth ?? port.roadstead;
+      const heading = Math.atan2(wx - port.x, wz - port.z);
+      const merged = mergeGeoms(parts);
+      merged.rotateY(heading);
+      merged.translate(port.x, y, port.z);
+      const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+      mesh.name = `port:${port.id}`; // sea suite anchor
+      scene.add(mesh);
+      // two night work-lights over the wharf
+      for (const lx of [-14, 14]) {
+        this.portGlowSpots.push([port.x + Math.cos(heading) * lx, y + 7, port.z - Math.sin(heading) * lx]);
+      }
+    }
+    const glowI = new THREE.InstancedMesh(new THREE.SphereGeometry(0.55, 6, 5), this.workGlow, this.portGlowSpots.length);
+    const m = new THREE.Matrix4();
+    this.portGlowSpots.forEach((p, i) => glowI.setMatrixAt(i, m.makeTranslation(...p)));
+    scene.add(glowI);
   }
 
   buildPlatforms(scene) {
@@ -307,8 +347,8 @@ export class MaritimeSystem {
     // ports: march the compass out from the wharf until open water takes over.
     // 30u minimum standoff — closer in, the kit merges into the crane/wharf
     // dressing and reads as port clutter, not its own small-craft site
-    for (const port of PORTS) {
-      const [px, pz] = port.at;
+    for (const port of GEO.sea.ports) {
+      const px = port.x, pz = port.z;
       let best = null;
       for (let a = 0; a < 16; a++) {
         const dx = Math.sin((a / 16) * Math.PI * 2), dz = Math.cos((a / 16) * Math.PI * 2);
@@ -456,6 +496,46 @@ export class MaritimeSystem {
       g.add(hull, deckTank, bridge);
       return g;
     };
+    const mkBulker = () => {
+      const g = new THREE.Group();
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.6, 13.5), new THREE.MeshLambertMaterial({ color: 0x5a4a42, flatShading: true }));
+      hull.position.y = SEA + 0.5;
+      g.add(hull);
+      // hatch covers down the deck, low derrick posts between them
+      const hatchMat = new THREE.MeshLambertMaterial({ color: 0x9a4a3a });
+      const postMat = new THREE.MeshLambertMaterial({ color: 0xd8d0c0 });
+      for (let i = 0; i < 4; i++) {
+        const hatch = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.5, 2.2), hatchMat);
+        hatch.position.set(0, SEA + 1.5, -4.5 + i * 2.9);
+        g.add(hatch);
+        if (i < 3) {
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.35, 2.6, 0.35), postMat);
+          post.position.set(0.9, SEA + 2.6, -3 + i * 2.9);
+          g.add(post);
+        }
+      }
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(2.6, 2.4, 1.6), new THREE.MeshLambertMaterial({ color: 0xe8e8e8 }));
+      bridge.position.set(0, SEA + 2.4, 5.4);
+      g.add(bridge);
+      return g;
+    };
+    const mkChemical = () => {
+      const g = new THREE.Group();
+      const hull = new THREE.Mesh(new THREE.BoxGeometry(3, 1.5, 12.5), new THREE.MeshLambertMaterial({ color: 0xc8c4b8, flatShading: true }));
+      hull.position.y = SEA + 0.45;
+      g.add(hull);
+      // round deck tanks — the chemical carrier's silhouette
+      const tankMat = new THREE.MeshLambertMaterial({ color: 0xe8e5dc });
+      for (let i = 0; i < 3; i++) {
+        const tank = new THREE.Mesh(new THREE.SphereGeometry(1.15, 10, 8), tankMat);
+        tank.position.set(0, SEA + 1.7, -3.8 + i * 3.1);
+        g.add(tank);
+      }
+      const bridge = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.2, 1.5), new THREE.MeshLambertMaterial({ color: 0xe8e8e8 }));
+      bridge.position.set(0, SEA + 2.3, 5);
+      g.add(bridge);
+      return g;
+    };
     const mkShrimper = () => {
       const g = new THREE.Group();
       const hull = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.7, 3.2), new THREE.MeshLambertMaterial({ color: 0xe8e4d8, flatShading: true }));
@@ -474,31 +554,34 @@ export class MaritimeSystem {
       return g;
     };
 
-    // 6 big ships on the lane
-    for (let i = 0; i < 6; i++) {
-      const g = i % 2 ? mkTanker() : mkCargo([0x3a5a3a, 0x3a4a6a, 0x6a4a3a][i % 3]);
-      scene.add(g);
-      ships.push({ g, s: (i / 6) * 99999, dir: i % 2 ? 1 : -1, speed: 2.6 + Math.random(), lane: true });
+    // ships ride the baked routes, each the right kind for its port: the trunk
+    // carries three (its top type weights — tanker/container/bulker), every
+    // approach >=200u carries one of its dominant type. 7 big ships total —
+    // the pre-rework count (perf line: ship count unchanged). All pingpong;
+    // a wrap teleport could pop in view at a route end (never-vanish law).
+    const mkByType = {
+      container: (i) => mkCargo([0x3a5a3a, 0x3a4a6a, 0x6a4a3a][i % 3]),
+      tanker: () => mkTanker(),
+      bulk: () => mkBulker(),
+      chemical: () => mkChemical(),
+    };
+    for (const route of this.routes) {
+      const rnd = seededRand('seaship:' + route.id);
+      const n = route.kind === 'trunk' ? 3 : route.len >= 200 ? 1 : 0;
+      const types = Object.entries(route.types).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+      for (let i = 0; i < n; i++) {
+        const type = types[i % types.length];
+        const g = mkByType[type](i);
+        scene.add(g);
+        ships.push({ g, route, s: rnd() * route.len, dir: rnd() < 0.5 ? -1 : 1, speed: 2.2 + rnd() * 0.9, type });
+      }
     }
     // shrimp boats off Padre / Galveston
     for (const [x, z] of [LL(26.7, -97.1), LL(26.3, -97.0), LL(29.25, -94.6), LL(27.6, -96.9)]) {
       const g = mkShrimper();
       g.position.set(x, 0, z);
       scene.add(g);
-      ships.push({ g, x, z, a: Math.random() * 6.28, lane: false });
-    }
-    // port-approach tanker — works the longest fairway leg in and out
-    const leg = this.fairwayLegs.reduce((b, l) => {
-      const len = l.reduce((a, p, i) => (i ? a + Math.hypot(p[0] - l[i - 1][0], p[1] - l[i - 1][1]) : 0), 0);
-      return (!b || len > b.len) ? { pts: l, len } : b;
-    }, null);
-    if (leg) {
-      const cum = [0];
-      for (let i = 1; i < leg.pts.length; i++)
-        cum.push(cum[i - 1] + Math.hypot(leg.pts[i][0] - leg.pts[i - 1][0], leg.pts[i][1] - leg.pts[i - 1][1]));
-      const g = mkTanker();
-      scene.add(g);
-      ships.push({ g, leg: leg.pts, cum, len: leg.len, s: 0, dir: 1, speed: 2.2, lane: false });
+      ships.push({ g, x, z, a: Math.random() * 6.28 });
     }
     return ships;
   }
@@ -512,23 +595,13 @@ export class MaritimeSystem {
     this.buoy.position.y = Math.sin(t * 0.8) * 0.12;
     this.buoy.rotation.z = Math.sin(t * 0.55) * 0.06;
     for (const s of this.ships) {
-      if (s.lane) {
+      if (s.route) {
+        // pingpong the route — never leaves the channel, never wrap-teleports
         s.s += s.speed * s.dir * dt;
-        const [x, z, dx, dz] = this.laneAt(s.s);
+        if (s.s >= s.route.len) { s.s = s.route.len; s.dir = -1; }
+        else if (s.s <= 0) { s.s = 0; s.dir = 1; }
+        const [x, z, dx, dz] = this.routeAt(s.route, s.s);
         s.g.position.set(x, Math.sin(t * 0.6 + s.s) * 0.06, z);
-        s.g.rotation.y = Math.atan2(-dx * s.dir, -dz * s.dir);
-      } else if (s.leg) {
-        // approach tanker pingpongs its fairway leg — never leaves the channel
-        s.s += s.speed * s.dir * dt;
-        if (s.s >= s.len) { s.s = s.len; s.dir = -1; }
-        if (s.s <= 0) { s.s = 0; s.dir = 1; }
-        let lo = 0;
-        while (lo < s.cum.length - 2 && s.cum[lo + 1] <= s.s) lo++;
-        const a = s.leg[lo], b = s.leg[lo + 1];
-        const seg = s.cum[lo + 1] - s.cum[lo] || 1;
-        const f = (s.s - s.cum[lo]) / seg;
-        const dx = (b[0] - a[0]) / seg, dz = (b[1] - a[1]) / seg;
-        s.g.position.set(a[0] + (b[0] - a[0]) * f, Math.sin(t * 0.6 + s.s) * 0.06, a[1] + (b[1] - a[1]) * f);
         s.g.rotation.y = Math.atan2(-dx * s.dir, -dz * s.dir);
       } else {
         // shrimpers circle their grounds slowly, bobbing
