@@ -342,12 +342,25 @@ graduate here (and out of `NEXT_SESSION.md`).
 - **Every verify run writes `/tmp/lonestar-verify.json`** (override:
   `VERIFY_JSON`, 2026-07-22): per-attempt boot/settle/body/cleanup/total/launch
   timings, per-check `{name, ms, status}`, machine conditions
-  (cpus/freemem/loadavg), scheduled queue order, and the flake list — the
-  timing source of record (`TEST_CYCLE_SPEC.md` no longer quotes a frozen
-  full-run number). Solo-green exit-zero is **temporary policy** pending an
-  evidence-based flake policy built from that recorded history — don't read
-  "exits 0" as a permanent verdict. Runner-internal changes (sink/report/JSON
-  shape) must pass `node tools/verify-selftest.mjs` before shipping.
+  (cpus/freemem/loadavg, start+end snapshots), scheduled queue order, and the
+  flake list — the timing source of record (`TEST_CYCLE_SPEC.md` no longer
+  quotes a frozen full-run number). Solo-green exit-zero is **temporary
+  policy** pending an evidence-based flake policy built from that recorded
+  history — don't read "exits 0" as a permanent verdict. Runner-internal
+  changes (sink/report/JSON shape) must pass `node tools/verify-selftest.mjs`
+  before shipping.
+- **Runner history is durable** (2026-07-22, runner-telemetry wave): every
+  completed run also writes a compact JSON snapshot (schema 2) to
+  `~/.cache/lonestar-verify/history/` (override: `VERIFY_HISTORY_DIR`), one
+  file per run, pruned only when a file is both older than
+  `VERIFY_HISTORY_DAYS` (default 180) AND beyond the newest
+  `VERIFY_HISTORY_KEEP` (default 100) — `/tmp/lonestar-verify.json` stays the
+  latest-run pointer, written atomically. Exit code **3 = infra-incomplete**
+  (no test failures, ≥1 suite ended `status:'infra'` — a browser-crash
+  casualty, distinct from `fail`/`flake`); precedence is 1 (any
+  confirmed-or-unconfirmed failure) over 3. Infra casualties never carry
+  failure signatures — a crashed attempt is discarded and retried (once),
+  never counted toward a suite's failure history.
 
 - **The harness fake clock swallows page-side timer throws** (2026-07-22,
   self-test wave): under `page.clock.install()` a `setTimeout(() => { throw
@@ -359,11 +372,15 @@ graduate here (and out of `NEXT_SESSION.md`).
   any assertion on real wall/body time needs Node-side
   `page.waitForTimeout()`, never `t.wait()`.
 
-- **Never pipe `verify.mjs`/`status.sh` through `tail`/`head`** (2026-07-22):
-  `-q` is the trim — one summary line, FAIL detail capped at 5 lines per
-  suite, full report always in `/tmp/lonestar-verify.log`. A pipe caps
-  blindly and cut the root-cause FAIL line during the turbine wave (25-FAIL
-  cascade, tail showed 3). Run bare; read the log only on failure. The
+- **Never pipe `verify.mjs`/`status.sh`/`verify-selftest.mjs` through
+  `tail`/`head`** (2026-07-22): `-q` is the trim — one summary line, FAIL
+  detail capped at 5 lines per suite, full report always in
+  `/tmp/lonestar-verify.log`. A pipe caps blindly and cut the root-cause FAIL
+  line during the turbine wave (25-FAIL cascade, tail showed 3). The
+  self-test has the same shape one tool over: its assertion FAIL list prints
+  *first*, then the child-output dump — tail keeps the dump and cuts the root
+  cause (observed in-flight, runner-telemetry wave). Run bare; read the log
+  only on failure. The
   harness also aborts a suite at its first *thrown* JS error
   (Reference/Type/SyntaxError → remaining checks report "not run");
   assertion failures and helper timeouts never abort.

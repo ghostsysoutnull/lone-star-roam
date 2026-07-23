@@ -175,14 +175,20 @@ browser sentinel continues to cover the visible integration.
 ## Runner self-test
 
 `tools/verify-selftest.mjs` validates `tools/verify.mjs`'s own runner
-internals — the near-guard, fatal-pageerror handling, pool/solo attempt
-preservation, summary format, and JSON sidecar shape — against three minimal
-fixture suites in `tools/checks-fixtures/` (green/assertfail/pagethrow) via
-`VERIFY_CHECKS`. It spawns one child `verify.mjs` run, asserts exit code,
-specific stdout lines, and the JSON sidecar's shape, and reports a compact
+internals — the near-NaN guard, fatal-pageerror handling, pool/solo attempt
+preservation, the solo-green flake path, the per-phase infra failure matrix
+(workers never reject; a browser-crash casualty gets `outcome:'infra'` and
+never poisons a failure signature; exit 3 = infra-incomplete), durable
+history (two sequential runs produce two distinct history files plus a
+latest-run pointer), and shot instrumentation — against nine minimal fixture
+suites in `tools/checks-fixtures/` (green, assertfail, pagethrow, nearnan,
+flakyonce, shotfix, importfail, crashonce, crashalways) via `VERIFY_CHECKS`.
+It spawns six child `verify.mjs` runs (A–F), asserts exit codes, specific
+stdout lines, and the JSON sidecar's shape (including `failed ===
+failures.length` reconciliation on every attempt), and reports a compact
 PASS/FAIL per assertion. Run it on demand and always after changing
-`verify.mjs`'s runner internals (sink/report/JSON shape) — game-suite changes
-don't need it.
+`verify.mjs`'s runner internals (sink/report/JSON/history shape) —
+game-suite changes don't need it.
 
 ## Completion
 

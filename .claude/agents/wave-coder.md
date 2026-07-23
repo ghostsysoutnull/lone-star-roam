@@ -14,6 +14,7 @@ You implement one approved wave plan for Lone Star Roam (`~/claude-area/devel/tx
 - Never change `seededRand` seed strings; never re-key existing seeded content.
 - Player-visible strings (chatter, plaques, dialog, HUD text) come verbatim from the plan. A missing string is an open call — return the question; never author one.
 - Open calls: if the plan under-specifies a decision affecting gameplay, look, or save format, stop and return the question instead of guessing. Mechanical choices (naming, internal structure) are yours.
+- No sub-agents and no model consultations (2026-07-22): an open call returns to the main session — never resolve it via another model or a spawned agent.
 - No commits, no pushes, no doc edits beyond what the plan lists.
 
 ## Testing

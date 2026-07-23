@@ -16,14 +16,12 @@
 //
 // Output contract: compact by default — one summary line per suite plus full
 // detail for any FAIL; -v prints every check (durations shown when ≥1 s).
-// -q caps console FAIL detail at 5 lines per suite (FLAKE/confirm labels
-// always print past the cap; the LOG file always has everything) — never
-// pipe this tool through tail/head, the cap is the trim and a pipe can cut
-// the root-cause line. A thrown JS bug (Reference/Type/SyntaxError) aborts
+// -q caps console FAIL detail at 5 lines per suite (FLAKE/confirm/INFRA
+// labels always print past the cap; the LOG file always has everything) —
+// never pipe this tool through tail/head, the cap is the trim and a pipe can
+// cut the root-cause line. A thrown JS bug (Reference/Type/SyntaxError) aborts
 // the rest of its suite — remaining checks report as "not run" instead of
 // cascading a FAIL each; assertion failures and timeouts don't abort.
-// Exit 1 on any failure. Suites assert NUMBERS at natural play values —
-// screenshots are a last resort (t.shot), never the pass/fail signal.
 //
 // Flake auto-confirm: any suite that fails in the parallel pool is rerun once
 // SOLO (its own browser, alone, nothing co-scheduled — the -j 1 equivalent),
@@ -36,13 +34,37 @@
 // (GOTCHAS.md → Verification → full-verify run discipline).
 //
 // TEMPORARY POLICY (2026-07-22): solo-green still exits 0 — this is a stopgap
-// pending an evidence-based flake policy (enough recorded /tmp/lonestar-verify.json
-// history to tell a real intermittent from a suite that never should have
-// flaked). The summary line and JSON both say so; don't read "exit 0" as a
-// permanent verdict that solo-green suites are fine to ignore.
+// pending an evidence-based flake policy (enough recorded history to tell a
+// real intermittent from a suite that never should have flaked). The summary
+// line and JSON both say so; don't read "exit 0" as a permanent verdict that
+// solo-green suites are fine to ignore.
+//
+// Failure matrix (2026-07-22 runner-telemetry wave): every suite-phase throw
+// is discriminated by `browser.isConnected()`. Browser alive → the failure
+// belongs to the suite (recorded as an 'assertion'/'pageerror'/'runner'
+// failure, normal solo-rerun flow). Browser dead → the attempt is an INFRA
+// casualty — zero failure signatures, never a FAIL — the suite is re-queued
+// once and the worker relaunches its browser once; a second casualty on the
+// same suite is final (`status:'infra'`). Workers never reject: a navigation/
+// import failure or a mid-suite browser crash no longer kills the whole pool
+// (the prior bug — no report, no LOG, no JSON). A solo rerun that loses its
+// browser gets one relaunch; if that's lost too, the original pool FAIL
+// stands **unconfirmed** (`FAIL (unconfirmed — solo rerun lost to browser
+// crash): <suite>`) and still counts toward the exit code. Exit codes: 0 pass
+// (solo-green flakes included) · 1 any confirmed-or-unconfirmed test failure
+// · 2 usage · 3 infra-incomplete (no test failures, ≥1 suite ended 'infra') —
+// precedence 1 > 3.
+//
+// Durable history: every completed run also writes a compact JSON snapshot to
+// VERIFY_HISTORY_DIR (default ~/.cache/lonestar-verify/history/, one file per
+// run, pruned past VERIFY_HISTORY_DAYS/VERIFY_HISTORY_KEEP — default 180 days
+// AND beyond the newest 100). VERIFY_JSON (/tmp/lonestar-verify.json) stays
+// the latest-run pointer, written atomically (temp file + rename). Any
+// telemetry write failure (LOG, history, or latest pointer) warns loudly on
+// stderr — test-result exit semantics are unaffected either way.
 import { createServer } from 'node:http';
 import { readFile, readdir } from 'node:fs/promises';
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -51,6 +73,7 @@ import os from 'node:os';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEPS = process.env.VERIFY_DEPS || join(os.homedir(), '.cache/lonestar-verify');
 const SHOTS = process.env.VERIFY_SHOTS || join(os.tmpdir(), 'lonestar-shots');
+const round1 = (x) => Math.round(x * 10) / 10;
 
 // --- playwright-core from the persistent cache dir ---
 const { chromium } = createRequire(join(DEPS, 'noop.js'))('playwright-core');
@@ -96,7 +119,22 @@ function serve() {
 const QUIET = process.argv.includes('-q');
 const VERBOSE = process.argv.includes('-v') && !QUIET; // -q wins over -v
 const LOG = process.env.VERIFY_LOG || '/tmp/lonestar-verify.log';
-function mkCheck(sink) {
+
+// Deterministic failure signature: strip timing/paths so identical failures
+// don't look unrelated across runs. tmp-path tokens are normalized BEFORE
+// digit runs (so the path's own digits don't survive as noise), then digit
+// runs collapse to '#', then truncate.
+function normalizeMessage(msg) {
+  return String(msg)
+    .replace(/\/tmp\/[^\s'"]*/g, '<tmp>')
+    .replace(/\d+/g, '#')
+    .slice(0, 120);
+}
+function makeSignature(type, check, message) {
+  return `${type}:${check ?? ''}:${normalizeMessage(message)}`;
+}
+
+function mkCheck(sink, browser) {
   return async function check(name, fn) {
     if (sink.aborted) { sink.skipped++; sink.checks.push({ name, ms: 0, status: 'skip' }); return; }
     const t0 = Date.now();
@@ -107,10 +145,23 @@ function mkCheck(sink) {
       sink.checks.push({ name, ms: Date.now() - t0, status: 'pass' });
       if (VERBOSE) sink.lines.push(`PASS ${name}${dur()}`);
     } catch (e) {
+      // Discriminator: a check body that touches a dead browser (e.g. a
+      // page.evaluate after the browser crashed) throws too — but that
+      // failure belongs to the browser, not the suite. Mark the whole
+      // attempt an infra casualty and stop (remaining checks would only
+      // repeat the same crash).
+      if (browser && !browser.isConnected()) {
+        sink.infra = true;
+        sink.aborted = true;
+        sink.checks.push({ name, ms: Date.now() - t0, status: 'skip' });
+        sink.lines.push(`     browser crashed during check "${name}" — attempt discarded (infra)`);
+        return;
+      }
       sink.failed++;
       sink.checks.push({ name, ms: Date.now() - t0, status: 'fail' });
       const msg = String(e.message || e).split('\n')[0];
       sink.lines.push(`FAIL ${name} — ${msg}${dur()}`);
+      sink.failures.push({ type: 'assertion', check: name, message: msg, signature: makeSignature('assertion', name, msg), count: 1 });
       // A thrown JS bug (Reference/Type/SyntaxError, node- or page-side)
       // invalidates every later check in the suite — one root cause cascades
       // into a FAIL per dependent check (25 FAILs from one bad variable,
@@ -124,7 +175,7 @@ function mkCheck(sink) {
   };
 }
 
-function mkT(page, check) {
+function mkT(page, check, sink) {
   // evaluate an expression string with `g` = window.__game
   const ev = (expr) => page.evaluate(`(() => { const g = window.__game; return (${expr}); })()`);
   const t = {
@@ -263,6 +314,8 @@ function mkT(page, check) {
       const p = join(SHOTS, `${name}.png`);
       await page.evaluate('window.__skipRender = 0');
       await t.wait(0.06); // one 50ms rAF tick — enough to render exactly one frame
+      sink.shots++;
+      sink.renderTicks += 1;
       await page.screenshot({ path: p });
       await page.evaluate('window.__skipRender = 1');
       console.log(`     shot: ${p}`);
@@ -302,11 +355,23 @@ const WEIGHTS = {
   shop: 8, missions: 7, springer: 6, jetpack: 5, drive: 4, debug: 4,
   padre: 3, rabbits: 3, traffic: 3, npcs: 2, walk: 1,
 };
+// Machine snapshot — taken once, before the worker-width calculation, so the
+// memory cap AND the JSON's start snapshot read the same os.freemem() value.
+function machineSnapshot(freememBytes) {
+  return {
+    ts: new Date().toISOString(),
+    cpus: os.cpus().length,
+    freememGiB: round1(freememBytes / 2 ** 30),
+    loadavg: os.loadavg(),
+  };
+}
+const startFreemem = os.freemem();
+const machineStart = machineSnapshot(startFreemem);
 // Default concurrency is capped by BOTH cores and free RAM. SwiftShader
 // rendering is CPU-heavy: on a 12-core host, 4 workers finish faster than 5+
 // because the renderer processes otherwise contend. `-j` remains available
 // when a host has different measured characteristics.
-const memCap = Math.floor(os.freemem() / (0.8 * 2 ** 30));
+const memCap = Math.floor(startFreemem / (0.8 * 2 ** 30));
 const DEFAULT_J = Math.min(suites.length, Math.max(2, Math.min(Math.ceil(os.cpus().length / 3), memCap)));
 const C = Math.max(1, Math.min(suites.length, jFlag > 0 ? jFlag : DEFAULT_J));
 
@@ -314,202 +379,393 @@ const srv = await serve();
 const port = srv.address().port;
 const queue = suites.slice().sort((a, b) => (WEIGHTS[b] ?? 5) - (WEIGHTS[a] ?? 5));
 const order = queue.slice(); // scheduled queue order, captured before workers drain it — JSON telemetry only
-const results = new Map();
+
+// Every attempt for every suite, chronological (pool casualty, retry,
+// solo…) — the single source of truth for both console reporting and the
+// JSON sidecar's per-suite attempts array.
+const attemptsByName = new Map();
+function recordAttempt(name, sink) {
+  if (!attemptsByName.has(name)) attemptsByName.set(name, []);
+  attemptsByName.get(name).push(sink);
+}
 
 // Per suite-attempt: distinct pageerror messages are fatal, deduped by the
 // first line of the error string (no allowlist). Counted once the suite body
 // finishes — including when it throws — so a pageerror-failed suite routes
-// through the normal solo-rerun flake path like any other failure.
+// through the normal solo-rerun flake path like any other failure. Skipped
+// entirely once the attempt is already flagged an infra casualty (it's being
+// discarded and retried, not counted).
 function finalizePageErrors(sink) {
-  if (!sink.pageErrors.size) return;
+  if (sink.infra || !sink.pageErrors.size) return;
   for (const [msg, count] of sink.pageErrors) {
     sink.lines.push(`FAIL pageerror — ${msg}${count > 1 ? ` (×${count})` : ''}`);
+    sink.failures.push({ type: 'pageerror', check: null, message: msg, signature: makeSignature('pageerror', null, msg), count });
   }
   sink.failed += sink.pageErrors.size;
+}
+
+// Launch one fresh browser + context (a "worker handle"). Used for the pool,
+// mid-run relaunches after a browser crash, and solo reruns alike.
+async function launchWorker() {
+  const tLaunch0 = Date.now();
+  const browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+  const launchS = (Date.now() - tLaunch0) / 1000;
+  const ctx = await browser.newContext({ viewport: { width: 640, height: 360 } }); // small viewport: SwiftShader fill rate limits sim fps
+  await ctx.addInitScript(() => { localStorage.clear(); window.__harness = 1; });
+  return { browser, ctx, launchS };
+}
+// One relaunch attempt on top of the first — matches the failure matrix's
+// "one relaunch per worker" / "one relaunch for that rerun" rows.
+async function launchWorkerWithRetry(label) {
+  try { return await launchWorker(); }
+  catch (e) {
+    if (!QUIET) process.stderr.write(`  ↻ relaunch after worker launch failure${label ? ` (${label})` : ''}: ${String(e.message || e).split('\n')[0]}\n`);
+    return await launchWorker(); // let a second failure propagate to the caller
+  }
 }
 
 // Each suite gets a fresh page and game boot. The worker context stays alive so
 // its HTTP cache can reuse the game's static modules and data; its init script
 // clears localStorage before game code runs, preserving the prior fresh-context
-// isolation for game saves and UI preferences. Returns its sink — callers decide
-// where it lives in `results` (pool vs solo-rerun register differently, below).
-async function runSuite(ctx, name, kind = 'pool', launch) {
+// isolation for game saves and UI preferences.
+//
+// Workers never reject: every suite-phase throw is caught here and
+// discriminated by browser.isConnected(). Browser alive → a normal suite
+// failure (type 'runner', check: null) — boot/settle timeouts, suite import
+// errors, and any node-side throw outside t.check() all land here. Browser
+// dead → sink.infra is set (by this catch, or by mkCheck when a check body
+// touches the dead browser) and the whole attempt is zeroed out below: it's
+// a casualty, not a result, and callers requeue/retry rather than count it.
+async function runSuite(browser, ctx, name, kind = 'pool', launch) {
   const sink = {
     name, passed: 0, failed: 0, skipped: 0, aborted: false, lines: [], checks: [], ms: 0,
     kind, launch, boot: 0, settle: 0, body: 0, cleanup: 0, total: 0,
-    pageErrors: new Map(),
+    pageErrors: new Map(), failures: [], shots: 0, renderTicks: 0, infra: false, outcome: 'pass',
   };
   const tTotal0 = Date.now();
   let page;
+  let phase = 'boot';
   try {
-    await ctx.clearCookies();
-    page = await ctx.newPage();
-    await page.clock.install();
-    // The browser clock's default rAF cadence is 60 Hz. Its tight synchronous
-    // callback loop makes that far more CPU-intensive than a headless game
-    // frame; the game's physics deliberately clamps at 50 ms, so match that
-    // stable simulation cadence instead.
-    await page.addInitScript(() => {
-      window.requestAnimationFrame = (callback) => setTimeout(() => callback(performance.now()), 50);
-      window.cancelAnimationFrame = (id) => clearTimeout(id);
-    });
-    page.on('pageerror', (e) => {
-      const first = String(e).split('\n')[0];
-      sink.lines.push(`     pageerror: ${first}`);
-      sink.pageErrors.set(first, (sink.pageErrors.get(first) || 0) + 1);
-    });
-    const tBoot0 = Date.now();
-    await page.goto(`http://127.0.0.1:${port}/`);
-    await page.waitForFunction('window.__game && document.getElementById("loading").style.display === "none"', null, { timeout: 60000 });
-    sink.boot = (Date.now() - tBoot0) / 1000;
-    // skip the ~300 ms SwiftShader draw: the loop still runs every system update
-    // at full rAF speed, sim time tracks wall time, and evaluates return fast
-    await page.evaluate('window.__skipRender = 1');
-    const tSettle0 = Date.now();
-    await page.clock.runFor(500); // first frames: chunks spawn, ATMOS settles
-    sink.settle = (Date.now() - tSettle0) / 1000;
-    const s0 = Date.now();
     try {
-      await (await import(join(suiteDir, name + '.mjs'))).default(mkT(page, mkCheck(sink)));
-    } finally {
-      sink.ms = Date.now() - s0;
-      sink.body = sink.ms / 1000;
-      finalizePageErrors(sink); // fatal pageerrors count even if default() threw
+      await ctx.clearCookies();
+      page = await ctx.newPage();
+      await page.clock.install();
+      // The browser clock's default rAF cadence is 60 Hz. Its tight synchronous
+      // callback loop makes that far more CPU-intensive than a headless game
+      // frame; the game's physics deliberately clamps at 50 ms, so match that
+      // stable simulation cadence instead.
+      await page.addInitScript(() => {
+        window.requestAnimationFrame = (callback) => setTimeout(() => callback(performance.now()), 50);
+        window.cancelAnimationFrame = (id) => clearTimeout(id);
+      });
+      page.on('pageerror', (e) => {
+        const first = String(e).split('\n')[0];
+        sink.lines.push(`     pageerror: ${first}`);
+        sink.pageErrors.set(first, (sink.pageErrors.get(first) || 0) + 1);
+      });
+      const tBoot0 = Date.now();
+      await page.goto(`http://127.0.0.1:${port}/`);
+      await page.waitForFunction('window.__game && document.getElementById("loading").style.display === "none"', null, { timeout: 60000 });
+      sink.boot = (Date.now() - tBoot0) / 1000;
+      // skip the ~300 ms SwiftShader draw: the loop still runs every system update
+      // at full rAF speed, sim time tracks wall time, and evaluates return fast
+      await page.evaluate('window.__skipRender = 1');
+      phase = 'settle';
+      const tSettle0 = Date.now();
+      await page.clock.runFor(500); // first frames: chunks spawn, ATMOS settles
+      sink.settle = (Date.now() - tSettle0) / 1000;
+      phase = 'body';
+      const s0 = Date.now();
+      try {
+        await (await import(join(suiteDir, name + '.mjs'))).default(mkT(page, mkCheck(sink, browser), sink));
+      } finally {
+        sink.ms = Date.now() - s0;
+        sink.body = sink.ms / 1000;
+        finalizePageErrors(sink); // fatal pageerrors count even if default() threw
+      }
+    } catch (e) {
+      if (browser && !browser.isConnected()) {
+        sink.infra = true;
+        sink.lines.push(`     browser crashed mid-suite (${phase} phase)`);
+      } else {
+        const msg = String((e && e.message) || e).split('\n')[0];
+        sink.failed++;
+        sink.lines.push(`FAIL runner — ${msg}`);
+        sink.failures.push({ type: 'runner', check: null, message: msg, signature: makeSignature('runner', null, msg), count: 1 });
+      }
     }
     if (!QUIET) process.stderr.write(`  ✓ ${name} (${(sink.ms / 1000).toFixed(1)}s)\n`); // live progress → stderr, off the stdout report
   } finally {
     const tCleanup0 = Date.now();
-    if (page) await page.close();
+    if (page) {
+      try { await page.close(); } catch (e) { sink.lines.push(`     page.close ignored: ${String((e && e.message) || e).split('\n')[0]}`); }
+    }
     sink.cleanup = (Date.now() - tCleanup0) / 1000;
   }
   sink.total = (Date.now() - tTotal0) / 1000;
+  if (sink.infra) {
+    // A casualty is discarded, not counted: zero everything so `failed ===
+    // failures.length` holds trivially (0 === 0) and no partial signature
+    // survives into history.
+    sink.outcome = 'infra';
+    sink.passed = 0; sink.failed = 0; sink.skipped = 0; sink.failures = [];
+  } else {
+    sink.outcome = sink.failed > 0 ? 'fail' : 'pass';
+  }
   return sink;
 }
 
 async function worker() {
-  let browser, ctx;
+  let handle;
+  try { handle = await launchWorkerWithRetry(); }
+  catch (e) {
+    process.stderr.write(`worker could not launch after retry: ${String((e && e.message) || e).split('\n')[0]}\n`);
+    return; // pool continues via other workers; this one contributes nothing
+  }
+  let { browser, ctx, launchS } = handle;
+  let first = true; // browser launch time is attributed to this worker's first suite only
   try {
-    const tLaunch0 = Date.now();
-    browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
-    const launchS = (Date.now() - tLaunch0) / 1000;
-    ctx = await browser.newContext({ viewport: { width: 640, height: 360 } }); // small viewport: SwiftShader fill rate limits sim fps
-    await ctx.addInitScript(() => { localStorage.clear(); window.__harness = 1; });
-    let first = true; // browser launch time is attributed to this worker's first suite only
     while (queue.length) {
       const name = queue.shift();
-      results.set(name, await runSuite(ctx, name, 'pool', first ? launchS : undefined));
+      const sink = await runSuite(browser, ctx, name, 'pool', first ? launchS : undefined);
       first = false;
+      recordAttempt(name, sink);
+      if (sink.outcome === 'infra') {
+        const infraCount = attemptsByName.get(name).filter((a) => a.kind === 'pool' && a.outcome === 'infra').length;
+        if (!QUIET) process.stderr.write(`  ↻ relaunch after browser crash: ${name}\n`);
+        try { await ctx.close(); } catch { /* dead already */ }
+        try { await browser.close(); } catch { /* dead already */ }
+        browser = null; ctx = null;
+        if (infraCount === 1) queue.push(name); // re-queue once; a 2nd casualty is final
+        try {
+          const h2 = await launchWorkerWithRetry(`after crash: ${name}`);
+          browser = h2.browser; ctx = h2.ctx; launchS = h2.launchS; first = true;
+        } catch (e) {
+          // this worker can't continue; remaining/requeued suites wait for
+          // other workers (post-drain sweep marks them infra if none survive)
+          process.stderr.write(`worker relaunch after crash failed: ${String((e && e.message) || e).split('\n')[0]}\n`);
+          break;
+        }
+      }
     }
   } finally {
-    if (ctx) await ctx.close();
-    if (browser) await browser.close();
+    if (ctx) { try { await ctx.close(); } catch { /* best-effort */ } }
+    if (browser) { try { await browser.close(); } catch { /* best-effort */ } }
   }
 }
 
 try {
   await Promise.all(Array.from({ length: C }, () => worker()));
 
+  // If every worker died, some suites never ran at all — mark them infra
+  // directly (never leave a suite with no result, no LOG/JSON entry).
+  for (const name of queue.splice(0)) {
+    recordAttempt(name, {
+      name, kind: 'pool', outcome: 'infra', passed: 0, failed: 0, skipped: 0, aborted: false,
+      lines: ['     no worker available to run this suite'], checks: [], failures: [],
+      shots: 0, renderTicks: 0, boot: 0, settle: 0, body: 0, cleanup: 0, total: 0,
+    });
+  }
+
   // --- auto-confirm flakes: solo rerun, one failed suite at a time, nothing
   // co-scheduled (the -j 1 equivalent) — see the header comment for the
-  // contract. Runs before the server closes — reruns still need it. The solo
-  // attempt does NOT overwrite the pool attempt in `results` — it's attached
-  // as origSink.solo, so both attempts' full timings survive to the JSON
-  // report; the solo attempt still decides the suite's counted pass/fail
-  // (report loop below reads r.solo when present).
-  const soloFailed = suites.filter((s) => (results.get(s)?.failed ?? 0) > 0);
-  for (const name of soloFailed) {
-    const origSink = results.get(name); // the pool attempt's FAIL detail
+  // contract. Runs before the server closes — reruns still need it. Only
+  // suites whose LAST pool attempt is a genuine 'fail' (not 'infra') are
+  // eligible — an infra casualty is re-queued at the pool level instead.
+  const soloEligible = suites.filter((s) => {
+    const attempts = (attemptsByName.get(s) || []).filter((a) => a.kind === 'pool');
+    const last = attempts[attempts.length - 1];
+    return last && last.outcome === 'fail';
+  });
+  for (const name of soloEligible) {
     if (!QUIET) process.stderr.write(`  ↻ rerun solo: ${name}\n`);
-    let browser, ctx;
-    try {
-      const tLaunch0 = Date.now();
-      browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
-      const launchS = (Date.now() - tLaunch0) / 1000;
-      ctx = await browser.newContext({ viewport: { width: 640, height: 360 } });
-      await ctx.addInitScript(() => { localStorage.clear(); window.__harness = 1; });
-      origSink.solo = await runSuite(ctx, name, 'solo', launchS);
-    } finally {
-      if (ctx) await ctx.close();
-      if (browser) await browser.close();
+    let attempt = 0;
+    let confirmed = false;
+    while (attempt < 2 && !confirmed) {
+      let browser, ctx, launchS;
+      try {
+        ({ browser, ctx, launchS } = await launchWorker());
+      } catch (e) {
+        if (!QUIET) process.stderr.write(`  solo rerun launch failed for ${name}: ${String((e && e.message) || e).split('\n')[0]}\n`);
+        attempt++;
+        continue;
+      }
+      let soloSink;
+      try {
+        soloSink = await runSuite(browser, ctx, name, 'solo', launchS);
+      } finally {
+        try { await ctx.close(); } catch { /* best-effort */ }
+        try { await browser.close(); } catch { /* best-effort */ }
+      }
+      recordAttempt(name, soloSink);
+      if (soloSink.outcome === 'infra') {
+        if (!QUIET) process.stderr.write(`  ↻ relaunch after browser crash: ${name} (solo)\n`);
+        attempt++;
+        continue; // one relaunch for that rerun (2 attempts total)
+      }
+      confirmed = true;
     }
+    // if !confirmed after 2 attempts, the pool FAIL stands unconfirmed — the
+    // last recorded solo attempt (outcome 'infra') signals that at report time
   }
 } finally {
   srv.close();
 }
 
-// flush in canonical suite order, same compact contract as the serial runner.
-// The full report is always written to LOG; -q prints only what r.lines holds
-// without -v (FAIL detail + FLAKE labels) plus the final summary. When a suite
-// has a solo rerun attached (r.solo), IT decides the counted pass/fail and the
-// FLAKE/confirmed label — the pool attempt's raw lines/timings stay on r for
-// the JSON report untouched.
-let passed = 0, failed = 0, skipped = 0, flakes = 0;
+const machineEnd = machineSnapshot(os.freemem());
+
+// --- flush in canonical suite order, same compact contract as the serial
+// runner. The full report is always written to LOG; -q prints only what
+// detailLines holds without -v (FAIL detail + FLAKE/INFRA labels) plus the
+// final summary. The LAST pool attempt decides the suite's outcome unless a
+// solo rerun exists and itself produced a real (non-infra) result.
+let passed = 0, failed = 0, skipped = 0, flakes = 0, infraSuites = 0;
 const FAIL_CAP = 5; // -q console cap per suite; the LOG always has every line
 const report = [];
 const wallS = process.uptime();
+const statusByName = new Map();
+const flakeByName = new Map();
+
 for (const s of suites) {
-  const r = results.get(s);
-  if (!r) continue;
-  const eff = r.solo || r; // the attempt that decides counted pass/fail
+  const attempts = attemptsByName.get(s) || [];
+  const poolAttempts = attempts.filter((a) => a.kind === 'pool');
+  const soloAttempts = attempts.filter((a) => a.kind === 'solo');
+  const lastPool = poolAttempts[poolAttempts.length - 1];
+  const lastSolo = soloAttempts.length ? soloAttempts[soloAttempts.length - 1] : null;
+  if (!lastPool) continue; // shouldn't happen — every suite gets at least one recorded attempt
+
+  let eff, detailLines, label, status;
+  if (lastPool.outcome === 'infra') {
+    eff = lastPool; // zeroed — contributes 0/0/0
+    detailLines = poolAttempts.flatMap((a) => a.lines);
+    label = `INFRA ${s} — browser crashed mid-suite (attempt not counted, no signatures recorded)`;
+    status = 'infra';
+    infraSuites++;
+  } else if (!lastSolo) {
+    eff = lastPool; detailLines = lastPool.lines; label = null;
+    status = lastPool.failed === 0 ? 'pass' : 'fail';
+  } else if (lastSolo.outcome === 'infra') {
+    eff = lastPool; detailLines = lastPool.lines;
+    label = `FAIL (unconfirmed — solo rerun lost to browser crash): ${s}`;
+    status = 'fail';
+  } else if (lastSolo.failed === 0) {
+    eff = lastSolo; detailLines = lastPool.lines;
+    label = `FLAKE (solo-green): ${s}`;
+    status = 'flake';
+    flakes++;
+  } else {
+    eff = lastSolo; detailLines = [...lastPool.lines, ...lastSolo.lines];
+    label = `FAIL (confirmed on rerun): ${s}`;
+    status = 'fail';
+  }
+  statusByName.set(s, status);
+  flakeByName.set(s, status === 'flake');
   passed += eff.passed; failed += eff.failed; skipped += eff.skipped;
-  if (r.solo && r.solo.failed === 0) flakes++;
-  const lines = r.solo
-    ? (r.solo.failed === 0
-        ? [...r.lines, `FLAKE (solo-green): ${s}`]
-        : [...r.lines, ...r.solo.lines, `FAIL (confirmed on rerun): ${s}`])
-    : r.lines;
+
   if (VERBOSE) report.push(`— ${s}`);
-  report.push(...lines);
-  report.push(`${s}: ${eff.passed} passed${eff.failed ? `, ${eff.failed} FAILED` : ''}${eff.skipped ? `, ${eff.skipped} not run` : ''}, ${(eff.ms / 1000).toFixed(1)}s`);
+  report.push(...detailLines);
+  if (label) report.push(label);
+  if (status !== 'infra') {
+    report.push(`${s}: ${eff.passed} passed${eff.failed ? `, ${eff.failed} FAILED` : ''}${eff.skipped ? `, ${eff.skipped} not run` : ''}, ${(eff.ms / 1000).toFixed(1)}s`);
+  }
   if (QUIET) {
-    // FLAKE/confirm labels always print, even past the cap — they are the
-    // signal the flake contract promises never to gate off.
-    const labels = lines.filter((l) => /^(FLAKE \(solo-green\)|FAIL \(confirmed on rerun\)):/.test(l));
-    const rest = lines.filter((l) => !/^(FLAKE \(solo-green\)|FAIL \(confirmed on rerun\)):/.test(l));
-    for (const line of rest.slice(0, FAIL_CAP)) console.log(line);
-    if (rest.length > FAIL_CAP) console.log(`     … +${rest.length - FAIL_CAP} more lines in this suite (full report: ${LOG})`);
-    for (const line of labels) console.log(line);
+    for (const line of detailLines.slice(0, FAIL_CAP)) console.log(line);
+    if (detailLines.length > FAIL_CAP) console.log(`     … +${detailLines.length - FAIL_CAP} more lines in this suite (full report: ${LOG})`);
+    if (label) console.log(label);
   }
 }
-const summary = `${passed} passed, ${failed} failed${skipped ? `, ${skipped} not run` : ''}${flakes ? `, ${flakes} flakes (solo-green; exit-zero is temporary policy)` : ''} (${suites.join(', ')})  [j=${C}, ${wallS.toFixed(0)}s wall]`;
-report.push(summary);
-try { writeFileSync(LOG, report.join('\n') + '\n'); } catch { /* log is best-effort — never fail the run over it */ }
 
-// JSON sidecar — every run, best-effort, never fails the run. Per-attempt
-// boot/settle/body/cleanup/total/launch timings + per-check {name, ms, status}
+const summary = `${passed} passed, ${failed} failed${skipped ? `, ${skipped} not run` : ''}${flakes ? `, ${flakes} flakes (solo-green; exit-zero is temporary policy)` : ''}${infraSuites ? `, ${infraSuites} infra (browser casualty, not verified)` : ''} (${suites.join(', ')})  [j=${C}, ${wallS.toFixed(0)}s wall]`;
+report.push(summary);
+
+const exitCode = failed ? 1 : (infraSuites ? 3 : 0);
+
+function warnTelemetry(path, e) {
+  process.stderr.write(`verify: telemetry write failed (${path}): ${String((e && e.message) || e)}\n`);
+}
+
+try { writeFileSync(LOG, report.join('\n') + '\n'); } catch (e) { warnTelemetry(LOG, e); }
+
+// JSON sidecar — every run, best-effort, never fails the run over a write
+// error (loud stderr warning instead). Per-attempt boot/settle/body/cleanup/
+// total/launch timings + per-check {name, ms, status} + structured failures
 // (console output contract is unchanged by this — durations still print only
 // under -v / when ≥1s).
-const round1 = (x) => Math.round(x * 10) / 10;
 function attemptJSON(sink) {
   const o = {
-    kind: sink.kind, boot: round1(sink.boot), settle: round1(sink.settle), body: round1(sink.body),
+    kind: sink.kind, outcome: sink.outcome,
+    boot: round1(sink.boot), settle: round1(sink.settle), body: round1(sink.body),
     cleanup: round1(sink.cleanup), total: round1(sink.total),
     passed: sink.passed, failed: sink.failed, skipped: sink.skipped, aborted: sink.aborted,
-    checks: sink.checks,
+    shots: sink.shots, renderTicks: sink.renderTicks,
+    checks: sink.checks, failures: sink.failures,
   };
   if (sink.launch !== undefined) o.launch = round1(sink.launch);
   return o;
 }
+
+let totalShots = 0, totalRenderTicks = 0;
+for (const atts of attemptsByName.values()) for (const a of atts) { totalShots += a.shots; totalRenderTicks += a.renderTicks; }
+
 const VERIFY_JSON = process.env.VERIFY_JSON || '/tmp/lonestar-verify.json';
 const jsonReport = {
+  schema: 2,
   date: new Date().toISOString(),
   argv: process.argv.slice(2),
   j: { requested: jFlag || null, effective: C },
-  machine: { cpus: os.cpus().length, freememGiB: round1(os.freemem() / 2 ** 30), loadavg: os.loadavg() },
+  machine: { start: machineStart, end: machineEnd },
   order,
   wall: round1(wallS),
-  totals: { passed, failed, skipped, flakes },
+  exit: exitCode,
+  totals: { passed, failed, skipped, flakes, infra: infraSuites, shots: totalShots, renderTicks: totalRenderTicks },
   policy: { soloGreenExitZero: 'temporary' },
-  suites: suites.map((s) => {
-    const r = results.get(s);
-    if (!r) return { name: s, flake: false, attempts: [] };
-    const attempts = [attemptJSON(r)];
-    if (r.solo) attempts.push(attemptJSON(r.solo));
-    return { name: s, flake: !!(r.solo && r.solo.failed === 0), attempts };
-  }),
+  suites: suites.map((s) => ({
+    name: s,
+    status: statusByName.get(s) || 'infra',
+    flake: flakeByName.get(s) || false,
+    attempts: (attemptsByName.get(s) || []).map(attemptJSON),
+  })),
 };
-try { writeFileSync(VERIFY_JSON, JSON.stringify(jsonReport, null, 2)); } catch { /* best-effort — never fail the run over it */ }
+
+// history: one compact file per run, reboot-durable, pruned on write.
+const HISTORY_DIR = process.env.VERIFY_HISTORY_DIR || join(os.homedir(), '.cache/lonestar-verify/history');
+const HISTORY_DAYS = parseInt(process.env.VERIFY_HISTORY_DAYS, 10) || 180;
+const HISTORY_KEEP = parseInt(process.env.VERIFY_HISTORY_KEEP, 10) || 100;
+function historyStamp(d) {
+  const p2 = (n) => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTCDate())}T${p2(d.getUTCHours())}${p2(d.getUTCMinutes())}${p2(d.getUTCSeconds())}Z`;
+}
+function pruneHistory(dir, days, keep) {
+  let entries;
+  try { entries = readdirSync(dir); } catch (e) { if (e.code === 'ENOENT') return; throw e; }
+  const matching = entries.filter((f) => /^\d{8}T\d{6}Z-\d+\.json$/.test(f)).sort(); // fixed-width names sort chronologically
+  const newest = new Set(matching.slice(-keep));
+  const cutoff = Date.now() - days * 24 * 3600 * 1000;
+  for (const f of matching) {
+    if (newest.has(f)) continue;
+    const m = f.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z-/);
+    if (!m) continue;
+    const ts = Date.parse(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}Z`);
+    if (Number.isFinite(ts) && ts < cutoff) {
+      try { unlinkSync(join(dir, f)); } catch (e) { if (e.code !== 'ENOENT') throw e; } // tolerate concurrent runs
+    }
+  }
+}
+let historyPath = null;
+try {
+  mkdirSync(HISTORY_DIR, { recursive: true });
+  historyPath = join(HISTORY_DIR, `${historyStamp(new Date())}-${process.pid}.json`);
+  writeFileSync(historyPath, JSON.stringify(jsonReport));
+  pruneHistory(HISTORY_DIR, HISTORY_DAYS, HISTORY_KEEP);
+} catch (e) { warnTelemetry(historyPath || HISTORY_DIR, e); }
+
+// latest-run pointer: atomic write (temp file + rename), pretty-printed.
+try {
+  const tmpPath = `${VERIFY_JSON}.tmp-${process.pid}`;
+  writeFileSync(tmpPath, JSON.stringify(jsonReport, null, 2));
+  renameSync(tmpPath, VERIFY_JSON);
+} catch (e) { warnTelemetry(VERIFY_JSON, e); }
 
 if (QUIET) console.log(summary);
 else for (const line of report) console.log(line);
-process.exit(failed ? 1 : 0);
+process.exit(exitCode);

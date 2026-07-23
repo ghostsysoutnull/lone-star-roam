@@ -6,53 +6,42 @@ Three.js free-roam Texas game. Process law, commands, and architecture live in
 changing); per-module grep anchors in `MODULES.md`; history in `ROADMAP.md`;
 queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
-No active track: **the test-gate hardening + telemetry wave shipped
-2026-07-22** (handoff via `wave-coder`) — `verify.mjs` now throws on
-non-finite `t.near` comparisons, fails suites on any unexpected page error
-(deduped, no allowlist, routes through the existing solo-rerun flake path),
-preserves both pool and solo attempts for JSON telemetry instead of the solo
-rerun overwriting the pool one, and writes a full per-attempt timing +
-machine-conditions JSON sidecar (`/tmp/lonestar-verify.json`) every run. New
-`tools/verify-selftest.mjs` + `tools/checks-fixtures/` validate the runner
-itself. The full verify came back clean on first run (572 passed, 0 failed,
-3 known solo-green flakes) — the new guards surfaced no latent check bugs.
-Solo-green exit-zero is flagged as **temporary policy** pending an
-evidence-based flake policy built from the recorded JSON history.
+No active track: **the runner-telemetry + durable-history wave shipped
+2026-07-22** (handoff via `wave-coder`) — every verify run now writes a
+schema-2 JSON with structured failure signatures to a reboot-durable
+history (`~/.cache/lonestar-verify/history/`, 180-day/keep-100 prune) plus
+the atomic latest pointer (`/tmp/lonestar-verify.json`); browser crashes
+are `infra` casualties (bounded relaunch, exit 3 = infra-incomplete, never
+FAIL, zero signatures) so crash noise can't poison flake-policy evidence;
+the runner self-test grew to 51 assertions across 6 child runs. The
+wave-close full verify (572 passed, 0 failed, 0 flakes) is the first
+trusted history entry. History now accumulates run over run — the
+flake-policy and startup-optimization gates (`BACKLOG.md`) are unblocked
+and waiting on volume.
 
-Also produced (measurement only, no action taken): a CDP-profiled
-caller-attribution table for `inPoly()` time during one game boot — the
-biggest cost by far is `neighborStateAt` (`geo.js`) called from the W3
-terrain painter's `bandTint` (`world.js`), ~2.8s of a ~10.7s boot profile
-(full table: `TESTING_ASSESSMENT.md` → Addendum). The startup-optimization
-decision waits on this table plus accumulated verify history — which does
-not exist yet: the JSON sidecar overwrites itself every run. The queued
-runner-telemetry wave (briefing below) makes it durable; no track opened.
-
-**Queue order (set 2026-07-22)**: runner-telemetry wave (below), then the
-turbine-sampler wave (`BACKLOG.md` → Bugs), then sea-industry
-(`VISION_SEA_INDUSTRY.md`, spec session first — doc-only, may interleave
-anywhere). The Mexico 25-mi band conversation was discarded 2026-07-22
-(covered by `VISION_MEXICO_SHOULDER.md`). Map W2 (layers + waypoint) is
-queued in `BACKLOG.md`.
+**Queue order (corrected 2026-07-22)**: sea-industry spec session (below),
+then the wind-farm bake-clip rebake (`BACKLOG.md` → Bugs; the solar-decal
+re-check may fold in). The turbine-sampler + city-clearance wave had
+already shipped 2026-07-22 (`3172eb3`); its stale BACKLOG entries are now
+struck. Map W2 (layers + waypoint) stays queued in `BACKLOG.md`.
 
 ## Session briefing
-- **This session**: runner telemetry + durable history, single wave —
-  settle the failure matrix + retention in the plan, then hand off. Scope
-  doc: `TEST_RUNNER_FOLLOWUP.md`; amendments + provenance in `BACKLOG.md`
-  → Test harness follow-ups. Hardening wave (gate hardening + JSON
-  sidecar) shipped 2026-07-22, commit ecad959.
-- **Recommended setup**: handoff **yes**, effort **high** — mechanical
-  runner work once the plan settles the two open contracts (per-phase
-  failure matrix incl. the browser-crash relaunch-vs-abort cell; retention
-  knobs). Session runs Fable 5; flag it if another model is running.
-- **Budget**: code + fixtures + self-test expansion; no game perf cost, no
-  judged shots (self-test adds a few boots + one capture fixture asserted
-  numerically); one full verify at wave close, retained as the first
-  trusted history entry.
-- **Then**: rewrite this block for the turbine-sampler + city-clearance
-  wave (`BACKLOG.md` → Bugs); sea-industry spec session may interleave
-  anytime (doc-only).
+- **This session**: sea-industry spec session — write `SEA_INDUSTRY_SPEC.md`
+  from `VISION_SEA_INDUSTRY.md` (goals, wave split, open calls resolved
+  before any wave codes, per-wave handoff grades + design-settled
+  sections; `NEWPLAYER_SPEC.md` is the format reference). Doc-only, no
+  code. Runner-telemetry wave shipped 2026-07-22 (the commit carrying this
+  briefing).
+- **Recommended setup**: handoff **no**, effort **high** — specs and tech
+  design are always Fable 5 in-loop. Session runs Fable 5; flag it if
+  another model is running.
+- **Budget**: the spec doc + queue/briefing rewrite only; doc-only diff —
+  no tests, no shots; grep-first for module touchpoints (maritime.js,
+  world.js, geo.js are the likely borders).
+- **Then**: rewrite this block for the spec's wave 1 — or, if the spec
+  defers coding, for the wind-farm bake-clip rebake wave.
 
-Gotchas carried over: history dir must be reboot-durable
-(`~/.cache/lonestar-verify/history/`); browser-crash casualties are
-`infra`, never FAIL — signature-history integrity is the wave's point.
+Gotchas carried over: the rebake wave (next coding work) must reproduce the
+shipped `data/energy.json` unfixed before applying the border clip
+(prefer-true-source rule); Overpass from this environment is GET, never
+POST (`curl -sG --data-urlencode`).

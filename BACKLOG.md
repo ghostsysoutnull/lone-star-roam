@@ -1,10 +1,13 @@
 # Backlog — queued work
 
 No active track. Rails Operations shipped in full 2026-07-19 (folded into
-`ROADMAP.md`). Queue order set 2026-07-22: the **runner-telemetry wave**
-(Test harness follow-ups below), then the **turbine-sampler wave** (Bugs
-below), then sea-industry (`VISION_SEA_INDUSTRY.md`, spec session first —
-doc-only, may interleave anywhere). Items below are the queue.
+`ROADMAP.md`). Queue order (corrected 2026-07-22 at runner-telemetry wave
+close): the **sea-industry spec session** (`VISION_SEA_INDUSTRY.md`,
+doc-only), then the **wind-farm bake-clip rebake** (Bugs below; the
+solar-decal re-check may fold in). The runner-telemetry wave shipped
+2026-07-22; the turbine-sampler wave had already shipped 2026-07-22
+(`3172eb3`) but its two Bugs entries were left unstruck by that session's
+sweep — corrected below. Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Bugs (live in shipped code)
@@ -35,57 +38,17 @@ until a probe confirms them.
   `build-energy.mjs` (confirm by reproducing the shipped file at rebake
   time).
 
-- **15 real wind farms render zero turbines; 5 render more turbines than
-  exist. QUEUED (2026-07-22): one wave with the city-clearance entry below,
-  after the boot-cost fix, before sea-industry. Mechanism re-confirmed in
-  code 2026-07-22 (Fable): the accept loop already stops at `TURBINE_CAP`
-  accepted sites, so the input-side cap is pure defect.**
-  `windTurbinesAt` (world.js ~980) draws candidates across the
-  whole 260-unit chunk and rejects them against the farm circle, but
-  derives the draw count from an *already-capped* expectation:
-  `expect = Math.min(TURBINE_CAP, density * CHUNK²)`, then
-  `draws = Math.ceil(expect) + 3`. Two independent failures follow:
-  - **Compact farms vanish.** A compact farm covers ~2% of a chunk, so
-    nearly every draw lands outside the circle and is discarded. 15 farms
-    render nothing at all — including a real 17-turbine farm at r 20.
-  - **Interior chunks over-populate.** A chunk lying fully inside a farm
-    accepts *every* candidate, so the `+3` becomes pure surplus (expect
-    6.6 → 10 turbines). 5 farms render above their baked count.
-
-  **Not to be confused with intentional thinning.** `TURBINE_CAP = 32` per
-  chunk is a deliberate density limiter and the game was never meant to
-  draw all 27,644 baked turbines — **do not treat 1:1 as the fix target.**
-  The defect is that the sampler is unfaithful *underneath* the cap, in
-  both directions. The distinguishing evidence: a density limiter yields
-  fewer-but-present, never zero, and can never exceed the real count.
-  `ENERGY_SPEC.md`'s expected result is "the 27k-turbine fleet appears
-  **clustered into its real farms**", and both spec and `GOTCHAS.md`
-  describe the seeded-stream design as keeping the JSON small "and the
-  fleet **honest**" — proportional representation under the cap, which is
-  exactly what is broken.
-
-  *Context only, not a target*: statewide the replay renders ~5,175 of
-  27,644 (an upper bound — geometry only, before the `inTexas`/road/airport
-  gates, and using a per-farm rather than the game's shared per-chunk cap).
-  213 farms render under their baked count. The correct fix target is
-  proportionality and non-vanishing, **not** a percentage.
-
-  Fix direction: draw from the *uncapped* chunk expectation and stop after
-  `TURBINE_CAP` **accepted** sites, so the cap bounds output rather than
-  input; drop or rethink the `+3` surplus. Note the seed-string law —
-  changing `turbine:` stream inputs moves every turbine in the world;
-  prefer a fix that keeps the stream shape (more draws from the same
-  stream) over one that re-keys it. Needs a `tools/checks/energy.mjs`
-  guard asserting no baked farm renders zero and none exceeds its count.
-- **Turbines skip the city-clearance gate — contradicts written law.**
-  `windTurbinesAt` checks `nearestAnyRoad` and `airportClear` but not
-  `cityClear`, so turbines can stand inside procedural downtowns.
-  `GOTCHAS.md` (Rendering & systems) states the opposite as settled law:
-  "every other site-placement function (`wellSiteAt`, `windTurbinesAt`)
-  checks road/city/airport clearance before drawing". Code violates a
-  documented rule — not a design choice. Omission confirmed by inspection;
-  a specific instance (Snyder) was reported but not verified. Fold into the
-  same wave as the sampler fix.
+- ~~15 real wind farms render zero turbines; 5 render more turbines than
+  exist~~ — shipped 2026-07-22, commit `3172eb3`: sampler draws from the
+  uncapped chunk expectation, `TURBINE_CAP` bounds *accepted* sites,
+  farm totals hard-bounded (zero-rendering farms 18→1, the one an evidenced
+  legality-exhausted exception); guards live in `tools/checks/energy.mjs`
+  (no in-Texas-centered farm renders zero, none exceeds its baked count).
+  Strike recorded at the runner-telemetry wave close — the shipping
+  session's sweep missed it. Provenance in the block below.
+- ~~Turbines skip the city-clearance gate — contradicts written law~~ —
+  shipped 2026-07-22 in the same commit (`3172eb3`, `cityClear` gate
+  added). Strike recorded at the runner-telemetry wave close.
 
 - **Solar field decals ignore road/river/city clearance at render time.**
   The ScenerySystem solar branch draws an `r*2 × r*2` field patch plus crop
@@ -227,36 +190,20 @@ until a probe confirms them.
   near-uniform, so body-only ordering can still strand a worker on an
   extra boot wave.
 
-- ~~Runner infra-failure normalization~~ (2026-07-22): a navigation/import
-  failure outside `t.check()` rejects its worker, kills the pool via
-  `Promise.all`, and exits with **no report, no LOG, no JSON**. Needs a
-  normalized fatal-suite result + cleanup that still writes the reports
-  (suite watchdogs optional, same family). Known and deliberately excluded
-  from the hardening wave's scope. → **Folded into the runner-telemetry
-  wave below (2026-07-22)**, gated on its plan-settled failure matrix.
+- ~~Runner infra-failure normalization~~ — shipped 2026-07-22 (folded into
+  and shipped as part of the runner-telemetry wave below); rules in
+  `GOTCHAS.md` → Verification.
 
-- **Runner telemetry + durable history wave** (queued 2026-07-22 — next
-  coding wave, before the turbine-sampler wave and sea-industry coding).
-  Scope: `TEST_RUNNER_FOLLOWUP.md` (history retention, structured failure
-  identity/signatures, self-test coverage of the NaN-guard and solo-green
-  paths, start/end machine snapshots + shot instrumentation) with three
-  amendments settled in-chat 2026-07-22: (1) history lives in
-  `~/.cache/lonestar-verify/history/`, not `/tmp` — reboot-durable;
-  `/tmp/lonestar-verify.json` stays as the latest-run pointer; (2) the
-  infra-failure normalization entry above folds in, gated on a plan-settled
-  **per-phase failure matrix** (scope/retry/continuation/reporting per
-  phase; browser-crash casualties get an `infra` status distinct from
-  fail/flake so they never poison signature history; relaunch-vs-abort is
-  the one open cell); (3) strict telemetry mode dropped — loud stderr
-  warning suffices, no CI consumer exists. Plan-session items (contract
-  settles before handoff): the failure matrix + retention knobs (age-based
-  prune with safety margin, concurrency-safe, never count-only). Handoff:
-  **yes** (wave-coder) once the plan settles those. Cost line: no game perf
-  cost, no judged shots; the self-test grows by a few boots + one capture
-  fixture asserted numerically. The wave-close full verify is retained as
-  the first trusted history entry. Unblocks the flake-policy and
-  startup-optimization gates (both wait on accumulated history, which
-  currently overwrites itself every run). *Provenance*: doc by the codex
+- ~~Runner telemetry + durable history wave~~ — shipped 2026-07-22: history
+  retention (`~/.cache/lonestar-verify/history/`, atomic latest-run
+  pointer, age+count prune), structured failure signatures
+  (`assertion`/`pageerror`/`runner`, `failed === failures.length`), the
+  per-phase infra failure matrix (workers never reject; browser-crash
+  casualties get `outcome:'infra'`, never a failure signature; exit 3 =
+  infra-incomplete), start/end machine snapshots, and `t.shot()`
+  instrumentation (schema 2). Self-test expanded to 9 fixtures / 6 child
+  runs (`tools/verify-selftest.mjs`). Rules in `GOTCHAS.md` → Verification
+  and `tools/verify.mjs`'s header comment. *Provenance*: doc by the codex
   lane (`gpt-5.6-sol`); four central claims (single-file overwrite + silent
   write catch, `{name,ms,status}`-only check records, missing `t.near`/
   solo-green fixtures, post-teardown machine block) verified in-session at
