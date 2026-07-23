@@ -201,7 +201,8 @@ until a probe confirms them.
   full caller table in `TESTING_ASSESSMENT.md` → Addendum. Implementation
   shape deliberately undecided (runtime scanline vs baked mask vs spatial
   index — trade-offs in `TESTING_ASSESSMENT_COUNTER.md`). Gate: accumulated
-  `/tmp/lonestar-verify.json` history confirming the payoff, then a
+  verify history confirming the payoff (durable only after the
+  runner-telemetry wave below ships — the sidecar overwrites today), then a
   spec'd wave; replacement must match the current classifier at every
   elevation-grid point before the old path is removed. When this opens,
   consider a scoped **Chrome DevTools MCP** trial for the perf-trace work

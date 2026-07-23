@@ -24,8 +24,9 @@ caller-attribution table for `inPoly()` time during one game boot — the
 biggest cost by far is `neighborStateAt` (`geo.js`) called from the W3
 terrain painter's `bandTint` (`world.js`), ~2.8s of a ~10.7s boot profile
 (full table: `TESTING_ASSESSMENT.md` → Addendum). The startup-optimization
-decision waits on this table plus the accumulating
-`/tmp/lonestar-verify.json` history — no track opened yet.
+decision waits on this table plus accumulated verify history — which does
+not exist yet: the JSON sidecar overwrites itself every run. The queued
+runner-telemetry wave (briefing below) makes it durable; no track opened.
 
 **Queue order (set 2026-07-22)**: runner-telemetry wave (below), then the
 turbine-sampler wave (`BACKLOG.md` → Bugs), then sea-industry
