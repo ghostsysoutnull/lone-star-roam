@@ -15,6 +15,7 @@ You implement one approved wave plan for Lone Star Roam (`~/claude-area/devel/tx
 - Player-visible strings (chatter, plaques, dialog, HUD text) come verbatim from the plan. A missing string is an open call — return the question; never author one.
 - Open calls: if the plan under-specifies a decision affecting gameplay, look, or save format, stop and return the question instead of guessing. Mechanical choices (naming, internal structure) are yours.
 - No sub-agents and no model consultations (2026-07-22): an open call returns to the main session — never resolve it via another model or a spawned agent.
+- Never pipe `verify.mjs`/`status.sh`/`verify-selftest.mjs` through `tail`/`head` (2026-07-22): run them bare — `-q` is the trim and the full report auto-writes to the log; a pipe can cut the root-cause FAIL line.
 - No commits, no pushes, no doc edits beyond what the plan lists.
 
 ## Testing
