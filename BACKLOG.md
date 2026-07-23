@@ -1,9 +1,9 @@
 # Backlog — queued work
 
 Active track: **Sea-Industry Realism** (`SEA_INDUSTRY_SPEC.md`, spec'd
-2026-07-22, 3 waves, none coded yet). Queue order: the **wind-farm
-bake-clip rebake** first (Bugs below; the solar-decal re-check may fold
-in), then sea-industry W1. The runner-telemetry wave shipped 2026-07-22.
+2026-07-22, 3 waves, none coded yet). Next up: **sea-industry W1**
+(ports + AIS routes). The wind-farm bake-clip rebake (+ solar-decal
+re-check) shipped 2026-07-22.
 Items below are the queue.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
@@ -20,20 +20,16 @@ found it, whether the claim was independently verified in-session, and the
 Claude session model that ran the effort. External findings are claims
 until a probe confirms them.
 
-- **83 baked wind farms have centers outside the Texas border polygon.**
-  `tools/build-energy.mjs` bins turbines into farm cells over the raw
-  Overpass bbox without clipping cell centers to the border, so `windFarms`
-  in `data/energy.json` carries out-of-state clusters (NM/OK edges). Runtime
-  harmless — every turbine candidate gates on `inTexas`, so they render
-  nothing — but the baked list overstates the fleet and the turbine
-  farm-fidelity check must scope them out. Fix at the source per standing
-  preference: rebake with a border-polygon clip (reproduce the shipped file
-  unfixed first), not a runtime filter. *Provenance*: found 2026-07-22 by
-  the `wave-coder` agent's farm-sweep measurement during the turbine-sampler
-  wave (session model Fable 5); the 83 out-of-border centers are verified
-  by the deterministic sweep, the bbox-binning cause is inferred from
-  `build-energy.mjs` (confirm by reproducing the shipped file at rebake
-  time).
+- ~~83 baked wind farms have centers outside the Texas border polygon~~ —
+  shipped 2026-07-22, bake-clip rebake wave: shipped `energy.json`
+  reproduced byte-identical from raw inputs first (bbox-binning cause
+  confirmed), then `build-energy.mjs` clips turbine points to
+  `data/border.json` before clustering — farms 225 → 145 (140 byte-identical,
+  2 border-straddlers reshaped to their Texas-side turbines, 83 phantoms
+  gone), 8,569 out-of-state turbine points dropped. Farm-fidelity check
+  drops the scope-out and asserts every baked center passes `inTexas`.
+  *Provenance*: found 2026-07-22 by the `wave-coder` agent's farm-sweep
+  measurement during the turbine-sampler wave (session model Fable 5).
 
 - ~~15 real wind farms render zero turbines; 5 render more turbines than
   exist~~ — shipped 2026-07-22, commit `3172eb3`: sampler draws from the
@@ -47,14 +43,16 @@ until a probe confirms them.
   shipped 2026-07-22 in the same commit (`3172eb3`, `cityClear` gate
   added). Strike recorded at the runner-telemetry wave close.
 
-- **Solar field decals ignore road/river/city clearance at render time.**
-  The ScenerySystem solar branch draws an `r*2 × r*2` field patch plus crop
-  rows at the baked aggregate radius **unconditionally**, while the turbine
-  branch a few lines away gates on road and airport. Fixed once already for
-  roads/rivers by `68aec12`, then restructured by the W4.5 rework
-  (`9b32732`) into per-block clearance — **status at HEAD unverified**, this
-  entry is a re-check item, not a confirmed live bug. Confirm before
-  scheduling.
+- ~~Solar field decals ignore road/river/city clearance at render time~~ —
+  re-checked 2026-07-22 (bake-clip rebake wave), **not a live bug**:
+  the W4.5 per-block restructure kept road+river clearance (each block
+  draws only if its whole rectangle clears, `src/world.js` solar branch;
+  the energy suite's "per-block clearance law" check covers it). City
+  clearance is genuinely absent from the branch but provably vacuous:
+  an offline envelope probe found 0 of 547 baked solar sites whose
+  farthest block corner can reach any of the 132 city radii
+  (`cityRadius(pop)`). No code change; re-open only if a rebake moves
+  solar sites or city radii grow.
 
   **Provenance (all three entries above).**
   - *Found*: 2026-07-21, external-agents gate run. Turbine defects from

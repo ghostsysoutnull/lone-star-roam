@@ -718,12 +718,10 @@ export default async function energy(t) {
   // circleChunkOverlap exactly to compute that count independently of the
   // sweep's own output, so check 3 isn't circular.
   //
-  // Scope note for check 2: 83/225 baked windFarms have a CENTER outside
-  // inTexas — a pre-existing bake artifact (windFarms isn't clipped to the
-  // border polygon, unlike other energy layers), tracked separately, not a
-  // sampler defect. Those are excluded by the inTexas(f.x, f.z) filter below,
-  // not by farm identity, so the exclusion is principled rather than a
-  // hand-picked list.
+  // Bake integrity (2026-07-22 bake-clip rebake): build-energy.mjs clips
+  // turbine points to the border ring before clustering, so every baked farm
+  // center must pass inTexas — check 1 asserts it, and check 2 no longer
+  // scopes anything out.
 
   let turbineSweep = null;
   await t.check('turbine fidelity: farm-sweep evaluate covers every baked farm exactly once (rendered count + independent coveringChunks)', async () => {
@@ -765,8 +763,10 @@ export default async function energy(t) {
       }
       return results;
     })()`);
-    t.ok(turbineSweep.length === 225, `expected 225 farms swept, got ${turbineSweep.length}`);
+    t.ok(turbineSweep.length === 145, `expected 145 farms swept, got ${turbineSweep.length}`);
     t.ok(turbineSweep.every((f) => Number.isInteger(f.rendered) && f.rendered >= 0), 'a farm produced a malformed rendered count');
+    const outTx = turbineSweep.filter((f) => !f.inTx);
+    t.ok(outTx.length === 0, `baked farm centers outside inTexas (bake clip regressed): ${JSON.stringify(outTx.map((f) => [f.x, f.z]))}`);
   });
 
   await t.check('turbine fidelity: every rendered site in the sweep passes cityClear(x, z, 20) (regression guard on the generation gate)', async () => {
@@ -794,8 +794,8 @@ export default async function energy(t) {
   const TURBINE_ZERO_EXCEPTIONS = [[-2203.6, -4673.7]]; // [x, z] — see comment above
   const isExcepted = (f) => TURBINE_ZERO_EXCEPTIONS.some(([ex, ez]) => Math.abs(f.x - ex) < 0.05 && Math.abs(f.z - ez) < 0.05);
 
-  await t.check('turbine fidelity: no in-Texas-centered farm renders zero turbines, except the one evidenced legality-exhausted exception (83 out-of-Texas-centered farms scoped out — separate bake artifact, tracked in BACKLOG.md)', async () => {
-    const zero = turbineSweep.filter((f) => f.inTx && f.count >= 1 && f.rendered === 0 && !isExcepted(f));
+  await t.check('turbine fidelity: no farm renders zero turbines, except the one evidenced legality-exhausted exception (all baked centers are in-Texas since the bake-clip rebake)', async () => {
+    const zero = turbineSweep.filter((f) => f.count >= 1 && f.rendered === 0 && !isExcepted(f));
     t.ok(zero.length === 0, `unexpected in-Texas farms rendering zero: ${JSON.stringify(zero.map((f) => ({ x: f.x, z: f.z, count: f.count, r: f.r })))}`);
   });
 

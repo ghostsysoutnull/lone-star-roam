@@ -201,12 +201,17 @@ console.log(`wells: ${wellsRaw.length} raw, ${wellOrphans} orphans (${(100 * wel
 
 // =================================================================
 // Turbines — cell-bin (20u ~= 2km) + flood-fill cluster into farms.
+// Points are clipped to the border ring before clustering: the raw Overpass
+// bbox spills into NM/OK, and runtime candidates gate on inTexas anyway, so
+// unclipped points would bake farms (and straddler counts) that never render.
 // =================================================================
+const borderRing = JSON.parse(readFileSync(join(ROOT, 'data', 'border.json'), 'utf8'));
 const turbRaw = load('turbines');
 const turbPts = [];
 for (const el of turbRaw) {
   if (el.type !== 'node') continue;
   const [x, z] = proj(el.lon, el.lat);
+  if (!inRings(x, z, [borderRing])) continue;
   turbPts.push({ x, z });
 }
 const windFarms = clusterPoints(turbPts, 20).map((group) => {
@@ -215,7 +220,7 @@ const windFarms = clusterPoints(turbPts, 20).map((group) => {
   const r = Math.max(...group.map((p) => Math.hypot(p.x - cx, p.z - cz)), 20);
   return { x: +cx.toFixed(1), z: +cz.toFixed(1), count: group.length, r: +r.toFixed(1) };
 });
-console.log(`turbines: ${turbRaw.length} raw -> ${windFarms.length} farm clusters`);
+console.log(`turbines: ${turbRaw.length} raw -> ${turbPts.length} in-border -> ${windFarms.length} farm clusters`);
 
 // =================================================================
 // Plants — kept individual (1,422 is small). Solar polygons additionally
