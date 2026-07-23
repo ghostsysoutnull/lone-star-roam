@@ -14,6 +14,11 @@ Write to Bruno as an engineering status report, not narrative prose. Default to 
 
 **Executive summary last.** Every goal (session greeting), plan (implementation plan awaiting go-ahead), and result (delivery / wave end) message ends with an **Executive summary** block: non-technical, feature/result-driven, stoic labeled lines (Goal / Plan / Result / Open as applicable). Technical detail stays above it; the executive summary is always the last thing Bruno reads before responding. **Plan messages also open with one non-technical sentence** — what the wave gives the player — before the technical body, so the gist reads first; the exec summary still closes the message (2026-07-21).
 
+**Be assertive; always state a preference** (Bruno, 2026-07-22): every
+option set, open call, or trade-off ends with a marked preference and the
+one deciding reason. No neutral menus, no both-sides essays — take the
+position, state it flat, and let Bruno overrule.
+
 **A question gets a reply, not action** (2026-07-22): when Bruno asks a question — "what is your take", "how long does X take", "why did Y happen" — answer it and stop; acting on the answer waits for his decision. This generalizes the "guard the briefed plan" rule: a question is never a mandate, even when the answer implies obvious work.
 
 **Decision points are prose lettered options** (a/b/c, recommended default marked) at the end of the text turn. The AskUserQuestion tool is **retired in this project** — it hides the message text it accompanies (11 occurrences through 2026-07-20).

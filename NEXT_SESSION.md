@@ -30,6 +30,13 @@ solar-decal re-check may fold in), then sea W1.
   W1 scout's AIS sample download can be requested from Bruno early —
   marinecadastre.gov daily extract).
 
+Sea W1 prerequisite (Bruno self-serve, any time before W1): download one
+AIS daily extract — marinecadastre.gov → AIS Vessel Traffic Data → any
+recent day's national CSV zip (~0.5–1 GB) — into
+`~/claude-area/devel/tx-inputs/`. One day is enough; the scout clips it
+to the Texas Gulf bbox offline. If absent when W1 opens, that session
+asks for it first thing.
+
 Gotchas carried over: the rebake must reproduce the shipped
 `data/energy.json` unfixed from raw inputs *before* applying the border
 clip (prefer-true-source rule); Overpass from this environment is GET,
