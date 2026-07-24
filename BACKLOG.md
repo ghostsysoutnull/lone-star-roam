@@ -414,13 +414,26 @@ Sea-Industry W3 shop slate (Bruno, 2026-07-22) — feel-tuning risk inside
 a handoff wave. Revisit as a small Fable in-loop tune if boat handling
 ever gets a pass.
 
-Placement audit follow-on (2026-07-16; **scheduled 2026-07-23** as the
-`data-scout` agent's first mission, riding the Map W2 session as a
-parallel sidecar — see `NEXT_SESSION.md`): coastal city-building scatter vs
-water is unaudited — `cities.js` rejects roads (<1.3u) but never `waterAt`,
-so Corpus/Galveston-class downtowns may push procedural buildings into the
-bay. The offline audit mirror in the placement-legality session's scratchpad
-pattern (data JSONs + projection) makes this a cheap check before any fix.
+Placement audit follow-on (2026-07-16; **audited 2026-07-23** by the
+`data-scout` agent's first mission — offline seeded mirror of the
+`cities.js:121-143` building loop, run twice byte-identical, Monte-Carlo
+cross-checked; **fix approved by Bruno 2026-07-23**, rides the Map W2
+session as a third file-disjoint `wave-coder` chunk): the placement loop
+tests only `airportClear`/`shoulderClear` — never `inTexas` or water.
+Findings: Corpus Christi 52/82 downtown buildings in bay water (worst
+13.6u offshore; the real-street filter rejects only land candidates, so it
+*worsens* the water fraction), Rockport 3/14, Port Lavaca 2/14; the same
+gap fires on land borders — El Paso 87/162 buildings across the Rio
+Grande, Texarkana 3/20, Orange 1/16. Galveston, Beaumont, Port Arthur,
+Kingsville structurally clean (footprints never reach water at
+border.json resolution); zero lake intrusions in all 132 cities. **Fix
+contract**: containment test in the loop with **reject-and-resample**
+(retry the candidate roll, capped — preserves downtown building counts;
+Bruno's call, else El Paso loses half its skyline); buildings are not
+save-coupled, so layout change is safe. Checks: zero in-water /
+cross-border buildings for the six flagged cities + building-count
+preservation. Caveat from the audit: detection is bounded by
+border.json's coastline resolution.
 
 Haunted Texas wave 3: San Antonio ghost tracks push (~29.34 N,
 −98.44 W — only event touching player physics; strict no-push-by-day check),
