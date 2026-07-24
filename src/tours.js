@@ -40,6 +40,10 @@ export const TOURS = [
   {
     track: 'Map (2026-07)',
     waves: [
+      { wave: 'W3 — live traffic + waypoint', spots: [
+        S('🚦 Map traffic — trains, ships, aircraft', [4507, 1834], { mode: 'BOAT', time: 0.35, act: 'mapTraffic', note: 'press M: a train and a vessel forced into view and the new Traffic layer switches on — amber squares for trains, blue circles for ships (pale blue for shrimpers), silver ✈ for aircraft' }),
+        S('⚑ Waypoint + player-position widget', [1676.4, 815.8], { mode: 'DRIVE', time: 0.35, act: 'waypoint', note: 'press M: a teal pin and header pill mark the forced waypoint 80 units NE (click the pin again to clear it); #map-coords now carries Copy and Maps ↗ buttons for your own position' }),
+      ] },
       { wave: 'W2 — overlay layers + coastal containment fix', spots: [
         S('🗺️ Big map — all layers on', [-2460, -1110], { act: 'mapAllLayers', note: 'over Midland — press M and judge the five inks across the Permian; act forces every layer on' }),
         S('🏖️ Corpus Christi bayfront — buildings out of the bay', [2007, 3562], { mode: 'WALK', note: 'rider fix: downtown towers all on land now; walk the shoreline' }),

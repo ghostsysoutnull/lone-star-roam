@@ -278,6 +278,20 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       for (const name of hud.layerList) if (!hud.layersOn.has(name)) hud.toggleLayer(name);
       hud.toast('🗺️ All map layers on');
     },
+    // Map W3: pure state, opens nothing — sets the waypoint 80 units NE of
+    // the player (no toast, matching the day()/night()/midnight() pure-state
+    // pattern; the real click gesture is the one that toasts)
+    waypoint() {
+      hud.waypoint = { x: player.pos.x + 56, z: player.pos.z - 56 };
+    },
+    // Map W3: forces one train near the player + one vessel in-window + the
+    // traffic layer on — deterministic force() hooks, guarantees the
+    // traffic-dots tour/check subject
+    mapTraffic() {
+      trains.force(player.pos.x, player.pos.z, sky.days);
+      maritime.force(player.pos.x, player.pos.z);
+      if (!hud.layersOn.has('traffic')) hud.toggleLayer('traffic');
+    },
     saveQuitToTitle() {
       gameplay.snapshotAt(player, sky);
       gameplay.persist();
@@ -314,7 +328,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       ['Weather', [['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'],
         ['storm', '⛈ Storm'], ['dust', '🌪 Dust']]],
       ['Energy jobs', [['crudeJob', '🛢 Crude haul'], ['fuelJob', '⛽ Fuel run'], ['bladeJob', '🌀 Blade load']]],
-      ['Map', [['mapAllLayers', 'Map: all layers on']]],
+      ['Map', [['mapAllLayers', 'Map: all layers on'], ['mapTraffic', 'Map traffic'], ['waypoint', 'Force waypoint']]],
       ['Boot', [['saveQuitToTitle', '🚪 Save & quit to title']]],
     ];
     const actionsHtml = sections.map(([title, rows]) =>

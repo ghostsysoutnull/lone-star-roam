@@ -176,3 +176,11 @@ the scout's numbers plus muted ink on the band-backdrop precedent.
   mainland-only approximation misclassified Port Aransas).
 - Remaining W4-plan knob (only one): place-population cutoffs, US vs
   Mexico — picked from the sweep numbers at plan time.
+- **Airports-toggle rework rider** (Bruno, 2026-07-24, W3 review): the
+  base layer already draws every airport as a tier-sized ✈ (both maps),
+  so the W2 Airports toggle's rings are near-duplicate ink. Rework the
+  toggle into the airport *detail* layer: toggled on, it forces the
+  airport codes always-on (today zoom-gated occasional via
+  `airportLabels`) alongside the tier rings — base says "airport here",
+  toggle says "which and what tier". ~15 lines in hud.js + a hud-suite
+  check tweak; rides W4 since that wave repaints the same canvases.

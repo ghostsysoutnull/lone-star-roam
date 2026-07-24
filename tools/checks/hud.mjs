@@ -570,27 +570,60 @@ export default async function hud(t) {
     t.ok(r.cleared, 'mouseleave should clear the cursor back to player-follow');
   });
 
-  await t.check('Map W1.2: clicking the map copies the pointed coordinates', async () => {
+  // Map W3: click sets/clears the waypoint — replaces the retired W1.2
+  // click-to-copy check (copyCoords deleted, mapClick is the sole gesture).
+  // No toast-content asserts here (shared #toast is written by maritime/
+  // trains/energy too) — assert on hud.waypoint + #map-waypoint DOM instead.
+  await t.check('Map W3: click sets the waypoint at the clicked world point', async () => {
     await t.tp(austin.x, austin.z);
     const r = await t.ev(`(() => {
       const h = g.hud, idx = h.bigZoomIdx;
+      h.waypoint = null;
       h.bigZoomIdx = 0; h.drawBig(g.player);
       const sa = g.GEO.cities.find((c) => c.name === 'San Antonio');
       const [lx, lz] = h.mapT(sa.x, sa.z);
       const { x: wx, z: wz, w: sw, h: sh } = h.bigWindow;
-      h.copyCoords((lx - wx) * (h.bigCanvas.width / sw), (lz - wz) * (h.bigCanvas.height / sh));
-      const [lat, lon] = g.toLatLon(sa.x, sa.z);
+      const cx = (lx - wx) * (h.bigCanvas.width / sw), cz = (lz - wz) * (h.bigCanvas.height / sh);
+      h.mapClick(cx, cz);
+      const [ex, ez] = h.mapInv(wx + cx * (sw / h.bigCanvas.width), wz + cz * (sh / h.bigCanvas.height));
+      h.drawBig(g.player); // per-blit DOM (pill) update happens in drawBig, not mapClick
       h.bigZoomIdx = idx;
-      return { copied: h.lastCopied, toast: g.hud.els.toast.textContent,
-               lat, lon, sx: sa.x, sz: sa.z };
+      return { waypoint: h.waypoint, expected: [ex, ez],
+               pillText: h.waypointEl.textContent, pillDisplay: h.waypointEl.style.display };
     })()`);
-    t.ok(r.copied.includes(r.lat.toFixed(2)) && r.copied.includes((-r.lon).toFixed(2)),
-      `copied string missing lat/lon: "${r.copied}"`);
-    const m = r.copied.match(/x (-?\d+) z (-?\d+)/);
-    t.ok(m && Math.abs(+m[1] - r.sx) <= 1 && Math.abs(+m[2] - r.sz) <= 1,
-      `copied x/z off San Antonio (${r.sx.toFixed(0)}, ${r.sz.toFixed(0)}): "${r.copied}"`);
-    t.ok(r.toast.includes('copied') && r.toast.includes(r.lat.toFixed(2)),
-      `no confirmation toast: "${r.toast}"`);
+    t.ok(r.waypoint && Math.abs(r.waypoint.x - r.expected[0]) < 1 && Math.abs(r.waypoint.z - r.expected[1]) < 1,
+      `waypoint off the mapInv-derived point: ${JSON.stringify(r.waypoint)} vs ${JSON.stringify(r.expected)}`);
+    t.ok(r.pillDisplay === 'block', `pill not shown after set: ${r.pillDisplay}`);
+    t.ok(/⚑ Waypoint · \d+ km/.test(r.pillText), `pill text malformed: "${r.pillText}"`);
+  });
+
+  await t.check('Map W3: re-click within CLEAR_PX of the pin clears the waypoint', async () => {
+    const r = await t.ev(`(() => {
+      const h = g.hud, idx = h.bigZoomIdx;
+      h.bigZoomIdx = 0; h.drawBig(g.player);
+      const { x: wx, z: wz, w: sw, h: sh } = h.bigWindow;
+      const [lx, lz] = h.mapT(h.waypoint.x, h.waypoint.z);
+      const cx = (lx - wx) * (h.bigCanvas.width / sw), cz = (lz - wz) * (h.bigCanvas.height / sh);
+      h.mapClick(cx, cz); // second click, within CLEAR_PX of the pin's own px
+      h.drawBig(g.player);
+      h.bigZoomIdx = idx;
+      return { waypoint: h.waypoint, pillDisplay: h.waypointEl.style.display };
+    })()`);
+    t.ok(r.waypoint === null, `waypoint not cleared: ${JSON.stringify(r.waypoint)}`);
+    t.ok(r.pillDisplay === 'none', `pill still shown after clear: ${r.pillDisplay}`);
+  });
+
+  await t.check('Map W3: "Force waypoint" debug action sets the contract 80u NE offset', async () => {
+    await t.tp(austin.x, austin.z);
+    const r = await t.ev(`(() => {
+      g.hud.waypoint = null;
+      g.debug.actions.waypoint();
+      const wp = g.hud.waypoint;
+      g.hud.waypoint = null; // hermetic — leave clean for the checks below
+      return { wp, px: g.player.pos.x, pz: g.player.pos.z };
+    })()`);
+    t.ok(r.wp && Math.abs(r.wp.x - (r.px + 56)) < 1e-6 && Math.abs(r.wp.z - (r.pz - 56)) < 1e-6,
+      `debug action offset wrong: ${JSON.stringify(r.wp)} vs player (${r.px}, ${r.pz})`);
   });
 
   // Map W2: big-map overlay layers. Fresh-slot state is asserted first (item
@@ -604,9 +637,9 @@ export default async function hud(t) {
   // filled path, where a plain 3x3 is exact.
   const MAP_LAYERS_KEY = 'lonestar-map-layers:1';
 
-  await t.check('Map W2: layerList is the five names; fresh slot boots with layersOn empty', async () => {
+  await t.check('Map W2/W3: layerList is the six names; fresh slot boots with layersOn empty', async () => {
     const r = await t.ev(`({ list: g.hud.layerList, on: [...g.hud.layersOn] })`);
-    t.ok(JSON.stringify(r.list) === JSON.stringify(['rails', 'energy', 'airports', 'counties', 'crops']),
+    t.ok(JSON.stringify(r.list) === JSON.stringify(['rails', 'energy', 'airports', 'counties', 'crops', 'traffic']),
       `layerList: ${JSON.stringify(r.list)}`);
     t.ok(r.on.length === 0, `layersOn not empty on a fresh slot: ${JSON.stringify(r.on)}`);
   });
@@ -629,14 +662,22 @@ export default async function hud(t) {
       const d = c.getContext('2d').getImageData(Math.round(px - half), Math.round(pz - half), half * 2 + 1, half * 2 + 1).data;
       let ink = false;
       for (let i = 3; i < d.length; i += 4) if (d[i] > 0) { ink = true; break; }
-      return { hasCanvas: !!c, ink, stored: localStorage['${MAP_LAYERS_KEY}'] };
+      // Map W3: 'traffic' round-trips through the same persistence path —
+      // no discrete check for it, extend this one (contract-settled);
+      // toggled back off immediately so downstream Map W2 checks are unaffected
+      h.toggleLayer('traffic');
+      const storedWithTraffic = localStorage['${MAP_LAYERS_KEY}'];
+      h.toggleLayer('traffic');
+      return { hasCanvas: !!c, ink, stored: localStorage['${MAP_LAYERS_KEY}'], storedWithTraffic };
     })()`);
     t.ok(r.hasCanvas, 'energy layer canvas missing after toggleLayer + drawBig');
     t.ok(r.ink, 'no ink found near GEO.energy.windFarms[0] on the energy layer');
     t.ok(r.stored === '["energy"]', `storage did not round-trip ["energy"]: ${r.stored}`);
+    t.ok(r.storedWithTraffic === '["energy","traffic"]',
+      `traffic did not round-trip alongside energy: ${r.storedWithTraffic}`);
   });
 
-  await t.check('Map W2: all five layers on — drawBig does not throw, bigWindow/scaleBar intact, each layer inks a known point', async () => {
+  await t.check('Map W2/W3: all six layers on (incl. traffic, no lazy canvas) — drawBig does not throw, bigWindow/scaleBar intact, each layer inks a known point', async () => {
     const r = await t.ev(`(() => {
       const h = g.hud;
       for (const name of h.layerList) if (!h.layersOn.has(name)) h.toggleLayer(name);
@@ -691,11 +732,14 @@ export default async function hud(t) {
     t.ok(r.sb && Number.isFinite(r.sb.px) && Number.isFinite(r.sb.miles), `scaleBar malformed: ${JSON.stringify(r.sb)}`);
   });
 
-  await t.check('Map W2: clearLayers() — layersOn empty, storage round-trips []', async () => {
+  await t.check('Map W2/W3: clearLayers() — layersOn empty (traffic included going in), storage round-trips []', async () => {
     const r = await t.ev(`(() => {
-      g.hud.clearLayers();
-      return { on: [...g.hud.layersOn], stored: localStorage['${MAP_LAYERS_KEY}'] };
+      const h = g.hud;
+      const before = [...h.layersOn]; // the prior "all six on" check left traffic on too
+      h.clearLayers();
+      return { before, on: [...h.layersOn], stored: localStorage['${MAP_LAYERS_KEY}'] };
     })()`);
+    t.ok(r.before.includes('traffic'), `traffic not among the pre-clear layers: ${JSON.stringify(r.before)}`);
     t.ok(r.on.length === 0, `layersOn not empty after clearLayers(): ${JSON.stringify(r.on)}`);
     t.ok(r.stored === '[]', `storage did not round-trip []: ${r.stored}`);
   });
@@ -716,5 +760,79 @@ export default async function hud(t) {
     })()`);
     t.ok(r.got === r.expected, `debug action did not turn on all five in layerList order: ${r.got}`);
     t.ok(r.stored === r.expected, `debug action did not persist all five: ${r.stored}`);
+  });
+
+  await t.check('Map W3: #map-coords Copy/Maps buttons — always the player position, never the cursor', async () => {
+    await t.tp(austin.x + 5, austin.z - 5);
+    const r = await t.ev(`(() => {
+      if (!navigator.clipboard) Object.defineProperty(navigator, 'clipboard', { value: {}, configurable: true });
+      const origWrite = navigator.clipboard.writeText;
+      let copied = null;
+      navigator.clipboard.writeText = (s) => { copied = s; return Promise.resolve(); };
+      const origOpen = window.open;
+      let openedUrl = null;
+      window.open = (u) => { openedUrl = u; };
+      const hasCopy = !!document.getElementById('map-coords-copy');
+      const hasMaps = !!document.getElementById('map-coords-maps');
+      document.getElementById('map-coords-copy').click();
+      // W3.1: the icon-only button's success feedback (📋 → ✓ swap) is the
+      // only visual confirmation left — assert it flips
+      const copyFlash = document.getElementById('map-coords-copy').textContent;
+      document.getElementById('map-coords-maps').click();
+      navigator.clipboard.writeText = origWrite;
+      window.open = origOpen;
+      const [lat, lon] = g.toLatLon(g.player.pos.x, g.player.pos.z);
+      return { hasCopy, hasMaps, copied, openedUrl, lat, lon, copyFlash };
+    })()`);
+    t.ok(r.hasCopy && r.hasMaps, '#map-coords missing the Copy/Maps buttons');
+    const expected = `${r.lat.toFixed(4)}, ${r.lon.toFixed(4)}`;
+    t.ok(r.copied === expected, `clipboard text off toLatLon(player.pos): "${r.copied}" vs "${expected}"`);
+    t.ok(r.openedUrl && r.openedUrl.includes('maps.google.com/?q='), `Maps URL malformed: ${r.openedUrl}`);
+    t.ok(r.copyFlash === '✓', `copy button did not flash ✓ after click: "${r.copyFlash}"`);
+  });
+
+  await t.check('Map W3: traffic layer glyph counts match a live recount; forced train+vessel guarantee ≥1 each', async () => {
+    const r = await t.ev(`(() => {
+      const track = g.debug.tours.find((tr) => tr.track.startsWith('Map'));
+      const spot = track.waves.flatMap((w) => w.spots).find((s) => s.act === 'mapTraffic');
+      g.debug.visit(spot);
+      const h = g.hud, idx = h.bigZoomIdx;
+      h.bigZoomIdx = 0;
+      // ONE atomic eval from here: drawBig, then recount from the SAME
+      // enumerations window-filtered — trains advance and radio.sources
+      // rebuilds between evals, so a split eval flakes at window boundaries
+      h.drawBig(g.player);
+      const { x: wx, z: wz, w: sw, h: sh } = h.bigWindow;
+      const W = h.bigCanvas.width, H = h.bigCanvas.height;
+      const Tw = (x, z) => { const [lx, lz] = h.mapT(x, z); return [(lx - wx) * (W / sw), (lz - wz) * (H / sh)]; };
+      const inWin = (x, z) => x >= 0 && x <= W && z >= 0 && z <= H;
+      let trains = 0;
+      for (const tr of h.movers.trains.trains) {
+        const [tx, tz] = h.movers.trains.at(tr.rail, tr.s);
+        const [gx, gz] = Tw(tx, tz);
+        if (inWin(gx, gz)) trains++;
+      }
+      let ships = 0;
+      for (const s of h.movers.maritime.ships) { const [gx, gz] = Tw(s.g.position.x, s.g.position.z); if (inWin(gx, gz)) ships++; }
+      for (const s of h.movers.maritime.shrimpers) { const [gx, gz] = Tw(s.g.position.x, s.g.position.z); if (inWin(gx, gz)) ships++; }
+      let aircraft = 0;
+      for (const s of h.movers.radio.sources) {
+        if (!s.air) continue;
+        const [gx, gz] = Tw(s.x, s.z);
+        if (inWin(gx, gz)) aircraft++;
+      }
+      const drawn = { ...h.trafficDrawn };
+      h.bigZoomIdx = idx;
+      // hermetic cleanup — leave layers/localStorage/waypoint as found
+      h.clearLayers();
+      localStorage.removeItem('${MAP_LAYERS_KEY}');
+      h.waypoint = null;
+      return { drawn, recount: { trains, ships, aircraft } };
+    })()`);
+    t.ok(r.drawn.trains === r.recount.trains, `trains mismatch: drawn ${r.drawn.trains} vs recount ${r.recount.trains}`);
+    t.ok(r.drawn.ships === r.recount.ships, `ships mismatch: drawn ${r.drawn.ships} vs recount ${r.recount.ships}`);
+    t.ok(r.drawn.aircraft === r.recount.aircraft, `aircraft mismatch: drawn ${r.drawn.aircraft} vs recount ${r.recount.aircraft}`);
+    t.ok(r.drawn.trains >= 1, `expected >=1 forced train, got ${r.drawn.trains}`);
+    t.ok(r.drawn.ships >= 1, `expected >=1 forced vessel, got ${r.drawn.ships}`);
   });
 }

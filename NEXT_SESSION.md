@@ -7,34 +7,45 @@ changing); per-module grep anchors in `MODULES.md`; history in `ROADMAP.md`;
 queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
 ## Session briefing
-- **This session**: **Map W3 of 4 per `MAP_SPEC.md`** (read its W3
-  sections before planning) — live traffic glyphs on the big map (trains/
-  ships/planes as a sixth Traffic toggle in the W2 layer bar), click-to-
-  waypoint (pin on both maps, compass tick, header distance, session-only),
-  and the you-are-here widget (`#map-coords` grows Copy + Google Maps on
-  the player position). W1.2's click-to-copy gesture is retired in this
-  wave (spec resolved call). Map W2 + the cities-containment rider shipped
-  2026-07-23 (the commit carrying this briefing).
-- **Recommended setup**: handoff **yes**, effort **high** — glyph ink and
-  a gesture swap on settled surfaces; single `wave-coder` (under the
-  multi-chunk threshold unless the plan grows). Plan-grill runs before
-  spawn (pilot verdict KEEP, now practice — BACKLOG "amendment pilots").
-  Session runs Fable 5; flag it if another model is running.
-- **Budget**: code + checks (waypoint numeric surface, mover-dot count vs
-  system state, widget text) + debug action (force a waypoint) + tours;
-  glyph table in the JSON contract file; grill = 1 round under the BACKLOG
-  token rules; one full verify (the agent's closing run); no shots —
-  logic/glyph work (`judge-shot.sh` still broken; Bruno judges any
-  exception shot).
-- **Then**: close via `/wave-close`; briefing rewrite points at Map W4
-  (the context bake — last wave: briefing deleted, track folds into
-  ROADMAP, minimap-untouched law repealed in GOTCHAS, W4's one open knob
-  is the place-population cutoffs picked from the scout's sweep numbers).
+- **This session**: **Map W4 of 4 per `MAP_SPEC.md`** (read its W4
+  sections before planning) — the context bake: `tools/build-context.mjs`
+  over the 2026-07-23 scout extracts
+  (`~/claude-area/devel/tx-inputs/map-context-*.json`, queries in
+  `map-context-QUERIES.txt` there) → `data/context.json` (7th boot data
+  file); beyond-band roads + cities muted under band ink (hierarchy
+  Texas > band > context, silver-class city marks); state-name labels
+  (NEW MEXICO / OKLAHOMA / ARKANSAS / LOUISIANA / MEXICO) on both
+  renders; `drawMini` re-targets the wide canvas (repeals the
+  minimap-untouched law — GOTCHAS entry at close). **Rider**: the
+  Airports-toggle rework (MAP_SPEC W4 rider bullet — toggle becomes the
+  code+tier detail layer over the base ✈, ~15 lines). Map W3 (traffic
+  glyphs + waypoint + position widget) shipped 2026-07-24, the commit
+  carrying this briefing; the Mexico Shoulder W0 scout memo landed the
+  same session (`VISION_MEXICO_SHOULDER.md`) — Mexico spec gate is
+  satisfied.
+- **Recommended setup**: handoff **yes**, effort **high** — bake
+  execution on the scout's numbers plus muted ink on the band-backdrop
+  precedent. Plan-grill before spawn (1 round, BACKLOG token rules).
+  W4's ONE open plan knob: place-population cutoffs US vs Mexico, picked
+  from the scout's sweep numbers (MAP_SPEC W4) at plan time. Session
+  runs Fable 5; flag it if another model is running.
+- **Budget**: bake script + gate asserts (nonzero km per slab, expected
+  named cities, island-aware `inTexas` classification) + draw + labels +
+  minimap re-target + checks; one full verify (agent's closing run);
+  ONE staged shot, Bruno-judged (`judge-shot.sh` still broken). Perf:
+  +1 boot fetch, costlier layer render, no 3D delta.
+- **Then**: LAST WAVE — close via `/wave-close` track-close path:
+  briefing deleted, track folds into one `ROADMAP.md` entry, satellites
+  swept (BACKLOG header, docs naming the track), surviving gotchas
+  graduate into `GOTCHAS.md`, this file returns to kickoff-only. Slot
+  export/import is next in BACKLOG after the track.
 
-Gotchas carried over: `tools/judge-shot.sh` broken (staged shots judged by
-Bruno only); minimap stays untouched through W3 (repeal only in W4); the
-shared `#toast` surface is written by maritime/trains/energy — any check
-asserting toast silence must clear moving-system interference (the 120u
-route-margin pattern in `tools/checks/energy.mjs`, Map W2); W3's mover
-enumerations are read-only (`trains` consists, `maritime.ships` +
-`shrimpers`, `radio.sources` — no new scans, `MAP_SPEC.md` W3).
+Gotchas carried over: `tools/judge-shot.sh` broken (staged shots judged
+by Bruno only); context is a **map-only overlay** — never merged into
+the band arrays (geo.js gameplay indexes must not move; Mexico is
+non-roamable); rectangle clip stays (the Monterrey effect is a feature);
+the bake classifies with island-aware `inTexas()` (the scout's
+mainland-only approximation misclassified Port Aransas); shared `#toast`
+interference pattern for any toast-silence assert (120u route margin,
+`tools/checks/energy.mjs`); Base-resets-toggles keeps muted context
+visible (base-canvas content, spec resolved call).

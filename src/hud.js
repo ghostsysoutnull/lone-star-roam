@@ -20,9 +20,29 @@ const AMBER_LIT = '#ffd27a'; // night shield: brighter core for the glyphs
 
 // Map W2: overlay layer tables — the big-map toggle bar. Fixed display order
 // (button bar) is separate from the composite DRAW order (crops under
-// everything, airports on top) applied in drawBig.
-const LAYER_LIST = ['rails', 'energy', 'airports', 'counties', 'crops'];
+// everything, airports on top) applied in drawBig. Map W3 adds 'traffic' —
+// it has NO lazy canvas (live movers, not baked ink), so it joins the
+// button-bar list only, never LAYER_COMPOSITE_ORDER.
+const LAYER_LIST = ['rails', 'energy', 'airports', 'counties', 'crops', 'traffic'];
 const LAYER_COMPOSITE_ORDER = ['crops', 'counties', 'rails', 'energy', 'airports'];
+
+// Map W3: live traffic glyphs + waypoint — shared constants (contract-fixed
+// ink/sizes). WIND8 is the hud location-line 8-wind idiom, reused for the
+// waypoint pill/toast/compass tick (bearing FROM player TO the waypoint —
+// same convention as the mission diamond/compass-tick math, not the
+// location line's city-relative-to-player sign).
+const WIND8 = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+function cardinalOf(dx, dz) {
+  return WIND8[Math.round(((Math.atan2(dx, -dz) + Math.PI * 2) % (Math.PI * 2)) / (Math.PI / 4)) % 8];
+}
+const TRAFFIC_GLYPH = {
+  train: { shape: 'square', size: 6, fill: '#e8a33d', stroke: 'rgba(0,0,0,0.6)', lineWidth: 1 },
+  ship: { shape: 'circle', size: 5, fill: '#5cb8e8', stroke: 'rgba(0,0,0,0.6)', lineWidth: 1 },
+  shrimper: { shape: 'circle', size: 3.5, fill: '#8fd4ec', stroke: 'rgba(0,0,0,0.5)', lineWidth: 1 },
+  aircraft: { shape: 'plane', size: 13, fill: '#eceff4', stroke: 'rgba(0,0,0,0.6)', lineWidth: 2 },
+};
+const WAYPOINT_INK = '#5ce0d8';
+const CLEAR_PX = 14; // canvas px: re-click within this of the pin clears the waypoint
 // same 11 dominant-crop ground colors as world.js CROP_STYLE — kept as its
 // own table (2D canvas ink, not a THREE material) rather than importing
 // world.js into hud.js (would cycle: world.js doesn't import hud.js today,
@@ -148,13 +168,22 @@ export class HUD {
     // coordinate readout (W1.1): real lat/lon is a player feature — this is a
     // real-geography game; raw x/z rides along only under ?debug
     this.coordsEl = document.getElementById('map-coords');
+    this.coordsText = document.getElementById('map-coords-text');
     this.showXZ = new URLSearchParams(location.search).has('debug');
     this.cursorPx = null; // big-canvas px under the mouse; null = follow the player
     this.bigCanvas.addEventListener('mousemove', (e) => { this.cursorPx = [e.offsetX, e.offsetY]; });
     this.bigCanvas.addEventListener('mouseleave', () => { this.cursorPx = null; });
-    // W1.2: click copies the pointed coordinates (waypoints, if they ever
-    // come, get a different gesture — this one is claimed for bug reports)
-    this.bigCanvas.addEventListener('click', (e) => this.copyCoords(e.offsetX, e.offsetY));
+    // Map W3: click sets/clears the waypoint — the sole big-map click gesture
+    // now (W1.2's click-to-copy retired; copyCoords deleted). #map-coords
+    // grows Copy/Maps buttons for the player's own position instead.
+    this.bigCanvas.addEventListener('click', (e) => this.mapClick(e.offsetX, e.offsetY));
+    this.waypoint = null; // { x, z } | null — session-only, no save key
+    this.movers = null; // { trains, maritime, radio } — wired by main.js after construction
+    this.trafficDrawn = { trains: 0, ships: 0, aircraft: 0 };
+    this._player = null; // cached each update() tick — mapClick/copy/maps need it outside the draw loop
+    document.getElementById('map-coords-copy').addEventListener('click', () => this.copyPlayerCoords());
+    document.getElementById('map-coords-maps').addEventListener('click', () => this.openPlayerMaps());
+    this.waypointEl = document.getElementById('map-waypoint');
     this.compass = document.getElementById('compass');
     if (localStorage.getItem(slotKey(KEYS.compass)) === 'off') this.compass.style.display = 'none';
     this.shield = document.getElementById('road-shield-wrap'); // outer: position/centered/perspective (static)
@@ -541,19 +570,84 @@ export class HUD {
 
   cycleBigZoom() { this.bigZoomIdx = (this.bigZoomIdx + 1) % this.bigZoomLevels.length; }
 
-  // Map W1.2: copy the clicked map point's coordinates. The copied string
-  // always carries raw x/z (bug-report friendly); only the pill display
-  // gates x/z behind ?debug. Clipboard write is best-effort (headless and
-  // permission-denied contexts fall back to the toast alone).
-  copyCoords(cx, cz) {
-    if (!this.bigWindow) return;
+  // Map W3: click sets the waypoint at the clicked world point (same
+  // bigWindow + mapInv math the retired copyCoords used); re-clicking within
+  // CLEAR_PX of the current pin's own canvas px clears it instead — no
+  // separate Clear button (the header pill text explains the gesture).
+  mapClick(cx, cz) {
+    if (!this.bigWindow || !this._player) return;
     const { x: wx, z: wz, w: sw, h: sh } = this.bigWindow;
     const [x, z] = this.mapInv(wx + cx * (sw / this.bigCanvas.width), wz + cz * (sh / this.bigCanvas.height));
-    const [lat, lon] = toLatLon(x, z);
-    const s = `${lat.toFixed(2)}° N · ${(-lon).toFixed(2)}° W · x ${x.toFixed(0)} z ${z.toFixed(0)}`;
-    this.lastCopied = s;
+    if (this.waypoint) {
+      const [lx, lz] = this.mapT(this.waypoint.x, this.waypoint.z);
+      const pcx = (lx - wx) * (this.bigCanvas.width / sw), pcz = (lz - wz) * (this.bigCanvas.height / sh);
+      if (Math.hypot(cx - pcx, cz - pcz) <= CLEAR_PX) {
+        this.waypoint = null;
+        this.toast('⚑ Waypoint cleared');
+        return;
+      }
+    }
+    this.waypoint = { x, z };
+    const dx = x - this._player.pos.x, dz = z - this._player.pos.z;
+    const km = Math.round(Math.hypot(dx, dz) * 0.1);
+    this.toast(`⚑ Waypoint set — ${km} km ${cardinalOf(dx, dz)}`);
+  }
+
+  // player-position widget (#map-coords): ALWAYS the player, never the
+  // cursor (spec-resolved call) — toLatLon at 4 decimals for both actions.
+  copyPlayerCoords() {
+    if (!this._player) return;
+    const [lat, lon] = toLatLon(this._player.pos.x, this._player.pos.z);
+    const s = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
     navigator.clipboard?.writeText(s).catch(() => {});
-    this.toast(`📋 copied: ${s}`);
+    // W3.1: success feedback — the icon-only button swaps 📋 → ✓ for a beat
+    // (the :active push says "pressed", this says "it worked")
+    const btn = document.getElementById('map-coords-copy');
+    btn.textContent = '✓';
+    clearTimeout(this._copyFlashT);
+    this._copyFlashT = setTimeout(() => { btn.textContent = '📋'; }, 1000);
+    this.toast(`Copied ${s}`);
+  }
+
+  openPlayerMaps() {
+    if (!this._player) return;
+    const [lat, lon] = toLatLon(this._player.pos.x, this._player.pos.z);
+    window.open(`https://maps.google.com/?q=${lat.toFixed(4)},${lon.toFixed(4)}`);
+  }
+
+  // waypoint pin: teal flag (2px pole 10px tall + solid pennant), identical
+  // size on both maps — per-blit ink like the player marker, drawn only
+  // when the caller has already confirmed the point is inside the window.
+  drawWaypointFlag(ctx, x, y) {
+    ctx.save();
+    ctx.strokeStyle = WAYPOINT_INK; ctx.fillStyle = WAYPOINT_INK; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x, y - 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y - 10); ctx.lineTo(x + 8, y - 7); ctx.lineTo(x, y - 4);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  // one glyph shape from the contract table, canvas px, world->px already applied by the caller
+  drawTrafficGlyph(ctx, x, y, spec) {
+    ctx.save();
+    ctx.fillStyle = spec.fill; ctx.strokeStyle = spec.stroke; ctx.lineWidth = spec.lineWidth;
+    const r = spec.size;
+    // W3.1: aircraft use the base map's ✈ text idiom (silver + dark outline
+    // vs the airports' static blue) — reads "plane" where a triangle didn't
+    if (spec.shape === 'plane') {
+      ctx.font = `${r}px system-ui`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.strokeText('✈', x, y); ctx.fillText('✈', x, y);
+      ctx.restore();
+      return;
+    }
+    ctx.beginPath();
+    if (spec.shape === 'square') ctx.rect(x - r, y - r, r * 2, r * 2);
+    else if (spec.shape === 'circle') ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
   }
 
   applyUiScale() { document.documentElement.style.fontSize = 10 * this.ui + 'px'; }
@@ -624,6 +718,19 @@ export class HUD {
       if (rel < -180) rel += 360;
       const x = Math.max(14, Math.min(W - 14, W / 2 + rel * PX_PER_DEG));
       this.diamond(ctx, x, 13, 8);
+    }
+    // Map W3: waypoint tick — same bearing math as the city pip / mission
+    // diamond, clamped at the tape ends like the diamond
+    if (this.waypoint) {
+      const wDeg = ((Math.atan2(this.waypoint.x - player.pos.x, -(this.waypoint.z - player.pos.z)) * 180) / Math.PI % 360 + 360) % 360;
+      let rel = wDeg - deg;
+      if (rel > 180) rel -= 360;
+      if (rel < -180) rel += 360;
+      const x = Math.max(14, Math.min(W - 14, W / 2 + rel * PX_PER_DEG));
+      ctx.fillStyle = WAYPOINT_INK;
+      ctx.beginPath();
+      ctx.moveTo(x - 7, 13 - 7); ctx.lineTo(x + 7, 13); ctx.lineTo(x - 7, 13 + 7);
+      ctx.closePath(); ctx.fill();
     }
     // center caret + degree readout
     ctx.fillStyle = '#ffd35c';
@@ -1032,6 +1139,9 @@ export class HUD {
   }
 
   update(player, counts, road, rail, water, clock, weatherIcon, stats, skyLine, county, forecast) {
+    // Map W3: cached for mapClick/copyPlayerCoords/openPlayerMaps, which fire
+    // outside the draw loop (DOM click handlers) and need the live player
+    this._player = player;
     this.lastDist = stats?.dist ?? this.lastDist;
     this.els.sky.textContent = skyLine || '';
     // location line: airport name/code when inside its footprint (A1), else
@@ -1094,6 +1204,14 @@ export class HUD {
       const mx = Math.max(10, Math.min(W - 10, (tx - px + sw / 2) * zoom));
       const my = Math.max(10, Math.min(H - 10, (tz - pz + sh / 2) * zoom));
       this.diamond(ctx, mx, my, 8);
+    }
+    // Map W3: waypoint pin — own window math (this.miniT/px/pz/sw/sh above,
+    // NOT the bigWindow/mapT/mapInv used by the big map), drawn only when
+    // inside the current window, no edge clamping (unlike the mission diamond)
+    if (this.waypoint) {
+      const [wtx, wtz] = this.miniT(this.waypoint.x, this.waypoint.z);
+      const mx = (wtx - px + sw / 2) * zoom, my = (wtz - pz + sh / 2) * zoom;
+      if (mx >= 0 && mx <= W && my >= 0 && my <= H) this.drawWaypointFlag(ctx, mx, my);
     }
     // player arrow
     ctx.save();
@@ -1291,7 +1409,7 @@ export class HUD {
       ? this.mapInv(wx + this.cursorPx[0] * (sw / W), wz + this.cursorPx[1] * (sh / H))
       : [player.pos.x, player.pos.z];
     const [lat, lon] = toLatLon(rx, rz);
-    this.coordsEl.textContent = `${this.cursorPx ? '⌖' : '➤'} ${lat.toFixed(2)}° N · ${(-lon).toFixed(2)}° W`
+    this.coordsText.textContent = `${this.cursorPx ? '⌖' : '➤'} ${lat.toFixed(2)}° N · ${(-lon).toFixed(2)}° W`
       + (this.showXZ ? `  ·  x ${rx.toFixed(0)} z ${rz.toFixed(0)}` : '');
     // one shared window transform: world coords → big-canvas px
     const Tw = (x, z) => { const [lx, lz] = this.mapT(x, z); return [(lx - wx) * (W / sw), (lz - wz) * (H / sh)]; };
@@ -1347,6 +1465,58 @@ export class HUD {
     ctx.font = '12px system-ui'; ctx.textAlign = 'left';
     ctx.fillText(`${miles} mi`, 16 + barPx + 8, H - 14);
     ctx.fillText(`${zoom}×`, 16, H - 30);
+    // Map W3: live traffic glyphs — read-only enumerations off the already-
+    // live mover systems (no new scans), redrawn every blit since movers
+    // keep moving; off-window glyphs are skipped, no edge clamping.
+    // trafficDrawn is the check surface, always present after this runs.
+    if (this.layersOn.has('traffic') && this.movers) {
+      const { trains, maritime, radio } = this.movers;
+      const counts = { trains: 0, ships: 0, aircraft: 0 };
+      const inWin = (x, z) => x >= 0 && x <= W && z >= 0 && z <= H;
+      if (trains) for (const tr of trains.trains) {
+        const [tx0, tz0] = trains.at(tr.rail, tr.s);
+        const [gx, gz] = Tw(tx0, tz0);
+        if (!inWin(gx, gz)) continue;
+        this.drawTrafficGlyph(ctx, gx, gz, TRAFFIC_GLYPH.train);
+        counts.trains++;
+      }
+      if (maritime) {
+        for (const s of maritime.ships) {
+          const [gx, gz] = Tw(s.g.position.x, s.g.position.z);
+          if (!inWin(gx, gz)) continue;
+          this.drawTrafficGlyph(ctx, gx, gz, TRAFFIC_GLYPH.ship);
+          counts.ships++;
+        }
+        for (const s of maritime.shrimpers) {
+          const [gx, gz] = Tw(s.g.position.x, s.g.position.z);
+          if (!inWin(gx, gz)) continue;
+          this.drawTrafficGlyph(ctx, gx, gz, TRAFFIC_GLYPH.shrimper);
+          counts.ships++;
+        }
+      }
+      if (radio) for (const s of radio.sources) {
+        if (!s.air) continue;
+        const [gx, gz] = Tw(s.x, s.z);
+        if (!inWin(gx, gz)) continue;
+        this.drawTrafficGlyph(ctx, gx, gz, TRAFFIC_GLYPH.aircraft);
+        counts.aircraft++;
+      }
+      this.trafficDrawn = counts;
+    } else {
+      this.trafficDrawn = { trains: 0, ships: 0, aircraft: 0 };
+    }
+    // Map W3: waypoint pin + header pill — per-blit ink like the player
+    // marker; distance/cardinal are always player->waypoint, recomputed live.
+    if (this.waypoint) {
+      const [wgx, wgz] = Tw(this.waypoint.x, this.waypoint.z);
+      if (wgx >= 0 && wgx <= W && wgz >= 0 && wgz <= H) this.drawWaypointFlag(ctx, wgx, wgz);
+      const dx = this.waypoint.x - player.pos.x, dz = this.waypoint.z - player.pos.z;
+      const km = Math.round(Math.hypot(dx, dz) * 0.1);
+      this.waypointEl.textContent = `⚑ Waypoint · ${km} km ${cardinalOf(dx, dz)} — click the pin to clear`;
+      this.waypointEl.style.display = 'block';
+    } else {
+      this.waypointEl.style.display = 'none';
+    }
     // player marker: the minimap's heading chevron, sized up — not a dot
     const [ax, az] = Tw(player.pos.x, player.pos.z);
     ctx.save();

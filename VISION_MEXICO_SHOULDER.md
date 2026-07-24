@@ -76,6 +76,46 @@ Mandate: a data-scout session **before** the spec, Band-Parity style.
   the real US-side gaps are the backlogged **band railroads** and **band
   airports** items — they ride along or follow at this track's data bar.
 
+## W0 scout memo (landed 2026-07-24, data-scout sidecar on the Map W3 session)
+
+Gate deliverable per "Data needs" above. Raw inputs:
+`~/claude-area/devel/tx-inputs/mexico-w0-*.json` (10 strip segments +
+7 twin-city POI passes + DP sample, 206 MB), queries recorded in
+`mexico-w0-QUERIES.txt` there.
+
+- **Source verdict — the lean is partially overturned: OSM for
+  everything.** Roads: OSM as planned. City list + populations: OSM too —
+  INEGI's WFS is auth-gated (HTTP 401 on every tested layer, anonymous),
+  its bulk shapefiles are nationwide-only ZIPs (~3 GB, no bbox scoping,
+  needs a local GIS clip step our pipeline lacks) behind a JS-only portal
+  with historically unstable URLs. OSM `place` population tags sit within
+  2–6 % of the 2020 census on every twin city checked (Reynosa −1.9 %,
+  Nuevo Laredo −2.1 %, Matamoros −5.8 %) — authoritative enough without a
+  net-new pipeline. INEGI license itself is fine (Términos de Libre Uso);
+  access, not license, is the blocker.
+- **Coverage**: 25-mi strip corpus is 70,996 km across all six tiers
+  (motorway 1,749 / trunk 2,531 / primary 3,349 / secondary 5,332 /
+  tertiary 7,437 / residential 50,599 — 71 % is twin-city street grid,
+  real block patterns for the south-side visual-register wave). No
+  missing skeleton anywhere: all 7 twin cities present with plazas and
+  named international bridges; MEX 2 runs unbroken through the sparse
+  Acuña→Ojinaga desert stretch. Genuine fill-policy territory is flesh
+  only (ranchitos, unnamed tracks between MEX 2 and the river).
+- **Sample bake**: DP at the band-precedent 0.0025° transfers cleanly to
+  Mexican OSM data (Juárez segment: 18–37 % point retention, <4 % length
+  loss on every tier).
+- **Bonus skeleton**: three extra crossings beyond the six pairs —
+  Rio Grande City–Camargo, Roma–Cd. Miguel Alemán, La Linda.
+- **Plaza tagging**: plazas are `leisure=park` with a `Plaza …`/`Zócalo`
+  name pattern, NOT a tag key (`landuse=square` = 0 hits) — bakes need a
+  name-regex pass.
+- **Open (spec-session inputs, provenance: data-scout, unverified)**:
+  Bridge of the Americas (El Paso–Juárez) not found by name — needs one
+  tight follow-up query before any bridge-list commitment; INEGI WFS
+  behind free registration unprobed (moot unless the OSM call is
+  overturned); Ciudad Acuña shows no tagged cathedral — untagged vs
+  absent undetermined.
+
 ## Open calls (for the spec session, informed by the scout)
 
 - Content depth south of the line: Shoulder-style (monuments + towns +

@@ -70,7 +70,17 @@
   #map-layers button#map-layers-base { margin-top: .2rem; border-top: 1px solid rgba(255,255,255,.2); padding-top: .6rem; }
   #map-coords { position: absolute; left: 50%; bottom: 1.6rem; transform: translateX(-50%);
     background: rgba(10,14,20,.85); border: 1px solid rgba(255,255,255,.25); border-radius: .8rem;
-    padding: .5rem 1.2rem; font-size: 1.2rem; color: #cfd4c6; letter-spacing: .05em; }
+    padding: .5rem 1.2rem; font-size: 1.2rem; color: #cfd4c6; letter-spacing: .05em;
+    display: flex; align-items: center; gap: .7rem; }
+  #map-coords button { font: inherit; font-size: 1.2rem; color: #cfd4c6; background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.3); border-radius: .5rem; padding: .3rem .6rem; cursor: pointer; }
+  #map-coords button:hover { background: rgba(255,255,255,.16); }
+  /* W3.1: pressed feedback — 1px push + darker face while held */
+  #map-coords button:active { transform: translateY(1px); background: rgba(255,255,255,.22); }
+  /* Map W3: waypoint header pill, #map-legend panel style, top-center of #bigmap */
+  #map-waypoint { position: absolute; top: 1.6rem; left: 50%; transform: translateX(-50%);
+    background: rgba(10,14,20,.85); border: 1px solid rgba(255,255,255,.25); border-radius: .8rem;
+    padding: .5rem 1.2rem; font-size: 1.2rem; color: #5ce0d8; letter-spacing: .05em; display: none; }
   #dialog { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%); max-width: min(56rem, 92vw); min-width: min(32rem, 80vw);
     background: rgba(12,16,24,.92); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 10px;
     padding: 14px 18px; font-size: 1.5rem; line-height: 1.45; display: none; z-index: 9; }
@@ -353,6 +363,7 @@
 <div id="road-shield-wrap"><div id="road-shield-card"><canvas id="road-shield" width="120" height="104"></canvas></div></div>
 <div id="rail-placard"></div>
 <div id="bigmap"><canvas id="bigmap-canvas"></canvas>
+<div id="map-waypoint"></div>
 <div id="map-panels">
 <div id="map-layers">
   <button type="button" data-layer="rails">Rails</button>
@@ -360,6 +371,7 @@
   <button type="button" data-layer="airports">Airports</button>
   <button type="button" data-layer="counties">Counties</button>
   <button type="button" data-layer="crops">Crops</button>
+  <button type="button" data-layer="traffic">Traffic</button>
   <button type="button" id="map-layers-base">Base</button>
 </div>
 <div id="map-legend">
@@ -372,7 +384,7 @@
   <div><span style="color:#e8e0c8">●</span> city <span style="color:#c7ccd4">●</span> band city ✈ airport <span style="color:#ffd35c">◆</span> delivery</div>
 </div>
 </div>
-<div id="map-coords"></div>
+<div id="map-coords"><button type="button" id="map-coords-copy" title="Copy coordinates">📋</button><span id="map-coords-text"></span><button type="button" id="map-coords-maps" title="Open in Google Maps">🌐</button></div>
 </div>
 <div id="dialog"><div class="npc-name"></div><div class="npc-sub"></div><div class="npc-text"></div><div class="hint">E — continue / close</div></div>
 <div id="interact-hint"></div>

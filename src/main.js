@@ -330,6 +330,9 @@ async function boot() {
   // ride the 12 Hz hud block (their inputs live there). Stale-by-80ms is fine —
   // every trigger is a lingering state, not an edge.
   const hintSig = { npc: false, cityEdge: false, dusk: false, apron: false, band: false, water: false };
+  // Map W3: read-only mover refs for the big-map traffic layer — wired here
+  // (not at hud construction, which runs before trains/maritime/radio exist)
+  hud.movers = { trains, maritime, radio };
   window.__game = { player, gameplay, GEO, scene, animals, bats, turtles, ferries, dolphins, sky, npcs, trains, ufo, haunts, traffic, missions, travel, dog, springer, rabbits, flares, scenery, cities, brands, airports, aviation, radio, heli, blimp, military, maritime, energy, shoulder, swampAt, shoulderClear, audio, AIRPORTS, airportClear, fieldNear, airportLayout, windFrom, runwayInUse, padAt, groundYAt, brandGroundYAt, daySchedule, AIRLINES, chatterLine, HELI_ID, chatterVoices, debug, hud, perf, nearestRoad, nearestBandRoad, nearestAnyRoad, nearestRiver, nearestCity, inTexas, inTexasOrBand, onIsland, beachAt, boatableAt, borderDist, terrainMeshY, toLatLon, ELEV, SEA_Y, LAKE_OFFSET, RIVER_OFFSET, CAUSEWAY, padreSites, inWorld, borderZoneAt, outsideAt, inStateWater, coastDist, TIDELANDS_U, hAt, seededRand, neighborStateAt, bandTint, neighborCountyAt, agAt, bandAgAt, energyAt, countyAt, chapelSitesNear, farmsteadAt, feedlotAt, fieldAt, ranchHQSite, ranchHQAt, wellSiteAt, windTurbinesAt, solarSitesAt, brandNear, cityClear, waterAt, LANDMARKS, ATMOS, clock, SPECIES, LEGENDS, title, tutorial, controlsBar, settings, slots, hintSig, setPaused, isPaused: () => pauseReason === 'esc', isFrozen: () => !!pauseReason };
 
   let hudTick = 0;
