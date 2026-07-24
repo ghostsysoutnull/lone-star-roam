@@ -90,9 +90,12 @@ triage; new `data-scout` agent definition). These two ride the **next
 handoff wave** as measured pilots, not law:
 
 - **Plan-grill pilot**: before spawning `wave-coder`, one adversarial review
-  of the plan + contract file by a strong-model subagent (Fable/Opus, high
-  effort, one round, structured output: holes / ambiguities / unverified
-  assumptions — never a dialogue). Handoff waves only; the plan is the full
+  of the plan + contract file by a strong-model subagent (**pinned Fable 5**,
+  effort high — the griller must sit at or above the plan author, and the
+  author is Fable; Opus is the fallback only if the pilot's ledger shows the
+  grill cost outrunning its findings. One round, structured output: holes /
+  ambiguities / unverified assumptions — never a dialogue; Bruno pinned the
+  model 2026-07-23). Handoff waves only; the plan is the full
   contract there, so contract holes are the dominant failure mode. Keep only
   if it finds a real hole; an all-clear carries no evidential weight (the
   Gemini false-all-clear precedent, `VISION_EXTERNAL_AGENTS.md`).
