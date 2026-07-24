@@ -112,6 +112,13 @@ handoff wave** as measured pilots, not law:
   (the 2026-07-22 law) as the trial. If it holds without friction, consider
   a commit-guard hook (block `git commit` absent an explicit go-ahead
   marker) as the second.
+- **Deferred to whichever session touches wave-close next** (Bruno accepted
+  2026-07-23): `/wave-close` skill (the fixed wave-end checklist —
+  performance report → ledger line → briefing rewrite → doc sweep — as a
+  checked-in skill instead of from-memory execution; `/wave-plan` is the
+  lower-priority second) and the LEDGER model-column convention
+  `fable+sonnet×N` for multi-chunk waves (adopt at the first multi-chunk
+  wave's close).
 
 ## Dev-process — external-agents retake (parked 2026-07-21, queued 2026-07-22)
 
@@ -152,7 +159,10 @@ handoff wave** as measured pilots, not law:
   field + base layer drawing — separate follow-up if ever worth it, no
   longer the dominant tax.
 
-- **Map layers wave (W2)**: toggleable big-map overlays — rails, energy
+- **Map layers wave (W2)** — **scheduled next** (2026-07-23): jumped the
+  queue ahead of slot export/import (Bruno's call) as the shakedown wave
+  for the wave-protocol amendment; briefing in `NEXT_SESSION.md`.
+  Toggleable big-map overlays — rails, energy
   sites, airports, counties, ag, collectibles found/unfound. Shape settled
   in the W1 discussion: one pre-rendered canvas per layer composited in
   `drawBig`, so toggles cost nothing at runtime and every future track can
@@ -328,7 +338,9 @@ vision doc. W1 (identity + chatter) and W2 (journeys) shipped 2026-07-19.
 
 ## Next in line (in order)
 
-1. **Slot export/import** (deferred from New Player W4, 2026-07-17): back up
+1. **Slot export/import** (deferred from New Player W4, 2026-07-17;
+   deferred one slot 2026-07-23 — Map W2 jumped ahead as the
+   protocol-amendment shakedown, Bruno's call): back up
    a save slot to a file and restore it from one, on the title screen —
    insurance against browser-data loss (`NEWPLAYER_SPEC.md` W4's own
    pre-authorized drop-to-backlog candidate). W4 shipped 3 named slots +
@@ -403,7 +415,9 @@ Sea-Industry W3 shop slate (Bruno, 2026-07-22) — feel-tuning risk inside
 a handoff wave. Revisit as a small Fable in-loop tune if boat handling
 ever gets a pass.
 
-Placement audit follow-on (2026-07-16): coastal city-building scatter vs
+Placement audit follow-on (2026-07-16; **scheduled 2026-07-23** as the
+`data-scout` agent's first mission, riding the Map W2 session as a
+parallel sidecar — see `NEXT_SESSION.md`): coastal city-building scatter vs
 water is unaudited — `cities.js` rejects roads (<1.3u) but never `waterAt`,
 so Corpus/Galveston-class downtowns may push procedural buildings into the
 bay. The offline audit mirror in the placement-legality session's scratchpad
