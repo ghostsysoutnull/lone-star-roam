@@ -186,7 +186,20 @@ handoff wave** as measured pilots, not law:
   field + base layer drawing — separate follow-up if ever worth it, no
   longer the dominant tax.
 
-- **Map layers wave (W2)** — **scheduled next** (2026-07-23): jumped the
+- **Traffic layer: scheduled aircraft statewide** (filed 2026-07-24,
+  Bruno-ratified from a map-review question): the Traffic toggle draws
+  ships from the always-live fleet (statewide, ~19 vessels) but aircraft
+  only from materialized `radio.sources` near the player (`MAX_AIR` 4) —
+  zoomed out, the sky reads empty while the sea reads busy. Fix shape:
+  `daySchedule`/`evalFlight` (aviation.js) are pure, so the per-blit
+  traffic pass can evaluate every airborne scheduled flight statewide and
+  draw its ✈ from closed-form positions — no meshes, no radio sources,
+  just math per glyph. Small map-polish wave; extends `trafficDrawn`
+  coverage.
+- ~~**Map layers wave (W2)** — **scheduled next** (2026-07-23)~~ —
+  shipped 2026-07-23 as Map W2, commit `1a55e21` (stale "scheduled next"
+  caught 2026-07-24; the track-close sweep missed striking this entry):
+  jumped the
   queue ahead of slot export/import (Bruno's call) as the shakedown wave
   for the wave-protocol amendment; briefing in `NEXT_SESSION.md`.
   Toggleable big-map overlays — rails, energy
