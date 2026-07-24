@@ -480,7 +480,11 @@ graduate here (and out of `NEXT_SESSION.md`).
   the full verify runs as its own single background command, never chained
   behind anything with `&&`/`|` (a compound background command can notify
   completion early) and never in the foreground (the 600 s Bash cap orphans
-  the run). (2) *one instance at a time* — the runner itself enforces this
+  the run). Main-session law only: `wave-coder` subagents run the verify in
+  the FOREGROUND per their agent file — a background run stalls the agent's
+  return (shakedown lesson, 2026-07-20), and the ~4 min run fits the Bash
+  cap; if the full run ever outgrows the cap, this breaks loudly (timeout
+  kill), which is the wanted failure mode (reconciled 2026-07-24, grill F3). (2) *one instance at a time* — the runner itself enforces this
   (single-instance lock, exit 3 + the pid/started/argv line on a live
   holder); on a refusal, wait for the holder and re-run, don't relaunch or
   fight the lock. (3) *the runner-owned `/tmp/lonestar-verify.log` is
