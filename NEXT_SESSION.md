@@ -31,9 +31,11 @@ queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
   `wave-coder` chunk (`src/cities.js` + checks; contract with the audit
   numbers in BACKLOG's "Placement audit follow-on" entry). Not part of
   the Map wave itself; rides the session.
-- **Scout still out**: beyond-band map-context prefetch (launched
-  2026-07-23) — its numbers gate the W4 plan, not W2. The coastal audit
-  landed 2026-07-23 (findings in BACKLOG).
+- **Both scouts landed 2026-07-23**: coastal audit → findings + approved
+  fix contract in BACKLOG (the W2-session rider); beyond-band context
+  prefetch → numbers and resolved calls folded into `MAP_SPEC.md` W4
+  (raw inputs in `~/claude-area/devel/tx-inputs/map-context-*.json`).
+  Nothing gates W2.
 - **Then**: close via the **`/wave-close` skill**; its report carries the
   pilot verdicts (grill keep/kill, multi-chunk economics, scout, the skill
   itself) and the `fable+sonnet×N` ledger convention; briefing rewrite

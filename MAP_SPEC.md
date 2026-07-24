@@ -152,6 +152,27 @@ the scout's numbers plus muted ink on the band-backdrop precedent.
 - **Minimap**: `drawMini` re-targets the wide canvas (own transform
   math); minimap zoom levels unchanged; the Texas-only minimap law is
   repealed in GOTCHAS with this wave's entry.
-- Open until the scout reports: slab road volumes, city list, extract
-  size, simplification tolerance. The W4 plan is written only after the
-  scout's report is triaged.
+- **Scout numbers** (prefetch landed 2026-07-23; inputs
+  `~/claude-area/devel/tx-inputs/map-context-*.json`, queries recorded in
+  `map-context-QUERIES.txt` there — the bake script header re-records
+  them per convention): wide rectangle = lat 24.83–36.86,
+  lon −107.07..−92.34. Beyond-band US roads **20,013 km** (NM 4,933 /
+  OK 8,542 / AR 4,568 / LA 1,970) and 185 places across NM/OK/AR/LA
+  (+3 in a Missouri sliver) incl. Albuquerque, Santa Fe, Oklahoma City,
+  Tulsa. The shipped band clips uniformly at 402u while the east canvas
+  pads to `SHELF_U` — a blank LA/AR strip today; the context layer fills
+  it. Mexico: **6,839 km + 148 places** incl. Monterrey (1.14M),
+  Chihuahua, Ciudad Juárez — zero band coverage by design. DP tolerance
+  0.0025° (the band-bake precedent) keeps 16–38% of points; Mexico
+  place-count sweep: pop ≥20k → 51, ≥50k → 33, ≥100k → 29.
+- **Resolved on the scout's report** (spec session): context is a
+  **separate map-only overlay** (`data/context.json`) — never merged
+  into the band arrays (geo.js law: nothing may perturb the band's
+  gameplay indexes; Mexico is non-roamable). The map stays
+  **rectangle-clipped**: the "Monterrey effect" (the frame reaching
+  ~200 km past the local border at central longitudes) is kept as a
+  feature — distant real metros anchor the diorama. The bake must
+  classify with the game's island-aware `inTexas()` (the scout's
+  mainland-only approximation misclassified Port Aransas).
+- Remaining W4-plan knob (only one): place-population cutoffs, US vs
+  Mexico — picked from the sweep numbers at plan time.
