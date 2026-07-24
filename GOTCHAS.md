@@ -388,9 +388,9 @@ graduate here (and out of `NEXT_SESSION.md`).
   render land at this scale (the first Brownsville ground sat south of the
   Rio Grande, outside the world).
 - **Channel 16 has ONE transmitter** (maritime.js, the trains idiom): the
-  range gate is `VHF_R`/`VHF_BOAT_R`, lifted to Infinity by the W3 `vhf`
-  perk — extend the gate, never add a second transmitter or move it to
-  radio.js.
+  range gate is `VHF_R`/`VHF_BOAT_R`, extended to `VHF_HAND_R` (700u coastal,
+  ≈70 km) by the W3 `vhf` perk — extend the gate, never add a second
+  transmitter or move it to radio.js.
 - **Sea-surface legibility law** (W2.1 playtest rounds): a waterline
   subject reads only by proud silhouette + motion cue + mini-world scale
   (turtle dome, dolphin arc, ray wingtips, tarpon leap) — waterline-flush

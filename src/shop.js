@@ -45,7 +45,7 @@ export const SHOP = [
     tiers: ['+17% top speed on the water, quicker spool-up', 'a third over stock — the Gulf gets small'],
     done: 'Wide open at the helm' },
   { id: 'vhf', icon: '📻', name: 'VHF handheld', prices: [350],
-    tiers: ['channel 16 anywhere — every working boat in the Gulf'],
+    tiers: ['channel 16 up and down the coast — every working boat in the Gulf'],
     done: 'Squawking on 16' },
   { id: 'boatlights', icon: '🏮', name: 'Running lights', prices: [300],
     tiers: ['red over port, green over starboard — legal after dark'],

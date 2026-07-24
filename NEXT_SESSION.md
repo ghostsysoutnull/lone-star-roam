@@ -8,7 +8,8 @@ queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
 Current state: **no active track** — the Map planning-tool track (W2–W4)
 closed 2026-07-24 and folded into `ROADMAP.md` (`MAP_SPEC.md` kept as
-history). Next session opens with a pick from `BACKLOG.md`: **slot
-export/import queues first** (Map-close note); `tools/judge-shot.sh` is
-still broken (BACKLOG bug — staged shots go to Bruno's eye only until it's
-fixed).
+history); a one-off VHF bugfix wave (finite coastal handheld range +
+transient tour gear) shipped later the same day. Next session opens with a
+pick from `BACKLOG.md`: **slot export/import queues first** (Map-close
+note); `tools/judge-shot.sh` is still broken (BACKLOG bug — staged shots
+go to Bruno's eye only until it's fixed).

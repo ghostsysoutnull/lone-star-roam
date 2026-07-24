@@ -62,7 +62,8 @@ const SHIP_TOAST_R = 60, SHIP_REARM_R = 90;
 // maritime owns its transmitter (the trains onChatter idiom) — radio.js stays
 // aviation-scoped. Humor rationed ~1-in-4 (the chatter law).
 const VHF_GAP_MIN = 25, VHF_GAP_VAR = 35, VHF_FLOOR = 14;
-const VHF_R = 90, VHF_BOAT_R = 220; // audible near vessels/ports; BOAT extends the ear (W3 handheld lifts it entirely)
+const VHF_R = 90, VHF_BOAT_R = 220; // audible near vessels/ports; BOAT extends the ear
+const VHF_HAND_R = 700; // 700 u = 70 km ≈ 38 nmi, plausible marine-VHF reach (W3 handheld)
 const VHF_POOLS = {
   pilot: [ // big ship with a port close aboard — boarding + berth work
     { t: '{port} traffic, {ship}, pilot aboard, commencing the inbound run.' },
@@ -870,7 +871,7 @@ export class MaritimeSystem {
     const px = player.pos.x, pz = player.pos.z;
     this.vhfFloor -= dt;
     let chatFired = false;
-    const vhfRange = player.perks?.vhf ? Infinity : player.mode === 'BOAT' ? VHF_BOAT_R : VHF_R;
+    const vhfRange = player.perks?.vhf ? VHF_HAND_R : player.mode === 'BOAT' ? VHF_BOAT_R : VHF_R;
     const vessels = (fn) => { for (const s of this.ships) fn(s); for (const b of this.shrimpers) fn(b); };
     vessels((s) => {
       const d = Math.hypot(s.g.position.x - px, s.g.position.z - pz);

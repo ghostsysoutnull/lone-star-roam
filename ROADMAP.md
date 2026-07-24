@@ -10,6 +10,13 @@ Operations, Sea-Industry Realism, and the Map planning-tool track followed
 and are folded in below).
 Queued work lives in `BACKLOG.md`.
 
+- [x] ~~VHF coastal retune + transient tour gear~~ — done 2026-07-24 (bugfix
+  wave, Sea-Industry Realism track): the W3 `vhf` perk's channel-16 range
+  gate is finite now (`VHF_HAND_R`, 700u ≈ 70 km coastal reach) instead of
+  `Infinity`; the boatyard `seaGear`/`sonar`/`handheld16` debug/tour grants
+  are transient (the `lacy` pattern) — a tour spot never mutates the
+  player's save.
+
 - [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
   tools/test.mjs` runs four sub-second Node-only groups (`aviation`, `data`,
   `progress`, `rules`) without a browser; focused group invocation keeps

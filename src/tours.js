@@ -33,7 +33,7 @@ export const TOURS = [
         S('🦐 shrimp rig — Galveston ground', [4752, 1993], { mode: 'BOAT', time: 0.5, act: 'seaGear', note: 'full boat gear granted — troll the ground slow (under ~6) and the rig ices a crate every dozen seconds; run the hold back to a fishing-port dock and the catch pays' }),
         S('🐟 fish finder — sonar contact', [4200, 2350], { mode: 'BOAT', time: 0.35, act: 'sonar', note: 'the W2 sea life conjured around the boat and the finder granted — the sonar pings each contact inside 60 units with a ring on the water' }),
         S('🏮 running lights', [4512.8, 1889], { mode: 'BOAT', time: 0.98, act: 'seaGear', note: 'red over port, green over starboard, white astern — the skiff is legal after dark; they douse at sunrise' }),
-        S('📻 handheld 16 from the cab', [1676.4, 815.8], { mode: 'DRIVE', time: 0.35, act: 'handheld16', note: 'the handheld lifts the range gate entirely — channel 16 keys up from the whole Gulf, heard here in Austin traffic' }),
+        S('📻 handheld 16 out of Beaumont', [5119.49, 1023.13], { mode: 'DRIVE', time: 0.35, act: 'handheld16', note: 'the handheld carries the working coast — a vessel keys channel 16 from far past stock radio range; inland past Victoria, 16 goes quiet now' }),
       ] },
     ],
   },

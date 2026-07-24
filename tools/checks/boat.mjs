@@ -125,30 +125,81 @@ export default async function boat(t) {
     await t.setDay();
   });
 
-  await t.check('VHF handheld (Sea-Industry W3): perks.vhf lifts the range gate from inland', async () => {
-    const austin = await t.ev(`(() => { const c = g.GEO.cities.find((c) => c.name === 'Austin'); return { x: c.x, z: c.z }; })()`);
-    await t.tp(austin.x, austin.z);
-    const res = await t.ev(`(() => {
+  await t.check('VHF handheld (Sea-Industry W3): finite VHF_HAND_R gate — silent 2728u inland even with the perk, fires at the forced Beaumont vessel, silent again once the perk is off', async () => {
+    // (a) Austin leg — single atomic ev: teleport, perk on, non-cutter
+    // cooldowns + floor re-zeroed every iteration of a real maritime.update
+    // loop (the real rAF loop keeps ticking maritime.update between harness
+    // calls, so a separate t.tp mid-sequence would race it) — with cooldowns
+    // held at zero the ONLY thing that can keep this silent is the finite
+    // 700u gate (2728u > 700u), a non-vacuous assertion.
+    const austinLeg = await t.ev(`(() => {
+      const c = g.GEO.cities.find((c) => c.name === 'Austin');
       const old = g.maritime.onChatter;
       let got = null;
       g.maritime.onChatter = (line) => { got = line; };
-      g.player.perks.vhf = false;
-      g.maritime.vhfFloor = 0;
-      for (const s of g.maritime.ships) s.id.chatT = 0;
-      g.maritime.update(0.05, 0, g.player);
-      const withoutPerk = got;
-      got = null;
+      g.player.pos.set(c.x, 0, c.z);
       g.player.perks.vhf = true;
-      g.maritime.vhfFloor = 0;
-      for (const s of g.maritime.ships) s.id.chatT = 0;
-      g.maritime.update(0.05, 0, g.player);
-      const withPerk = got;
+      for (let i = 0; i < 20 && !got; i++) {
+        g.maritime.vhfFloor = 0;
+        for (const s of g.maritime.ships) if (!g.maritime.cutters.includes(s)) s.id.chatT = 0;
+        for (const b of g.maritime.shrimpers) b.id.chatT = 0;
+        g.maritime.update(0.05, 0, g.player);
+      }
       g.maritime.onChatter = old;
-      return { withoutPerk, withPerk };
+      return got;
     })()`);
-    t.ok(!res.withoutPerk, `chatter fired from Austin without the handheld: "${res.withoutPerk}"`);
-    t.ok(res.withPerk, 'handheld did not lift the VHF range gate from Austin');
-    await t.ev('g.player.perks.vhf = false');
+    t.ok(!austinLeg, `chatter fired from Austin (2728u > 700u handheld range) with the perk on: "${austinLeg}"`);
+
+    // (b) Beaumont leg — single atomic ev: teleport onto the tour spot, run
+    // the real handheld16 act (exercises seaGear + force + the finite-range
+    // toast path), loop until chatter fires (absorbs a null-vhfLine re-roll
+    // on the forced vessel), then a perk-off sub-leg in the same ev proves
+    // the silence is attributable to the gate, not the cooldowns (514u >
+    // 220u stock BOAT range — the strongest case, so mode is forced BOAT).
+    const beaumontLeg = await t.ev(`(() => {
+      const old = g.maritime.onChatter;
+      let got = null;
+      g.maritime.onChatter = (line) => { got = line; };
+      g.player.pos.set(5119.49, 0, 1023.13);
+      g.debug.actions.handheld16();
+      let inRange = false;
+      for (let i = 0; i < 50 && !inRange; i++) {
+        g.maritime.vhfFloor = 0;
+        for (const s of g.maritime.ships) if (!g.maritime.cutters.includes(s)) s.id.chatT = 0;
+        for (const b of g.maritime.shrimpers) b.id.chatT = 0;
+        g.maritime.update(0.05, 0, g.player);
+        if (got) inRange = true;
+      }
+      got = null;
+      g.player.perks.vhf = false;
+      g.player.mode = 'BOAT'; // worst case: stock BOAT range (220u), still < 514u forced distance
+      let perkOff = false;
+      for (let i = 0; i < 20 && !perkOff; i++) {
+        g.maritime.vhfFloor = 0;
+        for (const s of g.maritime.ships) if (!g.maritime.cutters.includes(s)) s.id.chatT = 0;
+        for (const b of g.maritime.shrimpers) b.id.chatT = 0;
+        g.maritime.update(0.05, 0, g.player);
+        if (got) perkOff = true;
+      }
+      g.maritime.onChatter = old;
+      return { inRange, perkOff };
+    })()`);
+    t.ok(beaumontLeg.inRange, 'handheld range never fired chatter at the forced Beaumont vessel (514u < 700u handheld)');
+    t.ok(!beaumontLeg.perkOff, `chatter fired at Beaumont without the perk (514u > 220u stock BOAT range): ${JSON.stringify(beaumontLeg)}`);
+    await t.ev(`(g.player.perks.vhf = false)`);
+  });
+
+  await t.check('seaGear (Sea-Industry W3): transient grant — perks flip, save/persisted slot untouched', async () => {
+    const before = await t.ev(`localStorage.getItem(g.slots.slotKey(g.slots.KEYS.save, g.gameplay.slot))`);
+    const res = await t.ev(`(() => {
+      g.debug.actions.seaGear();
+      return { perk: g.player.perks.vhf, gear: g.gameplay.save.gear.vhf };
+    })()`);
+    const after = await t.ev(`localStorage.getItem(g.slots.slotKey(g.slots.KEYS.save, g.gameplay.slot))`);
+    t.ok(res.perk === true, 'seaGear did not set player.perks.vhf');
+    t.ok(!res.gear, `seaGear mutated the save's gear.vhf: ${res.gear}`);
+    t.ok(after === before, `seaGear persisted a save write (before ${before} vs after ${after})`);
+    await t.ev(`(async () => { const { applyGear } = await import('/src/shop.js'); applyGear(g.gameplay.save, g.player, g.dog); })()`);
   });
 
   await t.check('shrimp rig (Sea-Industry W3): trolling a ground ices crates, running one home pays', async () => {

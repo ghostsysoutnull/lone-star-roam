@@ -21,6 +21,27 @@ found it, whether the claim was independently verified in-session, and the
 Claude session model that ran the effort. External findings are claims
 until a probe confirms them.
 
+- ~~The Sea-Industry W3 `vhf` perk lifted the channel-16 range gate to
+  `Infinity`, keying Gulf ship chatter every ~14 s (the global `VHF_FLOOR`)
+  anywhere in Texas~~ — shipped 2026-07-24, VHF retune wave: replaced with a
+  finite `VHF_HAND_R` (700u ≈ 70 km coastal reach, `src/maritime.js`), shop
+  tier text retuned to match ("channel 16 up and down the coast — every
+  working boat in the Gulf"). *Provenance*: found by an external session
+  report 2026-07-24, verified in-session same day (gate-constant read at
+  `src/maritime.js:873`, distance measurement Austin↔routes), session model
+  Fable 5, fixed same-session on Bruno's explicit overrule of the
+  file-don't-fix rule.
+
+- ~~The `seaGear` debug action (and the `sonar`/`handheld16` tour acts that
+  chain it) permanently wrote boat gear into the player's save via
+  `gameplay.persist()`~~ — shipped 2026-07-24, VHF retune wave: the grant is
+  now transient (the `lacy` pattern) — `applyGear` runs against a spread
+  copy of the save, no `save.gear` mutation, no persist call.
+  *Provenance*: found by an external session report 2026-07-24, verified
+  in-session same day (call-graph read confirmed `gameplay.persist()` at
+  `src/debug.js:125`), session model Fable 5, fixed same-session on Bruno's
+  explicit overrule of the file-don't-fix rule.
+
 - ~~83 baked wind farms have centers outside the Texas border polygon~~ —
   shipped 2026-07-22, bake-clip rebake wave: shipped `energy.json`
   reproduced byte-identical from raw inputs first (bbox-binning cause

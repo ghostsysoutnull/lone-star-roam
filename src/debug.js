@@ -118,23 +118,35 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     // Sea-Industry W3: dock-to-dock haul, pinned houston → corpus (the
     // forceEnergy/forceSea idiom — accept() itself does the toast)
     seaJob() { missions.forceSea('houston', 'corpus'); },
-    // full boat gear granted for this session's tours — save + perks, real path
+    // full boat gear granted for this session's tours only — perks set
+    // straight from a spread save, the real save + persisted slot untouched
+    // (the lacy pattern: transient, no gameplay.persist())
     seaGear() {
-      gameplay.save.gear = { ...gameplay.save.gear, outboard: 2, vhf: 1, boatlights: 1, shrimprig: 1, fishfinder: 1 };
-      applyGear(gameplay.save, player, dog);
-      gameplay.persist();
-      hud.toast('🚤 Full boat gear granted — outboard, VHF, lights, rig, finder');
+      applyGear({ ...gameplay.save, gear: { ...gameplay.save.gear, outboard: 2, vhf: 1, boatlights: 1, shrimprig: 1, fishfinder: 1 } }, player, dog);
+      hud.toast('🚤 Boat gear aboard for this session — the shop purchase is the real path');
     },
     sonar() {
       actions.seaGear();
       actions.seaLife();
     },
-    // key channel 16 from anywhere: gear grant lifts the range gate, then
-    // every vessel's cooldown zeroes so the very next frame keys a line
+    // key channel 16 from anywhere within the finite handheld range: gear
+    // grant lifts the range gate to VHF_HAND_R (700u), then every non-cutter
+    // vessel's cooldown zeroes so the very next frame keys a line — silent
+    // beyond 700u, honestly (cutters keep their cooldowns; a null patrol
+    // line far from ports must never be the demo vessel)
     handheld16() {
       actions.seaGear();
+      maritime.force(player.pos.x, player.pos.z);
+      let bd = Infinity;
+      for (const r of maritime.routes) {
+        for (const p of r.pts) {
+          const d = Math.hypot(p[0] - player.pos.x, p[1] - player.pos.z);
+          if (d < bd) bd = d;
+        }
+      }
+      if (bd > 700) { hud.toast('📻 out of range — no working water within 70 km'); return; } // 700 = maritime.js VHF_HAND_R
       maritime.vhfFloor = 0;
-      for (const s of maritime.ships) s.id.chatT = 0;
+      for (const s of maritime.ships) if (!maritime.cutters.includes(s)) s.id.chatT = 0;
       for (const b of maritime.shrimpers) b.id.chatT = 0;
     },
     // Rails W2: named trains forced onto their routes, schedule bypassed
