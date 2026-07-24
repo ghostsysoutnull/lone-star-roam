@@ -337,9 +337,21 @@ vision doc. W1 (identity + chatter) and W2 (journeys) shipped 2026-07-19.
 
 ## Next in line (in order)
 
+Rider, not a queue slot (Bruno approved 2026-07-23): **Mexico Shoulder
+W0 — early scout**. The OSM-vs-INEGI data-quality memo that gates the
+Mexico spec (`VISION_MEXICO_SHOULDER.md` W0; vision rule "scouts early,
+codes last") runs as a `data-scout` sidecar on the **Map W3 session**,
+seeded from the 2026-07-23 prefetch
+(`~/claude-area/devel/tx-inputs/map-context-*.json`: Mexico
+motorway/trunk 6,839 km + 148 places inside the map frame, queries in
+`map-context-QUERIES.txt`). W0's scope is unchanged — coverage for the
+roamable 25-mi strip, all road tiers, twin cities, sample-bake
+recommendation; the map-frame data is a head start on its OSM half, not
+a substitute for the gate.
+
 1. **Slot export/import** (deferred from New Player W4, 2026-07-17;
-   deferred one slot 2026-07-23 — Map W2 jumped ahead as the
-   protocol-amendment shakedown, Bruno's call): back up
+   queues after the Map track 2026-07-23 — W2–W4 per `MAP_SPEC.md`,
+   Bruno's call): back up
    a save slot to a file and restore it from one, on the title screen —
    insurance against browser-data loss (`NEWPLAYER_SPEC.md` W4's own
    pre-authorized drop-to-backlog candidate). W4 shipped 3 named slots +
