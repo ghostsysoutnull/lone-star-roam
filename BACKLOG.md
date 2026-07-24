@@ -95,7 +95,15 @@ handoff wave** as measured pilots, not law:
   author is Fable; Opus is the fallback only if the pilot's ledger shows the
   grill cost outrunning its findings. One round, structured output: holes /
   ambiguities / unverified assumptions — never a dialogue; Bruno pinned the
-  model 2026-07-23). Handoff waves only; the plan is the full
+  model 2026-07-23). Token rules (Bruno approved 2026-07-23):
+  the spawn prompt is the wave-coder spawn text reused verbatim (plan +
+  contract-file path — no hand-crafted grill briefing); input budget =
+  `tools/law.sh` sweeps for the plan's touched areas + ~2 targeted file
+  reads, no repo wandering (contract holes, not code audit); output capped
+  ~10 findings, one line each (claim + where it bites), **no proposed
+  fixes** (triage and fixes are Fable's); findings-only return — nothing
+  restated, no affirmations (an all-clear is zero-weight by law, so
+  positive commentary is dead tokens). Handoff waves only; the plan is the full
   contract there, so contract holes are the dominant failure mode. Keep only
   if it finds a real hole; an all-clear carries no evidential weight (the
   Gemini false-all-clear precedent, `VISION_EXTERNAL_AGENTS.md`).
