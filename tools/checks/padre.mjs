@@ -200,8 +200,14 @@ export default async function padre(t) {
     const beachKit = (res.kinds.dune ?? 0) + (res.kinds.seaoats ?? 0) + (res.kinds.driftwood ?? 0);
     t.ok(beachKit > 0, `no dunes/sea oats/driftwood in the live chunks around Malaquite: ${JSON.stringify(res.kinds)}`);
     t.ok(!res.kinds.mesquite, 'mesquite growing on the beach — the island chunk table did not take');
-    t.ok(res.miniIsland[3] > 0, 'minimap: island pixel is transparent — Padre still missing from the Texas silhouette');
-    t.ok(res.miniGulf[3] === 0, 'minimap: open Gulf east of the island got painted — island fill leaked');
+    // Map W4: minimap and big map are now the SAME rendered layer (single-
+    // render law — miniLayer/miniT alias mapLayer/mapT), so the wide
+    // backdrop fill covers open Gulf on both now; "transparent Gulf" is
+    // retired. Assert the island still renders distinctly from the Gulf
+    // backdrop, and that the two aliased probes agree with each other.
+    t.ok(res.miniIsland.join() !== res.miniGulf.join(), 'minimap: island pixel identical to the Gulf backdrop — Padre still missing from the Texas silhouette');
     t.ok(res.wideIsland.join() !== res.wideGulf.join(), 'big map: island pixel identical to open Gulf — island not drawn on the wide layer');
+    t.ok(res.miniIsland.join() === res.wideIsland.join() && res.miniGulf.join() === res.wideGulf.join(),
+      'mini/wide layer probes diverged — Map W4 single-render law broken (miniLayer should alias mapLayer exactly)');
   });
 }

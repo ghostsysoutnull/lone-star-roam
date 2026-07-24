@@ -33,6 +33,12 @@ export const GEO = {
   sea: { routes: [], ports: [] },
   // sea: AIS-informed ship routes + the 8 real ports (quays/berth/roadstead,
   // character). Read directly off GEO.sea (GEO.cities idiom). tools/build-sea.mjs.
+  context: { roads: [], places: [] },
+  // Map W4: LA/AR/OK/NM + Mexico backdrop beyond the shoulder/shelf band —
+  // MAP-ONLY overlay. NEVER merged into bandHighways/bandCities/highways/
+  // cities (same never-merge law as those arrays) and nothing indexes it —
+  // Mexico is non-roamable, this exists purely so the big map has real
+  // geography past the world edge. tools/build-context.mjs.
 };
 
 export async function loadGeo(onStatus) {
@@ -81,6 +87,11 @@ export async function loadGeo(onStatus) {
   GEO.energy = await get('energy.json').catch(() => GEO.energy);
   onStatus?.('Charting the shipping lanes…');
   GEO.sea = await get('sea.json').catch(() => GEO.sea);
+  onStatus?.('Sketching the wider map…');
+  // 7th boot data file. MAP-ONLY overlay (Map W4): never merged into
+  // GEO.bandHighways/bandCities/highways/cities, nothing indexes it —
+  // Mexico is non-roamable, this is background for the big map only.
+  GEO.context = await get('context.json').catch(() => ({ roads: [], places: [] }));
   for (const c of GEO.counties) {
     // bbox per county for cheap point-in-county prefiltering
     let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9;

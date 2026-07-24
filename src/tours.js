@@ -40,6 +40,10 @@ export const TOURS = [
   {
     track: 'Map (2026-07)',
     waves: [
+      { wave: 'W4 — context bake + muted draw + state labels', spots: [
+        S('🇲🇽 Eagle Pass border crossing', [-953.7, 2550.2], { mode: 'DRIVE', time: 0.35, note: 'open the big map at 1×: the Mexico slab now carries real muted roads/places south of the river — Monterrey and the MEXICO label sit in the southern reach' }),
+        S('🗺️ Texline — NW Panhandle corner', [-3361.4, -6008.3], { mode: 'DRIVE', time: 0.35, note: 'the MINIMAP alone now carries NEW MEXICO/OKLAHOMA context past the world edge — no need to open the big map; watch for label magnification at higher minimap zoom' }),
+      ] },
       { wave: 'W3 — live traffic + waypoint', spots: [
         S('🚦 Map traffic — trains, ships, aircraft', [4507, 1834], { mode: 'BOAT', time: 0.35, act: 'mapTraffic', note: 'press M: a train and a vessel forced into view and the new Traffic layer switches on — amber squares for trains, blue circles for ships (pale blue for shrimpers), silver ✈ for aircraft' }),
         S('⚑ Waypoint + player-position widget', [1676.4, 815.8], { mode: 'DRIVE', time: 0.35, act: 'waypoint', note: 'press M: a teal pin and header pill mark the forced waypoint 80 units NE (click the pin again to clear it); #map-coords now carries Copy and Maps ↗ buttons for your own position' }),

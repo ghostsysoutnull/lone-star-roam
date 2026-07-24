@@ -6,7 +6,8 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 No active priority track (aviation shipped in full 2026-07-12; Brands,
 Jetpack, Agriculture, the Shoulder & the Shelf, Band Parity, New Player
 Experience, Energy, Performance, Railroads Realism, Water Vehicles, Rails
-Operations, and Sea-Industry Realism followed and are folded in below).
+Operations, Sea-Industry Realism, and the Map planning-tool track followed
+and are folded in below).
 Queued work lives in `BACKLOG.md`.
 
 - [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
@@ -1047,6 +1048,26 @@ Queued work lives in `BACKLOG.md`.
   outboard tiers, boatyard hull paint, VHF handheld (channel 16 anywhere),
   running lights, shrimp rig (troll the fleet's grounds, land the catch
   for pay), fish finder sonar; 13 new checks, full suite 606 green.
+- [x] ~~Map — planning tool (waves 2–4)~~ — done 2026-07-24
+  (`MAP_SPEC.md` kept as history; W1/W1.1/W1.2 above): the maps went from
+  picture to planning tool. W2 — big-map layer bar (Rails / Energy /
+  Airports / Counties / Crops + Base), lazy per-layer offscreen canvases at
+  the wide transform, persisted via the `slotKey` idiom; the cities
+  building-containment rider rode along. W3 — live Traffic layer (train/
+  ship/aircraft glyphs drawn per blit off the live mover systems),
+  click-to-waypoint (pin on both maps, compass tick, header distance;
+  W1.2's click-to-copy retired), player-position widget (Copy + Google
+  Maps). W4 — `tools/build-context.mjs` bakes neighbor-state + Mexico OSM
+  extracts → `data/context.json` (7th boot file, map-only overlay law):
+  18,653 km US + 6,461 km Mexico motorway/trunk and 70 places (cutoffs US
+  ≥20k / MX ≥50k, Roswell label exception) drawn muted under band ink
+  (Texas 1.0 > band 0.6 > context 0.32 by alpha), 5 state-name labels,
+  silver-class marks; the minimap-untouched law repealed — ONE wide render
+  serves both maps at the old minimap's px-per-unit (aliases + sharpness
+  parity gate); airports toggle reworked into the detail layer (codes
+  gated, base ✈ stays). The plan-grill pilot graduated to practice across
+  the track (3 rounds, 22 findings, all triaged pre-spawn; 3 latent check
+  bugs found and fixed).
 - [ ] Mobile touch controls (virtual stick + buttons)
 
 ## Non-goals

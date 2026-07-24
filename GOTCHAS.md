@@ -146,6 +146,13 @@ graduate here (and out of `NEXT_SESSION.md`).
 
 ## Geo & classification
 
+- **Runtime `inTexas()` is NOT island-aware** (Map W4, 2026-07-24):
+  `onIsland` is a separate geo.js export, so any "is this point Texas" test
+  that must include Padre/Mustang uses `inTexas(x,z) || onIsland(x,z)` — a
+  mainland-only test misclassified Port Aransas as abroad (the context-bake
+  scout precedent). Offline bakes classify with their own border∪islands
+  point-in-polygon union (`tools/build-context.mjs` is the pattern).
+
 - **Classify by what a point is standing on, not nearest border segment**
   (`classify`/`inWorld`/`borderZoneAt`): point-in-neighbor-state-polygon first,
   nearest-zone only for open water/actually-Mexico. Open water nearest a
@@ -172,6 +179,27 @@ graduate here (and out of `NEXT_SESSION.md`).
   clustering. Keeps the boot JSON small and the fleet honest.
 
 ## Rendering & systems
+
+- **The map context layer is a MAP-ONLY overlay** (Map W4, 2026-07-24):
+  `GEO.context` (`data/context.json`, 7th boot file — beyond-band US/Mexico
+  motorway/trunk roads + 70 places) is never merged into `highways`/`cities`/
+  `bandHighways`/`bandCities` (gameplay indexes must not move; Mexico is
+  non-roamable) and nothing indexes it. The map stays rectangle-clipped —
+  the "Monterrey effect" (the frame reaching ~200 km past the border at
+  central longitudes) is a feature: distant real metros anchor the diorama.
+  Base resets the layer toggles but the muted context stays (base-canvas
+  content). Ink hierarchy Texas 1.0 > band 0.6 > context 0.32, alpha alone.
+
+- **One render serves both maps — the minimap-untouched law is REPEALED**
+  (Map W4, 2026-07-24): `hud.miniLayer`/`miniT`/`miniSc` are exact aliases
+  of the wide layer; the boot callsite sizes the wide canvas so its scale
+  holds the old Texas-only formula value `sc0` within 1%. Assert
+  `miniSc === mapSc` (identity) and `|miniSc − sc0|/sc0 < 0.01` — never
+  1e-6 against `sc0`, integer canvas dims drift it ~5e-5. Guards: the
+  band.mjs single-render-law check + padre.mjs alias-agreement probes; no
+  check may hardcode the old 1400/1320 layer dims (two did — both latent-
+  broken, fixed this wave). Baked labels magnify ×zoom on the minimap
+  (same class as the baked ≥190k city names — accepted precedent).
 
 - **Map dash patterns: band along the contour, never by cell checkerboard**
   (Map W1.1, 2026-07-20): a `(⌊x/80⌋+⌊z/80⌋)&1` skip looks fine on curvy
@@ -371,6 +399,12 @@ graduate here (and out of `NEXT_SESSION.md`).
   floating prop.
 
 ## Verification
+
+- **Toast-silence asserts need the shared `#toast` interference margin**
+  (Map track, 2026-07-24): `#toast` is one shared DOM element, so a check
+  asserting a toast did NOT appear must first guarantee no other system can
+  toast during the window — the energy suite keeps a 120u route-clear
+  margin from anything toastable (`tools/checks/energy.mjs` is the pattern).
 
 - **Every verify run writes `/tmp/lonestar-verify.json`** (override:
   `VERIFY_JSON`, 2026-07-22): per-attempt boot/settle/body/cleanup/total/launch

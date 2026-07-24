@@ -53,6 +53,17 @@ const CROP_LAYER_INK = {
   soybeans: '#6b8a4a',
 };
 
+// Map W4: hand-authored state/country labels over the baked context slabs —
+// anchors chosen off-Texas/off-band by construction, drawn last in the layer.
+// Nudging for the staged shot is expected; keep every label on-canvas.
+const STATE_LABELS = [
+  { name: 'NEW MEXICO', x: -5534, z: -3562 },
+  { name: 'OKLAHOMA', x: 954, z: -5121 },
+  { name: 'ARKANSAS', x: 5821, z: -4341 },
+  { name: 'LOUISIANA', x: 6012, z: -334 },
+  { name: 'MEXICO', x: -2863, z: 3896 },
+];
+
 function railLabel(rail) {
   return [rail.operator, rail.name].filter((part, index, parts) =>
     part && parts.findIndex((other) => other?.toLowerCase() === part.toLowerCase()) === index).join(' · ');
@@ -126,20 +137,33 @@ export class HUD {
       return el;
     });
     this.tagV = new Vector3();
-    // Two offscreen layers: the minimap Law says untouched — it keeps the
-    // original Texas-only bounds/scale/T exactly as before. Only the big map
-    // widens to the shoulder/shelf (band cities/stars land in W2).
-    const mini = this.renderMapLayer(1400, 1320, GEO.bounds);
-    this.miniLayer = mini.canvas; this.miniT = mini.T; this.miniSc = mini.sc;
+    // Map W4: ONE offscreen layer serves both maps now — the old "minimap Law"
+    // (separate Texas-only canvas, its own decoupled scale) is retired: the
+    // Mexico/OK/AR/LA/NM context needs to show up on the minimap too (GRILL
+    // F8). sc0 is the OLD Texas-only target scale (1360x1280 over GEO.bounds,
+    // pad=20 baked into renderMapLayer); W/H are computed so the WIDENED
+    // shoulder/shelf bounds render at that same sc0 — sharpness parity with
+    // the pre-W4 Texas render. Integer W/H (Math.ceil) drift the actual sc a
+    // few 1e-5 off sc0 — never assert exact equality against sc0 itself,
+    // only miniSc === mapSc (same object) and |miniSc - sc0|/sc0 < 0.01.
+    const b = GEO.bounds;
+    const sc0 = Math.min(1360 / (b.maxX - b.minX), 1280 / (b.maxZ - b.minZ));
+    const wideBounds = {
+      minX: b.minX - SHOULDER_U, maxX: b.maxX + SHELF_U, // east = Gulf shelf too —
+      minZ: b.minZ - SHOULDER_U, maxZ: b.maxZ + SHELF_U, // the coast runs SW–NE
+    };
+    const PAD2 = 40; // renderMapLayer's own pad=20, both axes
+    const W = Math.ceil(sc0 * (wideBounds.maxX - wideBounds.minX) + PAD2);
+    const H = Math.ceil(sc0 * (wideBounds.maxZ - wideBounds.minZ) + PAD2);
     const wideT0 = performance.now();
-    const wide = this.renderMapLayer(1400, 1320, {
-      minX: GEO.bounds.minX - SHOULDER_U, maxX: GEO.bounds.maxX + SHELF_U, // east = Gulf shelf too —
-      minZ: GEO.bounds.minZ - SHOULDER_U, maxZ: GEO.bounds.maxZ + SHELF_U, // the coast runs SW–NE
-    });
+    const wide = this.renderMapLayer(W, H, wideBounds);
     // Boot-cost surface (always built, not URL-gated — the debug-suite idiom):
     // the wide layer's world-edge iso-lines sample borderDist ~258k times.
     this.wideLayerMs = performance.now() - wideT0;
     this.mapLayer = wide.canvas; this.mapT = wide.T; this.mapSc = wide.sc; this.mapInv = wide.inv;
+    // miniLayer/miniT/miniSc are now plain aliases — drawMini and the
+    // padre.mjs probes need no math change.
+    this.miniLayer = this.mapLayer; this.miniT = this.mapT; this.miniSc = this.mapSc;
     // Map W2: overlay layer canvases — same size/transform as the wide layer,
     // rendered lazily (layerCanvas) so a persisted toggle costs nothing at
     // boot; only the first drawBig that needs a layer pays to build it.
@@ -228,6 +252,16 @@ export class HUD {
         ctx.beginPath();
         ring.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
         ctx.closePath(); ctx.fillStyle = '#242a1e'; ctx.fill();
+      }
+      // Map W4.1: state lines — a second stroke-only pass (stroking inside
+      // the fill loop would let a later state's fill half-cover the shared
+      // edge). NM's south edge doubles as the US–Mexico border west of El
+      // Paso; Texas' own gold border draws later and stays on top.
+      ctx.strokeStyle = '#5d6452'; ctx.lineWidth = 1;
+      for (const ring of Object.values(GEO.neighborStates ?? {})) {
+        ctx.beginPath();
+        ring.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+        ctx.closePath(); ctx.stroke();
       }
     }
     ctx.fillStyle = '#20261c';
@@ -547,6 +581,48 @@ export class HUD {
         ctx.fillText(city.name, px + 6, pz + 4);
       }
     }
+    // Map W4: context — real US/Mexico roads+places beyond the shoulder/shelf
+    // band (GEO.context, map-only overlay, never merged into gameplay arrays).
+    // Spatially disjoint from Texas/band (clipped at the band seam at bake
+    // time), so no isWide gate is needed — dimmer than band by alpha alone:
+    // Texas 1.0 > band 0.6 > context 0.32, same hue family per tier.
+    let nCtxRoads = 0, nCtxPlaces = 0, nCtxLabels = 0;
+    ctx.globalAlpha = 0.32;
+    for (const r of GEO.context?.roads ?? []) {
+      nCtxRoads++;
+      [ctx.strokeStyle, ctx.lineWidth] = roadStyle[r.t];
+      ctx.beginPath();
+      r.pts.forEach(([x, z], i) => { const [px, pz] = T(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = '#9aa2ac';
+    for (const p of GEO.context?.places ?? []) {
+      nCtxPlaces++;
+      const [px, pz] = T(p.x, p.z);
+      const r = Math.max(0.9, Math.sqrt(p.pop) / 550);
+      ctx.beginPath(); ctx.arc(px, pz, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 0.8;
+    ctx.font = '13px system-ui'; ctx.fillStyle = '#878e99'; ctx.textAlign = 'left';
+    for (const p of GEO.context?.places ?? []) {
+      if (!(p.pop >= 80000 || p.name === 'Roswell')) continue; // UFO-lore exception
+      nCtxLabels++;
+      const [px, pz] = T(p.x, p.z);
+      ctx.fillText(p.name, px + 6, pz + 4);
+    }
+    ctx.globalAlpha = 1;
+    this.contextDrawn = { roads: nCtxRoads, places: nCtxPlaces, labels: nCtxLabels };
+    // Map W4: hand-authored state/country labels — drawn last in the layer
+    this.stateLabels = STATE_LABELS.map(({ name, x, z }) => ({ name, x, z }));
+    ctx.textAlign = 'center'; ctx.fillStyle = '#7e846f';
+    for (const { name, x, z } of STATE_LABELS) {
+      const [px, pz] = T(x, z);
+      if (name === 'MEXICO') { ctx.font = '600 18px system-ui'; ctx.letterSpacing = '8px'; ctx.globalAlpha = 0.5; }
+      else { ctx.font = '600 15px system-ui'; ctx.letterSpacing = '5px'; ctx.globalAlpha = 0.55; }
+      ctx.fillText(name, px, pz);
+    }
+    ctx.globalAlpha = 1; ctx.letterSpacing = '0px'; ctx.textAlign = 'left';
     return { canvas: c, T, sc, inv };
   }
 
@@ -1419,11 +1495,16 @@ export class HUD {
       this.diamond(ctx, Math.max(12, Math.min(W - 12, tx)), Math.max(12, Math.min(H - 12, tz)), 9);
     }
     // A5: airport codes next to the baked ✈ glyphs — drawn here (occasional
-    // full-map redraws), not on the always-live minimap layer
-    ctx.font = '12px system-ui'; ctx.fillStyle = '#8fc4f0'; ctx.textAlign = 'center';
-    for (const l of this.airportLabels()) {
-      const [lx, lz] = Tw(l.x, l.z);
-      ctx.fillText(l.id, lx, lz + 15);
+    // full-map redraws), not on the always-live minimap layer. Map W4: gated
+    // on the airports overlay toggle like every other layer (was always-on).
+    this.airportCodesDrawn = 0;
+    if (this.layersOn.has('airports')) {
+      ctx.font = '12px system-ui'; ctx.fillStyle = '#8fc4f0'; ctx.textAlign = 'center';
+      for (const l of this.airportLabels()) {
+        const [lx, lz] = Tw(l.x, l.z);
+        ctx.fillText(l.id, lx, lz + 15);
+        this.airportCodesDrawn++;
+      }
     }
     // zoomed-in city names: the layer bakes only the ≥190k names — 2× adds
     // the mid-size towns in view, 4× names everything (live draw, map-open

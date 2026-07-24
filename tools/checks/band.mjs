@@ -161,28 +161,39 @@ export default async function band(t) {
   await t.check('big map widened to the shoulder/shelf; a band point still maps on-canvas', async () => {
     const res = await t.ev(`(() => {
       const b = g.GEO.bounds;
+      const W = g.hud.mapLayer.width, H = g.hud.mapLayer.height;
+      // GRILL F5: expected bounds must match the hud.js callsite's real
+      // arithmetic — SHOULDER_U (402) west/north, SHELF_U (1127) east/south
+      // on BOTH axes (a prior version of this check used +402 on maxX, a
+      // pre-existing check bug — the callsite always used +1127 there).
       const expectedSc = Math.min(
-        (1400 - 40) / ((b.maxX + 402) - (b.minX - 402)),
-        (1320 - 40) / ((b.maxZ + 1127) - (b.minZ - 402))
+        (W - 40) / ((b.maxX + 1127) - (b.minX - 402)),
+        (H - 40) / ((b.maxZ + 1127) - (b.minZ - 402))
       );
       const shreveport = g.hud.mapT(5486.5, -1697.9); // Shreveport, LA — a real band point
-      return { sc: g.hud.mapSc, expectedSc, shreveport, texasCornerStillOnCanvas: g.hud.mapT(b.minX, b.minZ) };
+      return { sc: g.hud.mapSc, expectedSc, W, H, shreveport, texasCornerStillOnCanvas: g.hud.mapT(b.minX, b.minZ) };
     })()`);
-    t.ok(Math.abs(res.sc - res.expectedSc) < 1e-6, `map scale not widened to shoulder/shelf bounds: ${res.sc} vs ${res.expectedSc}`);
-    t.ok(res.shreveport[0] >= 0 && res.shreveport[0] <= 1400 && res.shreveport[1] >= 0 && res.shreveport[1] <= 1320,
+    t.ok(Math.abs(res.sc - res.expectedSc) / res.expectedSc < 0.01,
+      `map scale not widened to shoulder/shelf bounds: ${res.sc} vs ${res.expectedSc}`);
+    t.ok(res.shreveport[0] >= 0 && res.shreveport[0] <= res.W && res.shreveport[1] >= 0 && res.shreveport[1] <= res.H,
       `a real band city maps off-canvas: ${res.shreveport}`);
     t.ok(res.texasCornerStillOnCanvas[0] >= 0 && res.texasCornerStillOnCanvas[1] >= 0, 'Texas silhouette itself fell off-canvas after widening');
   });
 
-  await t.check('minimap layer stays untouched (Law): its own scale/bounds are Texas-only, decoupled from the widened big map', async () => {
+  await t.check('Map W4: single-render law — miniLayer/miniSc are exact aliases of the widened big-map layer, sharpness held vs the old Texas-only scale', async () => {
     const res = await t.ev(`(() => {
       const b = g.GEO.bounds;
-      const expectedMiniSc = Math.min((1400 - 40) / (b.maxX - b.minX), (1320 - 40) / (b.maxZ - b.minZ));
-      return { miniSc: g.hud.miniSc, mapSc: g.hud.mapSc, expectedMiniSc, sameLayer: g.hud.miniLayer === g.hud.mapLayer };
+      const sc0 = Math.min(1360 / (b.maxX - b.minX), 1280 / (b.maxZ - b.minZ)); // old Texas-only formula — the sharpness anchor
+      return {
+        miniSc: g.hud.miniSc, mapSc: g.hud.mapSc, sc0,
+        sameLayer: g.hud.miniLayer === g.hud.mapLayer, sameT: g.hud.miniT === g.hud.mapT,
+      };
     })()`);
-    t.ok(Math.abs(res.miniSc - res.expectedMiniSc) < 1e-6, `minimap scale drifted from its original Texas-only formula: ${res.miniSc} vs ${res.expectedMiniSc}`);
-    t.ok(res.miniSc !== res.mapSc, 'minimap scale equals the widened big-map scale — they should be decoupled layers');
-    t.ok(!res.sameLayer, 'minimap and big map share one canvas — widening one would leak into the other');
+    t.ok(res.miniSc === res.mapSc, `miniSc no longer an exact alias of mapSc: ${res.miniSc} vs ${res.mapSc}`);
+    t.ok(res.sameLayer, 'miniLayer and mapLayer are no longer the same canvas — Map W4 single-render law broken');
+    t.ok(res.sameT, 'miniT and mapT are no longer the same transform');
+    t.ok(Math.abs(res.miniSc - res.sc0) / res.sc0 < 0.01,
+      `miniSc drifted too far from the old Texas-only sc0 (sharpness regression): ${res.miniSc} vs ${res.sc0}`);
   });
 
   await t.check('out-of-state HUD line: toasts "Parish, State" once at a real crossing, never touches the county tally', async () => {

@@ -520,15 +520,17 @@ export default async function hud(t) {
       const h = g.hud, idx = h.bigZoomIdx, out = [];
       for (let i = 0; i < 3; i++) { h.bigZoomIdx = i; h.drawBig(g.player); out.push({ ...h.scaleBar }); }
       h.bigZoomIdx = idx; h.drawBig(g.player);
-      return { out, W: h.bigCanvas.width, mapSc: h.mapSc };
+      return { out, W: h.bigCanvas.width, LW: h.mapLayer.width, mapSc: h.mapSc };
     })()`);
     t.ok(r.out.map((o) => o.miles).join() === '100,50,25', `miles ladder wrong: ${r.out.map((o) => o.miles)}`);
     // miles halve exactly as the window halves, so the drawn px must be
     // constant across levels — an invariant independent of the bar formula
     t.ok(Math.abs(r.out[0].px - r.out[1].px) < 0.5 && Math.abs(r.out[1].px - r.out[2].px) < 0.5,
       `bar length should be zoom-invariant: ${r.out.map((o) => o.px.toFixed(1))}`);
-    // and the 1x bar must ground-truth to real miles: 100 mi = 1609.3 units through the layer scale
-    const expect = 100 * 16.093 * r.mapSc * (r.W / 1400);
+    // and the 1x bar must ground-truth to real miles: 100 mi = 1609.3 units
+    // through the layer scale. Map W4: mapLayer.width is no longer the fixed
+    // 1400 (single-render sizing computes it from sc0) — use the live width.
+    const expect = 100 * 16.093 * r.mapSc * (r.W / r.LW);
     t.ok(Math.abs(r.out[0].px - expect) < 1, `100 mi bar off ground truth: ${r.out[0].px.toFixed(1)} vs ${expect.toFixed(1)}`);
     t.ok(r.out[0].px > 30 && r.out[0].px < r.W * 0.5, `bar out of proportion: ${r.out[0].px.toFixed(1)} of ${r.W}`);
   });
@@ -834,5 +836,88 @@ export default async function hud(t) {
     t.ok(r.drawn.aircraft === r.recount.aircraft, `aircraft mismatch: drawn ${r.drawn.aircraft} vs recount ${r.recount.aircraft}`);
     t.ok(r.drawn.trains >= 1, `expected >=1 forced train, got ${r.drawn.trains}`);
     t.ok(r.drawn.ships >= 1, `expected >=1 forced vessel, got ${r.drawn.ships}`);
+  });
+
+  // --- Map W4: context bake + muted draw + state labels + airports rider ---
+
+  await t.check('Map W4: context loaded — real roads/places, key hubs present, zero inTexas/island places (GRILL F3)', async () => {
+    const r = await t.ev(`(() => {
+      const c = g.GEO.context;
+      const names = new Set(c.places.map((p) => p.name));
+      const badPlaces = c.places.filter((p) => g.inTexas(p.x, p.z) || g.onIsland(p.x, p.z));
+      return {
+        nRoads: c.roads.length,
+        hasMonterrey: names.has('Monterrey'), hasOKC: names.has('Oklahoma City'),
+        hasABQ: names.has('Albuquerque'), hasRoswell: names.has('Roswell'),
+        badPlaces: badPlaces.length,
+      };
+    })()`);
+    t.ok(r.nRoads > 0, 'GEO.context.roads is empty');
+    t.ok(r.hasMonterrey && r.hasOKC && r.hasABQ && r.hasRoswell, `missing a key hub: ${JSON.stringify(r)}`);
+    t.ok(r.badPlaces === 0, `${r.badPlaces} context places classify inTexas/onIsland (island-aware, GRILL F3)`);
+  });
+
+  await t.check('Map W4: renderMapLayer records contextDrawn counts; places count matches GEO.context.places.length (GRILL F10)', async () => {
+    const r = await t.ev(`({ drawn: g.hud.contextDrawn, total: g.GEO.context.places.length })`);
+    t.ok(r.drawn.roads > 0 && r.drawn.places > 0 && r.drawn.labels > 0,
+      `contextDrawn has a zero count: ${JSON.stringify(r.drawn)}`);
+    t.ok(r.drawn.places === r.total, `contextDrawn.places ${r.drawn.places} !== GEO.context.places.length ${r.total}`);
+  });
+
+  await t.check('Map W4: pixel probe — context ink visible in a 5x5 window around Monterrey (GRILL F10 corroboration)', async () => {
+    const r = await t.ev(`(() => {
+      const h = g.hud;
+      const m = g.GEO.context.places.find((p) => p.name === 'Monterrey');
+      const [px, pz] = h.mapT(m.x, m.z);
+      const d = h.mapLayer.getContext('2d').getImageData(Math.round(px) - 2, Math.round(pz) - 2, 5, 5).data;
+      const hex = (i) => '#' + [d[i], d[i + 1], d[i + 2]].map((v) => v.toString(16).padStart(2, '0')).join('');
+      let differs = false;
+      for (let i = 0; i < d.length; i += 4) {
+        const c = hex(i);
+        if (c !== '#171a14' && c !== '#242a1e') { differs = true; break; }
+      }
+      return { differs };
+    })()`);
+    t.ok(r.differs, 'no pixel in the 5x5 Monterrey neighborhood differs from the two backdrop fills — context ink missing');
+  });
+
+  await t.check('Map W4: state/country labels — 5 hand-authored anchors, off-Texas, on-canvas', async () => {
+    const r = await t.ev(`(() => {
+      const h = g.hud;
+      const w = h.mapLayer.width, hgt = h.mapLayer.height;
+      const rows = h.stateLabels.map((l) => {
+        const [px, pz] = h.mapT(l.x, l.z);
+        return {
+          name: l.name, x: l.x, z: l.z,
+          onCanvas: px >= 0 && px <= w && pz >= 0 && pz <= hgt,
+          offTexas: !(g.inTexas(l.x, l.z) || g.onIsland(l.x, l.z)),
+        };
+      });
+      return { rows };
+    })()`);
+    const names = r.rows.map((row) => row.name);
+    t.ok(JSON.stringify(names) === JSON.stringify(['NEW MEXICO', 'OKLAHOMA', 'ARKANSAS', 'LOUISIANA', 'MEXICO']),
+      `stateLabels names/order: ${JSON.stringify(names)}`);
+    for (const row of r.rows) {
+      t.ok(row.offTexas, `${row.name} anchor (${row.x},${row.z}) is inside Texas/island`);
+      t.ok(row.onCanvas, `${row.name} anchor fell off the layer canvas`);
+    }
+  });
+
+  await t.check('Map W4: airports-layer rider — A5 codes gate on the airports toggle (GRILL F9), A5 data check at :43 stays green unchanged', async () => {
+    const r = await t.ev(`(() => {
+      const h = g.hud;
+      const wasOn = h.layersOn.has('airports');
+      if (wasOn) h.toggleLayer('airports'); // force off
+      h.drawBig(g.player);
+      const offCount = h.airportCodesDrawn;
+      h.toggleLayer('airports'); // now on
+      h.drawBig(g.player);
+      const onCount = h.airportCodesDrawn;
+      if (!wasOn) h.toggleLayer('airports'); // restore original state
+      return { offCount, onCount };
+    })()`);
+    t.ok(r.offCount === 0, `airportCodesDrawn not 0 with the toggle off: ${r.offCount}`);
+    t.ok(r.onCount > 0, `airportCodesDrawn not >0 with the toggle on: ${r.onCount}`);
   });
 }

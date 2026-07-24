@@ -1,11 +1,11 @@
 # Backlog — queued work
 
-Active track: **none** — Sea-Industry Realism closed 2026-07-23 (3 waves:
-ports + AIS routes + Ports log; the working Gulf; sea jobs + boat shop —
-folded into `ROADMAP.md`, `SEA_INDUSTRY_SPEC.md` kept as history). The
-Verify Ops interstitial (runner single-instance lock + load warning +
-toast-class fix) also shipped 2026-07-23.
-Items below are the queue; the next track is an open pick.
+Active track: **none** — the Map planning-tool track closed 2026-07-24
+(W2 layer bar; W3 traffic/waypoint/position widget; W4 neighbor-context
+bake + single-render minimap + airports-toggle rework — folded into
+`ROADMAP.md`, `MAP_SPEC.md` kept as history).
+Items below are the queue; **slot export/import queues first** (Map-close
+note), the next track is otherwise an open pick.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Bugs (live in shipped code)
