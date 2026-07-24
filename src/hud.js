@@ -18,6 +18,21 @@ const SHIELD_HOLD = 0.8; // seconds the road shield lingers through a nearestRoa
 const AMBER = '#ffb020';     // night shield: glowing outline / lattice
 const AMBER_LIT = '#ffd27a'; // night shield: brighter core for the glyphs
 
+// Map W2: overlay layer tables — the big-map toggle bar. Fixed display order
+// (button bar) is separate from the composite DRAW order (crops under
+// everything, airports on top) applied in drawBig.
+const LAYER_LIST = ['rails', 'energy', 'airports', 'counties', 'crops'];
+const LAYER_COMPOSITE_ORDER = ['crops', 'counties', 'rails', 'energy', 'airports'];
+// same 11 dominant-crop ground colors as world.js CROP_STYLE — kept as its
+// own table (2D canvas ink, not a THREE material) rather than importing
+// world.js into hud.js (would cycle: world.js doesn't import hud.js today,
+// but the ag/crop constants are cheap enough to duplicate here).
+const CROP_LAYER_INK = {
+  cotton: '#9fa878', rice: '#41704d', sorghum: '#a5673c', corn: '#5e7f3d', wheat: '#c7a44e',
+  hay: '#99a057', peanuts: '#6e7f48', citrus: '#8a7a55', pecans: '#857550', sugarcane: '#4f8a3e',
+  soybeans: '#6b8a4a',
+};
+
 function railLabel(rail) {
   return [rail.operator, rail.name].filter((part, index, parts) =>
     part && parts.findIndex((other) => other?.toLowerCase() === part.toLowerCase()) === index).join(' · ');
@@ -105,6 +120,25 @@ export class HUD {
     // the wide layer's world-edge iso-lines sample borderDist ~258k times.
     this.wideLayerMs = performance.now() - wideT0;
     this.mapLayer = wide.canvas; this.mapT = wide.T; this.mapSc = wide.sc; this.mapInv = wide.inv;
+    // Map W2: overlay layer canvases — same size/transform as the wide layer,
+    // rendered lazily (layerCanvas) so a persisted toggle costs nothing at
+    // boot; only the first drawBig that needs a layer pays to build it.
+    this.layerList = LAYER_LIST;
+    this.layersOn = new Set();
+    this.layerCanvases = {};
+    try {
+      const raw = localStorage.getItem(slotKey(KEYS.mapLayers));
+      if (raw) for (const name of JSON.parse(raw)) if (this.layerList.includes(name)) this.layersOn.add(name);
+    } catch { /* malformed/missing storage — start with all layers off */ }
+    this.layerButtons = {};
+    const layersBox = document.getElementById('map-layers');
+    for (const btn of layersBox.querySelectorAll('button[data-layer]')) {
+      const name = btn.dataset.layer;
+      this.layerButtons[name] = btn;
+      btn.addEventListener('click', () => this.toggleLayer(name));
+    }
+    document.getElementById('map-layers-base').addEventListener('click', () => this.clearLayers());
+    this._syncLayerButtons();
     this.zoomLevels = [1.4, 2.4, 4.5];
     this.zoomIdx = 1;
     // big-map zoom (Map W1): level 0 is the classic full-extent view; deeper
@@ -1076,6 +1110,161 @@ export class HUD {
     ctx.restore();
   }
 
+  // ---- Map W2: overlay layers ------------------------------------------
+  _persistLayers() {
+    localStorage.setItem(slotKey(KEYS.mapLayers), JSON.stringify(this.layerList.filter((n) => this.layersOn.has(n))));
+  }
+
+  _syncLayerButtons() {
+    for (const [name, btn] of Object.entries(this.layerButtons)) btn.classList.toggle('on', this.layersOn.has(name));
+  }
+
+  toggleLayer(name) {
+    if (!this.layerList.includes(name)) return;
+    if (this.layersOn.has(name)) this.layersOn.delete(name); else this.layersOn.add(name);
+    this._persistLayers();
+    this._syncLayerButtons();
+  }
+
+  clearLayers() {
+    this.layersOn.clear();
+    this._persistLayers();
+    this._syncLayerButtons();
+  }
+
+  // Lazily renders + caches an offscreen canvas for one overlay layer, at the
+  // wide map layer's exact size/transform (this.mapT/this.mapSc) so drawBig
+  // can composite it with the same source-window args as the base layer.
+  layerCanvas(name) {
+    let c = this.layerCanvases[name];
+    if (c) return c;
+    c = document.createElement('canvas');
+    c.width = this.mapLayer.width; c.height = this.mapLayer.height;
+    this._drawLayer(name, c.getContext('2d'));
+    this.layerCanvases[name] = c;
+    return c;
+  }
+
+  _drawLayer(name, ctx) {
+    if (name === 'rails') return this._drawRailsLayer(ctx);
+    if (name === 'energy') return this._drawEnergyLayer(ctx);
+    if (name === 'airports') return this._drawAirportsLayer(ctx);
+    if (name === 'counties') return this._drawCountiesLayer(ctx);
+    if (name === 'crops') return this._drawCropsLayer(ctx);
+  }
+
+  _strokeLine(ctx, pts) {
+    if (!pts?.length) return;
+    ctx.beginPath();
+    pts.forEach(([x, z], i) => { const [px, pz] = this.mapT(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+    ctx.stroke();
+  }
+
+  _strokeRing(ctx, ring) {
+    if (!ring?.length) return;
+    ctx.beginPath();
+    ring.forEach(([x, z], i) => { const [px, pz] = this.mapT(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+    ctx.closePath(); ctx.stroke();
+  }
+
+  _fillRing(ctx, ring) {
+    if (!ring?.length) return;
+    ctx.beginPath();
+    ring.forEach(([x, z], i) => { const [px, pz] = this.mapT(x, z); i ? ctx.lineTo(px, pz) : ctx.moveTo(px, pz); });
+    ctx.closePath(); ctx.fill();
+  }
+
+  _drawRailsLayer(ctx) {
+    ctx.save();
+    ctx.strokeStyle = '#d8b97e'; ctx.lineWidth = 1.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.globalAlpha = 1.0;
+    for (const rail of GEO.rails) this._strokeLine(ctx, rail.pts);
+    ctx.globalAlpha = 0.55;
+    for (const rail of GEO.bandRails) this._strokeLine(ctx, rail.pts);
+    ctx.restore();
+  }
+
+  _drawEnergyLayer(ctx) {
+    const E = GEO.energy;
+    ctx.save();
+    ctx.strokeStyle = '#ffb64d'; ctx.fillStyle = '#ffb64d'; ctx.lineCap = 'round';
+    ctx.lineWidth = 0.8; ctx.globalAlpha = 0.75;
+    for (const l of E.lines345 ?? []) this._strokeLine(ctx, l.pts);
+    ctx.lineWidth = 1.0; ctx.globalAlpha = 0.9;
+    for (const f of E.windFarms ?? []) {
+      const [px, pz] = this.mapT(f.x, f.z);
+      const r = Math.max(2, Math.min(12, f.r * this.mapSc));
+      ctx.beginPath(); ctx.arc(px, pz, r, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.globalAlpha = 0.9;
+    for (const p of E.plants ?? []) {
+      const [px, pz] = this.mapT(p.x, p.z);
+      ctx.beginPath(); ctx.arc(px, pz, 1.6, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1.0;
+    for (const r of E.refineries ?? []) {
+      const [px, pz] = this.mapT(r.x, r.z);
+      ctx.fillRect(px - 1.5, pz - 1.5, 3.0, 3.0);
+    }
+    ctx.globalAlpha = 0.45;
+    for (const s of E.substations ?? []) {
+      const [px, pz] = this.mapT(s.x, s.z);
+      ctx.beginPath(); ctx.arc(px, pz, 0.9, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 0.8;
+    for (const p of E.platforms ?? []) {
+      const [px, pz] = this.mapT(p.x, p.z);
+      ctx.beginPath(); ctx.arc(px, pz, 1.3, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  _drawAirportsLayer(ctx) {
+    const TIER = { 1: { r: 5.0, lw: 1.4 }, 2: { r: 3.5, lw: 1.2 }, 3: { r: 2.5, lw: 1.0 } };
+    ctx.save();
+    ctx.strokeStyle = '#7ec8f0';
+    for (const a of AIRPORTS) {
+      const t = TIER[a.tier];
+      if (!t) continue;
+      ctx.lineWidth = t.lw;
+      ctx.globalAlpha = a.band ? 0.55 : 1.0;
+      const [px, pz] = this.mapT(a.at[0], a.at[1]);
+      ctx.beginPath(); ctx.arc(px, pz, t.r, 0, Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  _drawCountiesLayer(ctx) {
+    ctx.save();
+    ctx.strokeStyle = '#a8b890'; ctx.lineWidth = 0.9;
+    ctx.globalAlpha = 0.95;
+    for (const c of GEO.counties) for (const ring of c.rings) this._strokeRing(ctx, ring);
+    ctx.globalAlpha = 0.5;
+    for (const c of GEO.neighborCounties) this._strokeRing(ctx, c.ring);
+    ctx.restore();
+  }
+
+  _drawCropsLayer(ctx) {
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    for (const c of GEO.counties) {
+      const crop = GEO.ag?.[c.name]?.dominantCrop;
+      const ink = crop && CROP_LAYER_INK[crop];
+      if (!ink) continue;
+      ctx.fillStyle = ink;
+      for (const ring of c.rings) this._fillRing(ctx, ring);
+    }
+    ctx.globalAlpha = 0.2;
+    for (const c of GEO.neighborCounties) {
+      const crop = GEO.bandAg?.[`${c.state}|${c.name}`]?.dominantCrop;
+      const ink = crop && CROP_LAYER_INK[crop];
+      if (!ink) continue;
+      ctx.fillStyle = ink;
+      this._fillRing(ctx, c.ring);
+    }
+    ctx.restore();
+  }
+
   drawBig(player) {
     const ctx = this.bigCanvas.getContext('2d');
     const W = this.bigCanvas.width, H = this.bigCanvas.height;
@@ -1091,6 +1280,11 @@ export class HUD {
     const wz = Math.max(0, Math.min(LH - sh, pz - sh / 2));
     this.bigWindow = { x: wx, z: wz, w: sw, h: sh };
     ctx.drawImage(this.mapLayer, wx, wz, sw, sh, 0, 0, W, H);
+    // Map W2: overlay layers, composited right after the base layer and
+    // before the mission/label/marker draws — same source window as the base.
+    for (const name of LAYER_COMPOSITE_ORDER) {
+      if (this.layersOn.has(name)) ctx.drawImage(this.layerCanvas(name), wx, wz, sw, sh, 0, 0, W, H);
+    }
     // coordinate readout: cursor position while the mouse roams the map, the
     // player otherwise (12 Hz with the rest of the draw)
     const [rx, rz] = this.cursorPx

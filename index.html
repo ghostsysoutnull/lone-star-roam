@@ -52,12 +52,22 @@
     border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(10,14,20,.65); }
   #bigmap { position: fixed; inset: 0; display: none; background: rgba(6,9,14,.92); z-index: 10; }
   #bigmap canvas { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); }
-  #map-legend { position: absolute; right: 1.6rem; bottom: 1.6rem; background: rgba(10,14,20,.85);
+  #map-panels { position: absolute; right: 1.6rem; bottom: 1.6rem; display: flex; align-items: flex-end; gap: 1rem; }
+  #map-legend { background: rgba(10,14,20,.85);
     border: 1px solid rgba(255,255,255,.25); border-radius: .8rem; padding: .8rem 1.2rem;
     font-size: 1.1rem; line-height: 1.9rem; color: #cfd4c6; }
   #map-legend .lg { display: inline-block; width: 2.2rem; margin-right: .7rem; vertical-align: middle;
     border-top: .2rem solid; }
   #map-legend .lg.dash { border-top-style: dashed; }
+  /* Map W2: overlay layer toggle bar, matching #map-legend's panel style */
+  #map-layers { background: rgba(10,14,20,.85); border: 1px solid rgba(255,255,255,.25);
+    border-radius: .8rem; padding: .8rem 1rem; font-size: 1.1rem; color: #cfd4c6;
+    display: flex; flex-direction: column; gap: .5rem; }
+  #map-layers button { font: inherit; color: #cfd4c6; background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.25); border-radius: .5rem; padding: .35rem .9rem; cursor: pointer; }
+  #map-layers button:hover { background: rgba(255,255,255,.12); }
+  #map-layers button.on { background: #3e6a34; border-color: #7ec850; color: #eaffe0; }
+  #map-layers button#map-layers-base { margin-top: .2rem; border-top: 1px solid rgba(255,255,255,.2); padding-top: .6rem; }
   #map-coords { position: absolute; left: 50%; bottom: 1.6rem; transform: translateX(-50%);
     background: rgba(10,14,20,.85); border: 1px solid rgba(255,255,255,.25); border-radius: .8rem;
     padding: .5rem 1.2rem; font-size: 1.2rem; color: #cfd4c6; letter-spacing: .05em; }
@@ -343,6 +353,15 @@
 <div id="road-shield-wrap"><div id="road-shield-card"><canvas id="road-shield" width="120" height="104"></canvas></div></div>
 <div id="rail-placard"></div>
 <div id="bigmap"><canvas id="bigmap-canvas"></canvas>
+<div id="map-panels">
+<div id="map-layers">
+  <button type="button" data-layer="rails">Rails</button>
+  <button type="button" data-layer="energy">Energy</button>
+  <button type="button" data-layer="airports">Airports</button>
+  <button type="button" data-layer="counties">Counties</button>
+  <button type="button" data-layer="crops">Crops</button>
+  <button type="button" id="map-layers-base">Base</button>
+</div>
 <div id="map-legend">
   <div><span class="lg" style="border-color:#c8b878"></span>Texas border</div>
   <div><span class="lg dash" style="border-color:#5a86a8"></span>Tidelands (state water)</div>
@@ -351,6 +370,7 @@
   <div><span class="lg" style="border-color:#3e7aa8"></span>river · lake</div>
   <div><span class="lg" style="border-color:#c05040"></span>interstate <span class="lg" style="border-color:#907048; width:1.4rem; margin-left:.5rem"></span>highway</div>
   <div><span style="color:#e8e0c8">●</span> city <span style="color:#c7ccd4">●</span> band city ✈ airport <span style="color:#ffd35c">◆</span> delivery</div>
+</div>
 </div>
 <div id="map-coords"></div>
 </div>

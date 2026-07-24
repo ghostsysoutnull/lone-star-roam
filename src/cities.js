@@ -1,7 +1,7 @@
 // Procedural cities: street grids + skylines scaled by real population,
 // spawned/despawned by distance. Deterministic per city name.
 import * as THREE from 'three';
-import { GEO, seededRand, nearestRoad, nearestBandRoad, nearestCity, nearestBandCity, hAt } from './geo.js';
+import { GEO, seededRand, nearestRoad, nearestBandRoad, nearestCity, nearestBandCity, hAt, inTexas } from './geo.js';
 import { airportClear } from './airports.js';
 import { shoulderClear } from './shoulder.js'; // W6a vignette footprints (fed building, WinBig lot)
 
@@ -21,6 +21,25 @@ export function cityClear(x, z, extra) {
   const b = nearestBandCity(x, z);
   if (b.city && b.dist < cityRadius(b.city.pop) + extra) return false;
   return true;
+}
+
+// Reject-and-resample a building candidate that failed the Texas containment
+// gate (`!inTexas`). Draws only from the caller's dedicated `contain:` side
+// stream — never the main building stream — so the fix is layout-neutral for
+// every building that already lands in Texas. Cap 20 attempts; the sample
+// radius shrinks x0.85 per attempt past 8, converging toward the city
+// center. Placement always succeeds: the terminal fallback (center + <=1u
+// jitter) never checks inTexas again, matching the always-succeeds contract.
+function containedSpot(cx, cz, R, sideRand) {
+  let radius = R;
+  for (let attempt = 1; attempt <= 20; attempt++) {
+    if (attempt > 8) radius *= 0.85;
+    const a = sideRand() * Math.PI * 2, rr = Math.sqrt(sideRand()) * radius;
+    const x = cx + Math.cos(a) * rr, z = cz + Math.sin(a) * rr;
+    if (inTexas(x, z)) return [x, z];
+  }
+  const a = sideRand() * Math.PI * 2, rr = sideRand(); // terminal fallback
+  return [cx + Math.cos(a) * rr, cz + Math.sin(a) * rr];
 }
 
 export class CitySystem {
@@ -117,6 +136,11 @@ export class CitySystem {
     const inst = new THREE.InstancedMesh(this.boxGeo, this.buildingMat, count);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rot);
     const colors = [0xd8d2c4, 0xbfb8a8, 0xa8b0b8, 0x8f9aa5, 0xcfc4ae, 0x9aa5ad];
+    // dedicated side stream for the containment reject-and-resample below —
+    // Texas cities only (band towns legitimately sit outside inTexas and
+    // skip the gate, so they never touch this stream)
+    const sideRand = band ? null : seededRand('contain:' + city.name);
+    const buildings = []; // [x,z] per placed building, exposed for the containment checks
     let placed = 0;
     for (let i = 0; i < count * 3 && placed < count; i++) {
       // sample in disc, snap to block grid so buildings sit between streets
@@ -136,13 +160,21 @@ export class CitySystem {
       // world position: rotate local by city rot
       const wx = city.x + lx * cos + lz * sin, wz = city.z - lx * sin + lz * cos;
       if (!airportClear(wx, wz) || !shoulderClear(wx, wz)) continue; // Love Field sits inside Dallas' disc; Texarkana's fed building straddles the line
-      m4.compose(new THREE.Vector3(wx, hAt(wx, wz) + 0.1, wz), q, new THREE.Vector3(w, h, dep));
+      // containment gate (Texas cities only): reject-and-resample off the
+      // side stream, never `continue` — the main stream above stays consumed
+      // exactly as before the fix, so non-rejected buildings (and per-city
+      // placed counts) are unchanged; placement always succeeds
+      let px = wx, pz = wz;
+      if (!band && !inTexas(px, pz)) [px, pz] = containedSpot(city.x, city.z, R, sideRand);
+      m4.compose(new THREE.Vector3(px, hAt(px, pz) + 0.1, pz), q, new THREE.Vector3(w, h, dep));
       inst.setMatrixAt(placed, m4);
       inst.setColorAt(placed, new THREE.Color(colors[Math.floor(rand() * colors.length)]));
+      buildings.push([px, pz]);
       placed++;
     }
     inst.count = placed;
     group.add(inst);
+    group.userData.buildings = buildings; // exposed for the containment checks
 
     // City label — canvas sprite floating above downtown
     group.add(mkLabel(city.name, city.x, padY + maxH + 6, city.z, big ? 1.6 : 1));

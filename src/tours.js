@@ -40,6 +40,10 @@ export const TOURS = [
   {
     track: 'Map (2026-07)',
     waves: [
+      { wave: 'W2 — overlay layers + coastal containment fix', spots: [
+        S('🗺️ Big map — all layers on', [-2460, -1110], { act: 'mapAllLayers', note: 'over Midland — press M and judge the five inks across the Permian; act forces every layer on' }),
+        S('🏖️ Corpus Christi bayfront — buildings out of the bay', [2007, 3562], { mode: 'WALK', note: 'rider fix: downtown towers all on land now; walk the shoreline' }),
+      ] },
       { wave: 'W1 — readable big map', spots: [
         S('🗺️ the map learns to read', [4762, 1851], { mode: 'BOAT', time: 0.5, note: 'press M: the world-edge dashes are legible now (and hole-free along the coast diagonal — the Lake Jackson gap), the legend (bottom right) decodes every ink, a mile scale bar sits bottom left, and Z cycles 1×/2×/4× around your heading chevron — you are an arrow, not a dot; 2× and up name the mid-size towns; the bottom-center pill reads real lat/lon — yours, or the map point under your mouse' }),
       ] },

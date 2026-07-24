@@ -9,6 +9,7 @@ export const KEYS = {
   compass: 'lonestar-compass',
   uiScale: 'lonestar-ui-scale',
   brandScale: 'lonestar-brand-scale',
+  mapLayers: 'lonestar-map-layers',
 };
 const ACTIVE_KEY = 'lonestar-slot';
 

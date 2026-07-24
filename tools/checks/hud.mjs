@@ -592,4 +592,129 @@ export default async function hud(t) {
     t.ok(r.toast.includes('copied') && r.toast.includes(r.lat.toFixed(2)),
       `no confirmation toast: "${r.toast}"`);
   });
+
+  // Map W2: big-map overlay layers. Fresh-slot state is asserted first (item
+  // 1+2), then a single toggle (item 3), then all five at once (item 4),
+  // then Base (item 5), then the debug action (item 6). Ordering matters —
+  // the "no canvases before any toggle" check must run before anything else
+  // in this suite touches g.hud.layersOn/layerCanvases. Hollow-ring glyphs
+  // (windFarms, airports) never ink their own center pixel, so their probe
+  // windows are sized to the glyph's drawn radius rather than a bare 3x3 —
+  // rails/counties/crops sample a point that sits directly ON the stroked/
+  // filled path, where a plain 3x3 is exact.
+  const MAP_LAYERS_KEY = 'lonestar-map-layers:1';
+
+  await t.check('Map W2: layerList is the five names; fresh slot boots with layersOn empty', async () => {
+    const r = await t.ev(`({ list: g.hud.layerList, on: [...g.hud.layersOn] })`);
+    t.ok(JSON.stringify(r.list) === JSON.stringify(['rails', 'energy', 'airports', 'counties', 'crops']),
+      `layerList: ${JSON.stringify(r.list)}`);
+    t.ok(r.on.length === 0, `layersOn not empty on a fresh slot: ${JSON.stringify(r.on)}`);
+  });
+
+  await t.check('Map W2: lazy — no layer canvases exist before any toggle', async () => {
+    const n = await t.ev(`Object.keys(g.hud.layerCanvases).length`);
+    t.ok(n === 0, `layer canvases already built before any toggle (${n})`);
+  });
+
+  await t.check('Map W2: toggleLayer(energy) lazily renders on the next drawBig, inks a real wind farm, persists', async () => {
+    const r = await t.ev(`(() => {
+      const h = g.hud;
+      h.toggleLayer('energy');
+      h.drawBig(g.player);
+      const c = h.layerCanvases.energy;
+      const f = g.GEO.energy.windFarms[0];
+      const [px, pz] = h.mapT(f.x, f.z);
+      const rad = Math.max(2, Math.min(12, f.r * h.mapSc));
+      const half = Math.ceil(rad) + 2; // hollow ring — window must cover the drawn stroke, not just the center px
+      const d = c.getContext('2d').getImageData(Math.round(px - half), Math.round(pz - half), half * 2 + 1, half * 2 + 1).data;
+      let ink = false;
+      for (let i = 3; i < d.length; i += 4) if (d[i] > 0) { ink = true; break; }
+      return { hasCanvas: !!c, ink, stored: localStorage['${MAP_LAYERS_KEY}'] };
+    })()`);
+    t.ok(r.hasCanvas, 'energy layer canvas missing after toggleLayer + drawBig');
+    t.ok(r.ink, 'no ink found near GEO.energy.windFarms[0] on the energy layer');
+    t.ok(r.stored === '["energy"]', `storage did not round-trip ["energy"]: ${r.stored}`);
+  });
+
+  await t.check('Map W2: all five layers on — drawBig does not throw, bigWindow/scaleBar intact, each layer inks a known point', async () => {
+    const r = await t.ev(`(() => {
+      const h = g.hud;
+      for (const name of h.layerList) if (!h.layersOn.has(name)) h.toggleLayer(name);
+      h.drawBig(g.player);
+      const probe = (canvas, px, pz, half) => {
+        const d = canvas.getContext('2d').getImageData(Math.round(px - half), Math.round(pz - half), half * 2 + 1, half * 2 + 1).data;
+        for (let i = 3; i < d.length; i += 4) if (d[i] > 0) return true;
+        return false;
+      };
+      // rails: first vertex of the first Texas rail — sits directly on the stroked polyline
+      const railPt = g.GEO.rails[0].pts[0];
+      const [rpx, rpz] = h.mapT(railPt[0], railPt[1]);
+      const railInk = probe(h.layerCanvas('rails'), rpx, rpz, 1);
+      // airports: DFW's glyph center — hollow ring, window sized to its tier-1 radius
+      const dfw = g.AIRPORTS.find((a) => a.id === 'DFW');
+      const [apx, apz] = h.mapT(dfw.at[0], dfw.at[1]);
+      const airportInk = probe(h.layerCanvas('airports'), apx, apz, Math.ceil(5.0) + 2);
+      // counties: first vertex of the first county's outer ring — on the stroked ring
+      const cPt = g.GEO.counties[0].rings[0][0];
+      const [cpx, cpz] = h.mapT(cPt[0], cPt[1]);
+      const countyInk = probe(h.layerCanvas('counties'), cpx, cpz, 1);
+      // crops: true polygon centroid (shoelace) of a real cotton county — inside the filled ring
+      const cotton = g.GEO.counties.find((c) => g.GEO.ag?.[c.name]?.dominantCrop === 'cotton');
+      const centroid = (ring) => {
+        let a = 0, x = 0, z = 0;
+        for (let i = 0; i < ring.length; i++) {
+          const [x0, z0] = ring[i], [x1, z1] = ring[(i + 1) % ring.length];
+          const cr = x0 * z1 - x1 * z0;
+          a += cr; x += (x0 + x1) * cr; z += (z0 + z1) * cr;
+        }
+        a *= 0.5;
+        if (Math.abs(a) < 1e-6) {
+          const n = ring.length;
+          return [ring.reduce((s, p) => s + p[0], 0) / n, ring.reduce((s, p) => s + p[1], 0) / n];
+        }
+        return [x / (6 * a), z / (6 * a)];
+      };
+      const [ccx, ccz] = centroid(cotton.rings[0]);
+      const [cropx, cropz] = h.mapT(ccx, ccz);
+      const cropInk = probe(h.layerCanvas('crops'), cropx, cropz, 2);
+      return {
+        railInk, airportInk, countyInk, cropInk, cottonName: cotton?.name,
+        bw: h.bigWindow, sb: h.scaleBar,
+      };
+    })()`);
+    t.ok(r.cottonName, 'no county with GEO.ag dominantCrop === cotton found');
+    t.ok(r.railInk, 'no ink at GEO.rails[0].pts[0] on the rails layer');
+    t.ok(r.airportInk, `no ink at DFW's glyph on the airports layer`);
+    t.ok(r.countyInk, 'no ink at GEO.counties[0].rings[0][0] on the counties layer');
+    t.ok(r.cropInk, `no ink at the ${r.cottonName} centroid on the crops layer`);
+    t.ok(r.bw && Number.isFinite(r.bw.w) && Number.isFinite(r.bw.h), `bigWindow malformed: ${JSON.stringify(r.bw)}`);
+    t.ok(r.sb && Number.isFinite(r.sb.px) && Number.isFinite(r.sb.miles), `scaleBar malformed: ${JSON.stringify(r.sb)}`);
+  });
+
+  await t.check('Map W2: clearLayers() — layersOn empty, storage round-trips []', async () => {
+    const r = await t.ev(`(() => {
+      g.hud.clearLayers();
+      return { on: [...g.hud.layersOn], stored: localStorage['${MAP_LAYERS_KEY}'] };
+    })()`);
+    t.ok(r.on.length === 0, `layersOn not empty after clearLayers(): ${JSON.stringify(r.on)}`);
+    t.ok(r.stored === '[]', `storage did not round-trip []: ${r.stored}`);
+  });
+
+  await t.check('Map W2: debug action "Map: all layers on" mirrors clicking every toggle button', async () => {
+    const r = await t.ev(`(() => {
+      const h = g.hud;
+      h.clearLayers();
+      g.debug.actions.mapAllLayers();
+      const expected = JSON.stringify(h.layerList);
+      const got = JSON.stringify(h.layerList.filter((n) => h.layersOn.has(n)));
+      const stored = localStorage['${MAP_LAYERS_KEY}'];
+      // hermetic restore — leave layersOn empty and the storage key clean,
+      // as found before this suite's first Map W2 check
+      h.clearLayers();
+      localStorage.removeItem('${MAP_LAYERS_KEY}');
+      return { got, expected, stored };
+    })()`);
+    t.ok(r.got === r.expected, `debug action did not turn on all five in layerList order: ${r.got}`);
+    t.ok(r.stored === r.expected, `debug action did not persist all five: ${r.stored}`);
+  });
 }

@@ -107,6 +107,13 @@ handoff wave** as measured pilots, not law:
   contract there, so contract holes are the dominant failure mode. Keep only
   if it finds a real hole; an all-clear carries no evidential weight (the
   Gemini false-all-clear precedent, `VISION_EXTERNAL_AGENTS.md`).
+  **Verdict (Map W2 pilot, 2026-07-23): KEEP — now practice for handoff
+  waves.** 8 findings: 2 real contract holes (band-city collapse under the
+  rider's `inTexas` gate; count-preservation check unsatisfiable off the
+  shared RNG stream — each worth a mid-chunk triage round), 5 smaller
+  defects, 1 false positive (a "phantom" function that exists —
+  `hud.js:1173`). ~63k subagent tokens, ~3 min. Findings verified
+  in-session before triage per the external-agents law.
 - **Law-enforcing hooks pilot**: one PreToolUse hook blocking
   `verify.mjs`/`status.sh`/`verify-selftest.mjs` piped through `tail`/`head`
   (the 2026-07-22 law) as the trial. If it holds without friction, consider

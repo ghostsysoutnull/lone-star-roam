@@ -7,42 +7,34 @@ changing); per-module grep anchors in `MODULES.md`; history in `ROADMAP.md`;
 queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
 
 ## Session briefing
-- **This session**: **Map W2 of 4 per `MAP_SPEC.md`** (spec written
-  2026-07-23 — read its W2 sections before planning) — big-map overlay
-  layers (Rails/Energy/Airports/Counties/Crops toggles + Base reset,
-  lazily-rendered canvases composited in `drawBig`, persisted). Scope
-  changed from the old one-wave shape in Bruno's spec review: waypoint +
-  widgets moved to W3, collectibles layer dropped, beyond-band context
-  bake is W4. Still the **shakedown wave for the 2026-07-23
-  wave-protocol amendment**: JSON contract file, multi-chunk wave-coder +
-  single closer, plan-grill pilot, challenge triage (pilots in BACKLOG
-  "amendment pilots").
-- **Recommended setup**: handoff **yes**, effort **high** — settled canvas
-  pattern, no feel kernel; 2 chunks with disjoint files (spec names them),
-  second agent is the closer. Session runs Fable 5; flag it if another
-  model is running.
-- **Budget**: code + checks + debug action + tours; style tables go in the
-  JSON contract file, not the plan message; grill = 1 round under the
-  BACKLOG token rules; one full verify (the closer's); no shots unless a
-  layer looks wrong — then 1 staged shot, Bruno-judged (`judge-shot.sh`
-  still broken).
-- **Rider chunk** (Bruno approved 2026-07-23, from the coastal audit):
-  the `cities.js` building-containment fix — third file-disjoint
-  `wave-coder` chunk (`src/cities.js` + checks; contract with the audit
-  numbers in BACKLOG's "Placement audit follow-on" entry). Not part of
-  the Map wave itself; rides the session.
-- **Both scouts landed 2026-07-23**: coastal audit → findings + approved
-  fix contract in BACKLOG (the W2-session rider); beyond-band context
-  prefetch → numbers and resolved calls folded into `MAP_SPEC.md` W4
-  (raw inputs in `~/claude-area/devel/tx-inputs/map-context-*.json`).
-  Nothing gates W2.
-- **Then**: close via the **`/wave-close` skill**; its report carries the
-  pilot verdicts (grill keep/kill, multi-chunk economics, scout, the skill
-  itself) and the `fable+sonnet×N` ledger convention; briefing rewrite
-  points at Map W3 (slot export/import queues after the track — Bruno
-  approved 2026-07-23).
+- **This session**: **Map W3 of 4 per `MAP_SPEC.md`** (read its W3
+  sections before planning) — live traffic glyphs on the big map (trains/
+  ships/planes as a sixth Traffic toggle in the W2 layer bar), click-to-
+  waypoint (pin on both maps, compass tick, header distance, session-only),
+  and the you-are-here widget (`#map-coords` grows Copy + Google Maps on
+  the player position). W1.2's click-to-copy gesture is retired in this
+  wave (spec resolved call). Map W2 + the cities-containment rider shipped
+  2026-07-23 (the commit carrying this briefing).
+- **Recommended setup**: handoff **yes**, effort **high** — glyph ink and
+  a gesture swap on settled surfaces; single `wave-coder` (under the
+  multi-chunk threshold unless the plan grows). Plan-grill runs before
+  spawn (pilot verdict KEEP, now practice — BACKLOG "amendment pilots").
+  Session runs Fable 5; flag it if another model is running.
+- **Budget**: code + checks (waypoint numeric surface, mover-dot count vs
+  system state, widget text) + debug action (force a waypoint) + tours;
+  glyph table in the JSON contract file; grill = 1 round under the BACKLOG
+  token rules; one full verify (the agent's closing run); no shots —
+  logic/glyph work (`judge-shot.sh` still broken; Bruno judges any
+  exception shot).
+- **Then**: close via `/wave-close`; briefing rewrite points at Map W4
+  (the context bake — last wave: briefing deleted, track folds into
+  ROADMAP, minimap-untouched law repealed in GOTCHAS, W4's one open knob
+  is the place-population cutoffs picked from the scout's sweep numbers).
 
-Gotchas carried over: `tools/judge-shot.sh` broken (Copilot rejects the
-zero-tools lockdown — staged shots judged by Bruno only); verify
-single-instance lock means exactly one closer runs the wave's full verify;
-minimap stays untouched through W2–W3 (the law is repealed only in W4).
+Gotchas carried over: `tools/judge-shot.sh` broken (staged shots judged by
+Bruno only); minimap stays untouched through W3 (repeal only in W4); the
+shared `#toast` surface is written by maritime/trains/energy — any check
+asserting toast silence must clear moving-system interference (the 120u
+route-margin pattern in `tools/checks/energy.mjs`, Map W2); W3's mover
+enumerations are read-only (`trains` consists, `maritime.ships` +
+`shrimpers`, `radio.sources` — no new scans, `MAP_SPEC.md` W3).

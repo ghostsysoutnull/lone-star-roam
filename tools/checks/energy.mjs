@@ -237,8 +237,26 @@ export default async function energy(t) {
     await t.ev(`(() => { g.hud.toast(''); g.energy.cooldown = 0; })()`);
     await t.tp(nansen.x + 5, nansen.z);
     await t.until(`document.getElementById('toast').textContent.includes('NANSEN')`, 4000);
-    // unnamed minor: silent — no announcer entry at all
-    const dark = await t.ev(`g.GEO.energy.platforms.find((p) => !p.name && !p.operator)`);
+    // unnamed minor: silent — no announcer entry at all. Must not sit near a
+    // GEO.sea route: a passing ship's own identity toast (maritime.js
+    // SHIP_TOAST_R = 60u) shares the same #toast surface and would fire
+    // independently of this check, breaking the silence assertion on a
+    // check defect, not a production bug — 120u margin covers ship drift
+    // during the 1.2 s wait.
+    const dark = await t.ev(`(() => {
+      const distToSeg = (px, pz, [ax, az], [bx, bz]) => {
+        const dx = bx - ax, dz = bz - az;
+        const len2 = dx * dx + dz * dz;
+        const u = len2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (pz - az) * dz) / len2)) : 0;
+        return Math.hypot(px - (ax + u * dx), pz - (az + u * dz));
+      };
+      const nearRoute = (x, z) => g.GEO.sea.routes.some((r) => {
+        for (let i = 1; i < r.pts.length; i++)
+          if (distToSeg(x, z, r.pts[i - 1], r.pts[i]) <= 120) return true;
+        return false;
+      });
+      return g.GEO.energy.platforms.find((p) => !p.name && !p.operator && !nearRoute(p.x, p.z));
+    })()`);
     if (dark) {
       await t.ev(`(() => { g.hud.toast(''); g.energy.cooldown = 0; })()`);
       await t.tp(dark.x + 3, dark.z);

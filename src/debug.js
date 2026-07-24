@@ -271,6 +271,13 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
     crudeJob() { missions.forceEnergy('crude'); },
     fuelJob() { missions.forceEnergy('fuel'); },
     bladeJob() { missions.forceEnergy('blade'); },
+    // Map W2: every big-map overlay layer on + persisted, exactly equivalent
+    // to clicking each of the 5 toggle buttons — the Tours "judge every ink
+    // at once" spot chains this.
+    mapAllLayers() {
+      for (const name of hud.layerList) if (!hud.layersOn.has(name)) hud.toggleLayer(name);
+      hud.toast('🗺️ All map layers on');
+    },
     saveQuitToTitle() {
       gameplay.snapshotAt(player, sky);
       gameplay.persist();
@@ -307,6 +314,7 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       ['Weather', [['clear', '☀️ Clear'], ['clouds', '☁️ Clouds'], ['rain', '🌧 Rain'],
         ['storm', '⛈ Storm'], ['dust', '🌪 Dust']]],
       ['Energy jobs', [['crudeJob', '🛢 Crude haul'], ['fuelJob', '⛽ Fuel run'], ['bladeJob', '🌀 Blade load']]],
+      ['Map', [['mapAllLayers', 'Map: all layers on']]],
       ['Boot', [['saveQuitToTitle', '🚪 Save & quit to title']]],
     ];
     const actionsHtml = sections.map(([title, rows]) =>

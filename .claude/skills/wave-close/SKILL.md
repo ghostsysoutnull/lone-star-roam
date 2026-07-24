@@ -7,6 +7,8 @@ description: Close a Lone Star Roam wave — the fixed wave-end checklist (perfo
 
 Run the steps in order. Source of law: `CLAUDE.md` multi-wave protocol steps 3, 5, 6 — this skill is the checklist, not a replacement; on conflict, CLAUDE.md wins.
 
+**Invoker guard (Bruno, 2026-07-23)**: who invoked the skill decides how far it runs. Model-invoked (the session closing a wave per the briefing) → steps 0–3 only, always stopping at the report; commit and push wait for Bruno. Bruno-typed `/wave-close` *after the report has been delivered* → his invocation IS the explicit commit+push go-ahead; run step 4. A Bruno-typed invocation with no report yet delivered runs steps 0–3 first and then step 4 in the same pass.
+
 ## 0. Preconditions — do not start the close without all three
 - The wave's **single full verify** is green (the closer agent's run; log at `/tmp/lonestar-verify.log`), and `tools/status.sh` is clean.
 - Every agent report's `deviations:`/`challenges:`/`open:` lines are triaged (resolve in-wave / escalated to Bruno / BACKLOG with provenance) — no line silently dropped.
@@ -25,4 +27,4 @@ Run the steps in order. Source of law: `CLAUDE.md` multi-wave protocol steps 3, 
 Non-technical, feature/result-driven, stoic labeled lines (Result / Open). What changed in the game and why it matters. Nothing technical below it.
 
 ## 4. Commit gate
-Report first; **commit and push only on Bruno's explicit go-ahead** — plan approval is not commit approval. The wave commit carries code + checks + tours + the step-1 docs together. Trailer: `Co-Authored-By:` line per the running model — verify the model before writing the trailer (the 2026-07-21 attribution erratum).
+Report first; **commit and push only on Bruno's explicit go-ahead** — plan approval is not commit approval, and a *model-invoked* run of this skill never reaches this step (invoker guard above). Bruno's own `/wave-close` after the report counts as that go-ahead, as does a plain "commit"/"commit and push". The wave commit carries code + checks + tours + the step-1 docs together. Before the push: quick repo-state check (`gh repo view --json isPrivate` — visibility has flipped before; pushes deploy to GitHub Pages). Trailer: `Co-Authored-By:` line per the running model — verify the model before writing the trailer (the 2026-07-21 attribution erratum).
