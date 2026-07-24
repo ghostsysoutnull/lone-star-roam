@@ -9,6 +9,7 @@ import { releaseOn } from './turtles.js';
 import { TOURS } from './tours.js';
 import { AIRPORTS } from './airports.js';
 import { KEYS, slotKey } from './slots.js';
+import { applyGear } from './shop.js';
 
 const LL = (lat, lon) => [(lon + 99.5) * 111320 * Math.cos((31 * Math.PI) / 180) / 100, -(lat - 31) * 111320 / 100];
 const BRIDGE = LL(30.2617, -97.7447); // Congress Ave — the bat show
@@ -113,6 +114,28 @@ export function initDebug({ player, sky, haunts, ufo, hud, aviation, radio, heli
       const ring = [['spotteddolphin', 14, 0], ['greenturtle', 0, 14], ['cownose', -14, 0], ['tarpon', 0, -14]];
       for (const [sp, ox, oz] of ring) animals.forceSpawn(sp, player.pos.x + ox, player.pos.z + oz);
       hud.toast('🐬 pod, turtle, ray, and tarpon conjured — idle close to log them');
+    },
+    // Sea-Industry W3: dock-to-dock haul, pinned houston → corpus (the
+    // forceEnergy/forceSea idiom — accept() itself does the toast)
+    seaJob() { missions.forceSea('houston', 'corpus'); },
+    // full boat gear granted for this session's tours — save + perks, real path
+    seaGear() {
+      gameplay.save.gear = { ...gameplay.save.gear, outboard: 2, vhf: 1, boatlights: 1, shrimprig: 1, fishfinder: 1 };
+      applyGear(gameplay.save, player, dog);
+      gameplay.persist();
+      hud.toast('🚤 Full boat gear granted — outboard, VHF, lights, rig, finder');
+    },
+    sonar() {
+      actions.seaGear();
+      actions.seaLife();
+    },
+    // key channel 16 from anywhere: gear grant lifts the range gate, then
+    // every vessel's cooldown zeroes so the very next frame keys a line
+    handheld16() {
+      actions.seaGear();
+      maritime.vhfFloor = 0;
+      for (const s of maritime.ships) s.id.chatT = 0;
+      for (const b of maritime.shrimpers) b.id.chatT = 0;
     },
     // Rails W2: named trains forced onto their routes, schedule bypassed
     'railCrossing:laredo'() {

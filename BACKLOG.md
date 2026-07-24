@@ -1,12 +1,11 @@
 # Backlog — queued work
 
-Active track: **Sea-Industry Realism** (`SEA_INDUSTRY_SPEC.md`, spec'd
-2026-07-22, 3 waves). W1 (ports + AIS routes + Ports log) and W2 (named
-ships, VHF chatter, CG cutters, shrimp fleet, life offshore) shipped
-2026-07-23; next up: **sea-industry W3** (sea cargo jobs + boat shop —
-closes the track). The Verify Ops interstitial (runner single-instance
-lock + load warning + toast-class fix) shipped 2026-07-23.
-Items below are the queue.
+Active track: **none** — Sea-Industry Realism closed 2026-07-23 (3 waves:
+ports + AIS routes + Ports log; the working Gulf; sea jobs + boat shop —
+folded into `ROADMAP.md`, `SEA_INDUSTRY_SPEC.md` kept as history). The
+Verify Ops interstitial (runner single-instance lock + load warning +
+toast-class fix) also shipped 2026-07-23.
+Items below are the queue; the next track is an open pick.
 Direction-level ideas that aren't actionable yet live in `FUTURE.md`.
 
 ## Bugs (live in shipped code)

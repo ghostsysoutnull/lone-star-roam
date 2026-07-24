@@ -5,9 +5,9 @@ Status as of 2026-07-10. v1 is playable: real-geography Texas, drive/fly/walk,
 
 No active priority track (aviation shipped in full 2026-07-12; Brands,
 Jetpack, Agriculture, the Shoulder & the Shelf, Band Parity, New Player
-Experience, Energy, Performance, Railroads Realism, Water Vehicles, and
-Rails Operations followed and are folded in below). Queued work lives in
-`BACKLOG.md`.
+Experience, Energy, Performance, Railroads Realism, Water Vehicles, Rails
+Operations, and Sea-Industry Realism followed and are folded in below).
+Queued work lives in `BACKLOG.md`.
 
 - [x] ~~Test cycle — fast logic checks~~ — done 2026-07-15: `node
   tools/test.mjs` runs four sub-second Node-only groups (`aviation`, `data`,
@@ -1030,6 +1030,23 @@ Rails Operations followed and are folded in below). Queued work lives in
   runner-owned `/tmp/lonestar-verify.log` authoritative after the run).
   Born from the Sea W1 wave-close 3-run pile-up at load 33 —
   `VERIFY_OPS_SPEC.md` keeps the incident record.
+- [x] ~~Sea-Industry Realism (3 waves)~~ — done 2026-07-23
+  (`SEA_INDUSTRY_SPEC.md` kept as history): the Gulf became a workplace.
+  W1 — 8 real ports (OSM quay/crane extracts) dressed by baked character
+  with berth/roadstead records, 6 ship-route polylines traced on a real
+  AIS density grid (`tools/build-sea.mjs` + `tools/reduce-ais.mjs`, numeric
+  ridge gate at bake time), `data/sea.json` 6th boot layer, Ports log 12th
+  collectible (`save.ports`), old hand-laid LANE retired. W2 — per-vessel
+  seeded identity + placards (`shipid:`), token-gated VHF channel-16
+  chatter, CG cutters on patrol + the joint heli hover, the shrimp fleet
+  working real grounds dawn-to-dusk (`shrimper:`), 5 offshore species +
+  the gull-flock bridge (species sites 29→34); three playtest rounds
+  settled the sea-surface legibility law. W3 — sea cargo jobs (kind
+  `'sea'`, dock-to-dock between the real ports, `seaOfferTerms`, ×1.5
+  all-water bonus, roadstead-law dock resolution) and the boat shop:
+  outboard tiers, boatyard hull paint, VHF handheld (channel 16 anywhere),
+  running lights, shrimp rig (troll the fleet's grounds, land the catch
+  for pay), fish finder sonar; 13 new checks, full suite 606 green.
 - [ ] Mobile touch controls (virtual stick + buttons)
 
 ## Non-goals

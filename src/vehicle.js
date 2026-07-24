@@ -39,8 +39,9 @@ const FLASHLIGHT_DURATION = 10;
 // carries (a boat has no brakes, reverse is weak), turn authority that grows
 // with way on. Cap sits just under the street tier (26): open-water legs are
 // maritime distances, but roads keep the crown on pavement (Bruno, W1 tune).
-const BOAT_SPEED = 24;
-const BOAT_ACCEL = 10;
+// Top speed/accel are tiered (Sea-Industry W3 outboard upgrade): stock values
+// live in the perks defaults below (boatCap: 24, boatAccel: 10), same idiom
+// as engineCap/offroadCap — no separate top-level const to drift out of sync.
 const BOAT_REV = -3.5;
 const BOAT_COAST = 0.85; // per-second speed retention while coasting (DRIVE keeps 0.35)
 const BOAT_HOLD = 2;     // cruise-hold band (W3): coasting above this holds way on; below it, drift-to-rest
@@ -79,7 +80,7 @@ export class Player {
     this.pitchVis = 0;
     this.braking = false;
     // stock drive stats; shop.js applyGear() overwrites these with upgrade tiers
-    this.perks = { engineCap: 1, offroadCap: 20, offroadAccel: 14, rainDrag: 0.22, lightI: 30 };
+    this.perks = { engineCap: 1, offroadCap: 20, offroadAccel: 14, rainDrag: 0.22, lightI: 30, boatCap: 24, boatAccel: 10 };
 
     this.truck = mkTruck();
     this.wings = mkWings();
@@ -332,20 +333,20 @@ export class Player {
       this.tilt = steer * Math.min(1, Math.abs(this.speed) / 25) * 0.09;
     } else if (this.mode === 'BOAT') {
       // momentum-heavy: slow spool-up, a glide that carries, rudder needs way on
-      if (fwd) this.speed += BOAT_ACCEL * dt;
+      if (fwd) this.speed += this.perks.boatAccel * dt;
       else if (back) this.speed -= (this.speed > 0 ? 10 : 5) * dt;
       // cruise hold (W3): above the band the glide stops decaying — release W
       // and she holds way on; below it the old decay reclaims drift-to-rest.
       // No min-speed clamp (a floor would fight beaching's hard stop).
       else if (this.speed <= BOAT_HOLD) this.speed *= Math.pow(BOAT_COAST, dt);
-      this.speed = THREE.MathUtils.clamp(this.speed, BOAT_REV, BOAT_SPEED);
+      this.speed = THREE.MathUtils.clamp(this.speed, BOAT_REV, this.perks.boatCap);
       this.heading += steer * dt * BOAT_TURN * Math.min(1, Math.abs(this.speed) / 8) * Math.sign(this.speed || 1);
       const nx = this.pos.x - Math.sin(this.heading) * this.speed * dt;
       const nz = this.pos.z - Math.cos(this.heading) * this.speed * dt;
       const nw = boatableAt(nx, nz);
       if (nw) { this.pos.x = nx; this.pos.z = nz; this._water = nw; }
       else this.speed = 0; // beached: the hull grounds where the water ends
-      this.tilt = -steer * Math.min(1, Math.abs(this.speed) / BOAT_SPEED) * 0.13; // heel into the turn
+      this.tilt = -steer * Math.min(1, Math.abs(this.speed) / this.perks.boatCap) * 0.13; // heel into the turn
     } else if (this.mode === 'FLY') {
       if (fwd) this.speed += 40 * dt;
       else if (back) this.speed -= 50 * dt;
@@ -446,7 +447,7 @@ export class Player {
       // multiply, planing flattens as the hull climbs onto its own wake.
       // Attitude and bob live on the avatar only: pos.y stays _water.y (the
       // legality/y source, and what the wake/sparkle pools ride).
-      const planing = 1 - 0.7 * Math.min(1, Math.abs(this.speed) / BOAT_SPEED);
+      const planing = 1 - 0.7 * Math.min(1, Math.abs(this.speed) / this.perks.boatCap);
       this.chopAmp = 0.016 * ATMOS.wind * (1 + Math.min(1.6, ATMOS.rain) * 0.6) * planing;
       this.chopT += dt * (0.8 + ATMOS.wind * 0.5);
       avatar.rotateX(Math.sin(this.chopT * 1.7) * this.chopAmp);
@@ -612,10 +613,14 @@ export class Player {
           w.x = this.pos.x + Math.sin(this.heading) * 2.3;
           w.z = this.pos.z + Math.cos(this.heading) * 2.3;
           w.y = this.pos.y + 0.05 + i * 0.0015; // y-stagger above the one water plane
-          w.s = 0.9 + Math.min(1, Math.abs(this.speed) / BOAT_SPEED) * 1.3;
+          w.s = 0.9 + Math.min(1, Math.abs(this.speed) / this.perks.boatCap) * 1.3;
           break;
         }
       }
+      // running lights (Sea-Industry W3): same lightsOn threshold as the
+      // wings' navs (the mkWings idiom) — perk-gated, no scene light added
+      const sk = this.skiff.userData;
+      sk.navL.visible = sk.navR.visible = sk.stern.visible = this.mode === 'BOAT' && this.perks.boatlights && lightsOn;
     } else { // WALK
       const c = this.cowboy.userData;
       const moving = Math.abs(this.speed) > 0.4;
@@ -856,6 +861,23 @@ function mkSkiff() {
   star.rotation.x = -Math.PI / 2;
   star.position.set(0, 0.59, -1.2); // on the foredeck
   g.add(hull, bow, stripe, console, screen, bench, motor, skeg, star);
+
+  // Sea-Industry W3: crate stack (shrimp/cargo hauls) — foredeck, hidden until loaded
+  const cargo = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.5, 0.9), new THREE.MeshLambertMaterial({ color: 0xa07a48, flatShading: true }));
+  cargo.position.set(0, 0.85, -0.6);
+  cargo.visible = false;
+  g.add(cargo);
+
+  // running lights (the mkWings navL/navR/strobe idiom): red port, green
+  // starboard, white stern — MeshBasic only, never a scene light (GOTCHAS law)
+  const nav = (hex) => new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 0.12), new THREE.MeshBasicMaterial({ color: hex }));
+  const navL = nav(0xff2222); navL.position.set(-0.87, 0.62, 0.2);
+  const navR = nav(0x22ff44); navR.position.set(0.87, 0.62, 0.2);
+  const stern = nav(0xffffff); stern.position.set(0, 1.05, 2.25);
+  navL.visible = navR.visible = stern.visible = false;
+  g.add(navL, navR, stern);
+
+  g.userData = { hullMat, cargo, navL, navR, stern };
   return g;
 }
 

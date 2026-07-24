@@ -90,6 +90,106 @@ export default async function boat(t) {
     t.near(res.y, -2.5, 0.01, 'y left the water plane during the run');
   });
 
+  await t.check('outboard III (Sea-Industry W3): measured top speed rises stock 24 → upgraded 32', async () => {
+    await t.tp(GULF.x, GULF.z, 'BOAT');
+    await t.ev(`(g.player.heading = -1.97, g.player.speed = 0)`);
+    await t.hold('KeyW');
+    const stock = (await t.simStep(5)).maxSpeed;
+    await t.release();
+    t.near(stock, 24, 3, 'stock boat top speed');
+    await t.ev(`(() => { g.gameplay.save.bank = 1700; g.travel.buyItem('outboard'); g.travel.buyItem('outboard'); })()`);
+    t.ok((await t.ev('g.player.perks.boatCap')) === 32, 'outboard not maxed out');
+    await t.tp(GULF.x, GULF.z, 'BOAT');
+    await t.ev(`(g.player.heading = -1.97, g.player.speed = 0)`);
+    await t.hold('KeyW');
+    const tuned = (await t.simStep(6)).maxSpeed;
+    await t.release();
+    t.near(tuned, 32, 3, 'upgraded boat top speed');
+  });
+
+  await t.check('running lights (Sea-Industry W3): perk + night lit, day dark, no perk dark', async () => {
+    await t.tp(GULF.x, GULF.z, 'BOAT');
+    await t.ev('g.player.perks.boatlights = true');
+    await t.setNight();
+    await t.until('g.player.skiff.userData.navL.visible', 8000);
+    const lit = await t.ev(`({ l: g.player.skiff.userData.navL.visible, r: g.player.skiff.userData.navR.visible, s: g.player.skiff.userData.stern.visible })`);
+    t.ok(lit.l && lit.r && lit.s, `nav lights not all lit at night with the perk: ${JSON.stringify(lit)}`);
+    await t.setDay();
+    await t.wait(0.3);
+    t.ok(!(await t.ev('g.player.skiff.userData.navL.visible')), 'nav lights stayed lit in daylight');
+    await t.setNight();
+    await t.ev('g.player.perks.boatlights = false');
+    await t.wait(0.3);
+    t.ok(!(await t.ev('g.player.skiff.userData.navL.visible')), 'nav lights lit at night without the perk');
+    await t.ev('g.player.perks.boatlights = true');
+    await t.setDay();
+  });
+
+  await t.check('VHF handheld (Sea-Industry W3): perks.vhf lifts the range gate from inland', async () => {
+    const austin = await t.ev(`(() => { const c = g.GEO.cities.find((c) => c.name === 'Austin'); return { x: c.x, z: c.z }; })()`);
+    await t.tp(austin.x, austin.z);
+    const res = await t.ev(`(() => {
+      const old = g.maritime.onChatter;
+      let got = null;
+      g.maritime.onChatter = (line) => { got = line; };
+      g.player.perks.vhf = false;
+      g.maritime.vhfFloor = 0;
+      for (const s of g.maritime.ships) s.id.chatT = 0;
+      g.maritime.update(0.05, 0, g.player);
+      const withoutPerk = got;
+      got = null;
+      g.player.perks.vhf = true;
+      g.maritime.vhfFloor = 0;
+      for (const s of g.maritime.ships) s.id.chatT = 0;
+      g.maritime.update(0.05, 0, g.player);
+      const withPerk = got;
+      g.maritime.onChatter = old;
+      return { withoutPerk, withPerk };
+    })()`);
+    t.ok(!res.withoutPerk, `chatter fired from Austin without the handheld: "${res.withoutPerk}"`);
+    t.ok(res.withPerk, 'handheld did not lift the VHF range gate from Austin');
+    await t.ev('g.player.perks.vhf = false');
+  });
+
+  await t.check('shrimp rig (Sea-Industry W3): trolling a ground ices crates, running one home pays', async () => {
+    await t.ev('g.player.perks.shrimprig = true');
+    await t.tp(4752, 1993, 'BOAT'); // Galveston ground (tours spot / FISHING pts end)
+    await t.ev('(g.player.heading = 0.4, g.player.speed = 3)');
+    await t.step(13, 'g.maritime.update(dt, 0, g.player)', 'g.maritime.catch >= 1');
+    const iced = await t.ev('g.maritime.catch');
+    t.ok(iced >= 1, `no crate iced after 13s trolling the ground: ${iced}`);
+    // capture bank BEFORE the teleport — t.tp's own settle wait runs the real
+    // loop, which can pay out immediately once position/speed qualify
+    const bank0 = await t.ev('g.gameplay.save.bank');
+    await t.tp(4512.8, 1889, 'BOAT'); // Galveston home dock (FISHING pts[0] / port berth)
+    await t.ev('g.player.speed = 0');
+    await t.until('g.maritime.catch === 0', 4000); // real loop lands the hold
+    const bank1 = await t.ev('g.gameplay.save.bank');
+    t.ok(bank1 > bank0, `shrimp landing did not pay: ${bank0} → ${bank1}`);
+    t.ok((await t.ev('g.maritime.catch')) === 0, 'hold not reset after landing');
+    await t.ev('g.player.perks.shrimprig = false');
+  });
+
+  await t.check('fish finder (Sea-Industry W3): sonar pings a live sea species, fires onSonar', async () => {
+    await t.tp(4200, 2350, 'BOAT'); // Sea W2 sea-life tour spot
+    await t.ev(`(() => {
+      const ring = [['spotteddolphin', 14, 0], ['greenturtle', 0, 14], ['cownose', -14, 0], ['tarpon', 0, -14]];
+      for (const [sp, ox, oz] of ring) g.animals.forceSpawn(sp, g.player.pos.x + ox, g.player.pos.z + oz);
+      g.player.perks.fishfinder = true;
+      g.animals.sonarCd = 0;
+    })()`);
+    const res = await t.ev(`(() => {
+      let got = null;
+      const old = g.animals.onSonar;
+      g.animals.onSonar = (m) => { got = m; };
+      g.animals.sonar(g.player, 0.05);
+      g.animals.onSonar = old;
+      return got;
+    })()`);
+    t.ok(res && res.includes('Sonar contact'), `sonar did not fire near live sea life: ${res}`);
+    await t.ev('g.player.perks.fishfinder = false');
+  });
+
   await t.check('cruise hold (W3): S bleeds the way off, below-band drift still dies to rest', async () => {
     await t.tp(GULF.x, GULF.z, 'BOAT');
     await t.ev(`(g.player.heading = -1.97, g.player.speed = 12)`);

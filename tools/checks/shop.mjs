@@ -49,13 +49,13 @@ export default async function shop(t) {
       g.gameplay.save.bank = 0;
       g.travel.tab = 'Shop'; g.travel.render();
       const btns = [...document.querySelectorAll('#travel .poi-list button')];
-      const swatches = btns.filter((b) => b.dataset.i.startsWith('paint:'));
+      const swatches = btns.filter((b) => b.dataset.i.startsWith('paint:') || b.dataset.i.startsWith('hullpaint:'));
       g.travel.buyItem('engine');
       return { n: btns.length - swatches.length, sw: swatches.length, disabled: btns.every((b) => b.disabled),
                lvl: g.gameplay.save.gear.engine ?? 0, bank: g.gameplay.save.bank };
     })()`);
-    t.ok(r.n === 9, `${r.n} shop items rendered, expected 9`);
-    t.ok(r.sw === 7, `${r.sw} paint swatches rendered, expected 7`);
+    t.ok(r.n === 14, `${r.n} shop items rendered, expected 14`);
+    t.ok(r.sw === 13, `${r.sw} paint swatches rendered, expected 13 (7 truck + 6 hull)`);
     t.ok(r.disabled, 'an unaffordable item was clickable');
     t.ok(r.lvl === 0 && r.bank === 0, `broke purchase went through (lvl ${r.lvl}, bank ${r.bank})`);
   });
@@ -136,6 +136,45 @@ export default async function shop(t) {
     t.ok(bank === 0, `tiers should cost exactly $3050, $${3050 - bank} spent`);
     const tuned = await t.ev(`(() => { g.gameplay.save.bank = 0; g.missions.deliver(${job}); return g.gameplay.save.bank; })()`);
     t.ok(tuned === 1450, `rig III haul paid $${tuned}, expected 1450 (×1.45)`);
+  });
+
+  await t.check('outboard upgrade: perks.boatCap/boatAccel step with each tier, stock matches vehicle.js', async () => {
+    t.ok((await t.ev('g.player.perks.boatCap')) === 24 && (await t.ev('g.player.perks.boatAccel')) === 10,
+      'stock boat perks drifted from vehicle.js BOAT_SPEED/BOAT_ACCEL (24/10)');
+    await t.ev('g.gameplay.save.bank = 500');
+    await buyOut(t, 'outboard', 1);
+    t.ok((await t.ev('g.player.perks.boatCap')) === 28 && (await t.ev('g.player.perks.boatAccel')) === 12.5, 'tier I outboard perk mismatch');
+    await t.ev('g.gameplay.save.bank = 1200');
+    await buyOut(t, 'outboard', 1);
+    t.ok((await t.ev('g.player.perks.boatCap')) === 32 && (await t.ev('g.player.perks.boatAccel')) === 15, 'tier II outboard perk mismatch');
+  });
+
+  await t.check('boat gear line: VHF/running lights/shrimp rig/fish finder set their perk flags', async () => {
+    await t.ev('g.gameplay.save.bank = 1700');
+    await buyOut(t, 'vhf', 1);
+    t.ok(await t.ev('g.player.perks.vhf'), 'vhf perk not set after purchase');
+    await buyOut(t, 'boatlights', 1);
+    t.ok(await t.ev('g.player.perks.boatlights'), 'boatlights perk not set after purchase');
+    await buyOut(t, 'shrimprig', 1);
+    t.ok(await t.ev('g.player.perks.shrimprig'), 'shrimprig perk not set after purchase');
+    await buyOut(t, 'fishfinder', 1);
+    t.ok(await t.ev('g.player.perks.fishfinder'), 'fishfinder perk not set after purchase');
+  });
+
+  await t.check('boatyard: $200 a coat, skiff hull recolors, same coat rejected, broke buyer bounces', async () => {
+    const hex1 = await t.ev(`(() => {
+      g.gameplay.save.bank = 400;
+      g.travel.tab = 'Shop'; g.travel.render();
+      g.travel.buyItem('hullpaint:1');
+      return g.player.skiff.userData.hullMat.color.getHex();
+    })()`);
+    t.ok(hex1 === 0x2f8f8f, `bay teal not applied (got #${hex1.toString(16)})`);
+    t.ok((await t.ev('g.gameplay.save.bank')) === 200, 'coat price not deducted exactly');
+    await t.ev(`g.travel.buyItem('hullpaint:1')`); // already wearing it — must bounce
+    t.ok((await t.ev('g.gameplay.save.bank')) === 200, 'repaint in the same color charged');
+    await t.ev('g.gameplay.save.bank = 0');
+    await t.ev(`g.travel.buyItem('hullpaint:2')`);
+    t.ok((await t.ev('g.player.skiff.userData.hullMat.color.getHex()')) === 0x2f8f8f, 'broke coat purchase went through');
   });
 
   await t.check('Lacy rides the bed, perches on cargo crates, yips after the horn', async () => {

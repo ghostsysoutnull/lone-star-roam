@@ -7,12 +7,13 @@ const cityXZ = (t, name) =>
   t.ev(`(() => { const c = g.GEO.cities.find((c) => c.name === ${JSON.stringify(name)}); return { x: c.x, z: c.z }; })()`);
 
 export default async function missions(t) {
-  await t.check('job board offers 4 ground + 3 energy + 4 charter resolvable jobs', async () => {
-    const { n, nGround, nEnergy, nCharter, bad, badEnergy, badCharter } = await t.ev(`(() => {
+  await t.check('job board offers 4 ground + 3 energy + 4 charter + 2 sea resolvable jobs', async () => {
+    const { n, nGround, nEnergy, nCharter, nSea, bad, badEnergy, badCharter, badSea } = await t.ev(`(() => {
       const offers = g.missions.offers;
       const ground = offers.filter((o) => !o.kind);
       const energy = offers.filter((o) => o.kind === 'energy');
       const charter = offers.filter((o) => o.kind === 'charter');
+      const sea = offers.filter((o) => o.kind === 'sea');
       const bad = ground.filter((o) =>
         o.from === o.to || !g.missions.city(o.from) || !g.missions.city(o.to) || o.pay <= 0 || o.deadline <= 0).length;
       // energy endpoints resolve as a hero site (by id) or a city (by name)
@@ -21,12 +22,15 @@ export default async function missions(t) {
         o.from === o.to || !end(o.siteFrom, o.from) || !end(o.siteTo, o.to) || o.pay <= 0 || o.deadline <= 0).length;
       const badCharter = charter.filter((o) =>
         o.fromId === o.toId || !g.AIRPORTS.find((a) => a.id === o.fromId) || !g.AIRPORTS.find((a) => a.id === o.toId) || o.pay <= 0 || o.deadline <= 0).length;
-      return { n: offers.length, nGround: ground.length, nEnergy: energy.length, nCharter: charter.length, bad, badEnergy, badCharter };
+      const badSea = sea.filter((o) =>
+        o.fromId === o.toId || !g.GEO.sea.ports.find((p) => p.id === o.fromId) || !g.GEO.sea.ports.find((p) => p.id === o.toId) || o.pay <= 0 || o.deadline <= 0).length;
+      return { n: offers.length, nGround: ground.length, nEnergy: energy.length, nCharter: charter.length, nSea: sea.length, bad, badEnergy, badCharter, badSea };
     })()`);
-    t.ok(n === 11 && nGround === 4 && nEnergy === 3 && nCharter === 4, `${n} offers (${nGround} ground, ${nEnergy} energy, ${nCharter} charter)`);
+    t.ok(n === 13 && nGround === 4 && nEnergy === 3 && nCharter === 4 && nSea === 2, `${n} offers (${nGround} ground, ${nEnergy} energy, ${nCharter} charter, ${nSea} sea)`);
     t.ok(bad === 0, `${bad} malformed ground offers`);
     t.ok(badEnergy === 0, `${badEnergy} malformed energy offers`);
     t.ok(badCharter === 0, `${badCharter} malformed charter offers`);
+    t.ok(badSea === 0, `${badSea} malformed sea offers`);
   });
 
   const offer = await t.ev('({ ...g.missions.offers[0] })');
@@ -85,7 +89,7 @@ export default async function missions(t) {
     t.ok(bank1 - bank0 === expected, `paid $${bank1 - bank0}, expected $${expected}`);
     t.ok((await t.ev('g.gameplay.save.jobsDone')) >= 1, 'jobsDone not bumped');
     t.ok(!(await t.ev('g.player.truck.userData.cargo.visible')), 'crate still visible');
-    t.ok((await t.ev('g.missions.offers.length')) === 11, 'offers not regenerated');
+    t.ok((await t.ev('g.missions.offers.length')) === 13, 'offers not regenerated');
   });
 
   await t.check('late road delivery pays ×0.5×1.5', async () => {
@@ -187,6 +191,70 @@ export default async function missions(t) {
     const paid = (await t.ev('g.gameplay.save.bank')) - bank0;
     const expected = Math.round((pay * 0.5) / 5) * 5;
     t.ok(paid === expected, `paid $${paid}, expected $${expected}`);
+  });
+
+  // --- sea jobs: dock-to-dock hauls, BOAT-only arrival (Sea-Industry W3) ---
+  const dockXZ = (t, id) => t.ev(`(() => {
+    const p = g.GEO.sea.ports.find((p) => p.id === ${JSON.stringify(id)});
+    const d = p.berth ?? p.roadstead;
+    return { x: d[0], z: d[1] };
+  })()`);
+
+  await t.check('every SEA_RUNS from/to port id resolves in GEO.sea.ports', async () => {
+    const bad = await t.ev(`(async () => {
+      const { POOLS } = await import('/src/missions.js');
+      const ids = new Set(g.GEO.sea.ports.map((p) => p.id));
+      const bad = [];
+      for (const r of POOLS.SEA_RUNS) {
+        for (const id of r.from) if (!ids.has(id)) bad.push(r.cargo + ':from:' + id);
+        for (const id of r.to) if (!ids.has(id)) bad.push(r.cargo + ':to:' + id);
+      }
+      return bad;
+    })()`);
+    t.ok(bad.length === 0, `SEA_RUNS ids not in GEO.sea.ports: ${bad.join(' ')}`);
+  });
+
+  await t.check('sea job: forceSea pins houston→corpus, docked+slow loads, speeding past does not', async () => {
+    const offer = await t.ev("g.missions.forceSea('houston', 'corpus')");
+    t.ok(offer && offer.kind === 'sea', 'forceSea did not create a sea job');
+    t.ok((await t.ev('g.missions.job.fromId')) === 'houston' && (await t.ev('g.missions.job.toId')) === 'corpus',
+      'pinned endpoints drifted');
+    const houston = await dockXZ(t, 'houston');
+    // docked but still making way (≥3) — must NOT load
+    await t.tp(houston.x, houston.z, 'BOAT');
+    await t.ev('g.player.speed = 5');
+    await t.wait(0.4);
+    t.ok((await t.ev('g.missions.job.phase')) === 'pickup', 'load fired while still under way at the dock');
+    // slow to a stop at the dock — loads
+    await t.ev('g.player.speed = 0');
+    await t.until(`g.missions.job && g.missions.job.phase === 'haul'`, 8000);
+    t.ok(await t.ev('g.player.skiff.userData.cargo.visible'), 'skiff crate not visible after sea load');
+    t.ok(!(await t.ev('g.player.truck.userData.cargo.visible')), 'truck bed crate visible for a sea haul');
+  });
+
+  await t.check('sea job: travel lock holds mid-haul', async () => {
+    const { allLocked, hint } = await t.ev(`(() => {
+      g.travel.tab = 'Cities'; g.travel.render();
+      const btns = [...document.querySelectorAll('#travel .poi-list button')];
+      return { allLocked: btns.length > 0 && btns.every((b) => b.disabled),
+               hint: document.querySelector('#travel .hint').textContent };
+    })()`);
+    t.ok(allLocked, 'some city button still enabled mid-sea-haul');
+    t.ok(hint.includes('Cargo aboard'), `hint: "${hint}"`);
+  });
+
+  await t.check('sea job: deliver at the destination dock pays the all-water bonus', async () => {
+    const corpus = await dockXZ(t, 'corpus');
+    const bank0 = await t.ev('g.gameplay.save.bank');
+    await t.tp(corpus.x, corpus.z, 'BOAT');
+    await t.ev('g.player.speed = 0');
+    await t.until(`document.getElementById('toast').textContent.includes('all-water bonus')`, 8000);
+    const toast = await t.ev(`document.getElementById('toast').textContent`);
+    t.ok(toast.includes('×1.5 all-water bonus'), `delivery toast missing the all-water bonus note: "${toast}"`);
+    t.ok(!(await t.ev('g.missions.job')), 'job survived a delivered sea haul');
+    const bank1 = await t.ev('g.gameplay.save.bank');
+    t.ok(bank1 > bank0, `sea delivery did not pay: ${bank0} → ${bank1}`);
+    t.ok(!(await t.ev('g.player.skiff.userData.cargo.visible')), 'skiff crate still visible after delivery');
   });
 
   // W7 — every name on the board must resolve. An unresolvable `from` silently

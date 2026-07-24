@@ -3,7 +3,7 @@
 // arrival: cities land you on a road in drive mode, sights hover in fly mode.
 import { GEO, nearestRoad } from './geo.js';
 import { LANDMARKS } from './gameplay.js';
-import { SHOP, ROMAN, PAINTS, PAINT_PRICE, buy, buyPaint, applyGear, gearLevel } from './shop.js';
+import { SHOP, ROMAN, PAINTS, PAINT_PRICE, BOAT_PAINTS, BOAT_PAINT_PRICE, buy, buyPaint, buyBoatPaint, applyGear, gearLevel } from './shop.js';
 import { TOWERED } from './radio.js';
 import { AIRPORTS } from './airports.js';
 import { PASSPORT_STONES } from './shoulder.js';
@@ -217,6 +217,8 @@ export class TravelMenu {
       const label = j.kind === 'charter' ? j.manifest : j.cargo;
       const step = j.kind === 'charter'
         ? `land at <b>${j.phase === 'pickup' ? j.from : j.to}</b>`
+        : j.kind === 'sea'
+        ? `dock at <b>${j.phase === 'pickup' ? j.from : j.to}</b>`
         : j.phase === 'pickup' ? `load in <b>${j.from}</b>` : `deliver to <b>${j.to}</b>`;
       html += `<div style="grid-column:1/-1;background:#243046;border:1px solid rgba(255,211,92,.4);border-radius:8px;padding:10px 12px;font-size:1.3rem">
         ${j.icon} <b>${label}</b> — ${j.from} → ${j.to} · ${j.km} km · $${j.pay}${j.rush ? ' · 🔥 RUSH' : ''}<br>
@@ -264,6 +266,14 @@ export class TravelMenu {
         `<button data-i="paint:${i}" title="${p.name}" ${i === cur || save.bank < PAINT_PRICE ? 'disabled' : ''}
           style="width:2.8rem;height:2rem;padding:0;border-radius:5px;background:#${p.hex.toString(16).padStart(6, '0')};${i === cur ? 'outline:2px solid #ffd35c' : ''}"></button>`).join('')}
       </div></div>`;
+    // boatyard: same repeatable-coat idiom, own save key (save.gear.hullpaint)
+    const curHull = save.gear.hullpaint ?? 0;
+    html += `<div style="grid-column:1/-1;background:#243046;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:8px 12px;font-size:1.3rem">
+      ⚓ <b>Boatyard</b> — $${BOAT_PAINT_PRICE} a coat · wearing ${BOAT_PAINTS[curHull].name}<br>
+      <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${BOAT_PAINTS.map((p, i) =>
+        `<button data-i="hullpaint:${i}" title="${p.name}" ${i === curHull || save.bank < BOAT_PAINT_PRICE ? 'disabled' : ''}
+          style="width:2.8rem;height:2rem;padding:0;border-radius:5px;background:#${p.hex.toString(16).padStart(6, '0')};${i === curHull ? 'outline:2px solid #ffd35c' : ''}"></button>`).join('')}
+      </div></div>`;
     this.el.querySelector('.poi-list').innerHTML = html;
     this.el.querySelector('.hint').textContent =
       'Deliveries pay for upgrades — effects apply instantly and persist with your save.';
@@ -274,6 +284,10 @@ export class TravelMenu {
       const r = buyPaint(this.gameplay.save, +id.slice(6));
       if (!r) return;
       this.onToast?.(`🎨 Fresh coat of ${r.name} (−$${r.price})`);
+    } else if (id.startsWith('hullpaint:')) {
+      const r = buyBoatPaint(this.gameplay.save, +id.slice(10));
+      if (!r) return;
+      this.onToast?.(`⚓ Fresh coat of ${r.name} on the hull (−$${r.price})`);
     } else {
       const r = buy(this.gameplay.save, id);
       if (!r) return;

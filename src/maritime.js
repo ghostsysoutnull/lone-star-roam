@@ -153,6 +153,11 @@ export class MaritimeSystem {
     this.onIdentity = null; // (text) => placard toast (trains idiom)
     this.onChatter = null;  // (text, voice) => audio.radio + hud.subtitle
     this.vhfFloor = 0;      // global floor between any two channel-16 lines
+    // Sea-Industry W3: shrimp rig hold — crate count is the check surface,
+    // catchT is the trolling accumulator (paused, never reset, on a brief gap)
+    this.catch = 0;
+    this.catchT = 0;
+    this.onCatch = null;    // (pay, msg) => toast (+bank when pay > 0)
     this.buoy = this.buildBuoy(scene);
     // Water Vehicles W3: small-craft marinas + ICW channel markers
     this.marinas = this.buildMarinas(scene);
@@ -865,7 +870,7 @@ export class MaritimeSystem {
     const px = player.pos.x, pz = player.pos.z;
     this.vhfFloor -= dt;
     let chatFired = false;
-    const vhfRange = player.mode === 'BOAT' ? VHF_BOAT_R : VHF_R;
+    const vhfRange = player.perks?.vhf ? Infinity : player.mode === 'BOAT' ? VHF_BOAT_R : VHF_R;
     const vessels = (fn) => { for (const s of this.ships) fn(s); for (const b of this.shrimpers) fn(b); };
     vessels((s) => {
       const d = Math.hypot(s.g.position.x - px, s.g.position.z - pz);
@@ -881,6 +886,40 @@ export class MaritimeSystem {
       this.onChatter?.(line, s.id.voice);
       this.vhfFloor = VHF_FLOOR;
     });
+    if (player.perks?.shrimprig) this.updateShrimpRig(dt, player);
+  }
+
+  // Sea-Industry W3: the shrimp rig perk — troll a fishing port's ground
+  // slow and steady, then run the hold to that port's home dock for pay.
+  updateShrimpRig(dt, player) {
+    const px = player.pos.x, pz = player.pos.z, spd = Math.abs(player.speed);
+    if (player.mode === 'BOAT' && spd >= 1.5 && spd <= 6 && this.catch < 6) {
+      const onGround = FISHING.some((port) => {
+        const [gx, gz] = port.pts[port.pts.length - 1];
+        return Math.hypot(gx - px, gz - pz) < 60;
+      });
+      if (onGround) {
+        this.catchT += dt;
+        if (this.catchT >= 12) {
+          this.catchT -= 12;
+          this.catch++;
+          if (this.catch === 1) this.onCatch?.(0, '🦐 First crate iced down — troll the ground for more');
+          else if (this.catch === 6) this.onCatch?.(0, '🦐 Hold full (6 crates) — run it to a fishing-port dock');
+        }
+      }
+    }
+    if (player.mode === 'BOAT' && spd < 3 && this.catch > 0) {
+      const home = FISHING.some((port) => {
+        const [hx, hz] = port.pts[0];
+        return Math.hypot(hx - px, hz - pz) < 30;
+      });
+      if (home) {
+        const n = this.catch, pay = n * 40;
+        this.catch = 0;
+        this.catchT = 0;
+        this.onCatch?.(pay, `💵 Shrimp landed — ${n} crate${n === 1 ? '' : 's'}, +$${pay}`);
+      }
+    }
   }
 
   // the fleet's day: moored (night) → outbound at dawn → trawling the ground

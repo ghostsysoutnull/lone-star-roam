@@ -142,6 +142,12 @@ async function boot() {
   // Sea W2: vessel placards + channel 16 (the trains idiom, sea register)
   maritime.onIdentity = (text) => hud.toast(text);
   maritime.onChatter = (text, voice) => { audio.radio(text, { voice }); hud.subtitle(text, `📻 channel 16`); };
+  // Sea-Industry W3: shrimp rig payout + fish finder sonar toasts
+  maritime.onCatch = (pay, msg) => {
+    if (pay > 0) { gameplay.save.bank += pay; gameplay.persist(); audio.chime('cash'); }
+    hud.toast(msg);
+  };
+  animals.onSonar = (msg) => hud.toast(msg);
   traffic.onHonk = (type) => audio.honk(type);
   traffic.groundYAt = (x, z) => groundYAt(x, z) ?? brandGroundYAt(x, z);
   animals.onSound = (kind) => audio[kind]?.();
@@ -407,7 +413,8 @@ async function boot() {
     rabbits.update(dt, player.pos, player.mode); perf.lap('rabbits');
     ATMOS.ufo = ufo.near;
     radio.update(dt, player, aviation, sky); perf.lap('radio');
-    animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z)); perf.lap('animals');
+    animals.update(dt, player.pos.x, player.pos.z, player.pos.y - hAt(player.pos.x, player.pos.z));
+    animals.sonar(player, dt); perf.lap('animals');
     bats.update(dt, player.pos.x, player.pos.z, sky.t); perf.lap('bats');
     turtles.update(dt, player.pos.x, player.pos.z, sky.t, sky.days); perf.lap('turtles');
     audio.lap(beachAt(player.pos.x, player.pos.z) ? 1 : 0); // shore-lap term (W2)

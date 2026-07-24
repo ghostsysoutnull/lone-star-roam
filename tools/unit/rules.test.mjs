@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { pickRoute, routeProblems, scheduleAirport } from '../../src/aviation-rules.js';
-import { charterOfferTerms, groundOfferTerms, missionPayout, OVERSIZE_CAP, oversizeBonus, oversizeOfferTerms } from '../../src/mission-rules.js';
+import { charterOfferTerms, groundOfferTerms, missionPayout, OVERSIZE_CAP, oversizeBonus, oversizeOfferTerms, seaOfferTerms } from '../../src/mission-rules.js';
 
 test('aviation route helpers reject unresolved routes and select by weight', () => {
   const airports = [{ id: 'AAA' }, { id: 'BBB' }, { id: 'MIL', military: true }];
@@ -44,6 +44,18 @@ test('mission offer terms and payout modifiers retain their shared rounding rule
   assert.equal(missionPayout(175, 1.2, false, true), 315);
   assert.equal(missionPayout(175, 1.2, true, true), 160);
   assert.equal(missionPayout(175, 1.2, true), 105);
+});
+
+test('sea offer terms pay a premium per water mile over ground, with a generous deadline', () => {
+  assert.deepEqual(seaOfferTerms(1000, false), { km: 100, pay: 290, deadline: 233 });
+  assert.deepEqual(seaOfferTerms(1000, true), { km: 100, pay: 380, deadline: 175 });
+  for (const dist of [300, 1200, 3200, 6500]) {
+    const sea = seaOfferTerms(dist, false), ground = groundOfferTerms(dist, false);
+    assert.equal(sea.km, ground.km); // same distance→km rule, only pay/deadline differ
+    assert.ok(sea.pay > ground.pay, `sea pay ${sea.pay} not above ground pay ${ground.pay} at dist ${dist}`);
+    assert.ok(sea.deadline >= dist / 24 + 60, `sea deadline ${sea.deadline} too tight at dist ${dist}`);
+    assert.equal(sea.pay % 5, 0, `sea pay ${sea.pay} not rounded to $5`);
+  }
 });
 
 test('oversize offer terms and the steady-haul bonus follow the speed-over-time cap rule', () => {

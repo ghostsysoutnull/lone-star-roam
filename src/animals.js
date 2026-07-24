@@ -217,6 +217,11 @@ export class AnimalSystem {
     this.seaFlocks = [];
     this.gullGroup = null; // lazy pool, built on first working shrimper in range
     this.gulls = [];
+    // Sea-Industry W3: fish finder — one reused ping ring, lazy-built
+    this.onSonar = null;   // (msg) => toast
+    this.sonarCd = 0;
+    this.sonarRing = null;
+    this.sonarFade = 0;
   }
 
   update(dt, px, pz, py = 0) {
@@ -604,6 +609,43 @@ export class AnimalSystem {
 
     this.scene.add(group);
     this.live.set(key, { group, animals });
+  }
+
+  // Sea-Industry W3: fish finder — BOAT + perk only, 60u scan of live `sea`
+  // rows (skips event-only rows like the gull), 20s cooldown, a fading ring
+  // on the water at the contact. Ring fade drives every frame regardless of
+  // gate state so a live ping still dies out if the perk/mode drops mid-fade.
+  sonar(player, dt) {
+    if (this.sonarRing) {
+      this.sonarFade = Math.max(0, this.sonarFade - dt / 6);
+      this.sonarRing.material.opacity = this.sonarFade * 0.6;
+      this.sonarRing.visible = this.sonarFade > 0;
+    }
+    this.sonarCd -= dt;
+    if (player.mode !== 'BOAT' || !player.perks?.fishfinder || this.sonarCd > 0) return;
+    const px = player.pos.x, pz = player.pos.z;
+    let best = null, bd = 60;
+    for (const { animals } of this.live.values())
+      for (const a of animals) {
+        const spec = SPECIES[a.species];
+        if (!spec?.sea || spec.event) continue;
+        const d = Math.hypot(a.g.position.x - px, a.g.position.z - pz);
+        if (d < bd) { bd = d; best = a; }
+      }
+    if (!best) return;
+    this.sonarCd = 20;
+    this.onSonar?.(`🐟 Sonar contact — ${SPECIES[best.species].name}`);
+    if (!this.sonarRing) {
+      this.sonarRing = new THREE.Mesh(
+        new THREE.RingGeometry(1.2, 1.6, 24),
+        new THREE.MeshBasicMaterial({ color: 0x6ad8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide })
+      );
+      this.sonarRing.rotation.x = -Math.PI / 2;
+      this.scene.add(this.sonarRing);
+    }
+    this.sonarRing.position.set(best.g.position.x, SEA_Y + 0.05, best.g.position.z);
+    this.sonarFade = 1;
+    this.sonarRing.visible = true;
   }
 
   // Debug-only lever (the tours 🐻 button): conjure one animal near (x,z)

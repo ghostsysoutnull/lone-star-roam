@@ -39,3 +39,14 @@ export function oversizeOfferTerms(dist) {
 export function oversizeBonus(maxSpd, cap, flew) {
   return !flew && maxSpd <= cap;
 }
+
+// Sea-Industry W3 — the shrimp/cargo dock haul. Pays a touch more per km than
+// a ground job (water miles are the whole pitch) with a generous deadline
+// (12 u/s cruise assumption, slower than a road haul's).
+export function seaOfferTerms(dist, rush) {
+  return {
+    km: Math.round(dist * 0.1),
+    pay: roundMoney(70 + dist * 0.1 * 2.2 * (rush ? 1.4 : 1)),
+    deadline: Math.round((dist / 12 + 150) * (rush ? 0.75 : 1)),
+  };
+}

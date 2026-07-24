@@ -70,6 +70,15 @@ graduate here (and out of `NEXT_SESSION.md`).
   at use (`missions.site(id)`) and an orphaned id self-clears through
   `target()` — the city-rename lesson; never hardcode a site's coords into
   a job.
+- **Sea-track stable ids and seed streams** (Sea-Industry, 2026-07-23):
+  `save.ports` is the Ports log's own key (12th collectible) — never folded
+  into the Energy log. Sea-job `fromId`/`toId` are `GEO.sea.ports` ids
+  resolved at use (the HEROES idiom above — an orphaned id self-clears).
+  `shipid:` and `shrimper:` seed streams are shipped vessel identity —
+  never rename. Boat-shop knobs follow the index-0-is-stock law, but the
+  stock anchor lives in vehicle.js's `perks` defaults (`boatCap: 24`,
+  `boatAccel: 10`), not standalone consts — `boat.mjs` pins 24/32
+  behaviorally.
 - **Slot switching is live, never a page reload** — the verify harness's
   context wipes localStorage on every navigation, so a reload-based switch
   is untestable and the hard requirement puts `select`/`newGame`/`rename`/
@@ -338,6 +347,28 @@ graduate here (and out of `NEXT_SESSION.md`).
 - **Animal region boxes are duplicated** (plains, Hill Country, coast):
   world.js and animals.js each hold their own region tables — change one,
   change both, or flora and fauna disagree about where a region is.
+- **Ships ride baked `GEO.sea` routes only** (Sea W1): the old hand-laid
+  LANE system is retired — never re-key or resurrect it; route changes are
+  a `tools/build-sea.mjs` rebake (the AIS-ridge gate asserts at bake time).
+- **Three ports are roadstead-only** (`berth: null` — Beaumont, Port
+  Arthur, Brownsville: their harbors are not game water at this scale).
+  Every dock consumer resolves `berth ?? roadstead` (maritime facing,
+  sea-job targets/arrival). Fishing-port work (shrimp-rig landings, fleet
+  homes) exists only at maritime.js `FISHING` entries.
+- **maritime.js `FISHING` path points are probe-verified water literals** —
+  never "simplify" them back to raw LL projections; harbor shorelines
+  render land at this scale (the first Brownsville ground sat south of the
+  Rio Grande, outside the world).
+- **Channel 16 has ONE transmitter** (maritime.js, the trains idiom): the
+  range gate is `VHF_R`/`VHF_BOAT_R`, lifted to Infinity by the W3 `vhf`
+  perk — extend the gate, never add a second transmitter or move it to
+  radio.js.
+- **Sea-surface legibility law** (W2.1 playtest rounds): a waterline
+  subject reads only by proud silhouette + motion cue + mini-world scale
+  (turtle dome, dolphin arc, ray wingtips, tarpon leap) — waterline-flush
+  geometry is invisible from the helm; Bruno's eye caught all three misses.
+  Budget a curved body and a motion cue for any new sea species or
+  floating prop.
 
 ## Verification
 

@@ -8,11 +8,12 @@ import * as THREE from 'three';
 import { GEO } from './geo.js';
 import { cityRadius } from './cities.js';
 import { AIRPORTS, onRunway, TD_AGL, TD_SPD } from './airports.js';
-import { charterOfferTerms, groundOfferTerms, missionPayout, OVERSIZE_CAP, oversizeBonus, oversizeOfferTerms } from './mission-rules.js';
+import { charterOfferTerms, groundOfferTerms, missionPayout, OVERSIZE_CAP, oversizeBonus, oversizeOfferTerms, seaOfferTerms } from './mission-rules.js';
 import { HEROES } from './energy.js';
 import { KEYS, slotKey } from './slots.js';
 
 const CHARTER_LIVERY = 0xe8a33d; // air-taxi accent, swapped in over the wings' stock color
+const DOCK_R = 25; // sea-job arrival radius (dock point, not a city's pop radius)
 
 // Texas-flavored cargo; `from` lists preferred origins and `to` preferred
 // destinations — BOTH must be real GEO city names (settled call 2: the board
@@ -105,9 +106,25 @@ const ENERGY_RUNS = [
     note: 'Came off a ship at the Corpus docks, longer than the trailer under it. Keep it under 72 mph the whole way and the escort pay is yours.' },
 ];
 
+// Sea-Industry W3 — dock-to-dock hauls. `from`/`to` are GEO.sea.ports ids
+// (resolved at use — the ENERGY_RUNS self-clearing idiom: an id that stops
+// existing just drops the run off the board, nothing crashes).
+const SEA_RUNS = [
+  { cargo: 'Container stack', icon: '📦', from: ['houston', 'galveston'], to: ['corpus', 'brownsville', 'beaumont'],
+    note: 'Boxes off the Bayport cranes, coastwise the slow way — the intermodal yard quoted three days and the water quotes one.' },
+  { cargo: 'Gulf crude', icon: '🛢', from: ['corpus'], to: ['portarthur', 'texascity', 'houston'],
+    note: 'Eagle Ford barrels out of the Corpus docks, bound for the crackers up the coast.' },
+  { cargo: 'Chemical drums', icon: '🧪', from: ['freeport'], to: ['houston', 'portarthur'],
+    note: 'Out of the Brazosport plants under placard — keep her steady, the manifest reads like a chemistry final.' },
+  { cargo: 'Project cargo, bulk', icon: '🏗', from: ['beaumont', 'brownsville'], to: ['houston', 'corpus'],
+    note: 'Heavy-lift pieces strapped on deck — Beaumont moves more military tonnage than any port in the country.' },
+  { cargo: 'Shrimp catch, iced', icon: '🦐', from: ['galveston', 'brownsville'], to: ['houston', 'corpus'],
+    note: 'The fleet’s morning off-loaded and iced — the fish houses pay by freshness, so the clock is the whole job.' },
+];
+
 // the npcs.js POOLS idiom — the board's content tables, exposed so the checks
 // can assert every city/airport name resolves instead of trusting the spelling
-export const POOLS = { CARGO, MANIFEST, REAL_ROUTES, ENERGY_RUNS };
+export const POOLS = { CARGO, MANIFEST, REAL_ROUTES, ENERGY_RUNS, SEA_RUNS };
 
 const fmt = (s) => `${Math.floor(Math.max(0, s) / 60)}:${String(Math.floor(Math.max(0, s) % 60)).padStart(2, '0')}`;
 
@@ -153,7 +170,13 @@ export class MissionSystem {
   // cityRadius to a fixed parked-truck distance in update()
   site(id) { const h = HEROES.find((x) => x.id === id); return h && { x: h.at[0], z: h.at[1], name: h.name, site: true }; }
   field(id) { const a = AIRPORTS.find((x) => x.id === id); return a && { x: a.at[0], z: a.at[1], a }; }
-  crate(on) { this.player.truck.userData.cargo.visible = !!on; }
+  // sea hauls ride the skiff foredeck crate, every other kind the truck bed —
+  // kind defaults off the live job so most callers just pass `on`; abandon()
+  // nulls the save first, so it passes the captured kind explicitly.
+  crate(on, kind = this.job?.kind) {
+    const mesh = kind === 'sea' ? this.player.skiff.userData.cargo : this.player.truck.userData.cargo;
+    mesh.visible = !!on;
+  }
   setLivery(on) {
     const w = this.player.wings.userData;
     w.mat.color.setHex(on ? CHARTER_LIVERY : w.stockColor);
@@ -163,6 +186,12 @@ export class MissionSystem {
   // charters — both shapes carry x/z so update()/hudInfo() stay kind-agnostic
   target(j) {
     if (j.kind === 'charter') return this.field(j.phase === 'pickup' ? j.fromId : j.toId);
+    if (j.kind === 'sea') {
+      const port = GEO.sea.ports.find((p) => p.id === (j.phase === 'pickup' ? j.fromId : j.toId));
+      if (!port) return null;
+      const dock = port.berth ?? port.roadstead;
+      return { x: dock[0], z: dock[1], port };
+    }
     if (j.kind === 'energy') {
       const [siteId, name] = j.phase === 'pickup' ? [j.siteFrom, j.from] : [j.siteTo, j.to];
       return siteId ? this.site(siteId) : this.city(name);
@@ -170,7 +199,7 @@ export class MissionSystem {
     return this.city(j.phase === 'pickup' ? j.from : j.to);
   }
 
-  genOffers() { return [...this.genGroundOffers(), ...this.genEnergyOffers(), ...this.genCharterOffers()]; }
+  genOffers() { return [...this.genGroundOffers(), ...this.genEnergyOffers(), ...this.genCharterOffers(), ...this.genSeaOffers()]; }
 
   // 4 offers: short / medium / long haul + a wildcard. Regenerated per delivery.
   genGroundOffers() {
@@ -292,6 +321,50 @@ export class MissionSystem {
     return offers;
   }
 
+  // 2 offers, one apiece from 2 distinct SEA_RUNS — dock points resolve off
+  // the live GEO.sea.ports table (berth when the harbor is game water, else
+  // the roadstead), same shape as genEnergyOffers().
+  genSeaOffers() {
+    const offers = [];
+    const pick = (a) => a[Math.floor(Math.random() * a.length)];
+    const runs = [...SEA_RUNS].sort(() => Math.random() - 0.5).slice(0, 2);
+    for (const run of runs) {
+      for (let tries = 0; tries < 30; tries++) {
+        const from = GEO.sea.ports.find((p) => p.id === pick(run.from));
+        const to = GEO.sea.ports.find((p) => p.id === pick(run.to));
+        if (!from || !to || from.id === to.id) continue;
+        if (offers.some((o) => o.fromId === from.id && o.toId === to.id)) continue;
+        const fd = from.berth ?? from.roadstead, td = to.berth ?? to.roadstead;
+        const dist = Math.hypot(td[0] - fd[0], td[1] - fd[1]);
+        const rush = Math.random() < 0.25;
+        offers.push({
+          kind: 'sea', cargo: run.cargo, icon: run.icon, note: run.note ?? null,
+          fromId: from.id, toId: to.id, from: from.name, to: to.name, rush, ...seaOfferTerms(dist, rush),
+        });
+        break;
+      }
+    }
+    return offers;
+  }
+
+  // debug/test hook (the forceEnergy idiom): inject a pinned sea run between
+  // two real ports. Clears any active job first so a Tours spot can chain it.
+  forceSea(fromId, toId) {
+    if (this.job) this.abandon();
+    const from = GEO.sea.ports.find((p) => p.id === fromId);
+    const to = GEO.sea.ports.find((p) => p.id === toId);
+    if (!from || !to) return null;
+    const run = SEA_RUNS.find((r) => r.from.includes(fromId) && r.to.includes(toId)) ?? SEA_RUNS[0];
+    const fd = from.berth ?? from.roadstead, td = to.berth ?? to.roadstead;
+    const dist = Math.hypot(td[0] - fd[0], td[1] - fd[1]);
+    const offer = {
+      kind: 'sea', cargo: run.cargo, icon: run.icon, note: run.note ?? null,
+      fromId, toId, from: from.name, to: to.name, rush: false, ...seaOfferTerms(dist, false),
+    };
+    this.accept(offer);
+    return offer;
+  }
+
   // debug/test hook (the charter force() idiom): inject an energy run of the
   // given type with PINNED endpoints — deterministic for Tours and verify.
   // Clears any active job first so a Tours spot can always chain it.
@@ -341,6 +414,8 @@ export class MissionSystem {
     if (offer.kind === 'charter') {
       this.setLivery(true);
       this.onToast?.(`✈️ Charter taken — fly to ${offer.from} and land to pick up ${offer.icon} ${offer.manifest}`);
+    } else if (offer.kind === 'sea') {
+      this.onToast?.(`⚓ Sea job taken — dock at ${offer.from} to load ${offer.icon} ${offer.cargo}`);
     } else {
       this.onToast?.(`📦 Job taken — load ${offer.icon} ${offer.cargo} in ${offer.from}`);
     }
@@ -350,12 +425,13 @@ export class MissionSystem {
     if (!this.job) return;
     const j = this.job;
     this.save.job = null;
-    if (j.kind === 'charter') this.setLivery(false); else this.crate(false);
+    if (j.kind === 'charter') this.setLivery(false); else this.crate(false, j.kind);
     this.arrow.visible = false;
     this.gp.persist();
     this.offers = this.genOffers();
     const label = j.kind === 'charter' ? j.manifest : j.cargo;
-    this.onToast?.(`${j.kind === 'charter' ? '✈️' : '📦'} ${label} job abandoned`);
+    const icon = j.kind === 'charter' ? '✈️' : j.kind === 'sea' ? '⚓' : '📦';
+    this.onToast?.(`${icon} ${label} job abandoned`);
   }
 
   update(dt, pos, mode, agl) {
@@ -367,7 +443,9 @@ export class MissionSystem {
       if (j.kind !== 'charter' && mode === 'FLY' && !j.flew) {
         j.flew = true;
         if (j.cap != null) j.capBlown = true; // one toast, not two — flying kills the same bonus
-        this.onToast?.(j.cap != null ? '✈️ Blade went airborne — steady-haul bonus lost' : '✈️ Cargo went airborne — road bonus lost');
+        this.onToast?.(j.cap != null ? '✈️ Blade went airborne — steady-haul bonus lost'
+          : j.kind === 'sea' ? '✈️ Cargo went airborne — all-water bonus lost'
+          : '✈️ Cargo went airborne — road bonus lost');
       }
       // oversize speed-over-time: tracked every frame, not at arrival — a
       // burst over the cap can never slip between arrival samples
@@ -403,6 +481,13 @@ export class MissionSystem {
       else this.deliver(j);
       return;
     }
+    if (j.kind === 'sea') {
+      // dock only — a passing boat above cruising way on doesn't count as arrival
+      if (mode !== 'BOAT' || Math.abs(this.player.speed) >= 3) return;
+      const d = Math.hypot(tgt.x - pos.x, tgt.z - pos.z);
+      if (d < DOCK_R) { if (j.phase === 'pickup') this.load(j); else this.deliver(j); }
+      return;
+    }
     if (agl > 12) return; // must be on (or near) the ground, same as city visits
     const d = Math.hypot(tgt.x - pos.x, tgt.z - pos.z);
     // hero sites use a fixed parked-truck radius; cities keep their pop radius
@@ -420,6 +505,9 @@ export class MissionSystem {
     this.gp.persist();
     if (j.kind === 'charter') {
       this.onToast?.(`✈️ ${j.icon} ${j.manifest} aboard — logged in at ${j.from}. Next stop ${j.to} in ⏱ ${fmt(j.deadline)}${j.rush ? ' — 🔥 rush job' : ''}`);
+    } else if (j.kind === 'sea') {
+      this.crate(true);
+      this.onToast?.(`${j.icon} ${j.cargo} aboard — ${j.to} in ⏱ ${fmt(j.deadline)}${j.rush ? ' — 🔥 rush job' : ''}`);
     } else {
       this.crate(true);
       const capNote = j.cap != null ? ` — 🐢 keep it under ${Math.round(j.cap * 2.4)} mph` : '';
@@ -453,10 +541,15 @@ export class MissionSystem {
       return;
     }
     // oversize hauls earn the ×1.5 by staying under the cap the whole way;
-    // every other ground haul earns it by staying grounded
+    // every other ground/sea haul earns it by staying grounded/afloat
     const bonus = j.cap != null ? oversizeBonus(j.maxSpd ?? 0, j.cap, !!j.flew) : !j.flew;
     const payout = missionPayout(j.pay, rig, late, bonus);
     this.crate(false);
+    if (j.kind === 'sea') {
+      const notes = [bonus && '×1.5 all-water bonus', late && 'late — half pay'].filter(Boolean).join(', ');
+      this.finishJob(payout, `💵 ${j.cargo} landed at ${j.to}! +$${payout}${notes ? ` (${notes})` : ''}`);
+      return;
+    }
     const notes = [bonus && (j.cap != null ? '×1.5 steady-haul bonus' : '×1.5 road bonus'), late && 'late — half pay'].filter(Boolean).join(', ');
     this.finishJob(payout, `💵 ${j.cargo} delivered! +$${payout}${notes ? ` (${notes})` : ''}`);
   }
@@ -469,13 +562,20 @@ export class MissionSystem {
     if (!tgt) return null;
     const km = Math.round(Math.hypot(tgt.x - pos.x, tgt.z - pos.z) * 0.1);
     const label = j.kind === 'charter' ? j.manifest : j.cargo;
-    if (j.phase === 'pickup')
+    if (j.phase === 'pickup') {
+      if (j.kind === 'sea') return { text: `⚓ dock at ${j.from} to load ${j.icon} ${label} · ${km} km`, late: false, target: [tgt.x, tgt.z] };
       return {
         text: j.kind === 'charter' ? `${j.icon} land at ${j.from} to pick up ${label} · ${km} km` : `📦 load ${j.icon} ${label} in ${j.from} · ${km} km`,
         late: false, target: [tgt.x, tgt.z],
       };
+    }
     const late = j.left <= 0;
     const capTag = j.cap != null ? (j.capBlown ? ' · 🐢 bonus lost' : ` · 🐢 ≤${Math.round(j.cap * 2.4)} mph`) : '';
+    if (j.kind === 'sea')
+      return {
+        text: `${j.icon} ${label} → dock at ${j.to} · ${km} km · ${late ? '⏱ LATE' : '⏱ ' + fmt(j.left)}${j.rush ? ' 🔥' : ''}`,
+        late, urgent: !late && j.left < 45, target: [tgt.x, tgt.z],
+      };
     return {
       text: j.kind === 'charter'
         ? `${j.icon} ${label} → land at ${j.to} · ${km} km · ${late ? '⏱ LATE' : '⏱ ' + fmt(j.left)}${j.rush ? ' 🔥' : ''}`

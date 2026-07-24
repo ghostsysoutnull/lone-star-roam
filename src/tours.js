@@ -28,6 +28,13 @@ export const TOURS = [
         S('🦐 the fleet works the grounds', [4752, 1993], { mode: 'BOAT', time: 0.5, act: 'shrimpFleet', note: 'the Galveston pair trawls this ground at midday, outriggers down, gulls wheeling over the nets — dawn-out, dusk-home on the real clock; idle in close for the gull log entry' }),
         S('🐬 life offshore', [4200, 2350], { mode: 'BOAT', time: 0.35, act: 'seaLife', note: 'an offshore pod, a surfacing green turtle, a cownose ray, and a rolling tarpon conjured around the boat — all five W2 species log as critters (the gull logs at the shrimp fleet)' }),
       ] },
+      { wave: 'W3 — the working boat', spots: [
+        S('⚓ sea haul — Houston berth', [4293.9, 1431.3], { mode: 'BOAT', time: 0.35, act: 'seaJob', note: 'a container run Houston → Corpus forced onto the board — ease up to the dock under 3 kn to load; sea jobs pay by the water mile and the ×1.5 all-water bonus survives as long as you never fly' }),
+        S('🦐 shrimp rig — Galveston ground', [4752, 1993], { mode: 'BOAT', time: 0.5, act: 'seaGear', note: 'full boat gear granted — troll the ground slow (under ~6) and the rig ices a crate every dozen seconds; run the hold back to a fishing-port dock and the catch pays' }),
+        S('🐟 fish finder — sonar contact', [4200, 2350], { mode: 'BOAT', time: 0.35, act: 'sonar', note: 'the W2 sea life conjured around the boat and the finder granted — the sonar pings each contact inside 60 units with a ring on the water' }),
+        S('🏮 running lights', [4512.8, 1889], { mode: 'BOAT', time: 0.98, act: 'seaGear', note: 'red over port, green over starboard, white astern — the skiff is legal after dark; they douse at sunrise' }),
+        S('📻 handheld 16 from the cab', [1676.4, 815.8], { mode: 'DRIVE', time: 0.35, act: 'handheld16', note: 'the handheld lifts the range gate entirely — channel 16 keys up from the whole Gulf, heard here in Austin traffic' }),
+      ] },
     ],
   },
   {
