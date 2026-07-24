@@ -28,10 +28,11 @@ queued work in `BACKLOG.md`; per-wave scoreboard in `LEDGER.md`.
   **Sidecar**: `data-scout` first mission — coastal city-building scatter
   vs water audit (BACKLOG "Later" entry; findings-only, disjoint from the
   wave, may run in parallel).
-- **Then**: rewrite the briefing for the next pick (slot export/import
-  returns to queue head); wave-end report carries the pilot verdicts
-  (grill keep/kill, multi-chunk economics) and, if multi-chunk ran, adopts
-  the `fable+sonnet×N` LEDGER model-column convention.
+- **Then**: close via the **`/wave-close` skill** (first exercise —
+  shipped 2026-07-23); its report carries the pilot verdicts (grill
+  keep/kill, multi-chunk economics, scout, and the skill itself) and the
+  `fable+sonnet×N` ledger convention if multi-chunk ran; briefing rewrite
+  puts slot export/import back at queue head.
 
 Gotchas carried over: `tools/judge-shot.sh` broken (Copilot rejects the
 zero-tools lockdown — staged shots judged by Bruno only); verify

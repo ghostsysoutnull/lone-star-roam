@@ -112,13 +112,12 @@ handoff wave** as measured pilots, not law:
   (the 2026-07-22 law) as the trial. If it holds without friction, consider
   a commit-guard hook (block `git commit` absent an explicit go-ahead
   marker) as the second.
-- **Deferred to whichever session touches wave-close next** (Bruno accepted
-  2026-07-23): `/wave-close` skill (the fixed wave-end checklist —
-  performance report → ledger line → briefing rewrite → doc sweep — as a
-  checked-in skill instead of from-memory execution; `/wave-plan` is the
-  lower-priority second) and the LEDGER model-column convention
-  `fable+sonnet×N` for multi-chunk waves (adopt at the first multi-chunk
-  wave's close).
+- ~~`/wave-close` skill~~ — shipped 2026-07-23 same day it was queued
+  (Bruno pulled it forward so Map W2 exercises it rather than creates it):
+  `.claude/skills/wave-close/SKILL.md`, the fixed wave-end checklist with
+  the `fable+sonnet×N` ledger convention baked in. Still queued:
+  **`/wave-plan`** (plan template + contract-file scaffold, lower
+  priority — build when a spec session next wants it).
 
 ## Dev-process — external-agents retake (parked 2026-07-21, queued 2026-07-22)
 
