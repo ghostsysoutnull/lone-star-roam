@@ -82,6 +82,26 @@ until a probe confirms them.
   Full method, scoring and the model comparison: `VISION_EXTERNAL_AGENTS.md`
   → Gate result and Round A.
 
+## Dev-process — wave-protocol amendment pilots (queued 2026-07-23)
+
+The amendment itself shipped 2026-07-23 (CLAUDE.md: risk-kernel grading,
+JSON contract files, multi-chunk wave-coder with a single closer, challenge
+triage; new `data-scout` agent definition). These two ride the **next
+handoff wave** as measured pilots, not law:
+
+- **Plan-grill pilot**: before spawning `wave-coder`, one adversarial review
+  of the plan + contract file by a strong-model subagent (Fable/Opus, high
+  effort, one round, structured output: holes / ambiguities / unverified
+  assumptions — never a dialogue). Handoff waves only; the plan is the full
+  contract there, so contract holes are the dominant failure mode. Keep only
+  if it finds a real hole; an all-clear carries no evidential weight (the
+  Gemini false-all-clear precedent, `VISION_EXTERNAL_AGENTS.md`).
+- **Law-enforcing hooks pilot**: one PreToolUse hook blocking
+  `verify.mjs`/`status.sh`/`verify-selftest.mjs` piped through `tail`/`head`
+  (the 2026-07-22 law) as the trial. If it holds without friction, consider
+  a commit-guard hook (block `git commit` absent an explicit go-ahead
+  marker) as the second.
+
 ## Dev-process — external-agents retake (parked 2026-07-21, queued 2026-07-22)
 
 - **External-model review lane (codex)** — assessment done, no integration
